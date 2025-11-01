@@ -1,0 +1,315 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  googleId          String?   @unique
+  firstName         String?
+  lastName          String?
+  phone             String?
+  passwordHash      String?
+  avatar            String?
+  language          String    @default("en") // en, uz, ru
+  timezone          String?
+  currency          String    @default("USD")
+  emailVerified     Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  visaApplications  VisaApplication[]
+  documents         UserDocument[]
+  payments          Payment[]
+  preferences       UserPreferences?
+  activityLog       ActivityLog[]
+  chatSessions      ChatSession[]
+  chatMessages      ChatMessage[]
+  aiUsageMetrics    AIUsageMetrics[]
+
+  @@index([email])
+  @@index([googleId])
+}
+
+model UserPreferences {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  notificationsEnabled Boolean @default(true)
+  emailNotifications Boolean   @default(true)
+  pushNotifications Boolean    @default(true)
+  twoFactorEnabled  Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Country {
+  id                String    @id @default(cuid())
+  name              String    @unique
+  code              String    @unique // ISO 3166-1 alpha-2
+  flagEmoji         String
+  description       String?
+  requirements      String?   // JSON field with detailed requirements
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  visaTypes         VisaType[]
+  applications      VisaApplication[]
+
+  @@index([code])
+  @@index([name])
+}
+
+model VisaType {
+  id                String    @id @default(cuid())
+  countryId         String
+  name              String    // e.g., "Tourist Visa", "Work Visa"
+  description       String?
+  processingDays    Int       // Average processing time
+  validity          String    // Duration of visa validity
+  fee               Float     // In USD
+  requirements      String    // JSON with requirement details
+  documentTypes     String    // JSON array of required document types
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  country           Country   @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  applications      VisaApplication[]
+
+  @@unique([countryId, name])
+  @@index([countryId])
+}
+
+model VisaApplication {
+  id                String    @id @default(cuid())
+  userId            String
+  countryId         String
+  visaTypeId        String
+  status            String    @default("draft") // draft, submitted, approved, rejected, expired
+  progressPercentage Int      @default(0)
+  notes             String?
+  submissionDate    DateTime?
+  approvalDate      DateTime?
+  expiryDate        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country           Country   @relation(fields: [countryId], references: [id])
+  visaType          VisaType  @relation(fields: [visaTypeId], references: [id])
+  documents         UserDocument[]
+  payment           Payment?
+  checkpoints       Checkpoint[]
+
+  @@unique([userId, countryId, visaTypeId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Checkpoint {
+  id                String    @id @default(cuid())
+  applicationId     String
+  title             String    // e.g., "Document Verification", "Interview Scheduled"
+  description       String?
+  isCompleted       Boolean   @default(false)
+  order             Int
+  completedAt       DateTime?
+  dueDate           DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([isCompleted])
+}
+
+model DocumentType {
+  id                String    @id @default(cuid())
+  name              String    @unique // e.g., "Passport", "Bank Statement"
+  description       String?
+  supportedFormats  String    // JSON array ["pdf", "jpg", "png"]
+  maxFileSize       Int       // in MB
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([name])
+}
+
+model UserDocument {
+  id                String    @id @default(cuid())
+  userId            String
+  applicationId     String
+  documentName      String
+  documentType      String    // Type of document (e.g., "passport", "bank_statement")
+  fileUrl           String    // Firebase Storage URL
+  fileName          String
+  fileSize          Int       // In bytes
+  uploadedAt        DateTime  @default(now())
+  status            String    @default("pending") // pending, verified, rejected
+  verificationNotes String?
+  expiryDate        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([status])
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  userId            String
+  applicationId     String    @unique
+  amount            Float     // In USD
+  currency          String    @default("USD")
+  status            String    @default("pending") // pending, completed, failed, refunded
+  paymentMethod     String    // payme, uzum, click, stripe, card
+  transactionId     String?   @unique
+  orderId           String?
+  paymentGatewayData String?  // JSON with gateway response
+  paidAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AdminLog {
+  id                String    @id @default(cuid())
+  action            String    // create, update, delete, approve, reject
+  entityType        String    // User, VisaApplication, Payment, etc.
+  entityId          String
+  changes           String?   // JSON with before/after
+  performedBy       String    // Admin user ID
+  reason            String?
+  createdAt         DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([entityType])
+}
+
+model ActivityLog {
+  id                String    @id @default(cuid())
+  userId            String
+  action            String    // login, document_upload, application_submit
+  details           String?   // JSON with additional details
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime  @default(now())
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// AI/RAG MODELS
+// ============================================================================
+
+model Document {
+  id                String    @id @default(cuid())
+  title             String
+  content           String    @db.Text
+  type              String    // visa_requirement, guide, faq, requirement_detail
+  countryId         String?
+  visaTypeId        String?
+  source            String?   // Internal, External URL, User Uploaded
+  metadata          String?   // JSON with additional metadata
+  embedding         String?   // Vector embedding as JSON (for RAG)
+  isPublished       Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([type])
+  @@index([isPublished])
+  @@index([countryId])
+  @@index([visaTypeId])
+}
+
+model RAGChunk {
+  id                String    @id @default(cuid())
+  documentId        String
+  content           String    @db.Text
+  chunkIndex        Int       // Position in document
+  embedding         String?   // Vector embedding as JSON
+  metadata          String?   // JSON with source info
+  createdAt         DateTime  @default(now())
+
+  @@index([documentId])
+  @@index([chunkIndex])
+}
+
+model ChatSession {
+  id                String    @id @default(cuid())
+  userId            String
+  applicationId     String?   // null for general chat
+  title             String    @default("New Chat")
+  systemPrompt      String    @default("You are a helpful visa assistant for VisaBuddy. Provide accurate information about visa requirements and processes.")
+  messages          ChatMessage[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([applicationId])
+}
+
+model ChatMessage {
+  id                String    @id @default(cuid())
+  sessionId         String
+  userId            String
+  role              String    // "user" or "assistant"
+  content           String    @db.Text
+  sources           String?   // JSON array of RAG sources/references with URLs
+  model             String    @default("gpt-4")
+  tokensUsed        Int       @default(0)
+  responseTime      Int?      // milliseconds
+  feedback          String?   // thumbs_up, thumbs_down, detailed_feedback
+  createdAt         DateTime  @default(now())
+
+  session           ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AIUsageMetrics {
+  id                String    @id @default(cuid())
+  userId            String
+  date              DateTime  @db.Date
+  totalRequests     Int       @default(0)
+  totalTokens       Int       @default(0)
+  totalCost         Float     @default(0)
+  avgResponseTime   Int       @default(0)
+  errorCount        Int       @default(0)
+  createdAt         DateTime  @default(now())
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+}

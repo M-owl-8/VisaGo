@@ -1,0 +1,24 @@
+// Fix expo modules configuration
+allprojects {
+    def expoModuleNames = [
+        'expo', 'expo-modules-core', 'expo-application', 'expo-constants', 
+        'expo-file-system', 'expo-font', 'expo-keep-awake', 'expo-splash-screen',
+        'expo-json-utils', 'expo-permissions'
+    ]
+    
+    afterEvaluate {
+        if (project.name in expoModuleNames && project.hasProperty('android')) {
+            println("Fixing ${project.name} - adding buildConfig feature")
+            try {
+                project.android.buildFeatures {
+                    buildConfig = true
+                }
+                if (!project.android.compileSdkVersion) {
+                    project.android.compileSdkVersion 34
+                }
+            } catch (Exception e) {
+                println("Note: ${project.name} already has buildFeatures: ${e.message}")
+            }
+        }
+    }
+}

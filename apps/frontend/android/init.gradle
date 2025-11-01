@@ -1,0 +1,50 @@
+// Gradle init script to fix Expo modules early in the build lifecycle
+// This runs before settings.gradle is evaluated
+
+gradle.settingsEvaluated { settings ->
+    println("⚙️  Fixing Expo modules configuration...")
+    
+    settings.gradle.projectsLoaded { gradle ->
+        gradle.allprojects { project ->
+            // List of Expo modules that commonly have buildConfig issues
+            def expoModules = [
+                'expo', 'expo-modules-core', 'expo-application', 'expo-constants',
+                'expo-file-system', 'expo-font', 'expo-keep-awake', 'expo-blur',
+                'expo-camera', 'expo-haptics', 'expo-image-picker', 'expo-localization',
+                'expo-location', 'expo-permissions', 'expo-sharing', 'expo-sqlite',
+                'expo-status-bar', 'react-native', 'react-native-gesture-handler'
+            ]
+            
+            if (project.name in expoModules) {
+                project.afterEvaluate { p ->
+                    println("  ✓ Fixing module: ${project.name}")
+                    
+                    if (p.hasProperty('android')) {
+                        // Enable buildConfig feature
+                        try {
+                            p.android.buildFeatures.buildConfig = true
+                        } catch (Exception e) {
+                            try {
+                                p.android.buildFeatures {
+                                    buildConfig = true
+                                }
+                            } catch (Exception e2) {
+                                println("    ⚠️  Could not set buildFeatures: ${e2.message}")
+                            }
+                        }
+                        
+                        // Set compileSdkVersion if missing
+                        try {
+                            if (!p.android.compileSdkVersion) {
+                                p.android.compileSdkVersion 34
+                                println("    ✓ Set compileSdkVersion=34")
+                            }
+                        } catch (Exception e) {
+                            println("    ⚠️  Could not set compileSdkVersion: ${e.message}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

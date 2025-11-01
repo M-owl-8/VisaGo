@@ -1,0 +1,158 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║                                                                        ║
+║         VisaBuddy Android Build - IN PROGRESS                         ║
+║                                                                        ║
+║  The app is being built and deployed to your Android emulator        ║
+║                                                                        ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+
+CURRENT BUILD SEQUENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Step 1: Fixed dependencies
+   └─ Added @react-native-community/cli
+   └─ Reinstalled npm packages
+
+⏳ Step 2: Metro Bundler Starting
+   Terminal: Metro Bundler (Terminal 4)
+   Watch for: "Ready for changes" message
+   Status: Starting...
+
+⏳ Step 3: Android Build
+   Terminal: Android Build (Terminal 5)  
+   Watch for: "BUILD SUCCESSFUL"
+   Status: Building...
+
+⏳ Step 4: Deploy to Emulator
+   Target: Pixel_6 Android Emulator
+   Expected: App appears on screen
+
+
+TERMINAL REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Terminal 1: Backend API (Port 3000)
+Terminal 2: AI Service (Port 8001)
+Terminal 3: Frontend (Original - can close)
+Terminal 4: Metro Bundler (Watch this)
+Terminal 5: Android Build (Watch this)
+Emulator: Pixel_6 (Watch for app to appear)
+
+
+EXPECTED MESSAGES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+In Metro Terminal (Terminal 4), you should see:
+  
+  INFO    Bundled index.js and 1,234 modules
+  INFO    Serialized bundled index.js (12.3 MB) in 45s
+  LOG     Ready for changes
+  LOG     Listening on port 8081
+
+
+In Android Build Terminal (Terminal 5), you should see:
+
+  > Task :app:compileDebugKotlin
+  > Task :app:compileDebugJavaWithJavac
+  > Task :app:bundleDebugJsAndAssets
+  ✓ Built the app and connected to the device
+  ✓ Launching VisaBuddy on Android (visabuddy-mobile)
+
+
+On Your Emulator:
+  
+  [Android bootloader animation]
+  ↓
+  VisaBuddy app loading...
+  ↓
+  LOGIN SCREEN ✓
+
+
+TIMING BREAKDOWN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Now              Metro Starts
+│                (30-60 sec)
+│                    │
+│                    ├─ Bundling JS
+│                    │  (1-3 min)
+│                    │
+│                    └─ Ready for changes
+│                         │
+│                         ├─ Android compiles
+│                         │  (1-2 min)
+│                         │
+│                         └─ Deploys to emulator
+│                            (30-60 sec)
+│                              │
+└──────────────────────────────┘ App visible (5-10 min total)
+
+
+TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If Metro doesn't show "Ready for changes":
+  • Wait another 30-60 seconds
+  • Check for red error box in terminal
+  • If stuck: Close metro terminal and retry
+
+If Android build fails:
+  • Check for "BUILD SUCCESSFUL" before deploy
+  • Look for error messages about gradle or SDK
+  • Try: Close build terminal and retry
+
+If app won't deploy to emulator:
+  • Make sure emulator is RUNNING (check if Pixel_6 window open)
+  • Try: adb devices (in cmd) to verify connection
+  • Restart emulator if needed
+
+If nothing happens after 10 minutes:
+  • Check all 3 backend terminals are running
+  • Verify Android emulator still has home screen
+  • Check for errors in any of the 5 terminals
+
+
+NEXT STEPS WHEN APP APPEARS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Once you see the VisaBuddy login screen on the emulator:
+
+1. Tap: "Don't have account?"
+2. Enter email: test@example.com
+3. Enter password: password123
+4. Tap: "Register"
+5. Should see: HOME SCREEN ✓
+
+Then test all features:
+  ✓ Navigate to all tabs
+  ✓ Create visa application
+  ✓ Upload document
+  ✓ Chat with AI
+  ✓ Switch languages
+  ✓ View profile
+
+
+DO NOT CLOSE ANY TERMINALS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All 5 terminals must stay open:
+  • If any closes, that service/build stops
+  • You can minimize terminals to taskbar
+  • Closing any = need to restart everything
+
+If a terminal crashes:
+  • Go back to VisaBuddy folder
+  • Run: powershell -ExecutionPolicy Bypass -File LAUNCH_ALL.ps1
+  • This will restart all services
+
+
+CURRENT TIME SPENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Started:  Build sequence initiated
+Expected: App visible in ~5-10 minutes
+Elapsed:  (Check your watch!)
+
+
+Keep watching those terminals! You're almost there! 🚀

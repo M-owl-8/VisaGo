@@ -1,0 +1,176 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║                 VisaBuddy - Android Testing Quick Start                 ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 1: SETUP (One-time, 5 minutes)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Install dependencies:
+   
+   powershell -ExecutionPolicy Bypass -File c:\work\VisaBuddy\RUN_ANDROID.ps1
+
+2. Wait for output: "Setup Complete!"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 2: START SERVICES (Open 3 terminals)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPTION A: One-click launcher (easiest)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  powershell -ExecutionPolicy Bypass -File c:\work\VisaBuddy\LAUNCH_ALL.ps1
+
+  Then confirm emulator is running when prompted.
+
+
+OPTION B: Manual (if you want to see each step)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  TERMINAL 1:
+  ─────────────────────────────────────────
+  Set-Location "c:\work\VisaBuddy\apps\backend"
+  npm run dev
+  
+  TERMINAL 2:
+  ─────────────────────────────────────────
+  Set-Location "c:\work\VisaBuddy\apps\ai-service"
+  python -m uvicorn main:app --reload --port 8001
+  
+  TERMINAL 3:
+  ─────────────────────────────────────────
+  ⚠ WAIT: Start Android emulator FIRST
+     → Android Studio → Device Manager → Launch
+  
+  Set-Location "c:\work\VisaBuddy\apps\frontend"
+  npm run android
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 3: VERIFY STARTUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Check Terminal 1:  ✓ Server running on port 3000
+Check Terminal 2:  ✓ Uvicorn running on http://127.0.0.1:8001
+Check Terminal 3:  ✓ App building... (1-3 min) → App loaded on emulator
+Emulator:          ✓ Login screen visible
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QUICK TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Register:
+   → Click "Don't have account?"
+   → Email: test@example.com
+   → Password: password123
+   → Click Register
+
+2. Explore:
+   → Home tab: See welcome + stats
+   → Visas tab: Create visa application
+   → Chat tab: Ask AI questions
+   → Profile: Change language
+
+3. Test Features:
+   → Create visa → Japan/Tourist
+   → Upload document
+   → Send chat message
+   → Switch language (EN/UZ/RU)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  EXPECTED TIMINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Setup:              5 minutes
+Start Backend:      15 seconds
+Start AI:           10 seconds
+Build Android:      1-3 minutes (first time)
+Deploy to emulator: 30-60 seconds
+App loads:          30-60 seconds
+
+TOTAL:              ~5-10 minutes
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PREREQUISITES CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+System:
+  ✓ Node.js v20+      → node --version
+  ✓ npm v10+          → npm --version
+  ✓ Python 3.9+       → python --version
+  
+Tools:
+  ✓ Android Studio    → Download from google.com
+  ✓ Android Emulator  → In Android Studio
+  ✓ PostgreSQL        → Optional (will auto-create DB)
+
+Ports Available:
+  ✓ Port 3000   (Backend)
+  ✓ Port 8001   (AI Service)
+  ✓ Port 8081   (React Native)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WHAT YOU'LL TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Screens:
+  • Login / Register
+  • Home (with stats)
+  • Visa Selection
+  • Country Browser
+  • Document Upload
+  • Chat Interface
+  • Profile / Settings
+
+Features:
+  • User authentication
+  • Create visa applications
+  • Upload documents (PDF/JPG/PNG)
+  • AI chat with context
+  • Payment flow
+  • Multilingual UI (EN/UZ/RU)
+  • Offline capabilities
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Backend won't start:
+  → Kill: taskkill /F /IM node.exe
+  → Check: Port 3000 available
+  → Restart: npm run dev
+
+Frontend builds forever:
+  → This is normal first time (2-3 min)
+  → Let it finish - watch for progress
+  → Second builds are 30-60 sec
+
+Emulator won't start:
+  → Open Android Studio
+  → Device Manager → Launch emulator
+  → Wait 3-5 min for full boot
+
+App crashes:
+  → Check Terminal 1 for errors
+  → Try: npm start (instead of npm run android)
+  → Or: npm run android --reset-cache
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+START_TESTING_NOW.md              ← Read this first!
+QUICK_START_ANDROID.md            ← Detailed testing guide
+SPECIFICATION_COMPLIANCE.md       ← Full feature checklist
+SPEC_TO_CODE_MAPPING.md          ← Code reference
+
+RUN_ANDROID.ps1                   ← Setup script
+LAUNCH_ALL.ps1                    ← One-click launcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ready? Start with:
+
+  powershell -ExecutionPolicy Bypass -File c:\work\VisaBuddy\LAUNCH_ALL.ps1
+
+Let's test! 🚀

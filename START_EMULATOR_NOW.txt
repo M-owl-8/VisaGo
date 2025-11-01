@@ -1,0 +1,114 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║                                                                        ║
+║           Android Emulator - Quick Start                              ║
+║                                                                        ║
+║  Follow these steps to launch the Android emulator                    ║
+║                                                                        ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+
+STEP 1: Open Android Studio
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Click Start menu
+• Search for "Android Studio"
+• Click to open it
+
+(This may take 30-60 seconds to load)
+
+
+STEP 2: Open Device Manager
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Once Android Studio is open:
+
+• Look for right side panel with device icons
+• Click the phone/device icon (or Tools → Device Manager)
+• You should see a list of emulators
+
+
+STEP 3: Launch Emulator
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Find any emulator listed (e.g., "Pixel 5", "Nexus 5")
+• Click the "Launch" button (play icon) next to it
+• Emulator window will open
+
+
+STEP 4: Wait for Boot
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Emulator is booting - you'll see Android logo
+• This takes 2-3 minutes
+• Once you see the home screen with apps and clock:
+  ✓ Emulator is ready!
+
+
+STEP 5: Ready to Launch VisaBuddy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Once you see the Android home screen, run this in PowerShell:
+
+  powershell -ExecutionPolicy Bypass -File c:\work\VisaBuddy\LAUNCH_ALL.ps1
+
+That's it! The app will:
+  1. Start backend (Terminal 1)
+  2. Start AI service (Terminal 2)
+  3. Build and deploy to emulator (Terminal 3)
+  4. You'll see the app on your emulator screen!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏱️ TIMING SUMMARY:
+
+  Android Studio load:      30-60 seconds
+  Emulator boot:           2-3 minutes
+  Backend startup:         10-15 seconds
+  AI service startup:      10-15 seconds
+  App build + deploy:      1-3 minutes (first time)
+  ────────────────────────────────
+  Total from now:          ~7-12 minutes
+
+
+🎯 WHAT YOU'LL SEE:
+
+  After emulator boots:
+    ✓ Android home screen with apps
+    ✓ Clock showing correct time
+    ✓ Battery/signal indicators
+
+  After running LAUNCH_ALL.ps1:
+    ✓ 3 PowerShell terminals open
+    ✓ Backend starts and shows "Server running on port 3000"
+    ✓ AI service shows "Uvicorn running on http://127.0.0.1:8001"
+    ✓ Frontend builds and deploys
+    ✓ VisaBuddy app appears on emulator
+    ✓ Login screen shows
+
+
+⚠️ TROUBLESHOOTING:
+
+If emulator doesn't start:
+  • Make sure Android Studio finished loading completely
+  • Try clicking Launch button again
+  • Check that you have enough disk space (5+ GB)
+  • Restart your computer if needed
+
+If emulator is very slow to boot:
+  • This is normal for first boot
+  • Can take up to 5 minutes
+  • Be patient!
+
+If you see "No emulator found":
+  • You may need to create one first
+  • In Device Manager: Click "Create virtual device"
+  • Select "Pixel 6" (or similar)
+  • Click "Create"
+  • Then click "Launch"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ready? Follow the steps above, and once you see the Android home screen,
+confirm and we'll launch the app!
