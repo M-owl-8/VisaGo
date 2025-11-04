@@ -5,7 +5,7 @@
 
 export class EmailTemplatesService {
   /**
-   * Payment Confirmation Email
+   * Payment Confirmation Email - Static method
    */
   static paymentConfirmation(params: {
     userName: string;

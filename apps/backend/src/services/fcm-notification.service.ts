@@ -288,7 +288,7 @@ export class FCMNotificationService {
         where: { userId, isActive: true },
       });
 
-      return tokens.map((token: any) => this.mapDeviceToken(token));
+      return tokens.map((token: any): any => this.mapDeviceToken(token));
     } catch (error) {
       console.error('Error retrieving device tokens:', error);
       return [];
@@ -306,7 +306,7 @@ export class FCMNotificationService {
         take: limit,
       });
 
-      return logs.map((log: any) => ({
+      return logs.map((log: any): any => ({
         id: log.id,
         userId: log.userId,
         deviceToken: log.deviceTokenId || undefined,

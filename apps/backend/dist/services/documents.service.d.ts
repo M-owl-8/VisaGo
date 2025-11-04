@@ -110,7 +110,7 @@ export declare class DocumentService {
             verified: number;
             rejected: number;
         };
-        totalSize: any;
+        totalSize: number;
     }>;
 }
 declare const _default: DocumentService;

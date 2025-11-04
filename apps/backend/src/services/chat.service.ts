@@ -104,7 +104,7 @@ export class ChatService {
         });
         history = recentMessages
           .reverse()
-          .map((m: any) => ({ role: m.role, content: m.content }));
+          .map((m: any): any => ({ role: m.role, content: m.content }));
       }
 
       // Extract application context for better responses
@@ -250,7 +250,7 @@ User's Current Visa Application:
         select: { id: true },
       });
 
-      const sessionIds = sessions.map((s: any) => s.id);
+      const sessionIds = sessions.map((s: any): string => s.id);
 
       const messages = await prisma.chatMessage.findMany({
         where: {
@@ -449,7 +449,7 @@ User's Current Visa Application:
         select: { id: true },
       });
 
-      const sessionIds = sessions.map((s: any) => s.id);
+      const sessionIds = sessions.map((s: any): string => s.id);
 
       // Delete all messages in these sessions
       const messagesDeleted = await prisma.chatMessage.deleteMany({
@@ -498,10 +498,10 @@ User's Current Visa Application:
       let totalTokens = 0;
       let totalSessions = sessions.length;
 
-      sessions.forEach((session: any) => {
+      sessions.forEach((session: any): void => {
         totalMessages += session.messages.length;
         totalTokens += session.messages.reduce(
-          (sum: any, msg: any) => sum + (msg.tokensUsed || 0),
+          (sum: number, msg: any): number => sum + (msg.tokensUsed || 0),
           0
         );
       });

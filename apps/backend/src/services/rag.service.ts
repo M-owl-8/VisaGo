@@ -396,7 +396,7 @@ export class RAGService {
 
         if (userApplications.length > 0) {
           userContext = `User's recent visa applications: ${userApplications
-            .map((app: any) => `${app.country?.name} - ${app.visaType?.name}`)
+            .map((app: any): string => `${app.country?.name} - ${app.visaType?.name}`)
             .join(', ')}`;
         }
       }

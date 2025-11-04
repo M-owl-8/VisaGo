@@ -4,6 +4,7 @@
     "description": "VisaBuddy React Native Mobile App",
     "main": "index.js",
     "scripts": {
+        "build": "echo 'Mobile app build - no compilation needed'",
         "dev": "npx metro start --reset-cache",
         "metro": "npx metro start --reset-cache",
         "android": "npx react-native run-android",

@@ -266,7 +266,7 @@ export class EmailNotificationService {
         take: limit,
       });
 
-      return logs.map((log: any) => ({
+      return logs.map((log: any): any => ({
         id: log.id,
         userId: log.userId,
         recipientEmail: log.recipientEmail,
@@ -294,9 +294,9 @@ export class EmailNotificationService {
 
       const stats = {
         total: logs.length,
-        sent: logs.filter((l: any) => l.status === 'sent').length,
-        failed: logs.filter((l: any) => l.status === 'failed').length,
-        pending: logs.filter((l: any) => l.status === 'pending').length,
+        sent: logs.filter((l: any): boolean => l.status === 'sent').length,
+        failed: logs.filter((l: any): boolean => l.status === 'failed').length,
+        pending: logs.filter((l: any): boolean => l.status === 'pending').length,
         byType: this.groupByType(logs),
       };
 

@@ -88,7 +88,7 @@ export class PaymentRefundService {
         userId: payment.user?.id,
         amount: refundAmount,
         currency: payment.currency || 'USD',
-      });
+      } as any);
 
       // Process refund based on gateway
       const result = await this.processRefund(payment, refund, traceId);
@@ -113,7 +113,7 @@ export class PaymentRefundService {
         paymentError.severity,
         paymentError.message,
         paymentError.statusCode,
-        { refundRequest: request }
+        { refundRequest: request } as any
       );
 
       throw paymentError;

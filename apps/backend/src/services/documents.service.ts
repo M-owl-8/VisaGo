@@ -196,11 +196,11 @@ export class DocumentService {
     const stats = {
       total: documents.length,
       byStatus: {
-        pending: documents.filter((d: any) => d.status === "pending").length,
-        verified: documents.filter((d: any) => d.status === "verified").length,
-        rejected: documents.filter((d: any) => d.status === "rejected").length,
+        pending: documents.filter((d: any): boolean => d.status === "pending").length,
+        verified: documents.filter((d: any): boolean => d.status === "verified").length,
+        rejected: documents.filter((d: any): boolean => d.status === "rejected").length,
       },
-      totalSize: documents.reduce((sum: any, d: any) => sum + d.fileSize, 0),
+      totalSize: documents.reduce((sum: number, d: any): number => sum + d.fileSize, 0),
     };
 
     return stats;
