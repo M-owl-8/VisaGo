@@ -12,7 +12,7 @@ import DatabasePoolService from "./services/db-pool.service";
 import FirebaseStorageService from "./services/firebase-storage.service";
 import LocalStorageService from "./services/local-storage.service";
 import StorageAdapter from "./services/storage-adapter";
-import CacheService from "./services/cache.service";
+import { OptimizedCacheService } from "./services/cache.service.optimized";
 import AIOpenAIService from "./services/ai-openai.service";
 import db from "./db";
 
@@ -23,6 +23,9 @@ const app: Express = express();
 const prisma = db; // Use shared instance
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || "development";
+
+// Initialize Redis Cache Service
+const cacheService = new OptimizedCacheService(process.env.REDIS_URL);
 
 // ============================================================================
 // MIDDLEWARE
@@ -253,7 +256,7 @@ async function startServer() {
 ║ Environment: ${NODE_ENV.padEnd(42)} ║
 ║ Port: ${String(PORT).padEnd(52)} ║
 ║ Database: PostgreSQL (pooled)                              ║
-║ Cache: node-cache                                          ║
+║ Cache: Redis (optimized)                                   ║
 ║ Storage: ${finalStorageType.padEnd(44)} ║
 ║ AI: OpenAI GPT-4 (RAG enabled)                             ║
 ║ Notifications: Email + Push + Job Scheduler                ║
@@ -304,3 +307,4 @@ process.on("SIGTERM", async () => {
 startServer();
 
 export default app;
+export { cacheService };
