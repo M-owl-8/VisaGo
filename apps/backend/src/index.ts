@@ -220,9 +220,11 @@ async function startServer() {
     }
 
     // 5. Log Cache Service
-    console.log("💾 Cache Service ready (node-cache)");
-    const cacheStats = CacheService.getStats();
-    console.log(`   - Keys in cache: ${cacheStats.keys}`);
+    console.log("💾 Cache Service ready (Redis)");
+    const cacheStats = cacheService.getStats?.();
+    if (cacheStats) {
+      console.log(`   - Cache service active`);
+    }
 
     // 6. Initialize Notification Services
     console.log("📬 Initializing Notification Services...");
