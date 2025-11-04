@@ -12,7 +12,7 @@ const redisClient = process.env.REDIS_URL
 const getStore = () => {
   if (redisClient) {
     return new RedisStore({
-      send_command: (...args: any[]) => redisClient.call(...args),
+      sendCommand: (command: string, ...args: any[]) => redisClient.call(command, ...args),
       prefix: 'rl:',
     });
   }
