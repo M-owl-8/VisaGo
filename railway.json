@@ -1,39 +1,39 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
-  "build": {
-    "builder": "dockerfile",
-    "dockerfile": "apps/backend/Dockerfile",
-    "context": "apps/backend"
-  },
-  "deploy": {
-    "numReplicas": 1,
-    "startCommand": "node dist/main.js",
-    "restartPolicyMaxRetries": 3,
-    "restartPolicyWindowMs": 60000
-  },
-  "environments": {
-    "production": {
-      "numReplicas": 2,
+  "$schema": "https://railway.app/schema.json",
+  "services": {
+    "backend": {
+      "name": "VisaBuddy Backend",
+      "image": "railway:latest",
+      "context": "./apps/backend",
+      "dockerfile": "./Dockerfile",
+      "port": 3000,
+      "replicas": 1,
       "variables": {
         "NODE_ENV": "production",
+        "PORT": "3000",
         "LOG_LEVEL": "info"
       }
     },
-    "staging": {
-      "numReplicas": 1,
+    "ai-service": {
+      "name": "VisaBuddy AI Service",
+      "image": "railway:latest",
+      "context": "./apps/ai-service",
+      "dockerfile": "./Dockerfile",
+      "port": 8001,
+      "replicas": 1,
       "variables": {
-        "NODE_ENV": "staging",
-        "LOG_LEVEL": "debug"
+        "PORT": "8001",
+        "PYTHONUNBUFFERED": "1",
+        "LOG_LEVEL": "INFO"
       }
     }
   },
-  "healthCheck": {
-    "method": "GET",
-    "path": "/health",
-    "port": 3000,
-    "intervalSeconds": 30,
-    "timeoutSeconds": 10,
-    "successThreshold": 1,
-    "failureThreshold": 3
-  }
+  "plugins": [
+    {
+      "source": "https://github.com/railwayapp/plugin-postgres"
+    },
+    {
+      "source": "https://github.com/railwayapp/plugin-redis"
+    }
+  ]
 }
