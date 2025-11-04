@@ -10,19 +10,8 @@ const getApiBaseUrl = (): string => {
     return process.env.REACT_APP_API_URL;
   }
 
-  // For Android emulator, use 10.0.2.2 to reach host machine
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:3000";
-  }
-
-  // For iOS emulator or physical device
-  if (Platform.OS === "ios") {
-    // For physical device, change this to your machine's IP address
-    return "http://localhost:3000";
-  }
-
-  // Fallback
-  return "http://localhost:3000";
+  // Production Railway URL
+  return "https://visabuddy-backend-production.up.railway.app";
 };
 
 const API_BASE_URL = getApiBaseUrl();
