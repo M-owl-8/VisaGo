@@ -117,8 +117,8 @@ When answering questions, cite the sources from the knowledge base when relevant
                 where: {
                     isPublished: true,
                     OR: [
-                        { title: { contains: query, mode: "insensitive" } },
-                        { content: { contains: query, mode: "insensitive" } },
+                        { title: { contains: query } },
+                        { content: { contains: query } },
                     ],
                 },
                 take: 5,

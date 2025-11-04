@@ -1,0 +1,290 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Switch,
+  ScrollView,
+  ActivityIndicator,
+  SafeAreaView,
+  Alert,
+} from 'react-native';
+import { useNotificationStore } from '../../store/notifications';
+
+interface SettingItem {
+  key: keyof import('../../store/notifications').NotificationPreferences;
+  title: string;
+  description: string;
+  category: 'general' | 'content' | 'reminders';
+}
+
+const SETTINGS: SettingItem[] = [
+  {
+    key: 'emailNotifications',
+    title: 'Email Notifications',
+    description: 'Receive updates via email',
+    category: 'general',
+  },
+  {
+    key: 'pushNotifications',
+    title: 'Push Notifications',
+    description: 'Receive notifications on your device',
+    category: 'general',
+  },
+  {
+    key: 'paymentConfirmations',
+    title: 'Payment Confirmations',
+    description: 'Get notified when payments are processed',
+    category: 'content',
+  },
+  {
+    key: 'documentUpdates',
+    title: 'Document Updates',
+    description: 'Get notified about document verification status',
+    category: 'content',
+  },
+  {
+    key: 'visaStatusUpdates',
+    title: 'Visa Status Updates',
+    description: 'Get notified about changes to your visa applications',
+    category: 'content',
+  },
+  {
+    key: 'dailyReminders',
+    title: 'Daily Reminders',
+    description: 'Get reminders about missing documents',
+    category: 'reminders',
+  },
+  {
+    key: 'newsUpdates',
+    title: 'News Updates',
+    description: 'Get updates about visa policy changes',
+    category: 'reminders',
+  },
+];
+
+export const NotificationSettingsScreen: React.FC = () => {
+  const { preferences, isLoading, updatePreferences, loadPreferences } =
+    useNotificationStore();
+  const [localPreferences, setLocalPreferences] = useState(preferences);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  useEffect(() => {
+    setLocalPreferences(preferences);
+  }, [preferences]);
+
+  const handleToggle = async (key: string, value: boolean) => {
+    const newPreferences = {
+      ...localPreferences,
+      [key]: value,
+    };
+    setLocalPreferences(newPreferences);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const changes: Record<string, boolean> = {};
+      Object.keys(preferences).forEach((key) => {
+        if (preferences[key as keyof typeof preferences] !== localPreferences[key as keyof typeof localPreferences]) {
+          changes[key] = localPreferences[key as keyof typeof localPreferences];
+        }
+      });
+
+      if (Object.keys(changes).length === 0) {
+        Alert.alert('No Changes', 'Your preferences are already up to date.');
+      } else {
+        await updatePreferences(changes);
+        Alert.alert('Success', 'Your notification preferences have been updated.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update preferences. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderCategory = (category: string, categoryTitle: string) => {
+    const categorySettings = SETTINGS.filter((s) => s.category === category);
+
+    return (
+      <View key={category} style={styles.categoryContainer}>
+        <Text style={styles.categoryTitle}>{categoryTitle}</Text>
+
+        {categorySettings.map((setting) => (
+          <View key={setting.key} style={styles.settingItem}>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>{setting.title}</Text>
+              <Text style={styles.settingDescription}>{setting.description}</Text>
+            </View>
+
+            <Switch
+              value={localPreferences[setting.key] as boolean}
+              onValueChange={(value) => handleToggle(setting.key, value)}
+              trackColor={{ false: '#ddd', true: '#81C784' }}
+              thumbColor={localPreferences[setting.key] ? '#4CAF50' : '#f4f3f4'}
+              disabled={isLoading || isSaving}
+            />
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}>
+        <View style={styles.headerContainer}>
+          <Text style={styles.header}>Notification Settings</Text>
+          <Text style={styles.headerDescription}>
+            Manage how you want to receive notifications and updates
+          </Text>
+        </View>
+
+        {renderCategory('general', 'General')}
+        {renderCategory('content', 'Content & Updates')}
+        {renderCategory('reminders', 'Reminders')}
+
+        <View style={styles.infoContainer}>
+          <Text style={styles.infoTitle}>💡 Tip</Text>
+          <Text style={styles.infoText}>
+            Enable push notifications to get real-time updates about your visa applications.
+          </Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <Text style={styles.saveButtonText}>Changes are auto-saved</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerContainer: {
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  header: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 8,
+  },
+  headerDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  categoryContainer: {
+    marginTop: 16,
+    backgroundColor: 'white',
+    marginHorizontal: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  categoryTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    backgroundColor: '#f9f9f9',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+    marginBottom: 4,
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: '#999',
+    lineHeight: 18,
+  },
+  infoContainer: {
+    marginHorizontal: 8,
+    marginTop: 16,
+    backgroundColor: '#E3F2FD',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1976D2',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 13,
+    color: '#1565C0',
+    lineHeight: 18,
+  },
+  buttonContainer: {
+    marginHorizontal: 8,
+    marginTop: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2e7d32',
+  },
+});

@@ -1,0 +1,54 @@
+// Test setup file - runs before all tests
+import dotenv from 'dotenv';
+
+// Load test environment variables
+dotenv.config({ path: '.env.test' });
+
+// Set test environment
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
+
+// Mock external services
+jest.mock('firebase-admin', () => ({
+  initializeApp: jest.fn(),
+  storage: jest.fn(() => ({
+    bucket: jest.fn(() => ({
+      file: jest.fn(),
+      upload: jest.fn(),
+      delete: jest.fn(),
+    })),
+  })),
+}));
+
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn(() => ({
+    sendMail: jest.fn(),
+  })),
+}));
+
+jest.mock('@sendgrid/mail', () => ({
+  setApiKey: jest.fn(),
+  send: jest.fn(),
+}));
+
+jest.mock('openai', () => ({
+  OpenAI: jest.fn(() => ({
+    chat: {
+      completions: {
+        create: jest.fn(),
+      },
+    },
+  })),
+}));
+
+// Global test timeout
+jest.setTimeout(10000);
+
+// Suppress console logs in tests
+global.console = {
+  ...console,
+  error: jest.fn(),
+  warn: jest.fn(),
+  log: jest.fn(),
+  debug: jest.fn(),
+};

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import React, { useEffect, ErrorInfo } from 'react';
+import { StatusBar, View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -7,6 +7,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from './store/auth';
+import { initializeGoogleSignIn } from './services/google-oauth';
+import { GOOGLE_WEB_CLIENT_ID } from './config/constants';
 
 // Screens
 import SplashScreen from './screens/SplashScreen';
@@ -139,17 +141,75 @@ function AppTabs() {
 }
 
 // ============================================================================
+// ERROR BOUNDARY
+// ============================================================================
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('=== ERROR BOUNDARY: getDerivedStateFromError ===', error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('=== ERROR BOUNDARY: componentDidCatch ===', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#fff' }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#000' }}>
+            App Error
+          </Text>
+          <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </Text>
+          <Text style={{ fontSize: 12, color: '#999', marginTop: 20, textAlign: 'center' }}>
+            {this.state.error?.stack}
+          </Text>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
-export default function App() {
+function AppContent() {
   const isLoading = useAuthStore((state) => state.isLoading);
   const isSignedIn = useAuthStore((state) => state.isSignedIn);
   const initializeApp = useAuthStore((state) => state.initializeApp);
 
   useEffect(() => {
+    console.log('=== APP.TSX: useEffect Starting ===');
+    
     // Initialize app on launch
-    initializeApp();
+    initializeApp().catch((error) => {
+      console.error('=== APP.TSX: initializeApp Error ===', error);
+    });
+    
+    // Initialize Google Sign-In
+    if (GOOGLE_WEB_CLIENT_ID && GOOGLE_WEB_CLIENT_ID !== 'YOUR_GOOGLE_WEB_CLIENT_ID_HERE') {
+      initializeGoogleSignIn(GOOGLE_WEB_CLIENT_ID).catch((error) => {
+        console.warn('=== APP.TSX: Failed to initialize Google Sign-In ===', error);
+        // Continue anyway - Google OAuth is optional
+      });
+    } else {
+      console.warn('=== APP.TSX: Google Web Client ID not configured ===');
+    }
   }, []);
+  
+  console.log('=== APP.TSX: Render ===', { isLoading, isSignedIn });
 
   if (isLoading) {
     return <SplashScreen />;
@@ -168,5 +228,13 @@ export default function App() {
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }

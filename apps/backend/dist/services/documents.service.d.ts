@@ -11,11 +11,11 @@ export declare class DocumentService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
-        status: string;
+        documentType: string;
         expiryDate: Date | null;
+        status: string;
         applicationId: string;
         documentName: string;
-        documentType: string;
         verificationNotes: string | null;
     }>;
     /**
@@ -30,11 +30,11 @@ export declare class DocumentService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
-        status: string;
+        documentType: string;
         expiryDate: Date | null;
+        status: string;
         applicationId: string;
         documentName: string;
-        documentType: string;
         verificationNotes: string | null;
     }[]>;
     /**
@@ -49,11 +49,11 @@ export declare class DocumentService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
-        status: string;
+        documentType: string;
         expiryDate: Date | null;
+        status: string;
         applicationId: string;
         documentName: string;
-        documentType: string;
         verificationNotes: string | null;
     }[]>;
     /**
@@ -68,11 +68,11 @@ export declare class DocumentService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
-        status: string;
+        documentType: string;
         expiryDate: Date | null;
+        status: string;
         applicationId: string;
         documentName: string;
-        documentType: string;
         verificationNotes: string | null;
     }>;
     /**
@@ -93,11 +93,11 @@ export declare class DocumentService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
-        status: string;
+        documentType: string;
         expiryDate: Date | null;
+        status: string;
         applicationId: string;
         documentName: string;
-        documentType: string;
         verificationNotes: string | null;
     }>;
     /**

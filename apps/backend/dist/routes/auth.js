@@ -7,12 +7,13 @@ const express_1 = __importDefault(require("express"));
 const auth_service_1 = require("../services/auth.service");
 const auth_1 = require("../middleware/auth");
 const errors_1 = require("../utils/errors");
+const validation_1 = require("../middleware/validation");
 const router = express_1.default.Router();
 /**
  * POST /api/auth/register
  * Register a new user with email and password
  */
-router.post("/register", async (req, res, next) => {
+router.post("/register", validation_1.validateRegister, validation_1.handleValidationErrors, async (req, res, next) => {
     try {
         const { email, password, firstName, lastName } = req.body;
         const result = await auth_service_1.AuthService.register({
@@ -34,7 +35,7 @@ router.post("/register", async (req, res, next) => {
  * POST /api/auth/login
  * Login with email and password
  */
-router.post("/login", async (req, res, next) => {
+router.post("/login", validation_1.validateLogin, validation_1.handleValidationErrors, async (req, res, next) => {
     try {
         const { email, password } = req.body;
         const result = await auth_service_1.AuthService.login({
@@ -102,6 +103,41 @@ router.put("/me", auth_1.authenticateToken, async (req, res, next) => {
         res.json({
             success: true,
             data: updated,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * POST /api/auth/refresh
+ * Refresh JWT token (requires valid token)
+ */
+router.post("/refresh", auth_1.authenticateToken, async (req, res, next) => {
+    try {
+        const newToken = await auth_service_1.AuthService.refreshToken(req.userId);
+        res.json({
+            success: true,
+            data: {
+                token: newToken,
+            },
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * POST /api/auth/logout
+ * Logout user (optional - just clears client-side)
+ */
+router.post("/logout", auth_1.authenticateToken, async (req, res, next) => {
+    try {
+        // In a real app, you might invalidate the token on server side (e.g., add to blacklist)
+        // For now, logout is handled client-side by removing the token from AsyncStorage
+        res.json({
+            success: true,
+            message: "Logged out successfully",
         });
     }
     catch (error) {

@@ -9,20 +9,23 @@ import {
   FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Icon from "react-native-vector-icons/Ionicons";
 import { useDocumentStore } from "../../store/documents";
 import { colors } from "../../theme/colors";
+import {
+  getDocumentTypeLabel,
+  formatFileSize,
+} from "../../utils/documentHelpers";
+import {
+  pickFromCamera,
+  pickFromGallery,
+  pickDocument,
+  prepareFileForUpload,
+  isFileSizeValid,
+  showFilePickerOptions,
+} from "../../utils/mediaPickerHelpers";
 
-// Mock document picker - replace with actual library in production
-const pickDocument = async (): Promise<any> => {
-  // In production, use react-native-document-picker
-  return {
-    name: "document.pdf",
-    size: 1024000,
-    type: "application/pdf",
-  };
-};
-
-export const DocumentScreen = ({ route }: any) => {
+export const DocumentScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
   const applicationId = route?.params?.applicationId;
 
@@ -35,23 +38,17 @@ export const DocumentScreen = ({ route }: any) => {
     uploadDocument,
     deleteDocument,
     clearError,
+    getRequiredDocuments,
   } = useDocumentStore();
 
   const [selectedDocType, setSelectedDocType] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
-
-  const documentTypes = [
-    { id: "passport", label: "Passport" },
-    { id: "birth_certificate", label: "Birth Certificate" },
-    { id: "bank_statement", label: "Bank Statement" },
-    { id: "proof_of_residence", label: "Proof of Residence" },
-    { id: "employment_letter", label: "Employment Letter" },
-    { id: "financial_proof", label: "Financial Proof" },
-  ];
+  const [requiredDocs, setRequiredDocs] = useState<string[]>([]);
 
   useEffect(() => {
     if (applicationId) {
       loadApplicationDocuments(applicationId);
+      getRequiredDocuments(applicationId).then(setRequiredDocs);
     }
   }, [applicationId]);
 
@@ -59,26 +56,57 @@ export const DocumentScreen = ({ route }: any) => {
     ? applicationDocuments[applicationId] || []
     : documents || [];
 
-  const handlePickDocument = async () => {
+  const handleCameraPress = async () => {
+    const file = await pickFromCamera();
+    if (file) {
+      await uploadSelectedFile(file);
+    }
+  };
+
+  const handleGalleryPress = async () => {
+    const file = await pickFromGallery();
+    if (file) {
+      await uploadSelectedFile(file);
+    }
+  };
+
+  const handleDocumentPress = async () => {
+    const file = await pickDocument();
+    if (file) {
+      await uploadSelectedFile(file);
+    }
+  };
+
+  const uploadSelectedFile = async (file: any) => {
     if (!selectedDocType) {
       Alert.alert("Select Document Type", "Please select a document type first");
       return;
     }
 
+    if (!isFileSizeValid(file.size || 0, 20)) {
+      Alert.alert("File Too Large", "File size must be less than 20 MB");
+      return;
+    }
+
     try {
       setIsUploading(true);
-      const doc = await pickDocument();
-
-      if (doc) {
-        await uploadDocument(applicationId || "", selectedDocType, doc);
-        Alert.alert("Success", "Document uploaded successfully");
-        setSelectedDocType("");
-      }
+      const fileToUpload = prepareFileForUpload(file);
+      await uploadDocument(applicationId || "", selectedDocType, fileToUpload);
+      Alert.alert("Success", "Document uploaded successfully");
+      setSelectedDocType("");
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to upload document");
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handlePickFile = () => {
+    showFilePickerOptions(
+      handleCameraPress,
+      handleGalleryPress,
+      handleDocumentPress
+    );
   };
 
   const handleDeleteDocument = (docId: string) => {
@@ -330,7 +358,7 @@ export const DocumentScreen = ({ route }: any) => {
 
           {/* Upload Button */}
           <TouchableOpacity
-            onPress={handlePickDocument}
+            onPress={handlePickFile}
             disabled={isUploading || !selectedDocType}
             style={{
               backgroundColor:

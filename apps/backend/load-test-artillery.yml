@@ -1,0 +1,208 @@
+# Artillery.io Load Testing Configuration
+# Tests API under 1000+ concurrent users
+# Run: artillery run load-test-artillery.yml
+
+config:
+  target: "{{ $processEnvironment.API_URL | default('http://localhost:3000') }}"
+  phases:
+    # Warm up phase: Gradually increase load
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm up"
+    # Ramp up phase: Increase to 100 users/sec
+    - duration: 120
+      arrivalRate: 100
+      rampTo: 500
+      name: "Ramp up"
+    # Peak phase: Maintain high load
+    - duration: 180
+      arrivalRate: 500
+      name: "Peak load (500 users/sec)"
+    # Cool down phase: Gradually decrease
+    - duration: 60
+      arrivalRate: 500
+      rampTo: 10
+      name: "Cool down"
+  
+  processor: "./load-test-processor.js"
+  variables:
+    baseUrl: "{{ $processEnvironment.API_URL | default('http://localhost:3000') }}"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept-Encoding: "gzip, deflate"
+  # Timeout settings
+  timeout: 10
+  http:
+    timeout: 10
+
+scenarios:
+  # Scenario 1: Browse countries and visa types
+  - name: "Browse Public Content"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/countries"
+          expect:
+            - statusCode: 200
+          capture:
+            json: "$.data[0].id"
+            as: "countryId"
+          metrics:
+            - name: "countries_list_latency"
+      
+      - get:
+          url: "/api/countries/{{ countryId }}/visa-types"
+          expect:
+            - statusCode: 200
+          metrics:
+            - name: "visa_types_latency"
+
+  # Scenario 2: Authentication flow
+  - name: "Authentication Flow"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/auth/register"
+          json:
+            email: "user{{ $randomNumber(1, 999999) }}@test.com"
+            password: "TestPassword123!"
+            firstName: "Test"
+            lastName: "User"
+          expect:
+            - statusCode: 201
+          capture:
+            json: "$.token"
+            as: "token"
+          metrics:
+            - name: "register_latency"
+      
+      - get:
+          url: "/api/auth/me"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+          metrics:
+            - name: "auth_me_latency"
+
+  # Scenario 3: Application workflow
+  - name: "Application Workflow"
+    weight: 20
+    flow:
+      # Login
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ $randomString(8) }}@example.com"
+            password: "TestPassword123!"
+          expect:
+            - statusCode: 200
+          capture:
+            json: "$.token"
+            as: "token"
+      
+      # Create application
+      - post:
+          url: "/api/applications"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            countryId: "{{ countryId }}"
+            visaTypeId: "{{ visaTypeId }}"
+          expect:
+            - statusCode: 201
+          capture:
+            json: "$.id"
+            as: "appId"
+      
+      # Initiate payment
+      - post:
+          url: "/api/payments/payme"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            applicationId: "{{ appId }}"
+            amount: 100
+          expect:
+            - statusCode: 200
+          metrics:
+            - name: "payment_initiation_latency"
+
+  # Scenario 4: Chat interaction
+  - name: "Chat Interaction"
+    weight: 10
+    flow:
+      # Create chat session
+      - post:
+          url: "/api/chat/sessions"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            applicationId: "{{ appId }}"
+          expect:
+            - statusCode: 201
+          capture:
+            json: "$.id"
+            as: "sessionId"
+      
+      # Send message
+      - post:
+          url: "/api/chat/sessions/{{ sessionId }}/messages"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            content: "What documents do I need?"
+          expect:
+            - statusCode: 201
+          metrics:
+            - name: "chat_message_latency"
+      
+      # Get messages
+      - get:
+          url: "/api/chat/sessions/{{ sessionId }}/messages"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+          metrics:
+            - name: "chat_get_messages_latency"
+
+  # Scenario 5: Heavy read load
+  - name: "Heavy Read Load"
+    weight: 5
+    flow:
+      # Get user profile
+      - get:
+          url: "/api/users/profile"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+      
+      # List applications
+      - get:
+          url: "/api/applications?page=1&pageSize=20"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+      
+      # Get analytics
+      - get:
+          url: "/api/analytics/dashboard"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          expect:
+            - statusCode: 200
+          metrics:
+            - name: "analytics_latency"
+
+# Reporting
+reporting:
+  - type: "json"
+    filename: "./load-test-results.json"
+  - type: "statsd"
+    host: "localhost"
+    port: 8125
+    prefix: "visabuddy"

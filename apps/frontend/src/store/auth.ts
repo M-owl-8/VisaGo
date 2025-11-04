@@ -7,10 +7,72 @@ interface User {
   email: string;
   firstName?: string;
   lastName?: string;
+  phone?: string;
   avatar?: string;
   language?: string;
+  timezone?: string;
   currency?: string;
   emailVerified?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  preferences?: {
+    notificationsEnabled?: boolean;
+    emailNotifications?: boolean;
+    pushNotifications?: boolean;
+    twoFactorEnabled?: boolean;
+  };
+}
+
+interface UserApplication {
+  id: string;
+  countryId: string;
+  visaTypeId: string;
+  status: string;
+  progressPercentage: number;
+  submissionDate?: string;
+  approvalDate?: string;
+  country: {
+    name: string;
+    flagEmoji: string;
+    code: string;
+  };
+  visaType: {
+    name: string;
+    fee: number;
+    processingDays: number;
+    validity: string;
+  };
+  payment?: {
+    amount: number;
+    status: string;
+    paidAt?: string;
+  };
+  checkpoints: Array<{
+    id: string;
+    title: string;
+    isCompleted: boolean;
+    dueDate?: string;
+  }>;
+}
+
+interface PaymentHistory {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  paymentMethod: string;
+  transactionId?: string;
+  paidAt?: string;
+  application: {
+    countryId: string;
+    visaType: {
+      name: string;
+    };
+    country: {
+      name: string;
+      flagEmoji: string;
+    };
+  };
 }
 
 interface AuthState {
@@ -19,23 +81,32 @@ interface AuthState {
   refreshToken: string | null;
   isSignedIn: boolean;
   isLoading: boolean;
+  userApplications: UserApplication[];
+  paymentHistory: PaymentHistory[];
   
   // Actions
   initializeApp: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
-  loginWithGoogle: (token: string) => Promise<void>;
+  loginWithGoogle: (googleId: string, email: string, firstName?: string, lastName?: string, avatar?: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
+  fetchUserProfile: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  updatePreferences: (preferences: Partial<User['preferences']> & { language?: string }) => Promise<void>;
+  fetchUserApplications: () => Promise<void>;
+  fetchPaymentHistory: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, _get) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   refreshToken: null,
   isSignedIn: false,
   isLoading: true,
+  userApplications: [],
+  paymentHistory: [],
 
   // Initialize app by checking stored token
   initializeApp: async () => {
@@ -147,7 +218,7 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
     try {
       set({ isLoading: true });
 
-      const response = await apiClient.loginWithGoogle(googleId, email, firstName, lastName, avatar);
+      const response = await apiClient.loginWithGoogle(googleId, email, firstName || '', lastName || '', avatar);
 
       if (!response.success || !response.data) {
         throw new Error(response.error?.message || 'Google login failed');
@@ -165,7 +236,7 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          avatar: user.avatar,
+          avatar: avatar,
           language: 'en',
           currency: 'USD',
           emailVerified: user.emailVerified,
@@ -208,4 +279,164 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
 
   // Set token
   setToken: (token: string | null) => set({ token }),
+
+  // Fetch user profile from backend
+  fetchUserProfile: async () => {
+    try {
+      set({ isLoading: true });
+      const user = get().user;
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await apiClient.getUserProfile();
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to fetch profile');
+      }
+
+      const updatedUser = {
+        ...response.data,
+        language: response.data.language || 'en',
+        currency: response.data.currency || 'USD',
+      };
+
+      // Update AsyncStorage
+      await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
+
+      set({ user: updatedUser });
+    } catch (error: any) {
+      console.error('Failed to fetch profile:', error.message);
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // Update user profile
+  updateProfile: async (data: Partial<User>) => {
+    try {
+      set({ isLoading: true });
+      const user = get().user;
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await apiClient.updateUserProfile(user.id, data);
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to update profile');
+      }
+
+      const updatedUser = {
+        ...user,
+        ...response.data,
+      };
+
+      // Update AsyncStorage
+      await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
+
+      set({ user: updatedUser });
+    } catch (error: any) {
+      console.error('Failed to update profile:', error.message);
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // Update user preferences
+  updatePreferences: async (preferences: Partial<User['preferences']> & { language?: string }) => {
+    try {
+      set({ isLoading: true });
+      const user = get().user;
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await apiClient.updateUserPreferences(user.id, preferences);
+
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Failed to update preferences');
+      }
+
+      // Update user language if provided
+      if (preferences.language) {
+        const updatedUser = {
+          ...user,
+          language: preferences.language,
+        };
+        await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
+        set({ user: updatedUser });
+      }
+
+      // Update preferences in user object
+      if (preferences.notificationsEnabled !== undefined || 
+          preferences.emailNotifications !== undefined ||
+          preferences.pushNotifications !== undefined ||
+          preferences.twoFactorEnabled !== undefined) {
+        const updatedUser = {
+          ...user,
+          preferences: {
+            ...user.preferences,
+            ...preferences,
+          },
+        };
+        await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
+        set({ user: updatedUser });
+      }
+    } catch (error: any) {
+      console.error('Failed to update preferences:', error.message);
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // Fetch user applications
+  fetchUserApplications: async () => {
+    try {
+      const user = get().user;
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await apiClient.getUserApplications(user.id);
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to fetch applications');
+      }
+
+      set({ userApplications: response.data });
+    } catch (error: any) {
+      console.error('Failed to fetch applications:', error.message);
+      throw error;
+    }
+  },
+
+  // Fetch payment history
+  fetchPaymentHistory: async () => {
+    try {
+      const user = get().user;
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await apiClient.getUserPaymentHistory(user.id);
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to fetch payment history');
+      }
+
+      set({ paymentHistory: response.data });
+    } catch (error: any) {
+      console.error('Failed to fetch payment history:', error.message);
+      throw error;
+    }
+  },
 }));

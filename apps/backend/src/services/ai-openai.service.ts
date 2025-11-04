@@ -180,14 +180,14 @@ When answering questions, cite the sources from the knowledge base when relevant
         where: {
           isPublished: true,
           OR: [
-            { title: { contains: query, mode: "insensitive" } },
-            { content: { contains: query, mode: "insensitive" } },
+            { title: { contains: query } },
+            { content: { contains: query } },
           ],
         },
         take: 5,
       });
 
-      return documents.map((doc) => ({
+      return documents.map((doc: any) => ({
         documentId: doc.id,
         title: doc.title,
         content: doc.content.substring(0, 500), // First 500 chars

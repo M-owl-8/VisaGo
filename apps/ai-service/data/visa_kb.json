@@ -1,0 +1,244 @@
+{
+  "countries": {
+    "Spain": {
+      "country_code": "ES",
+      "flag": "🇪🇸",
+      "description": "Spain is a popular European destination known for its culture, beaches, and Mediterranean lifestyle.",
+      "visa_types": {
+        "Tourist Visa": {
+          "requirements": "Valid passport with 6 months validity. Proof of accommodation (hotel booking or invitation letter). Return flight booking. Sufficient financial means (approximately €100 per day). Travel insurance. Completed Schengen visa application form.",
+          "processing_time": "10-15 days",
+          "validity": "90 days within 180 days",
+          "fee": "€80",
+          "documents": ["Passport", "Passport photos", "Accommodation proof", "Flight booking", "Financial statements", "Travel insurance", "Employment letter"],
+          "tips": "Book accommodation before applying. Have proof of sufficient funds in bank account. Ensure your passport has at least 6 months validity from travel date. Spain is part of Schengen area.",
+          "embassy": {
+            "url": "https://www.minsait.gob.es/",
+            "phone": "+34 91 701 4200"
+          }
+        },
+        "Work Visa": {
+          "requirements": "Job offer from Spanish employer. Employment contract. Proof of qualifications. Health insurance. Valid passport. Background check clearance.",
+          "processing_time": "30-45 days",
+          "validity": "1-2 years (renewable)",
+          "fee": "€100-150",
+          "documents": ["Passport", "Employment contract", "Job offer letter", "Educational certificates", "Health insurance", "Background check", "Bank statements"],
+          "tips": "Employer sponsorship is required. Most work visas allow family members to apply for dependent visas. Spain recognizes EU/EEA citizens have freedom of movement.",
+          "embassy": {
+            "url": "https://www.minsait.gob.es/",
+            "phone": "+34 91 701 4200"
+          }
+        },
+        "Student Visa": {
+          "requirements": "Acceptance letter from Spanish educational institution. Proof of financial means. Accommodation proof. Travel insurance. Valid passport. Background check.",
+          "processing_time": "15-20 days",
+          "validity": "1-4 years (duration of studies)",
+          "fee": "€60",
+          "documents": ["Passport", "Acceptance letter", "Educational certificates", "Financial statements", "Accommodation proof", "Travel insurance", "Medical certificate"],
+          "tips": "Acceptance letter from recognized institution is mandatory. Financial proof should show minimum €700 per month. After graduation, you can apply for 6-month post-study work visa.",
+          "embassy": {
+            "url": "https://www.minsait.gob.es/",
+            "phone": "+34 91 701 4200"
+          }
+        }
+      }
+    },
+    "USA": {
+      "country_code": "US",
+      "flag": "🇺🇸",
+      "description": "United States offers opportunities in technology, business, education, and various industries with diverse visa categories.",
+      "visa_types": {
+        "B1/B2 (Tourist/Business)": {
+          "requirements": "Valid passport. DS-160 form completion. Visa interview appointment. Proof of ties to home country. Financial documents. Travel itinerary.",
+          "processing_time": "5-10 business days (variable by location)",
+          "validity": "10 years (multiple entries)",
+          "fee": "$160",
+          "documents": ["Passport", "DS-160 confirmation", "Visa interview appointment", "Photo", "Financial statements", "Employment letter", "Proof of ties"],
+          "tips": "Demonstrate strong ties to your home country. Have return flight booked before interview. Practice interview answers. Be honest about purpose of travel. Processing times vary significantly by embassy.",
+          "embassy": {
+            "url": "https://www.usembassy.gov/",
+            "phone": "Varies by location"
+          }
+        },
+        "H1-B (Specialty Occupation)": {
+          "requirements": "Job offer from US employer. Bachelor's degree or equivalent. Employer sponsorship. Labor certification (PERM if required). Valid passport.",
+          "processing_time": "2-3 months",
+          "validity": "3-6 years (renewable)",
+          "fee": "$460-1,500",
+          "documents": ["Passport", "Job offer letter", "I-129 petition", "Educational credentials", "Pay stubs", "Work authorization documents"],
+          "tips": "Employer must file I-129 petition. H1-B has annual cap (April lottery). Work begins on approval date. Spouse can apply for H4 dependent visa. Process involves lottery system.",
+          "embassy": {
+            "url": "https://www.usembassy.gov/",
+            "phone": "Varies by location"
+          }
+        },
+        "Student Visa (F-1)": {
+          "requirements": "Acceptance from SEVIS-certified institution. I-20 form from school. Proof of financial support. Valid passport. Interview at US embassy.",
+          "processing_time": "2-4 weeks",
+          "validity": "Duration of study + 60 days",
+          "fee": "$160 + SEVIS $350",
+          "documents": ["Passport", "I-20 form", "SEVIS fee receipt", "Financial documents", "Educational transcripts", "Acceptance letter"],
+          "tips": "School must issue I-20 before visa application. Bring proof of financial support (minimum ~$50,000/year). On-campus employment limited to 20 hours/week. Can work off-campus after first year.",
+          "embassy": {
+            "url": "https://www.usembassy.gov/",
+            "phone": "Varies by location"
+          }
+        }
+      }
+    },
+    "UAE": {
+      "country_code": "AE",
+      "flag": "🇦🇪",
+      "description": "United Arab Emirates is a hub for business, tourism, and employment with modern infrastructure and diverse opportunities.",
+      "visa_types": {
+        "Visit Visa (Tourist)": {
+          "requirements": "Valid passport (6 months validity). Hotel booking or sponsorship letter. Return flight booking. Financial proof. Travel insurance (recommended).",
+          "processing_time": "1-3 days",
+          "validity": "30-90 days",
+          "fee": "AED 100-350",
+          "documents": ["Passport", "Hotel booking", "Flight booking", "Bank statements", "Sponsorship letter (if applicable)"],
+          "tips": "Visa on arrival available for many nationalities. Processing is very fast. Can be extended by 30 days. No work allowed on visit visa.",
+          "embassy": {
+            "url": "https://www.fcnca.ae/",
+            "phone": "+971 4 308 3333"
+          }
+        },
+        "Work Visa": {
+          "requirements": "Job offer from UAE employer. Labour contract. Educational certificates. Medical fitness certificate. Passport valid for 2 years. Employer sponsorship mandatory.",
+          "processing_time": "7-14 days",
+          "validity": "2 years (renewable)",
+          "fee": "Employer pays (varies)",
+          "documents": ["Passport", "Employment contract", "Educational certificates", "Medical examination report", "Qualification documents"],
+          "tips": "Employer must be registered with Ministry of Human Resources. Medical exam required (standard screening). Visa tied to employer - changing jobs requires new visa. Family sponsorship available after 1-2 years employment.",
+          "embassy": {
+            "url": "https://www.fcnca.ae/",
+            "phone": "+971 4 308 3333"
+          }
+        },
+        "Student Visa": {
+          "requirements": "Acceptance from recognized UAE institution. Sponsorship letter from educational institute. Valid passport. Medical fitness certificate. Financial proof from sponsor.",
+          "processing_time": "5-7 days",
+          "validity": "Duration of studies",
+          "fee": "Varies by institution",
+          "documents": ["Passport", "Admission letter", "Sponsorship documents", "Medical report", "Financial proof"],
+          "tips": "Educational institution acts as sponsor. Tuition fees typically paid upfront. Renewable annually. Can apply for work permit after graduation.",
+          "embassy": {
+            "url": "https://www.fcnca.ae/",
+            "phone": "+971 4 308 3333"
+          }
+        }
+      }
+    },
+    "Japan": {
+      "country_code": "JP",
+      "flag": "🇯🇵",
+      "description": "Japan offers rich cultural experiences, world-class technology, and opportunities in education and business sectors.",
+      "visa_types": {
+        "Tourist Visa": {
+          "requirements": "Valid passport (6+ months validity). Completed application form. Passport photos. Sufficient funds proof. Return flight booking. No criminal record.",
+          "processing_time": "4-7 days",
+          "validity": "90 days (single/multiple entries)",
+          "fee": "$20-60",
+          "documents": ["Passport", "Application form", "Photos", "Bank statements", "Flight booking", "Employment letter"],
+          "tips": "Many nationalities get 90-day visa exemption. Citizens of eligible countries can enter visa-free. Japan has very low crime and high safety standards. Must have clear return or onward travel plan.",
+          "embassy": {
+            "url": "https://www.us.emb-japan.go.jp/",
+            "phone": "Varies by location"
+          }
+        },
+        "Work Visa": {
+          "requirements": "Job offer from Japanese employer. Educational or professional qualification verification. Health certificate. Valid passport. Work permit application (Certificate of Eligibility).",
+          "processing_time": "2-4 weeks",
+          "validity": "1-3 years (renewable)",
+          "fee": "Free (employer submits)",
+          "documents": ["Passport", "Job offer letter", "Educational certificates", "Medical certificate", "CV", "Certificate of Eligibility"],
+          "tips": "Employer sponsorship required. Certificate of Eligibility issued by Immigration Bureau. Most companies provide visa sponsorship. Language skills may be required depending on job.",
+          "embassy": {
+            "url": "https://www.us.emb-japan.go.jp/",
+            "phone": "Varies by location"
+          }
+        },
+        "Student Visa": {
+          "requirements": "Acceptance from Japanese educational institution. Proof of financial support (tuition + living expenses). Valid passport. Health certificate. Academic qualifications.",
+          "processing_time": "1-3 months",
+          "validity": "1-2 years (renewable)",
+          "fee": "$0-50",
+          "documents": ["Passport", "Admission letter", "Certificate of Eligibility", "Financial proof", "Health certificate", "Academic transcripts"],
+          "tips": "School typically handles Certificate of Eligibility. Monthly living costs approximately ¥150,000-200,000 ($1,000-1,400). Part-time work allowed (max 20 hours/week). Can extend for entire degree duration.",
+          "embassy": {
+            "url": "https://www.us.emb-japan.go.jp/",
+            "phone": "Varies by location"
+          }
+        }
+      }
+    },
+    "Germany": {
+      "country_code": "DE",
+      "flag": "🇩🇪",
+      "description": "Germany is Europe's economic powerhouse with excellent opportunities in technology, engineering, education, and business.",
+      "visa_types": {
+        "Schengen Tourist Visa": {
+          "requirements": "Valid passport (3+ months validity). Completed Schengen visa form. Travel insurance (Schengen area requirement). Accommodation proof. Sufficient funds (€100/day). Return flight booking.",
+          "processing_time": "10-15 days",
+          "validity": "90 days within 180 days",
+          "fee": "€80",
+          "documents": ["Passport", "Application form", "Photos", "Travel insurance", "Accommodation proof", "Bank statements", "Flight booking"],
+          "tips": "Apply at German consulate in your country. Must have Schengen-compliant travel insurance. Part of Schengen area - valid for all Schengen countries. Apply 2-3 weeks before travel.",
+          "embassy": {
+            "url": "https://www.auswaertiges-amt.de/",
+            "phone": "Varies by location"
+          }
+        },
+        "Work Visa": {
+          "requirements": "Employment offer from German employer. University degree or equivalent qualification. Health insurance. Valid passport. Background check. Language skills may be required.",
+          "processing_time": "2-4 weeks",
+          "validity": "1-2 years (renewable, up to 5 years)",
+          "fee": "€75",
+          "documents": ["Passport", "Employment contract", "Educational credentials", "Health insurance proof", "Background check"],
+          "tips": "EU/EEA citizens have freedom of movement. Non-EU citizens need Blue Card or work visa. EU Blue Card available for skilled workers (higher salary threshold). Germany has labor shortage in tech and engineering.",
+          "embassy": {
+            "url": "https://www.auswaertiges-amt.de/",
+            "phone": "Varies by location"
+          }
+        },
+        "Student Visa": {
+          "requirements": "Acceptance from German university. Proof of financial means (€934/month). Health insurance enrollment. Valid passport. German language certificate (for German-taught programs).",
+          "processing_time": "6-12 weeks",
+          "validity": "Semester + 90 days",
+          "fee": "€75",
+          "documents": ["Passport", "Acceptance letter", "Financial proof", "Health insurance", "German language certificate", "Academic transcripts"],
+          "tips": "Many public universities free or low tuition. Health insurance mandatory for students (~€110/month). Part-time work allowed (120 days full-time equivalent per year). Can stay 18 months after graduation for job search.",
+          "embassy": {
+            "url": "https://www.auswaertiges-amt.de/",
+            "phone": "Varies by location"
+          }
+        }
+      }
+    }
+  },
+  "general_topics": {
+    "Document Preparation": {
+      "content": "When preparing visa documents, ensure all original documents are certified copies or official versions. For non-English documents, get professional certified translations. Organize documents in the order specified by the visa officer. Keep digital copies as backup. Ensure all signatures are original (not photocopied). Dates should be recent (usually within 3-6 months for financial documents).",
+      "keywords": ["documents", "preparation", "certified", "translation"]
+    },
+    "Financial Requirements": {
+      "content": "Most countries require proof of financial means to support your stay. This typically includes bank statements (3-6 months), proof of income, sponsor letters if applicable, or savings certificates. The required amount varies by country and visa type, typically $100-5000 USD. Funds must be in your name or properly documented as gifts/sponsorship.",
+      "keywords": ["financial", "means", "bank", "funds", "money", "proof"]
+    },
+    "Processing Timeline": {
+      "content": "Visa processing times vary significantly by country, season, and visa type. Tourist visas typically take 5-15 days. Work and study visas may take 2-8 weeks. Summer months have longer processing times due to volume. Always apply well in advance of your travel date. Some countries offer expedited processing for additional fees.",
+      "keywords": ["processing", "time", "timeline", "duration", "how long"]
+    },
+    "Application Mistakes": {
+      "content": "Common visa application mistakes include: incomplete forms, expired documents, poor quality photos, inconsistent information, insufficient financial proof, missing required documents, inadequate explanation letters, and failure to demonstrate ties to home country. Double-check all information before submission. Inconsistencies can lead to rejection.",
+      "keywords": ["mistake", "error", "wrong", "rejected", "deny"]
+    }
+  },
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2024-01-15",
+    "total_countries": 5,
+    "total_visa_types": 15,
+    "language": "English"
+  }
+}

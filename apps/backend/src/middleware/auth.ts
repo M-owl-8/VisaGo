@@ -18,7 +18,16 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: "Unauthorized", message: "No token provided" });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || "your-secret-key", (err: any, decoded: any) => {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    console.error("🔴 CRITICAL: JWT_SECRET is not defined in environment variables!");
+    return res.status(500).json({ 
+      error: "Internal Server Error", 
+      message: "Server configuration error" 
+    });
+  }
+
+  jwt.verify(token, jwtSecret, (err: any, decoded: any) => {
     if (err) {
       console.error("Token verification failed:", err.message);
       return res.status(403).json({ error: "Forbidden", message: "Invalid or expired token" });
@@ -31,9 +40,14 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 };
 
 export const generateToken = (userId: string, email: string): string => {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET is not defined in environment variables!");
+  }
+
   return jwt.sign(
     { id: userId, email },
-    process.env.JWT_SECRET || "your-secret-key",
+    jwtSecret,
     { expiresIn: "7d" }
   );
 };

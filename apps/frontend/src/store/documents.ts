@@ -34,12 +34,14 @@ interface DocumentStore {
   applicationDocuments: Record<string, Document[]>;
   currentDocument: Document | null;
   stats: DocumentStats | null;
+  requiredDocuments: Record<string, string[]>;
   isLoading: boolean;
   error: string | null;
 
   // Actions
   loadDocuments: () => Promise<void>;
   loadApplicationDocuments: (applicationId: string) => Promise<void>;
+  getRequiredDocuments: (applicationId: string) => Promise<string[]>;
   getDocument: (documentId: string) => Promise<void>;
   uploadDocument: (
     applicationId: string,
@@ -47,6 +49,11 @@ interface DocumentStore {
     file: any
   ) => Promise<void>;
   deleteDocument: (documentId: string) => Promise<void>;
+  updateDocumentStatus: (
+    documentId: string,
+    status: "pending" | "verified" | "rejected",
+    verificationNotes?: string
+  ) => Promise<void>;
   loadStats: () => Promise<void>;
   clearError: () => void;
 }
@@ -59,6 +66,7 @@ export const useDocumentStore = create<DocumentStore>()(
       applicationDocuments: {},
       currentDocument: null,
       stats: null,
+      requiredDocuments: {},
       isLoading: false,
       error: null,
 
@@ -181,6 +189,67 @@ export const useDocumentStore = create<DocumentStore>()(
         } catch (error: any) {
           set({
             error: error.message || "Failed to delete document",
+            isLoading: false,
+          });
+        }
+      },
+
+      // Get required documents for an application
+      getRequiredDocuments: async (applicationId: string) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await apiClient.getRequiredDocuments(applicationId);
+
+          if (response.success) {
+            const requiredDocs = response.data?.requiredDocuments || [];
+            set((state) => ({
+              requiredDocuments: {
+                ...state.requiredDocuments,
+                [applicationId]: requiredDocs,
+              },
+              isLoading: false,
+            }));
+            return requiredDocs;
+          } else {
+            set({ error: response.error?.message || "Failed to load required documents" });
+            return [];
+          }
+        } catch (error: any) {
+          set({
+            error: error.message || "Failed to load required documents",
+            isLoading: false,
+          });
+          return [];
+        }
+      },
+
+      // Update document status
+      updateDocumentStatus: async (
+        documentId: string,
+        status: "pending" | "verified" | "rejected",
+        verificationNotes?: string
+      ) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await apiClient.updateDocumentStatus(
+            documentId,
+            status,
+            verificationNotes
+          );
+
+          if (response.success) {
+            set((state) => ({
+              documents: state.documents.map((d) =>
+                d.id === documentId ? { ...d, status, verificationNotes } : d
+              ),
+              isLoading: false,
+            }));
+          } else {
+            set({ error: response.error?.message || "Failed to update document status" });
+          }
+        } catch (error: any) {
+          set({
+            error: error.message || "Failed to update document status",
             isLoading: false,
           });
         }

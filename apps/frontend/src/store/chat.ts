@@ -23,6 +23,16 @@ export interface ChatStats {
   uniqueApplications: number;
 }
 
+export interface ChatSession {
+  id: string;
+  userId: string;
+  applicationId?: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages?: ChatMessage[];
+}
+
 interface ChatConversation {
   messages: ChatMessage[];
   total: number;
@@ -35,6 +45,8 @@ interface ChatStore {
   conversations: Record<string, ChatConversation>;
   currentConversation: ChatConversation | null;
   currentApplicationId: string | null;
+  currentSessionId: string | null;
+  sessions: ChatSession[];
   stats: ChatStats | null;
   isLoading: boolean;
   isSending: boolean;
@@ -47,10 +59,16 @@ interface ChatStore {
     applicationId?: string,
     conversationHistory?: ChatMessage[]
   ) => Promise<void>;
-  searchDocuments: (query: string) => Promise<any>;
+  searchDocuments: (query: string, country?: string, visaType?: string) => Promise<any>;
   clearChatHistory: (applicationId?: string) => Promise<void>;
   loadStats: () => Promise<void>;
+  loadSessions: (limit?: number, offset?: number) => Promise<void>;
+  loadSessionDetails: (sessionId: string) => Promise<void>;
+  renameSession: (sessionId: string, newTitle: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  addMessageFeedback: (messageId: string, feedback: "thumbs_up" | "thumbs_down") => Promise<void>;
   setCurrentApplicationId: (applicationId: string | null) => void;
+  setCurrentSessionId: (sessionId: string | null) => void;
   clearError: () => void;
 }
 
@@ -61,6 +79,8 @@ export const useChatStore = create<ChatStore>()(
       conversations: {},
       currentConversation: null,
       currentApplicationId: null,
+      currentSessionId: null,
+      sessions: [],
       stats: null,
       isLoading: false,
       isSending: false,
@@ -218,6 +238,121 @@ export const useChatStore = create<ChatStore>()(
       // Set current application ID
       setCurrentApplicationId: (applicationId: string | null) => {
         set({ currentApplicationId: applicationId });
+      },
+
+      // Load chat sessions
+      loadSessions: async (limit = 20, offset = 0) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await apiClient.getChatSessions(limit, offset);
+
+          if (response.success) {
+            set({
+              sessions: response.data.sessions || [],
+              isLoading: false,
+            });
+          } else {
+            set({ error: response.error?.message || "Failed to load sessions" });
+          }
+        } catch (error: any) {
+          set({
+            error: error.message || "Failed to load sessions",
+            isLoading: false,
+          });
+        }
+      },
+
+      // Load session details
+      loadSessionDetails: async (sessionId: string) => {
+        try {
+          set({ isLoading: true, error: null });
+          const response = await apiClient.getSessionDetails(sessionId);
+
+          if (response.success) {
+            const session = response.data;
+            set((state) => ({
+              conversations: {
+                ...state.conversations,
+                [sessionId]: {
+                  messages: session.messages || [],
+                  total: session.messages?.length || 0,
+                  limit: 50,
+                  offset: 0,
+                },
+              },
+              currentConversation: {
+                messages: session.messages || [],
+                total: session.messages?.length || 0,
+                limit: 50,
+                offset: 0,
+              },
+              currentSessionId: sessionId,
+              isLoading: false,
+            }));
+          } else {
+            set({ error: response.error?.message || "Failed to load session" });
+          }
+        } catch (error: any) {
+          set({
+            error: error.message || "Failed to load session",
+            isLoading: false,
+          });
+        }
+      },
+
+      // Rename session
+      renameSession: async (sessionId: string, newTitle: string) => {
+        try {
+          const response = await apiClient.renameSession(sessionId, newTitle);
+
+          if (response.success) {
+            set((state) => ({
+              sessions: state.sessions.map((s) =>
+                s.id === sessionId ? { ...s, title: newTitle } : s
+              ),
+            }));
+          } else {
+            set({ error: response.error?.message || "Failed to rename session" });
+          }
+        } catch (error: any) {
+          set({ error: error.message || "Failed to rename session" });
+        }
+      },
+
+      // Delete session
+      deleteSession: async (sessionId: string) => {
+        try {
+          const response = await apiClient.deleteSession(sessionId);
+
+          if (response.success) {
+            set((state) => ({
+              sessions: state.sessions.filter((s) => s.id !== sessionId),
+              currentSessionId:
+                state.currentSessionId === sessionId ? null : state.currentSessionId,
+            }));
+          } else {
+            set({ error: response.error?.message || "Failed to delete session" });
+          }
+        } catch (error: any) {
+          set({ error: error.message || "Failed to delete session" });
+        }
+      },
+
+      // Add message feedback
+      addMessageFeedback: async (
+        messageId: string,
+        feedback: "thumbs_up" | "thumbs_down"
+      ) => {
+        try {
+          await apiClient.addMessageFeedback(messageId, feedback);
+        } catch (error: any) {
+          console.error("Failed to send feedback:", error);
+        }
+      },
+
+      // Set current session ID
+      setCurrentSessionId: (sessionId: string | null) => {
+        set({ currentSessionId: sessionId });
       },
 
       // Clear error

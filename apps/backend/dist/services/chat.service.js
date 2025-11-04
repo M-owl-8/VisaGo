@@ -32,9 +32,46 @@ class ChatService {
         return newSession.id;
     }
     /**
-     * Send a message and get AI response
+     * Extract context from visa application
+     */
+    async extractApplicationContext(applicationId) {
+        try {
+            const application = await prisma.visaApplication.findUnique({
+                where: { id: applicationId },
+                include: {
+                    country: true,
+                    visaType: true,
+                    documents: true,
+                },
+            });
+            if (!application) {
+                return null;
+            }
+            const documentStatus = application.documents.reduce((acc, doc) => {
+                acc[doc.documentType] = doc.status;
+                return acc;
+            }, {});
+            return {
+                country: application.country.name,
+                visaType: application.visaType.name,
+                processingDays: application.visaType.processingDays,
+                fee: application.visaType.fee,
+                requiredDocuments: JSON.parse(application.visaType.documentTypes || "[]"),
+                documentsCollected: application.documents.filter((d) => d.status === "verified").length,
+                totalDocuments: application.documents.length,
+                applicationStatus: application.status,
+            };
+        }
+        catch (error) {
+            console.error("Failed to extract application context:", error);
+            return null;
+        }
+    }
+    /**
+     * Send a message and get AI response with RAG context
      */
     async sendMessage(userId, content, applicationId, conversationHistory) {
+        const startTime = Date.now();
         try {
             // Get or create session
             const sessionId = await this.getOrCreateSession(userId, applicationId);
@@ -50,14 +87,37 @@ class ChatService {
                     .reverse()
                     .map((m) => ({ role: m.role, content: m.content }));
             }
-            // Call AI service
+            // Extract application context for better responses
+            let applicationContext = null;
+            if (applicationId) {
+                applicationContext = await this.extractApplicationContext(applicationId);
+            }
+            // Build context string for RAG
+            let ragContext = "";
+            if (applicationContext) {
+                ragContext = `
+User's Current Visa Application:
+- Country: ${applicationContext.country}
+- Visa Type: ${applicationContext.visaType}
+- Processing Time: ${applicationContext.processingDays} days
+- Fee: $${applicationContext.fee}
+- Documents Collected: ${applicationContext.documentsCollected}/${applicationContext.totalDocuments}
+- Required Documents: ${applicationContext.requiredDocuments.join(", ")}
+- Application Status: ${applicationContext.applicationStatus}
+        `.trim();
+            }
+            // Call AI service with full context
             const aiResponse = await axios_1.default.post(`${AI_SERVICE_URL}/api/chat`, {
                 content,
                 user_id: userId,
                 application_id: applicationId,
                 conversation_history: history,
+                context: ragContext,
+                country: applicationContext?.country,
+                visa_type: applicationContext?.visaType,
             });
-            const { message, sources = [], tokens_used = 0, model = "gpt-4" } = aiResponse.data;
+            const { message, sources = [], tokens_used = 0, model = "gpt-4", } = aiResponse.data;
+            const responseTime = Date.now() - startTime;
             // Save user message
             await prisma.chatMessage.create({
                 data: {
@@ -67,9 +127,10 @@ class ChatService {
                     content,
                     sources: JSON.stringify([]),
                     model,
+                    responseTime,
                 },
             });
-            // Save assistant response
+            // Save assistant response with sources and response time
             const assistantMessage = await prisma.chatMessage.create({
                 data: {
                     sessionId,
@@ -79,7 +140,13 @@ class ChatService {
                     sources: JSON.stringify(sources || []),
                     model,
                     tokensUsed: tokens_used,
+                    responseTime,
                 },
+            });
+            // Update session's last interaction time
+            await prisma.chatSession.update({
+                where: { id: sessionId },
+                data: { updatedAt: new Date() },
             });
             return {
                 message,
@@ -87,6 +154,7 @@ class ChatService {
                 tokens_used,
                 model,
                 id: assistantMessage.id,
+                applicationContext,
             };
         }
         catch (error) {
@@ -96,6 +164,7 @@ class ChatService {
                 try {
                     const sessionId = await this.getOrCreateSession(userId, applicationId);
                     // Save user message anyway
+                    const responseTime = Date.now() - startTime;
                     await prisma.chatMessage.create({
                         data: {
                             sessionId,
@@ -103,6 +172,7 @@ class ChatService {
                             role: "user",
                             content,
                             sources: JSON.stringify([]),
+                            responseTime,
                         },
                     });
                 }
@@ -159,18 +229,77 @@ class ChatService {
         }
     }
     /**
-     * Get user's chat sessions
+     * Get user's chat sessions with pagination
      */
-    async getUserSessions(userId) {
-        return await prisma.chatSession.findMany({
+    async getUserSessions(userId, limit = 20, offset = 0) {
+        const sessions = await prisma.chatSession.findMany({
             where: { userId },
             orderBy: { updatedAt: "desc" },
+            skip: offset,
+            take: limit,
             include: {
                 messages: {
                     orderBy: { createdAt: "desc" },
                     take: 1,
+                    select: {
+                        content: true,
+                        createdAt: true,
+                        role: true,
+                    },
                 },
             },
+        });
+        const total = await prisma.chatSession.count({
+            where: { userId },
+        });
+        return {
+            sessions,
+            total,
+            limit,
+            offset,
+        };
+    }
+    /**
+     * Get session details
+     */
+    async getSessionDetails(sessionId, userId) {
+        const session = await prisma.chatSession.findFirst({
+            where: { id: sessionId, userId },
+            include: {
+                messages: {
+                    orderBy: { createdAt: "asc" },
+                    select: {
+                        id: true,
+                        role: true,
+                        content: true,
+                        sources: true,
+                        model: true,
+                        tokensUsed: true,
+                        responseTime: true,
+                        feedback: true,
+                        createdAt: true,
+                    },
+                },
+            },
+        });
+        if (!session) {
+            throw new Error("Session not found");
+        }
+        return session;
+    }
+    /**
+     * Rename a chat session
+     */
+    async renameSession(sessionId, userId, newTitle) {
+        const session = await prisma.chatSession.findFirst({
+            where: { id: sessionId, userId },
+        });
+        if (!session) {
+            throw new Error("Session not found");
+        }
+        return await prisma.chatSession.update({
+            where: { id: sessionId },
+            data: { title: newTitle },
         });
     }
     /**
@@ -191,19 +320,48 @@ class ChatService {
         });
     }
     /**
-     * Search documents in knowledge base
+     * Search documents in knowledge base with filters
      */
-    async searchDocuments(query) {
+    async searchDocuments(query, country, visaType, limit = 5) {
         try {
-            // Call AI service to search
-            const response = await axios_1.default.post(`${AI_SERVICE_URL}/api/search`, {
+            // Call AI service to search with filters
+            const response = await axios_1.default.post(`${AI_SERVICE_URL}/api/chat/search`, {
                 query,
+                country,
+                visa_type: visaType,
+                limit,
             });
-            return response.data.results || [];
+            return response.data.data || response.data.results || [];
         }
         catch (error) {
             console.error("Search error:", error);
             return [];
+        }
+    }
+    /**
+     * Add feedback to a message (thumbs up/down or detailed feedback)
+     */
+    async addMessageFeedback(messageId, userId, feedback) {
+        try {
+            // Verify message belongs to user
+            const message = await prisma.chatMessage.findFirst({
+                where: { id: messageId, userId },
+            });
+            if (!message) {
+                throw new Error("Message not found");
+            }
+            // If it's a new thumbs_down, don't overwrite if already exists
+            if (feedback === "thumbs_down" && message.feedback === "thumbs_down") {
+                return message;
+            }
+            return await prisma.chatMessage.update({
+                where: { id: messageId },
+                data: { feedback },
+            });
+        }
+        catch (error) {
+            console.error("Feedback error:", error);
+            throw error;
         }
     }
     /**

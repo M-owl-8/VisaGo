@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useChatStore } from "../../store/chat";
 import { colors } from "../../theme/colors";
+import { apiClient } from "../../services/api";
 
 export const ChatScreen = ({ route }: any) => {
   const insets = useSafeAreaInsets();
@@ -53,64 +54,159 @@ export const ChatScreen = ({ route }: any) => {
     );
   };
 
+  const [showQuickActions, setShowQuickActions] = React.useState(true);
+  const [feedbackLoading, setFeedbackLoading] = React.useState<string | null>(null);
+  const [messageFeedback, setMessageFeedback] = React.useState<{
+    [messageId: string]: string;
+  }>({});
+
+  const handleQuickAction = async (action: string) => {
+    const quickMessages: { [key: string]: string } = {
+      documents: "What documents do I need to upload for my application?",
+      timeline: "What's the expected processing timeline for my visa?",
+      requirements: "What are the financial requirements for my application?",
+      mistakes: "What are common mistakes applicants make?",
+      embassy: "How can I contact the embassy?",
+      update: "What's the status of my application?",
+    };
+
+    if (quickMessages[action]) {
+      setMessageInput(quickMessages[action]);
+      setTimeout(() => handleSendMessage(), 100);
+      setShowQuickActions(false);
+    }
+  };
+
+  const handleMessageFeedback = async (
+    messageId: string,
+    feedback: "thumbs_up" | "thumbs_down"
+  ) => {
+    try {
+      setFeedbackLoading(messageId);
+      await apiClient.addMessageFeedback(messageId, feedback);
+      setMessageFeedback((prev) => ({
+        ...prev,
+        [messageId]: feedback,
+      }));
+    } catch (error) {
+      console.error("Failed to send feedback:", error);
+    } finally {
+      setFeedbackLoading(null);
+    }
+  };
+
   const renderMessage = ({ item }: { item: any }) => {
     const isUser = item.role === "user";
 
     return (
       <View
         style={{
-          flexDirection: "row",
-          justifyContent: isUser ? "flex-end" : "flex-start",
           marginBottom: colors.spacing[12],
           paddingHorizontal: colors.spacing[16],
         }}
       >
         <View
           style={{
-            maxWidth: "80%",
-            backgroundColor: isUser ? colors.black : colors.gray[100],
-            borderRadius: colors.radius[12],
-            paddingHorizontal: colors.spacing[12],
-            paddingVertical: colors.spacing[10],
+            flexDirection: "row",
+            justifyContent: isUser ? "flex-end" : "flex-start",
           }}
         >
-          <Text
+          <View
             style={{
-              fontSize: colors.typography.sizes.sm,
-              color: isUser ? colors.white : colors.black,
-              lineHeight: colors.typography.lineHeights[1.5],
+              maxWidth: "80%",
+              backgroundColor: isUser ? colors.black : colors.gray[100],
+              borderRadius: colors.radius[12],
+              paddingHorizontal: colors.spacing[12],
+              paddingVertical: colors.spacing[10],
             }}
           >
-            {item.content}
-          </Text>
+            <Text
+              style={{
+                fontSize: colors.typography.sizes.sm,
+                color: isUser ? colors.white : colors.black,
+                lineHeight: colors.typography.lineHeights[1.5],
+              }}
+            >
+              {item.content}
+            </Text>
 
-          {item.sources && item.sources.length > 0 && (
-            <View style={{ marginTop: colors.spacing[8] }}>
-              <Text
-                style={{
-                  fontSize: colors.typography.sizes.xs,
-                  color: isUser ? colors.gray[200] : colors.gray[600],
-                  fontStyle: "italic",
-                }}
-              >
-                Sources: {item.sources.join(", ")}
-              </Text>
-            </View>
-          )}
+            {item.sources && item.sources.length > 0 && (
+              <View style={{ marginTop: colors.spacing[8] }}>
+                <Text
+                  style={{
+                    fontSize: colors.typography.sizes.xs,
+                    color: isUser ? colors.gray[200] : colors.gray[600],
+                    fontStyle: "italic",
+                  }}
+                >
+                  📚 Sources: {item.sources.join(", ")}
+                </Text>
+              </View>
+            )}
 
-          <Text
-            style={{
-              fontSize: colors.typography.sizes.xs,
-              color: isUser ? colors.gray[300] : colors.gray[500],
-              marginTop: colors.spacing[4],
-            }}
-          >
-            {new Date(item.createdAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </Text>
+            <Text
+              style={{
+                fontSize: colors.typography.sizes.xs,
+                color: isUser ? colors.gray[300] : colors.gray[500],
+                marginTop: colors.spacing[4],
+              }}
+            >
+              {new Date(item.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </Text>
+          </View>
         </View>
+
+        {/* Feedback buttons for assistant messages */}
+        {!isUser && (
+          <View
+            style={{
+              flexDirection: "row",
+              gap: colors.spacing[8],
+              marginTop: colors.spacing[8],
+              marginLeft: isUser ? "auto" : colors.spacing[0],
+              marginRight: isUser ? colors.spacing[0] : "auto",
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => handleMessageFeedback(item.id, "thumbs_up")}
+              disabled={feedbackLoading === item.id}
+              style={{
+                paddingVertical: colors.spacing[6],
+                paddingHorizontal: colors.spacing[10],
+                borderRadius: colors.radius[4],
+                backgroundColor:
+                  messageFeedback[item.id] === "thumbs_up"
+                    ? colors.gray[300]
+                    : colors.white,
+                borderWidth: 1,
+                borderColor: colors.gray[300],
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>👍</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => handleMessageFeedback(item.id, "thumbs_down")}
+              disabled={feedbackLoading === item.id}
+              style={{
+                paddingVertical: colors.spacing[6],
+                paddingHorizontal: colors.spacing[10],
+                borderRadius: colors.radius[4],
+                backgroundColor:
+                  messageFeedback[item.id] === "thumbs_down"
+                    ? colors.gray[300]
+                    : colors.white,
+                borderWidth: 1,
+                borderColor: colors.gray[300],
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>👎</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -191,6 +287,17 @@ export const ChatScreen = ({ route }: any) => {
           >
             <Text
               style={{
+                fontSize: colors.typography.sizes.lg,
+                fontWeight: "600",
+                color: colors.black,
+                textAlign: "center",
+                marginBottom: colors.spacing[8],
+              }}
+            >
+              🤖 AI Visa Assistant
+            </Text>
+            <Text
+              style={{
                 fontSize: colors.typography.sizes.base,
                 color: colors.gray[600],
                 textAlign: "center",
@@ -208,6 +315,105 @@ export const ChatScreen = ({ route }: any) => {
             >
               Ask me anything about your visa application or the visa process
             </Text>
+
+            {/* Quick Action Buttons */}
+            {showQuickActions && (
+              <View
+                style={{
+                  marginTop: colors.spacing[24],
+                  width: "100%",
+                  gap: colors.spacing[12],
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() => handleQuickAction("documents")}
+                  style={{
+                    backgroundColor: colors.gray[100],
+                    paddingVertical: colors.spacing[12],
+                    paddingHorizontal: colors.spacing[16],
+                    borderRadius: colors.radius[8],
+                    borderLeftWidth: 3,
+                    borderLeftColor: colors.black,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: colors.typography.sizes.sm,
+                      color: colors.black,
+                      fontWeight: "500",
+                    }}
+                  >
+                    📄 What documents do I need?
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleQuickAction("timeline")}
+                  style={{
+                    backgroundColor: colors.gray[100],
+                    paddingVertical: colors.spacing[12],
+                    paddingHorizontal: colors.spacing[16],
+                    borderRadius: colors.radius[8],
+                    borderLeftWidth: 3,
+                    borderLeftColor: colors.black,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: colors.typography.sizes.sm,
+                      color: colors.black,
+                      fontWeight: "500",
+                    }}
+                  >
+                    ⏱️ What's the processing time?
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleQuickAction("requirements")}
+                  style={{
+                    backgroundColor: colors.gray[100],
+                    paddingVertical: colors.spacing[12],
+                    paddingHorizontal: colors.spacing[16],
+                    borderRadius: colors.radius[8],
+                    borderLeftWidth: 3,
+                    borderLeftColor: colors.black,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: colors.typography.sizes.sm,
+                      color: colors.black,
+                      fontWeight: "500",
+                    }}
+                  >
+                    💰 What are the financial requirements?
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleQuickAction("mistakes")}
+                  style={{
+                    backgroundColor: colors.gray[100],
+                    paddingVertical: colors.spacing[12],
+                    paddingHorizontal: colors.spacing[16],
+                    borderRadius: colors.radius[8],
+                    borderLeftWidth: 3,
+                    borderLeftColor: colors.black,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: colors.typography.sizes.sm,
+                      color: colors.black,
+                      fontWeight: "500",
+                    }}
+                  >
+                    ⚠️ What mistakes should I avoid?
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         ) : (
           <FlatList

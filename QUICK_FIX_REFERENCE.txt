@@ -1,0 +1,45 @@
+================================================================================
+VISABUDDY STARTUP SCRIPTS - FIXES APPLIED
+================================================================================
+
+PROBLEMS FOUND:
+1. Variable interpolation in URL - $HostIP:$BackendPort couldn't parse
+2. Complex string expressions with nested parentheses
+3. Unicode character encoding corruption (emojis)
+
+SOLUTION APPLIED:
+✓ Fixed ${Variable} syntax for URL construction
+✓ Simplified complex expressions with intermediate variables
+✓ Replaced all emojis with plain text
+✓ Adjusted error handling for better robustness
+
+SCRIPTS FIXED:
+✓ START_VISABUDDY_PROPERLY.ps1 - Main startup script
+✓ RUN_NOW.ps1 - Quick launcher wrapper
+✓ START_EMULATOR_NOW.ps1 - Original emulator script
+
+HOW TO RUN:
+1. Open PowerShell
+2. Run: c:\work\VisaBuddy\RUN_NOW.ps1
+3. Wait for app to appear on emulator (5-10 min first time)
+
+WHAT HAPPENS:
+1. Checks all prerequisites (Node, npm, Android SDK)
+2. Starts Android Emulator (2-3 min)
+3. Starts Backend server on localhost:3000
+4. Sets up Frontend configuration
+5. Builds and deploys app to emulator
+6. App opens with login screen
+
+TEST LOGIN:
+Email: test@visabuddy.com
+Password: Test123!
+
+TROUBLESHOOTING:
+- If "Port 3000 in use": Get-Process node | Stop-Process -Force
+- If emulator won't start: Try manually from Android Studio
+- If app blank: Press 'R' twice in Expo terminal
+- Check backend window for errors
+
+STATUS: READY TO RUN!
+================================================================================

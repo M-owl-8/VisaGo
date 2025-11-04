@@ -45,12 +45,12 @@ export declare class ApplicationsService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
+        notes: string | null;
+        expiryDate: Date | null;
         status: string;
         progressPercentage: number;
-        notes: string | null;
         submissionDate: Date | null;
         approvalDate: Date | null;
-        expiryDate: Date | null;
     })[]>;
     /**
      * Get single application
@@ -98,12 +98,12 @@ export declare class ApplicationsService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
+        notes: string | null;
+        expiryDate: Date | null;
         status: string;
         progressPercentage: number;
-        notes: string | null;
         submissionDate: Date | null;
         approvalDate: Date | null;
-        expiryDate: Date | null;
     }>;
     /**
      * Create new visa application
@@ -155,12 +155,12 @@ export declare class ApplicationsService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
+        notes: string | null;
+        expiryDate: Date | null;
         status: string;
         progressPercentage: number;
-        notes: string | null;
         submissionDate: Date | null;
         approvalDate: Date | null;
-        expiryDate: Date | null;
     }>;
     /**
      * Update application status
@@ -208,12 +208,12 @@ export declare class ApplicationsService {
         createdAt: Date;
         updatedAt: Date;
         userId: string;
+        notes: string | null;
+        expiryDate: Date | null;
         status: string;
         progressPercentage: number;
-        notes: string | null;
         submissionDate: Date | null;
         approvalDate: Date | null;
-        expiryDate: Date | null;
     }>;
     /**
      * Update checkpoint status

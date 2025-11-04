@@ -68,6 +68,10 @@ export declare class AuthService {
         currency: string;
     }>;
     /**
+     * Refresh JWT token
+     */
+    static refreshToken(userId: string): Promise<string>;
+    /**
      * Verify Google OAuth login/registration
      */
     static verifyGoogleAuth(payload: {

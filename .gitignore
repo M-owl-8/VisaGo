@@ -58,6 +58,11 @@ google-services.json
 *.crt
 firebase-key.json
 serviceAccountKey.json
+*-firebase-adminsdk-*.json   # Firebase service accounts (e.g., pctt-203e6-firebase-adminsdk-fbsvc-*.json)
+firebase-*.json
+*-adminsdk-*.json
+service-account.json
+*.serviceAccountKey.json
 
 # Python
 __pycache__/

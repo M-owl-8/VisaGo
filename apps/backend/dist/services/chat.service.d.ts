@@ -4,7 +4,11 @@ export declare class ChatService {
      */
     getOrCreateSession(userId: string, applicationId?: string): Promise<string>;
     /**
-     * Send a message and get AI response
+     * Extract context from visa application
+     */
+    private extractApplicationContext;
+    /**
+     * Send a message and get AI response with RAG context
      */
     sendMessage(userId: string, content: string, applicationId?: string, conversationHistory?: any[]): Promise<{
         message: any;
@@ -12,12 +16,23 @@ export declare class ChatService {
         tokens_used: any;
         model: any;
         id: string;
+        applicationContext: {
+            country: string;
+            visaType: string;
+            processingDays: number;
+            fee: number;
+            requiredDocuments: any;
+            documentsCollected: number;
+            totalDocuments: number;
+            applicationStatus: string;
+        } | null;
     } | {
         message: string;
         sources: never[];
         tokens_used: number;
         model: string;
         id?: undefined;
+        applicationContext?: undefined;
     }>;
     /**
      * Get conversation history
@@ -31,14 +46,37 @@ export declare class ChatService {
         content: string;
         createdAt: Date;
         userId: string;
-        sessionId: string;
         role: string;
+        sessionId: string;
         feedback: string | null;
     }[]>;
     /**
-     * Get user's chat sessions
+     * Get user's chat sessions with pagination
      */
-    getUserSessions(userId: string): Promise<({
+    getUserSessions(userId: string, limit?: number, offset?: number): Promise<{
+        sessions: ({
+            messages: {
+                content: string;
+                createdAt: Date;
+                role: string;
+            }[];
+        } & {
+            id: string;
+            title: string;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            applicationId: string | null;
+            systemPrompt: string;
+        })[];
+        total: number;
+        limit: number;
+        offset: number;
+    }>;
+    /**
+     * Get session details
+     */
+    getSessionDetails(sessionId: string, userId: string): Promise<{
         messages: {
             id: string;
             model: string;
@@ -47,8 +85,6 @@ export declare class ChatService {
             tokensUsed: number;
             content: string;
             createdAt: Date;
-            userId: string;
-            sessionId: string;
             role: string;
             feedback: string | null;
         }[];
@@ -60,7 +96,19 @@ export declare class ChatService {
         userId: string;
         applicationId: string | null;
         systemPrompt: string;
-    })[]>;
+    }>;
+    /**
+     * Rename a chat session
+     */
+    renameSession(sessionId: string, userId: string, newTitle: string): Promise<{
+        id: string;
+        title: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        applicationId: string | null;
+        systemPrompt: string;
+    }>;
     /**
      * Add feedback to a message
      */
@@ -73,8 +121,8 @@ export declare class ChatService {
         content: string;
         createdAt: Date;
         userId: string;
-        sessionId: string;
         role: string;
+        sessionId: string;
         feedback: string | null;
     }>;
     /**
@@ -90,9 +138,25 @@ export declare class ChatService {
         systemPrompt: string;
     }>;
     /**
-     * Search documents in knowledge base
+     * Search documents in knowledge base with filters
      */
-    searchDocuments(query: string): Promise<any>;
+    searchDocuments(query: string, country?: string, visaType?: string, limit?: number): Promise<any>;
+    /**
+     * Add feedback to a message (thumbs up/down or detailed feedback)
+     */
+    addMessageFeedback(messageId: string, userId: string, feedback: "thumbs_up" | "thumbs_down" | string): Promise<{
+        id: string;
+        model: string;
+        responseTime: number | null;
+        sources: string | null;
+        tokensUsed: number;
+        content: string;
+        createdAt: Date;
+        userId: string;
+        role: string;
+        sessionId: string;
+        feedback: string | null;
+    }>;
     /**
      * Clear conversation history for a user/application
      */

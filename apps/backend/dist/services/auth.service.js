@@ -18,8 +18,21 @@ class AuthService {
         if (!payload.email || !payload.password) {
             throw errors_1.errors.validationError("Email and password are required");
         }
-        if (payload.password.length < 6) {
-            throw errors_1.errors.validationError("Password must be at least 6 characters");
+        // Validate password strength (12+ chars, uppercase, lowercase, number, special char)
+        if (payload.password.length < 12) {
+            throw errors_1.errors.validationError("Password must be at least 12 characters");
+        }
+        if (!/[A-Z]/.test(payload.password)) {
+            throw errors_1.errors.validationError("Password must contain at least one uppercase letter");
+        }
+        if (!/[a-z]/.test(payload.password)) {
+            throw errors_1.errors.validationError("Password must contain at least one lowercase letter");
+        }
+        if (!/[0-9]/.test(payload.password)) {
+            throw errors_1.errors.validationError("Password must contain at least one number");
+        }
+        if (!/[!@#$%^&*]/.test(payload.password)) {
+            throw errors_1.errors.validationError("Password must contain at least one special character (!@#$%^&*)");
         }
         // Check if user already exists
         const existingUser = await prisma.user.findUnique({
@@ -28,8 +41,8 @@ class AuthService {
         if (existingUser) {
             throw errors_1.errors.conflict("Email");
         }
-        // Hash password
-        const passwordHash = await bcryptjs_1.default.hash(payload.password, 10);
+        // Hash password with 12 rounds for production security
+        const passwordHash = await bcryptjs_1.default.hash(payload.password, 12);
         // Create user
         const user = await prisma.user.create({
             data: {
@@ -141,6 +154,20 @@ class AuthService {
             timezone: user.timezone,
             currency: user.currency,
         };
+    }
+    /**
+     * Refresh JWT token
+     */
+    static async refreshToken(userId) {
+        // Get user to verify they still exist
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw errors_1.errors.notFound("User");
+        }
+        // Generate new token
+        return (0, auth_1.generateToken)(user.id, user.email);
     }
     /**
      * Verify Google OAuth login/registration

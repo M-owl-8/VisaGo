@@ -42,8 +42,13 @@ class ChatMessage(BaseModel):
     """Message model for chat requests"""
     content: str
     user_id: str
+    session_id: Optional[str] = None
     application_id: Optional[str] = None
+    application_context: Optional[dict] = None
     conversation_history: Optional[List[dict]] = None
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = None
+    language: Optional[str] = "en"  # Language code: en, ru, uz
 
 
 class ChatResponse(BaseModel):
@@ -51,7 +56,28 @@ class ChatResponse(BaseModel):
     message: str
     sources: List[str]
     tokens_used: int
+    tokens_breakdown: Optional[dict] = None
     model: str
+    generation_time_ms: Optional[float] = None
+    finish_reason: Optional[str] = None
+    error: Optional[str] = None
+
+
+class RateLimitInfo(BaseModel):
+    """Rate limit information"""
+    current_requests: int
+    limit: int
+    remaining: int
+    reset_at: str
+
+
+class UsageStats(BaseModel):
+    """Usage statistics"""
+    total_tokens: int
+    total_cost: float
+    request_count: int
+    average_tokens_per_request: float
+    period: str
 
 
 class HealthResponse(BaseModel):
@@ -88,69 +114,115 @@ async def api_status():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage):
     """
-    Chat endpoint with RAG support
+    Chat endpoint with RAG support and OpenAI integration
     
     - **content**: User's message
-    - **user_id**: User identifier
-    - **application_id**: Optional visa application context
+    - **user_id**: User identifier (for rate limiting and tracking)
+    - **session_id**: Optional session identifier
+    - **application_id**: Optional visa application ID
+    - **application_context**: Optional application context for context injection
     - **conversation_history**: Optional chat history for context
+    - **temperature**: Response creativity (0-2, default 0.7)
+    - **max_tokens**: Maximum tokens in response
     """
     try:
         logger.info(f"Received chat message from user {message.user_id}")
         
-        # Prepare system prompt with context
-        system_prompt = """You are a helpful visa application assistant for VisaBuddy. 
-You provide accurate information about:
-- Visa requirements and processes
-- Document preparation and submission
-- Application timelines and costs
-- Immigration procedures and regulations
-- Payment and processing details
-
-Be professional, concise, and helpful. Always recommend consulting official government websites or immigration lawyers for complex legal matters."""
+        # Import services
+        from services.rag import get_rag_service
+        from services.prompt import get_prompt_service
+        from services.openai import get_openai_service
         
-        # Build conversation history for context
-        messages = []
-        if message.conversation_history:
-            messages.extend(message.conversation_history)
-        messages.append({"role": "user", "content": message.content})
+        rag_service = get_rag_service()
+        prompt_service = get_prompt_service()
+        openai_service = get_openai_service()
         
-        # Call OpenAI API (using fallback if not configured)
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            logger.warning("OpenAI API key not configured, using fallback response")
-            response_text = _get_fallback_response(message.content)
-            tokens_used = len(message.content.split()) + len(response_text.split())
-        else:
+        # Check rate limit
+        is_allowed, rate_info = openai_service.check_rate_limit(message.user_id)
+        if not is_allowed:
+            logger.warning(f"Rate limit exceeded for user {message.user_id}")
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded. {rate_info['remaining']} requests remaining after reset.",
+                headers={"Retry-After": rate_info["reset_at"]},
+            )
+        
+        # Retrieve relevant context from knowledge base
+        rag_context = None
+        sources = []
+        
+        if rag_service.initialized:
+            logger.info(f"Retrieving RAG context for query: {message.content[:100]}")
             try:
-                from openai import OpenAI
-                client = OpenAI(api_key=api_key)
-                
-                response = client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[{"role": "system", "content": system_prompt}] + messages,
-                    max_tokens=500,
-                    temperature=0.7,
+                rag_context = await rag_service.retrieve_context(
+                    query=message.content,
+                    top_k=5
                 )
-                
-                response_text = response.choices[0].message.content
-                tokens_used = response.usage.total_tokens
+                sources = rag_context.get("sources", [])
+                logger.info(f"✅ Retrieved {len(sources)} relevant sources from RAG")
             except Exception as e:
-                logger.error(f"OpenAI API error: {str(e)}")
-                response_text = _get_fallback_response(message.content)
-                tokens_used = len(message.content.split()) + len(response_text.split())
+                logger.warning(f"RAG retrieval error: {str(e)}, continuing without context")
+                rag_context = None
+        else:
+            logger.debug("RAG service not initialized, proceeding without knowledge base context")
         
+        # Build system prompt with all context
+        system_prompt = prompt_service.build_system_prompt(
+            language=message.language or "en",
+            rag_context=rag_context,
+            application_context=message.application_context,
+        )
+        
+        # Build messages with context
+        messages = prompt_service.build_messages(
+            user_message=message.content,
+            conversation_history=message.conversation_history,
+            system_prompt=system_prompt,
+            language=message.language or "en"
+        )
+        
+        # Generate response using OpenAI service
+        logger.info(f"Generating response with OpenAI service")
+        ai_response = await openai_service.generate_response(
+            user_message=message.content,
+            conversation_history=message.conversation_history,
+            system_prompt=system_prompt,
+            user_id=message.user_id,
+            temperature=message.temperature or 0.7,
+            max_tokens=message.max_tokens,
+        )
+        
+        # Log result
+        if ai_response.error:
+            logger.warning(f"AI response generated with fallback: {ai_response.error}")
+        else:
+            logger.info(
+                f"✅ Response generated in {ai_response.generation_time_ms:.0f}ms, "
+                f"tokens: {ai_response.tokens_used.total_tokens}"
+            )
+        
+        # Prepare response
         response_data = {
-            "message": response_text,
-            "sources": [],  # TODO: Implement RAG document retrieval
-            "tokens_used": tokens_used,
-            "model": "gpt-4",
+            "message": ai_response.content,
+            "sources": sources,
+            "tokens_used": ai_response.tokens_used.total_tokens,
+            "tokens_breakdown": {
+                "prompt": ai_response.tokens_used.prompt_tokens,
+                "completion": ai_response.tokens_used.completion_tokens,
+                "total": ai_response.tokens_used.total_tokens,
+            },
+            "model": ai_response.model,
+            "generation_time_ms": ai_response.generation_time_ms,
+            "finish_reason": ai_response.finish_reason,
+            "error": ai_response.error,
         }
         
         return response_data
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Chat error: {str(e)}")
+        logger.error(f"Chat error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -172,23 +244,62 @@ def _get_fallback_response(user_message: str) -> str:
     return fallback_responses["default"]
 
 
+@app.get("/api/rag/status")
+async def rag_status():
+    """Get RAG service status and configuration"""
+    try:
+        from services.rag import get_rag_service
+        
+        rag_service = get_rag_service()
+        status = rag_service.get_status()
+        
+        return {
+            "status": status,
+            "message": "RAG system operational" if status.get("initialized") else "RAG system initializing",
+        }
+        
+    except Exception as e:
+        logger.error(f"Status check error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/chat/search")
-async def search_documents(query: str):
+async def search_documents(query: str, country: Optional[str] = None, visa_type: Optional[str] = None):
     """
-    Search visa documents and knowledge base
+    Search visa documents and knowledge base using RAG
     
     - **query**: Search query
+    - **country**: Optional country filter
+    - **visa_type**: Optional visa type filter
     """
     try:
         logger.info(f"Search query: {query}")
         
-        # Placeholder implementation
-        # TODO: Implement actual document search with RAG
+        from services.rag import get_rag_service
+        
+        rag_service = get_rag_service()
+        
+        if not rag_service.initialized:
+            return {
+                "results": [],
+                "query": query,
+                "count": 0,
+                "message": "RAG service not initialized"
+            }
+        
+        # Retrieve context using RAG
+        context = await rag_service.retrieve_context(
+            query=query,
+            country=country,
+            visa_type=visa_type,
+            top_k=5
+        )
         
         return {
-            "results": [],
+            "results": context.get("documents", []),
             "query": query,
-            "count": 0,
+            "count": context.get("count", 0),
+            "sources": context.get("sources", []),
         }
         
     except Exception as e:
@@ -241,15 +352,112 @@ async def get_conversation(conversation_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/rate-limit/{user_id}", response_model=dict)
+async def check_rate_limit(user_id: str):
+    """
+    Check rate limit status for a user
+    
+    - **user_id**: User identifier
+    """
+    try:
+        from services.openai import get_openai_service
+        
+        openai_service = get_openai_service()
+        is_allowed, rate_info = openai_service.check_rate_limit(user_id)
+        
+        return {
+            "user_id": user_id,
+            "allowed": is_allowed,
+            "current_requests": rate_info["current_requests"],
+            "limit": rate_info["limit"],
+            "remaining": rate_info["remaining"],
+            "reset_at": rate_info["reset_at"],
+        }
+        
+    except Exception as e:
+        logger.error(f"Rate limit check error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/usage", response_model=dict)
+async def get_usage_stats(user_id: Optional[str] = None):
+    """
+    Get token usage statistics
+    
+    - **user_id**: Optional user ID to filter stats (if not provided, returns global stats)
+    """
+    try:
+        from services.openai import get_openai_service
+        
+        openai_service = get_openai_service()
+        stats = openai_service.get_usage_stats(user_id=user_id)
+        
+        return {
+            "user_id": user_id or "global",
+            **stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Usage stats error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/usage/reset")
+async def reset_usage_log():
+    """Reset token usage log (admin only)"""
+    try:
+        from services.openai import get_openai_service
+        
+        openai_service = get_openai_service()
+        openai_service.clear_usage_log()
+        
+        return {
+            "status": "success",
+            "message": "Usage log cleared"
+        }
+        
+    except Exception as e:
+        logger.error(f"Usage reset error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # STARTUP & SHUTDOWN
 # ============================================================================
 
 @app.on_event("startup")
 async def startup_event():
-    """Startup event"""
-    logger.info("🚀 VisaBuddy AI Service started")
-    logger.info(f"OpenAI API configured: {bool(os.getenv('OPENAI_API_KEY'))}")
+    """Startup event - Initialize services"""
+    logger.info("🚀 VisaBuddy AI Service starting...")
+    
+    # Initialize OpenAI service
+    from services.openai import get_openai_service
+    logger.info("Initializing OpenAI service...")
+    openai_svc = get_openai_service()
+    openai_status = "✅ Configured" if openai_svc.initialized else "⚠️ Not configured (using fallback)"
+    logger.info(f"OpenAI API {openai_status}")
+    logger.info(f"Rate limit: {20} requests per hour per user")
+    
+    # Initialize embeddings service
+    from services.embeddings import get_embeddings_service
+    logger.info("Initializing embeddings service...")
+    embeddings_svc = get_embeddings_service()
+    embeddings_mode = "OpenAI API" if not embeddings_svc.use_local_fallback else "Local fallback"
+    logger.info(f"Embeddings mode: {embeddings_mode}")
+    
+    # Initialize RAG service
+    from services.rag import get_rag_service
+    logger.info("Initializing RAG service...")
+    rag_svc = get_rag_service()
+    success = await rag_svc.initialize()
+    
+    if success:
+        status = rag_svc.get_status()
+        logger.info(f"✅ RAG Service initialized: {status}")
+    else:
+        logger.warning("⚠️ RAG Service initialization had issues (non-blocking)")
+    
+    logger.info("✅ VisaBuddy AI Service ready!")
 
 
 @app.on_event("shutdown")

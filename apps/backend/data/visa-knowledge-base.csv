@@ -1,0 +1,85 @@
+country_code,country_name,visa_type,requirement_category,requirement_detail,processing_days,validity_months,max_stay_days,cost_usd,difficulty_level
+US,United States,B1/B2 Visitor,Documents,Valid passport with 6+ months validity,7,120,180,160,MEDIUM
+US,United States,B1/B2 Visitor,Documents,Completed DS-160 form,7,120,180,160,MEDIUM
+US,United States,B1/B2 Visitor,Documents,Passport photo (2x2 inches),7,120,180,160,MEDIUM
+US,United States,B1/B2 Visitor,Financial,Proof of financial support (bank statements),7,120,180,160,MEDIUM
+US,United States,B1/B2 Visitor,Documentation,Evidence of ties to home country,7,120,180,160,MEDIUM
+US,United States,B1/B2 Visitor,Interview,Visa interview at US embassy/consulate required,7,120,180,160,MEDIUM
+US,United States,H1-B Work,Employment,Job offer from US employer,20,36,1825,1500,HARD
+US,United States,H1-B Work,Employment,Bachelor's degree or equivalent,20,36,1825,1500,HARD
+US,United States,H1-B Work,Employment,USCIS I-129 petition by employer,20,36,1825,1500,HARD
+US,United States,H1-B Work,Financial,Labor certification completed,20,36,1825,1500,HARD
+US,United States,F1 Student,Education,Acceptance letter from SEVIS-approved school,5,48,2555,350,MEDIUM
+US,United States,F1 Student,Financial,Proof of ability to pay tuition and expenses,5,48,2555,350,MEDIUM
+US,United States,F1 Student,Documentation,Passport valid for study duration,5,48,2555,350,MEDIUM
+US,United States,F1 Student,Interview,Visa interview demonstrating intent to return,5,48,2555,350,MEDIUM
+UK,United Kingdom,Standard Visitor,Documents,Valid passport with 6+ months validity,10,72,180,120,MEDIUM
+UK,United Kingdom,Standard Visitor,Financial,Proof of funds (£945+ in bank account for 28 days),10,72,180,120,MEDIUM
+UK,United Kingdom,Standard Visitor,Accommodation,Accommodation details (booking or letter from host),10,72,180,120,MEDIUM
+UK,United Kingdom,Standard Visitor,Employment,Proof of UK employment (if working),10,72,180,120,MEDIUM
+UK,United Kingdom,Student,Education,Confirmation of Acceptance for Studies (CAS) letter,15,48,2555,719,MEDIUM
+UK,United Kingdom,Student,Financial,Proof of tuition fees payment and living expenses,15,48,2555,719,MEDIUM
+UK,United Kingdom,Student,Documents,Valid passport throughout study duration,15,48,2555,719,MEDIUM
+UK,United Kingdom,Skilled Worker,Employment,Job offer from UK employer (salary >£26,200),15,60,1825,719,HARD
+Canada,Canada,Visitor,Documents,Valid passport (valid for entire stay),10,60,180,0,EASY
+Canada,Canada,Visitor,Financial,Proof of funds for stay (minimum $2000 CAD),10,60,180,0,EASY
+Canada,Canada,Visitor,Accommodation,Accommodation details or invitation letter,10,60,180,0,EASY
+Canada,Canada,Visitor,Police,Police certificate if criminal record,10,60,180,0,EASY
+Canada,Canada,Work Permit,Employment,Job offer with approved Labour Market Impact Assessment,15,24,1095,275,HARD
+Canada,Canada,Work Permit,Documents,Valid passport valid for work permit validity,15,24,1095,275,HARD
+Canada,Canada,Study Permit,Education,Letter of acceptance from Canadian school,20,48,2555,150,MEDIUM
+Canada,Canada,Study Permit,Financial,Proof of financial support for studies,20,48,2555,150,MEDIUM
+Australia,Australia,Visitor,Documents,Valid passport with 6+ months validity,5,12,90,20,EASY
+Australia,Australia,Visitor,Financial,Proof of sufficient funds and return ticket,5,12,90,20,EASY
+Australia,Australia,Visitor,Health,Health and character requirements,5,12,90,20,EASY
+Australia,Australia,Visitor,Documentation,Travel insurance recommended,5,12,90,20,EASY
+Australia,Australia,Skilled Migration,Employment,Points test qualification (60+ points required),30,90,1825,4290,HARD
+Australia,Australia,Skilled Migration,Language,IELTS minimum 6.0 or equivalent,30,90,1825,4290,HARD
+Australia,Australia,Work Holiday,Age,Age between 18-35 (some nationalities up to 30-45),5,24,1095,485,EASY
+Australia,Australia,Student,Education,Confirmation of Enrolment (CoE) from Australian school,10,48,2555,620,MEDIUM
+Uzbekistan,Uzbekistan,Business,Documents,Visa support letter from sponsor,5,12,90,70,EASY
+Uzbekistan,Uzbekistan,Business,Employment,Business registration or employment contract,5,12,90,70,EASY
+Uzbekistan,Uzbekistan,Tourism,Documents,Hotel booking or tour operator confirmation,3,30,30,75,EASY
+Uzbekistan,Uzbekistan,Tourism,Financial,Proof of accommodation and funds,3,30,30,75,EASY
+Uzbekistan,Uzbekistan,Student,Education,Acceptance letter from Uzbek university,14,12,365,0,MEDIUM
+Uzbekistan,Uzbekistan,Student,Financial,Proof of financial support from institution,14,12,365,0,MEDIUM
+Japan,Japan,Visitor,Documents,Valid passport for entire stay,5,90,90,0,EASY
+Japan,Japan,Visitor,Financial,Proof of sufficient funds,5,90,90,0,EASY
+Japan,Japan,Visitor,Accommodation,Accommodation details,5,90,90,0,EASY
+Japan,Japan,Work,Employment,Job offer from Japanese employer with visa sponsorship,10,36,1825,4500,HARD
+Japan,Japan,Work,Documents,Certificate of eligibility from employer,10,36,1825,4500,HARD
+Japan,Japan,Student,Education,Acceptance letter from Japanese school/university,10,48,2555,500,MEDIUM
+Singapore,Singapore,Visitor,Documents,Valid passport (validity for at least 6 months beyond stay),5,12,90,0,EASY
+Singapore,Singapore,Visitor,Financial,Proof of financial support ($10,000+ recommended),5,12,90,0,EASY
+Singapore,Singapore,Visitor,Accommodation,Accommodation details,5,12,90,0,EASY
+Singapore,Singapore,Work Permit,Employment,Job offer from Singapore employer,7,24,1095,700,HARD
+Singapore,Singapore,Work Permit,Financial,Monthly salary requirement ($3,000+ for Employment Pass),7,24,1095,700,HARD
+Singapore,Singapore,Student,Education,Acceptance letter from Singapore institution,10,12,365,200,EASY
+Germany,Germany,Schengen Visitor,Documents,Valid passport valid for 3+ months beyond trip,10,90,90,80,EASY
+Germany,Germany,Schengen Visitor,Financial,Proof of funds (€1,934 minimum recommended),10,90,90,80,EASY
+Germany,Germany,Schengen Visitor,Accommodation,Hotel booking or invitation letter,10,90,90,80,EASY
+Germany,Germany,Blue Card (Work),Employment,Job offer from German employer,20,48,1825,255,HARD
+Germany,Germany,Blue Card (Work),Education,University degree or 5 years professional experience,20,48,1825,255,HARD
+Germany,Germany,Student,Education,Acceptance letter from German university,15,48,2555,75,MEDIUM
+UK,United Kingdom,Tier 2 General,Employment,Job offer with Certificate of Sponsorship,15,60,1825,719,HARD
+UK,United Kingdom,Tier 2 General,Financial,Salary meets minimum requirement,15,60,1825,719,HARD
+Australia,Australia,Temporary Graduate,Education,Completion of Australian qualification,7,24,1095,0,MEDIUM
+Australia,Australia,Temporary Graduate,Financial,Proof of funds for post-study work,7,24,1095,0,MEDIUM
+Dubai,United Arab Emirates,Visit,Documents,Valid passport (minimum 6 months validity),1,12,30,0,EASY
+Dubai,United Arab Emirates,Visit,Financial,Proof of sufficient funds (AED 20,000+),1,12,30,0,EASY
+Dubai,United Arab Emirates,Work,Employment,Employment contract from UAE employer,7,24,1095,3500,HARD
+Dubai,United Arab Emirates,Work,Police,Certificate of good conduct,7,24,1095,3500,HARD
+France,France,Schengen Visitor,Documents,Valid passport valid for 3+ months beyond trip,10,90,90,100,EASY
+France,France,Schengen Visitor,Financial,Proof of sufficient funds (€1,934 minimum),10,90,90,100,EASY
+France,France,Long Stay,Accommodation,Proof of accommodation in France,30,12,365,125,MEDIUM
+Malaysia,Malaysia,Visitor,Documents,Valid passport valid beyond stay period,2,12,90,0,EASY
+Malaysia,Malaysia,Visitor,Financial,Proof of funds for stay (RM 10,000 minimum),2,12,90,0,EASY
+Malaysia,Malaysia,Work,Employment,Approved job offer from Malaysian company,14,24,1095,1200,HARD
+Thailand,Thailand,Tourist,Documents,Valid passport (6+ months validity),0,60,90,0,EASY
+Thailand,Thailand,Tourist,Accommodation,Hotel booking or accommodation details,0,60,90,0,EASY
+Thailand,Thailand,Work,Employment,Approval from Thai Department of Employment,14,12,365,2000,HARD
+Spain,Spain,Schengen Visitor,Documents,Valid passport valid for 3+ months beyond trip,10,90,90,90,EASY
+Spain,Spain,Schengen Visitor,Financial,Proof of funds (€2,142 minimum recommended),10,90,90,90,EASY
+India,India,Tourist,Documents,Valid passport with minimum 6 months validity,5,60,90,60,EASY
+India,India,Tourist,Financial,Proof of return tickets and accommodation,5,60,90,60,EASY
+India,India,Business,Employment,Business invitation letter,5,12,90,60,MEDIUM

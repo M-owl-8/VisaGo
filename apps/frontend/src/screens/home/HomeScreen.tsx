@@ -1,19 +1,135 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  FlatList,
+  TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../../store/auth';
+import { useVisaStore } from '../../store/visa';
 
-export default function HomeScreen() {
+interface HomeScreenProps {
+  navigation?: any;
+}
+
+export default function HomeScreen({ navigation }: HomeScreenProps) {
   const user = useAuthStore((state) => state.user);
+  const {
+    fetchCountries,
+    filteredCountries,
+    isLoadingCountries,
+    setSearchQuery,
+    searchQuery,
+    selectCountry,
+  } = useVisaStore();
+  
+  const [showCountriesList, setShowCountriesList] = useState(false);
+
+  useEffect(() => {
+    // Load countries on mount
+    loadCountries();
+  }, []);
+
+  const loadCountries = async () => {
+    try {
+      await fetchCountries();
+    } catch (error) {
+      console.error('Error loading countries:', error);
+    }
+  };
+
+  const handleCountrySelect = async (country: any) => {
+    try {
+      await selectCountry(country);
+      setShowCountriesList(false);
+      navigation?.navigate('VisaSelection', {
+        countryId: country.id,
+      });
+    } catch (error) {
+      console.error('Error selecting country:', error);
+    }
+  };
+
+  const handleStartApplication = () => {
+    setShowCountriesList(true);
+  };
+
+  const renderCountryItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.countryItem}
+      onPress={() => handleCountrySelect(item)}
+    >
+      <Text style={styles.countryItemFlag}>{item.flagEmoji}</Text>
+      <View style={styles.countryItemContent}>
+        <Text style={styles.countryItemName}>{item.name}</Text>
+        <Text style={styles.countryItemCode}>{item.code}</Text>
+      </View>
+      <Icon name="chevron-forward" size={20} color="#1E88E5" />
+    </TouchableOpacity>
+  );
+
+  // If countries list is shown, display it
+  if (showCountriesList) {
+    return (
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.listHeader}>
+          <TouchableOpacity
+            onPress={() => setShowCountriesList(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Icon name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.listHeaderTitle}>Select Destination</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <Icon name="search" size={20} color="#999" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search countries..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#999"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Icon name="close" size={20} color="#999" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Countries List */}
+        {isLoadingCountries ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1E88E5" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredCountries}
+            renderItem={renderCountryItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.countriesListContainer}
+          />
+        )}
+      </View>
+    );
+  }
 
   const features = [
-    { icon: '🌍', title: 'Browse Countries', desc: 'Explore visa requirements' },
+    {
+      icon: '🌍',
+      title: 'Browse Countries',
+      desc: 'Explore visa requirements',
+      onPress: handleStartApplication,
+    },
     { icon: '📄', title: 'Track Documents', desc: 'Manage your documents' },
     { icon: '💰', title: 'Payment Status', desc: 'Monitor payments' },
     { icon: '🤖', title: 'AI Assistant', desc: 'Get visa guidance' },
@@ -54,6 +170,7 @@ export default function HomeScreen() {
               key={index}
               style={styles.featureCard}
               activeOpacity={0.7}
+              onPress={feature.onPress}
             >
               <Text style={styles.featureIcon}>{feature.icon}</Text>
               <Text style={styles.featureTitle}>{feature.title}</Text>
@@ -71,7 +188,10 @@ export default function HomeScreen() {
           <Text style={styles.getStartedDesc}>
             Create your first visa application and start tracking your documents
           </Text>
-          <TouchableOpacity style={styles.getStartedButton}>
+          <TouchableOpacity
+            style={styles.getStartedButton}
+            onPress={handleStartApplication}
+          >
             <Text style={styles.getStartedButtonText}>Start New Application</Text>
             <Icon name="arrow-forward" size={16} color="#FFFFFF" />
           </TouchableOpacity>
@@ -237,5 +357,82 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     marginTop: 12,
+  },
+
+  // Countries List Styles
+  listHeader: {
+    backgroundColor: '#1E88E5',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  listHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  searchInput: {
+    flex: 1,
+    marginHorizontal: 8,
+    fontSize: 14,
+    color: '#212121',
+  },
+
+  countriesListContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 8,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  countryItemFlag: {
+    fontSize: 32,
+  },
+  countryItemContent: {
+    flex: 1,
+  },
+  countryItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212121',
+  },
+  countryItemCode: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
   },
 });

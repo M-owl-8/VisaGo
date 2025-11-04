@@ -1,0 +1,39 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "dockerfile",
+    "dockerfile": "apps/backend/Dockerfile",
+    "context": "apps/backend"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "startCommand": "node dist/main.js",
+    "restartPolicyMaxRetries": 3,
+    "restartPolicyWindowMs": 60000
+  },
+  "environments": {
+    "production": {
+      "numReplicas": 2,
+      "variables": {
+        "NODE_ENV": "production",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "staging": {
+      "numReplicas": 1,
+      "variables": {
+        "NODE_ENV": "staging",
+        "LOG_LEVEL": "debug"
+      }
+    }
+  },
+  "healthCheck": {
+    "method": "GET",
+    "path": "/health",
+    "port": 3000,
+    "intervalSeconds": 30,
+    "timeoutSeconds": 10,
+    "successThreshold": 1,
+    "failureThreshold": 3
+  }
+}

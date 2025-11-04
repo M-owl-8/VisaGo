@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../../store/auth';
+import { signInWithGoogle } from '../../services/google-oauth';
+import { GOOGLE_WEB_CLIENT_ID } from '../../config/constants';
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
@@ -18,6 +20,7 @@ export default function LoginScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
   
   const login = useAuthStore((state) => state.login);
+  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -30,6 +33,39 @@ export default function LoginScreen({ navigation }: any) {
       await login(email, password);
     } catch (error: any) {
       Alert.alert('Login Failed', error.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+
+      // Sign in with Google
+      const googleUserInfo = await signInWithGoogle();
+
+      // Call auth store to login with Google
+      await loginWithGoogle(
+        googleUserInfo.googleId,
+        googleUserInfo.email,
+        googleUserInfo.firstName,
+        googleUserInfo.lastName,
+        googleUserInfo.avatar
+      );
+
+      // Success - user will be redirected by auth store
+      Alert.alert('Success', 'Logged in with Google!');
+    } catch (error: any) {
+      const errorMessage = error.message || 'An error occurred';
+      
+      // Don't show alert for cancelled sign-in
+      if (errorMessage.includes('cancelled')) {
+        console.log('Google sign-in cancelled by user');
+        return;
+      }
+
+      Alert.alert('Google Login Failed', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -112,13 +148,25 @@ export default function LoginScreen({ navigation }: any) {
 
       {/* Social Login */}
       <View style={styles.socialButtons}>
-        <TouchableOpacity style={styles.socialButton} disabled={loading}>
+        <TouchableOpacity 
+          style={styles.socialButton} 
+          disabled={loading}
+          onPress={handleGoogleLogin}
+        >
           <Text style={styles.socialIcon}>G</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton} disabled={loading}>
+        <TouchableOpacity 
+          style={styles.socialButton} 
+          disabled={loading}
+          onPress={() => Alert.alert('Coming Soon', 'Facebook login not yet implemented')}
+        >
           <Text style={styles.socialIcon}>f</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton} disabled={loading}>
+        <TouchableOpacity 
+          style={styles.socialButton} 
+          disabled={loading}
+          onPress={() => Alert.alert('Coming Soon', 'Apple Sign-In not yet implemented')}
+        >
           <Text style={styles.socialIcon}>🍎</Text>
         </TouchableOpacity>
       </View>

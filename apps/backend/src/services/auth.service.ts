@@ -38,8 +38,21 @@ export class AuthService {
       throw errors.validationError("Email and password are required");
     }
 
-    if (payload.password.length < 6) {
-      throw errors.validationError("Password must be at least 6 characters");
+    // Validate password strength (12+ chars, uppercase, lowercase, number, special char)
+    if (payload.password.length < 12) {
+      throw errors.validationError("Password must be at least 12 characters");
+    }
+    if (!/[A-Z]/.test(payload.password)) {
+      throw errors.validationError("Password must contain at least one uppercase letter");
+    }
+    if (!/[a-z]/.test(payload.password)) {
+      throw errors.validationError("Password must contain at least one lowercase letter");
+    }
+    if (!/[0-9]/.test(payload.password)) {
+      throw errors.validationError("Password must contain at least one number");
+    }
+    if (!/[!@#$%^&*]/.test(payload.password)) {
+      throw errors.validationError("Password must contain at least one special character (!@#$%^&*)");
     }
 
     // Check if user already exists
@@ -51,8 +64,8 @@ export class AuthService {
       throw errors.conflict("Email");
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(payload.password, 10);
+    // Hash password with 12 rounds for production security
+    const passwordHash = await bcrypt.hash(payload.password, 12);
 
     // Create user
     const user = await prisma.user.create({
@@ -181,6 +194,23 @@ export class AuthService {
       timezone: user.timezone,
       currency: user.currency,
     };
+  }
+
+  /**
+   * Refresh JWT token
+   */
+  static async refreshToken(userId: string): Promise<string> {
+    // Get user to verify they still exist
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw errors.notFound("User");
+    }
+
+    // Generate new token
+    return generateToken(user.id, user.email);
   }
 
   /**

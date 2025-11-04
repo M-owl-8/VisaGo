@@ -18,8 +18,17 @@ interface Payment {
 
 interface PaymentLink {
   paymentUrl: string;
-  merchantTransId: string;
+  merchantTransId?: string;
+  sessionId?: string;
   transactionId: string;
+}
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  description: string;
+  supportedCurrencies: string[];
+  supportsRefunds: boolean;
 }
 
 interface PaymentStore {
@@ -27,11 +36,17 @@ interface PaymentStore {
   currentPayment: Payment | null;
   isLoading: boolean;
   error: string | null;
+  availableMethods: PaymentMethod[];
   
   // Actions
   loadUserPayments: () => Promise<void>;
   setCurrentPayment: (payment: Payment | null) => void;
-  initiatePayment: (applicationId: string, returnUrl: string) => Promise<PaymentLink | null>;
+  loadAvailableMethods: () => Promise<void>;
+  initiatePayment: (
+    applicationId: string,
+    returnUrl: string,
+    paymentMethod?: string
+  ) => Promise<PaymentLink | null>;
   verifyPayment: (transactionId: string) => Promise<boolean>;
   getPaymentDetails: (transactionId: string) => Promise<Payment | null>;
   cancelPayment: (transactionId: string) => Promise<boolean>;
@@ -40,11 +55,12 @@ interface PaymentStore {
 
 export const usePaymentStore = create<PaymentStore>()(
   persist(
-    (set, _get) => ({
+    (set, get) => ({
       payments: [],
       currentPayment: null,
       isLoading: false,
       error: null,
+      availableMethods: [],
 
       loadUserPayments: async () => {
         set({ isLoading: true, error: null });
@@ -66,10 +82,30 @@ export const usePaymentStore = create<PaymentStore>()(
         set({ currentPayment: payment });
       },
 
-      initiatePayment: async (applicationId, returnUrl) => {
+      loadAvailableMethods: async () => {
         set({ isLoading: true, error: null });
         try {
-          const response = await apiClient.initiatePayment(applicationId, returnUrl);
+          const response = await apiClient.getPaymentMethods();
+          if (response.success && response.data) {
+            set({ availableMethods: response.data });
+          }
+        } catch (error: any) {
+          const message = error.response?.data?.error?.message || "Failed to load payment methods";
+          set({ error: message });
+          console.error("Load payment methods error:", error);
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      initiatePayment: async (applicationId, returnUrl, paymentMethod = "payme") => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiClient.initiatePayment(
+            applicationId,
+            returnUrl,
+            paymentMethod
+          );
           if (response.success && response.data) {
             return response.data as PaymentLink;
           } else {

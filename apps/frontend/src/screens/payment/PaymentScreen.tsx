@@ -70,14 +70,15 @@ export default function PaymentScreen({ navigation, route }: any) {
 
     try {
       const returnUrl = `${Platform.OS === "ios" ? "visabuddy://" : "visabuddy://"}payment/return`;
-      const paymentLink = await initiatePayment(applicationId, returnUrl);
+      // Pass the payment method to the backend
+      const paymentLink = await initiatePayment(applicationId, returnUrl, method.id);
 
       if (paymentLink) {
         setTransactionId(paymentLink.transactionId);
         setPaymentUrl(paymentLink.paymentUrl);
 
-        // Open Payme payment URL
-        if (method.id === "payme" && paymentLink.paymentUrl) {
+        // Handle different payment gateways
+        if (paymentLink.paymentUrl) {
           const canOpen = await Linking.canOpenURL(paymentLink.paymentUrl);
           if (canOpen) {
             await Linking.openURL(paymentLink.paymentUrl);
@@ -85,8 +86,10 @@ export default function PaymentScreen({ navigation, route }: any) {
             // Start polling for payment verification
             startPaymentVerification(paymentLink.transactionId);
           } else {
-            Alert.alert("Error", "Cannot open payment link");
+            Alert.alert("Error", `Cannot open ${method.name} payment link`);
           }
+        } else {
+          Alert.alert("Error", "No payment URL received from server");
         }
       }
     } catch (err: any) {

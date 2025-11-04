@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -23,6 +23,7 @@ model User {
   timezone          String?
   currency          String    @default("USD")
   emailVerified     Boolean   @default(false)
+  role              String    @default("user") // user, admin, super_admin
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -38,6 +39,7 @@ model User {
 
   @@index([email])
   @@index([googleId])
+  @@index([role])
 }
 
 model UserPreferences {
@@ -194,6 +196,29 @@ model Payment {
   @@index([status])
 }
 
+model WebhookIdempotency {
+  id                String    @id @default(cuid())
+  fingerprint       String    @unique // SHA256 hash of webhook unique identifier
+  webhookId         String    // Unique ID from payment gateway
+  paymentMethod     String    // payme, click, uzum, stripe
+  transactionId     String    // Payment transaction ID
+  eventType         String    // Type of webhook event
+  signature         String    // Webhook signature for verification
+  body              String    // Full webhook payload (JSON string for SQLite compatibility)
+  status            String    @default("pending") // pending, processed, failed
+  attempts          Int       @default(0) // Number of processing attempts
+  lastAttemptAt     DateTime?
+  processedAt       DateTime?
+  error             String?   // Error message if processing failed
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([paymentMethod])
+  @@index([transactionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
 model AdminLog {
   id                String    @id @default(cuid())
   action            String    // create, update, delete, approve, reject
@@ -230,7 +255,7 @@ model ActivityLog {
 model Document {
   id                String    @id @default(cuid())
   title             String
-  content           String    @db.Text
+  content           String
   type              String    // visa_requirement, guide, faq, requirement_detail
   countryId         String?
   visaTypeId        String?
@@ -250,7 +275,7 @@ model Document {
 model RAGChunk {
   id                String    @id @default(cuid())
   documentId        String
-  content           String    @db.Text
+  content           String
   chunkIndex        Int       // Position in document
   embedding         String?   // Vector embedding as JSON
   metadata          String?   // JSON with source info
@@ -281,7 +306,7 @@ model ChatMessage {
   sessionId         String
   userId            String
   role              String    // "user" or "assistant"
-  content           String    @db.Text
+  content           String
   sources           String?   // JSON array of RAG sources/references with URLs
   model             String    @default("gpt-4")
   tokensUsed        Int       @default(0)
@@ -300,7 +325,7 @@ model ChatMessage {
 model AIUsageMetrics {
   id                String    @id @default(cuid())
   userId            String
-  date              DateTime  @db.Date
+  date              DateTime
   totalRequests     Int       @default(0)
   totalTokens       Int       @default(0)
   totalCost         Float     @default(0)
@@ -313,3 +338,40 @@ model AIUsageMetrics {
   @@unique([userId, date])
   @@index([date])
 }
+
+model AnalyticsEvent {
+  id                String    @id @default(cuid())
+  userId            String?   // null for anonymous events
+  eventType         String    // signup, visa_selected, payment_completed, document_uploaded, chat_message, login, app_opened
+  source            String?   // email, google, organic, referral
+  metadata          String?   // JSON with additional event data (country, visa_type, amount, etc)
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime  @default(now())
+
+  @@index([eventType])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([source])
+}
+
+model DailyMetrics {
+  id                String    @id @default(cuid())
+  date              DateTime  @unique // YYYY-MM-DD format
+  totalSignups      Int       @default(0)
+  totalVisaSelections Int    @default(0)
+  totalPayments     Int       @default(0)
+  totalRevenue      Float     @default(0) // in USD
+  totalDocuments    Int       @default(0)
+  totalMessages     Int       @default(0)
+  activeUsers       Int       @default(0)
+  newUsers          Int       @default(0)
+  conversionRate    Float     @default(0) // signup to payment
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([date])
+}
+
+
+

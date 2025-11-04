@@ -1,0 +1,88 @@
+═════════════════════════════════════════════════════════════════════════════
+  VisaBuddy Physical Device Build - Quick Reference Card
+═════════════════════════════════════════════════════════════════════════════
+
+BEFORE YOU START (One-Time Setup on Phone):
+─────────────────────────────────────────
+1. Open Settings > About Phone
+2. Tap "Build Number" 7 times
+3. Settings > Developer Options > USB Debugging [ON]
+4. Connect phone to computer via USB
+5. Tap "Allow" on USB authorization prompt
+
+═════════════════════════════════════════════════════════════════════════════
+
+BUILD PROCESS:
+──────────────
+
+Step 1: PRE-CHECK (1 min)
+  PowerShell> c:\work\VisaBuddy\PRECHECK_DEVICE_BUILD.ps1
+  
+  ✓ If all green, continue to Step 2
+  ✗ If any red, fix issues and retry
+
+Step 2: TERMINAL 1 - Start Backend (Keep running!)
+  PowerShell> c:\work\VisaBuddy\START_BACKEND.ps1
+  
+  Wait for: "[OK] Starting backend server..."
+  DO NOT CLOSE THIS TERMINAL!
+
+Step 3: TERMINAL 2 - Build & Deploy (3-5 min)
+  PowerShell> c:\work\VisaBuddy\BUILD_FOR_DEVICE.ps1
+  
+  Script will:
+    • Detect your computer IP
+    • Install dependencies (first time)
+    • Build Android APK
+    • Deploy to device
+    • Launch app
+
+Step 4: WATCH DEVICE
+  App should appear in ~15 seconds
+  Login screen = SUCCESS!
+
+═════════════════════════════════════════════════════════════════════════════
+
+QUICK FIXES:
+────────────
+
+Device Not Found?
+  > adb kill-server
+  > adb start-server
+  > Reconnect USB cable
+  > Accept ADB prompt on phone
+
+App Won't Start?
+  > Check backend is running (Terminal 1)
+  > View logs: adb logcat | findstr visabuddy
+  > Try uninstall: adb uninstall com.visabuddy.app
+
+Build Fails?
+  > cd c:\work\VisaBuddy\apps\frontend\android
+  > .\gradlew.bat clean
+  > cd ..
+  > npm run android
+
+═════════════════════════════════════════════════════════════════════════════
+
+USEFUL COMMANDS:
+────────────────
+
+Check device connected:        adb devices
+View app logs:                 adb logcat | findstr visabuddy
+Uninstall app:                 adb uninstall com.visabuddy.app
+Find computer IP:              ipconfig
+
+═════════════════════════════════════════════════════════════════════════════
+
+TEST CREDENTIALS (After Login Screen Appears):
+───────────────────────────────────────────────
+
+Email:     test@visabuddy.com
+Password:  Test123!
+
+═════════════════════════════════════════════════════════════════════════════
+
+THAT'S IT! Enjoy testing on your Samsung A56! 🚀
+
+═════════════════════════════════════════════════════════════════════════════

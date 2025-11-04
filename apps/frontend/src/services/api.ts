@@ -12,17 +12,17 @@ const getApiBaseUrl = (): string => {
 
   // For Android emulator, use 10.0.2.2 to reach host machine
   if (Platform.OS === "android") {
-    return "http://10.0.2.2:8000";
+    return "http://10.0.2.2:3000";
   }
 
   // For iOS emulator or physical device
   if (Platform.OS === "ios") {
     // For physical device, change this to your machine's IP address
-    return "http://localhost:8000";
+    return "http://localhost:3000";
   }
 
   // Fallback
-  return "http://localhost:8000";
+  return "http://localhost:3000";
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -146,6 +146,11 @@ class ApiClient {
     return response.data;
   }
 
+  async refreshToken(): Promise<ApiResponse> {
+    const response = await this.api.post("/auth/refresh");
+    return response.data;
+  }
+
   /**
    * ============================================================================
    * COUNTRIES & VISA TYPES ENDPOINTS
@@ -235,10 +240,20 @@ class ApiClient {
    * ============================================================================
    */
 
-  async initiatePayment(applicationId: string, returnUrl: string): Promise<ApiResponse> {
+  async getPaymentMethods(): Promise<ApiResponse> {
+    const response = await this.api.get("/payments/methods");
+    return response.data;
+  }
+
+  async initiatePayment(
+    applicationId: string,
+    returnUrl: string,
+    paymentMethod: string = "payme"
+  ): Promise<ApiResponse> {
     const response = await this.api.post("/payments/initiate", {
       applicationId,
       returnUrl,
+      paymentMethod,
     });
     return response.data;
   }
@@ -297,6 +312,23 @@ class ApiClient {
     return response.data;
   }
 
+  async getRequiredDocuments(applicationId: string): Promise<ApiResponse> {
+    const response = await this.api.get(`/documents/application/${applicationId}/required`);
+    return response.data;
+  }
+
+  async updateDocumentStatus(
+    documentId: string,
+    status: "pending" | "verified" | "rejected",
+    verificationNotes?: string
+  ): Promise<ApiResponse> {
+    const response = await this.api.patch(`/documents/${documentId}/status`, {
+      status,
+      verificationNotes,
+    });
+    return response.data;
+  }
+
   async getDocument(documentId: string): Promise<ApiResponse> {
     const response = await this.api.get(`/documents/${documentId}`);
     return response.data;
@@ -345,8 +377,13 @@ class ApiClient {
     return response.data;
   }
 
-  async searchDocuments(query: string): Promise<ApiResponse> {
-    const response = await this.api.post("/chat/search", { query });
+  async searchDocuments(query: string, country?: string, visaType?: string): Promise<ApiResponse> {
+    const response = await this.api.post("/chat/search", { 
+      query, 
+      country, 
+      visaType,
+      limit: 5 
+    });
     return response.data;
   }
 
@@ -360,6 +397,69 @@ class ApiClient {
 
   async getChatStats(): Promise<ApiResponse> {
     const response = await this.api.get("/chat/stats");
+    return response.data;
+  }
+
+  async getChatSessions(limit: number = 20, offset: number = 0): Promise<ApiResponse> {
+    const response = await this.api.get("/chat/sessions", {
+      params: { limit, offset },
+    });
+    return response.data;
+  }
+
+  async getSessionDetails(sessionId: string): Promise<ApiResponse> {
+    const response = await this.api.get(`/chat/sessions/${sessionId}`);
+    return response.data;
+  }
+
+  async renameSession(sessionId: string, title: string): Promise<ApiResponse> {
+    const response = await this.api.patch(`/chat/sessions/${sessionId}`, { title });
+    return response.data;
+  }
+
+  async deleteSession(sessionId: string): Promise<ApiResponse> {
+    const response = await this.api.delete(`/chat/sessions/${sessionId}`);
+    return response.data;
+  }
+
+  async addMessageFeedback(
+    messageId: string,
+    feedback: "thumbs_up" | "thumbs_down"
+  ): Promise<ApiResponse> {
+    const response = await this.api.post(`/chat/messages/${messageId}/feedback`, {
+      feedback,
+    });
+    return response.data;
+  }
+
+  /**
+   * ============================================================================
+   * USER PROFILE ENDPOINTS
+   * ============================================================================
+   */
+
+  async getUserProfile(): Promise<ApiResponse> {
+    const response = await this.api.get("/users/me");
+    return response.data;
+  }
+
+  async updateUserProfile(userId: string, data: any): Promise<ApiResponse> {
+    const response = await this.api.patch(`/users/${userId}`, data);
+    return response.data;
+  }
+
+  async getUserApplications(userId: string): Promise<ApiResponse> {
+    const response = await this.api.get(`/users/${userId}/applications`);
+    return response.data;
+  }
+
+  async getUserPaymentHistory(userId: string): Promise<ApiResponse> {
+    const response = await this.api.get(`/users/${userId}/payments`);
+    return response.data;
+  }
+
+  async updateUserPreferences(userId: string, preferences: any): Promise<ApiResponse> {
+    const response = await this.api.patch(`/users/${userId}/preferences`, preferences);
     return response.data;
   }
 

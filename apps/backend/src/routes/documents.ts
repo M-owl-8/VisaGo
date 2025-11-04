@@ -4,8 +4,10 @@ import path from "path";
 import DocumentService from "../services/documents.service";
 import StorageAdapter from "../services/storage-adapter";
 import { authenticateToken } from "../middleware/auth";
+import { PrismaClient } from "@prisma/client";
 
 const router = Router();
+const prisma = new PrismaClient();
 
 // Configure multer for file uploads
 const upload = multer({
@@ -64,7 +66,6 @@ router.post(
       }
 
       // Verify user owns the application (for security)
-      const prisma = new (require("@prisma/client").PrismaClient)();
       const application = await prisma.visaApplication.findFirst({
         where: { id: applicationId, userId },
       });
@@ -104,8 +105,6 @@ router.post(
         },
       });
 
-      await prisma.$disconnect();
-
       res.status(201).json({
         success: true,
         data: document,
@@ -138,6 +137,52 @@ router.get("/", async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: documents,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * GET /api/documents/application/:applicationId/required
+ * Get required documents for a specific application (from VisaType)
+ */
+router.get("/application/:applicationId/required", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { applicationId } = req.params;
+
+    // Verify user owns the application
+    const application = await prisma.visaApplication.findFirst({
+      where: { id: applicationId, userId },
+      include: { visaType: true },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: "Application not found or access denied",
+        },
+      });
+    }
+
+    // Extract required documents from visa type
+    const requiredDocTypes = application.visaType.documentTypes || [];
+
+    res.json({
+      success: true,
+      data: {
+        applicationId,
+        visaTypeName: application.visaType.name,
+        requiredDocuments: requiredDocTypes,
+        totalRequired: requiredDocTypes.length,
+      },
     });
   } catch (error: any) {
     res.status(500).json({
@@ -194,6 +239,63 @@ router.get("/:documentId", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     res.status(404).json({
+      success: false,
+      error: {
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * PATCH /api/documents/:documentId/status
+ * Update document status (pending, verified, rejected)
+ */
+router.patch("/:documentId/status", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { documentId } = req.params;
+    const { status, verificationNotes } = req.body;
+
+    // Validate status
+    if (!["pending", "verified", "rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: "Invalid status. Must be one of: pending, verified, rejected",
+        },
+      });
+    }
+
+    // Verify user owns the document
+    const document = await prisma.userDocument.findFirst({
+      where: { id: documentId, userId },
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: "Document not found or access denied",
+        },
+      });
+    }
+
+    // Update status
+    const updatedDocument = await prisma.userDocument.update({
+      where: { id: documentId },
+      data: {
+        status,
+        verificationNotes: verificationNotes || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: updatedDocument,
+    });
+  } catch (error: any) {
+    res.status(400).json({
       success: false,
       error: {
         message: error.message,

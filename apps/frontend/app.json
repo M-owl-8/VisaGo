@@ -19,7 +19,8 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ],
-      "useNextNotificationApi": true
+      "useNextNotificationApi": true,
+      "googleServicesFile": "./google-services.json"
     },
     "scheme": "visabuddy",
     "platforms": [

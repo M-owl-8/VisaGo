@@ -1,0 +1,180 @@
+🔐 GOOGLE OAUTH - QUICK SETUP CHECKLIST
+========================================
+
+✅ COMPLETED (Code Changes)
+----------------------------
+[✓] Installed @react-native-google-signin/google-signin package
+[✓] Created google-oauth.ts service with full OAuth flow
+[✓] Updated LoginScreen.tsx with real Google Sign-In button handler
+[✓] Created config/constants.ts with environment configuration
+[✓] Updated App.tsx to initialize Google Sign-In on app launch
+[✓] Updated app.json with Android Google Services configuration
+[✓] Created comprehensive setup guide (GOOGLE_OAUTH_SETUP.md)
+
+⏳ ACTION ITEMS (Manual Setup Required)
+---------------------------------------
+
+STEP 1: Google Cloud Console Setup (15 mins)
+[   ] Go to https://console.cloud.google.com
+[   ] Create new project: "VisaBuddy"
+[   ] Enable APIs:
+      - Google+ API
+      - Identity Toolkit API
+      - Google Identity Services API
+[   ] Create OAuth 2.0 Credentials:
+      ✓ Web application client
+      ✓ Android client
+      ✓ iOS client
+
+STEP 2: Get Web Client ID (5 mins)
+[   ] In Google Cloud Console Credentials page:
+[   ] Copy Web Client ID
+[   ] Format: 123456789-abcdefghij.apps.googleusercontent.com
+
+STEP 3: Get Android SHA-1 Fingerprint (5 mins)
+[   ] cd apps/frontend/android
+[   ] Run: ./gradlew signingReport (Windows: gradlew.bat)
+[   ] Copy SHA-1 fingerprint
+[   ] Format: AB:CD:EF:12:34:56:78:9A:BC:DE:F0:12:34:56:78:9A:BC:DE:F0:12
+[   ] Add to Android OAuth credentials in Google Cloud Console
+
+STEP 4: Environment Configuration (5 mins)
+[   ] Create apps/frontend/.env file
+[   ] Add: GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID_HERE
+[   ] Replace with actual Web Client ID from STEP 2
+
+STEP 5: Install Dependencies (10 mins)
+[   ] cd apps/frontend
+[   ] npm install
+[   ] npx pod-install ios (if on Mac)
+
+STEP 6: Test Configuration (5 mins)
+[   ] npm run typecheck (should have ZERO errors)
+[   ] npm run lint (check for issues)
+
+STEP 7: Test Email/Password Login First (10 mins)
+[   ] Start backend: cd apps/backend && npm start
+[   ] Start mobile: cd apps/frontend && npm run android
+[   ] Test email/password login (verify backend works)
+[   ] Stop and proceed to Google OAuth testing
+
+STEP 8: Test Google OAuth on Android (15 mins)
+[   ] Clear app data: adb shell pm clear com.visabuddy.app
+[   ] npm run android
+[   ] Tap Google button on login screen
+[   ] Select your Google account
+[   ] Approve permissions
+[   ] Verify logged in and see user profile
+
+STEP 9: Verify Database (5 mins)
+[   ] In backend: npm run db:studio
+[   ] Go to User table
+[   ] Verify new user created with googleId field populated
+
+STEP 10: Test Google OAuth on iOS (15 mins) [if on Mac]
+[   ] npm run ios
+[   ] Repeat STEP 8 tests on iOS
+[   ] Verify Google OAuth works on iOS
+
+---
+
+IMPORTANT NOTES
+---------------
+
+1. Use Different Client IDs:
+   - Web Client ID: for frontend OAuth flow
+   - Android Client ID: auto-configured, just needs SHA-1
+   - iOS Client ID: auto-configured, just needs Bundle ID
+
+2. Security:
+   - NEVER commit .env file to git
+   - Add .env to .gitignore
+   - Use different credentials for prod vs dev
+
+3. Common Issues:
+   - "Play Services not available": Use real device instead of emulator
+   - "Invalid Web Client ID": Check .env file has correct ID
+   - "SHA-1 mismatch": Regenerate fingerprint and update OAuth credentials
+
+4. Testing Sequence:
+   [1] Email/Password login (basic auth)
+   [2] Google OAuth on Android
+   [3] Google OAuth on iOS
+   [4] Database verification
+   [5] Error handling (try wrong password, etc)
+
+---
+
+TIME ESTIMATE
+=============
+Total Setup Time: ~2 hours
+- Google Cloud Console: 30 mins
+- Environment Setup: 30 mins
+- Testing: 60 mins
+
+---
+
+FILES MODIFIED/CREATED
+======================
+
+✅ Created:
+   - apps/frontend/src/services/google-oauth.ts
+   - apps/frontend/src/config/constants.ts
+   - GOOGLE_OAUTH_SETUP.md (comprehensive guide)
+
+✏️ Modified:
+   - apps/frontend/package.json (added @react-native-google-signin/google-signin)
+   - apps/frontend/src/screens/auth/LoginScreen.tsx (implemented Google login)
+   - apps/frontend/src/App.tsx (init Google Sign-In)
+   - apps/frontend/app.json (Android config)
+
+---
+
+TESTING CHECKLIST
+=================
+
+Email/Password Tests:
+[   ] Can register with email/password
+[   ] Can login with registered email
+[   ] Wrong password shows error
+[   ] Duplicate email shows error
+[   ] Logout clears session
+
+Google OAuth Tests:
+[   ] Google button appears on login screen
+[   ] Tapping Google button opens Google account picker
+[   ] Can select Google account
+[   ] Permission request shows email + profile
+[   ] After approval, logged in to app
+[   ] User info saved (email, name, avatar)
+[   ] Token saved to AsyncStorage
+[   ] Logout clears Google session (optional)
+
+Database Tests:
+[   ] New user in database with googleId
+[   ] User can login again with same Google account
+[   ] User info matches Google profile
+
+Error Handling Tests:
+[   ] Cancel Google account picker (should dismiss)
+[   ] No Play Services error (real device test)
+[   ] Network error during OAuth (should show error)
+[   ] Wrong Web Client ID (should show config error)
+
+---
+
+SUPPORT
+=======
+
+Documentation: Read GOOGLE_OAUTH_SETUP.md
+Issues: Check troubleshooting section in guide
+Backend: Verify /api/auth/google endpoint working
+Frontend: Check console logs for detailed errors
+
+Command to view logs:
+   Android: adb logcat | grep VisaBuddy
+   iOS: Xcode Console or run with sim
+
+---
+
+Next Phase: Phase 1.2 - Visa Selection & Info Display
