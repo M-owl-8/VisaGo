@@ -20,6 +20,9 @@ RUN npm ci --legacy-peer-deps
 # Copy source code
 COPY . .
 
+# Generate Prisma Client before build
+RUN npx prisma generate
+
 # Build backend
 RUN npm run build
 
@@ -51,6 +54,7 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy necessary configuration files
 COPY .env.example .env.example
 COPY tsconfig.json tsconfig.json
+COPY prisma prisma
 
 # Set environment
 ENV NODE_ENV=production
@@ -70,4 +74,4 @@ EXPOSE 3000
 ENTRYPOINT ["/usr/sbin/dumb-init", "--"]
 
 # Start application
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/index.js"]
