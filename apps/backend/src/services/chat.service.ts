@@ -55,7 +55,7 @@ export class ChatService {
       }
 
       const documentStatus = application.documents.reduce(
-        (acc: any, doc: any) => {
+        (acc: Record<string, string>, doc: typeof application.documents[0]) => {
           acc[doc.documentType] = doc.status;
           return acc;
         },
@@ -69,7 +69,7 @@ export class ChatService {
         fee: application.visaType.fee,
         requiredDocuments: JSON.parse(application.visaType.documentTypes || "[]"),
         documentsCollected: application.documents.filter(
-          (d: any) => d.status === "verified"
+          (d: typeof application.documents[0]) => d.status === "verified"
         ).length,
         totalDocuments: application.documents.length,
         applicationStatus: application.status,
@@ -104,7 +104,7 @@ export class ChatService {
         });
         history = recentMessages
           .reverse()
-          .map((m) => ({ role: m.role, content: m.content }));
+          .map((m: any) => ({ role: m.role, content: m.content }));
       }
 
       // Extract application context for better responses
@@ -250,7 +250,7 @@ User's Current Visa Application:
         select: { id: true },
       });
 
-      const sessionIds = sessions.map((s) => s.id);
+      const sessionIds = sessions.map((s: any) => s.id);
 
       const messages = await prisma.chatMessage.findMany({
         where: {
@@ -449,7 +449,7 @@ User's Current Visa Application:
         select: { id: true },
       });
 
-      const sessionIds = sessions.map((s) => s.id);
+      const sessionIds = sessions.map((s: any) => s.id);
 
       // Delete all messages in these sessions
       const messagesDeleted = await prisma.chatMessage.deleteMany({
@@ -498,10 +498,10 @@ User's Current Visa Application:
       let totalTokens = 0;
       let totalSessions = sessions.length;
 
-      sessions.forEach((session) => {
+      sessions.forEach((session: any) => {
         totalMessages += session.messages.length;
         totalTokens += session.messages.reduce(
-          (sum, msg) => sum + (msg.tokensUsed || 0),
+          (sum: any, msg: any) => sum + (msg.tokensUsed || 0),
           0
         );
       });

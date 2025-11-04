@@ -396,7 +396,7 @@ export class RAGService {
 
         if (userApplications.length > 0) {
           userContext = `User's recent visa applications: ${userApplications
-            .map((app) => `${app.country?.name} - ${app.visaType?.name}`)
+            .map((app: any) => `${app.country?.name} - ${app.visaType?.name}`)
             .join(', ')}`;
         }
       }
@@ -438,9 +438,9 @@ export class RAGService {
     visaType?: string
   ): KnowledgeEntry[] {
     const queryLower = query.toLowerCase();
-    const queryTerms = queryLower.split(/\s+/).filter((term) => term.length > 2);
+    const queryTerms = queryLower.split(/\s+/).filter((term: string) => term.length > 2);
 
-    return this.knowledgeBase.filter((entry) => {
+    return this.knowledgeBase.filter((entry: KnowledgeEntry) => {
       // Filter by country if provided
       if (country && entry.country !== 'General' && !entry.country.toLowerCase().includes(country.toLowerCase())) {
         return false;
@@ -455,7 +455,7 @@ export class RAGService {
       const contentLower = (entry.content + ' ' + entry.topic + ' ' + entry.keywords.join(' ')).toLowerCase();
 
       // Check if query terms exist in content
-      return queryTerms.some((term) => contentLower.includes(term)) || contentLower.includes(queryLower);
+      return queryTerms.some((term: string) => contentLower.includes(term)) || contentLower.includes(queryLower);
     });
   }
 
@@ -465,12 +465,12 @@ export class RAGService {
   private rankResults(query: string, documents: KnowledgeEntry[]): KnowledgeEntry[] {
     const queryTerms = query.toLowerCase().split(/\s+/);
 
-    const scored = documents.map((doc) => {
+    const scored = documents.map((doc: KnowledgeEntry) => {
       let score = 0;
 
       // Score based on keyword matches
       const contentLower = `${doc.content} ${doc.topic} ${doc.keywords.join(' ')}`.toLowerCase();
-      queryTerms.forEach((term) => {
+      queryTerms.forEach((term: string) => {
         const matches = (contentLower.match(new RegExp(term, 'g')) || []).length;
         score += matches;
       });
@@ -483,7 +483,7 @@ export class RAGService {
       return { document: doc, score };
     });
 
-    return scored.sort((a, b) => b.score - a.score).map((item) => item.document);
+    return scored.sort((a: { document: KnowledgeEntry; score: number }, b: { document: KnowledgeEntry; score: number }) => b.score - a.score).map((item: { document: KnowledgeEntry; score: number }) => item.document);
   }
 
   /**
@@ -496,7 +496,7 @@ export class RAGService {
   ): string {
     const documentContent = documents
       .map(
-        (doc) => `
+        (doc: KnowledgeEntry) => `
 ## ${doc.topic} (${doc.country})
 ${doc.content}
 `

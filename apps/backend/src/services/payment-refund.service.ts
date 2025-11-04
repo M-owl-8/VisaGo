@@ -1,8 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import crypto from 'crypto';
-import { PaymentAuditLogger } from './payment-audit-logger';
-import { PaymentErrorHandler, PaymentError, ErrorCode } from './payment-errors';
+import { PaymentAuditLogger, PaymentAuditAction } from './payment-audit-logger';
+import { PaymentError, PaymentErrorCode, PaymentErrorSeverity } from './payment-errors';
 
 interface RefundRequest {
   paymentId: string;
@@ -26,12 +26,10 @@ interface RefundResult {
 export class PaymentRefundService {
   private prisma: PrismaClient;
   private auditLogger: PaymentAuditLogger;
-  private errorHandler: PaymentErrorHandler;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
     this.auditLogger = new PaymentAuditLogger(prisma);
-    this.errorHandler = new PaymentErrorHandler();
   }
 
   /**
@@ -48,9 +46,12 @@ export class PaymentRefundService {
       });
 
       if (!payment) {
-        throw this.errorHandler.createError(
-          ErrorCode.PAYMENT_NOT_FOUND,
-          `Payment ${request.paymentId} not found`
+        throw new PaymentError(
+          PaymentErrorCode.APPLICATION_NOT_FOUND,
+          `Payment ${request.paymentId} not found`,
+          PaymentErrorSeverity.HIGH,
+          404,
+          false
         );
       }
 
@@ -60,9 +61,12 @@ export class PaymentRefundService {
       // Calculate refund amount
       const refundAmount = request.amount || payment.amount;
       if (refundAmount > payment.amount) {
-        throw this.errorHandler.createError(
-          ErrorCode.INVALID_AMOUNT,
-          `Refund amount ${refundAmount} exceeds payment amount ${payment.amount}`
+        throw new PaymentError(
+          PaymentErrorCode.INVALID_AMOUNT,
+          `Refund amount ${refundAmount} exceeds payment amount ${payment.amount}`,
+          PaymentErrorSeverity.LOW,
+          400,
+          false
         );
       }
 
@@ -75,18 +79,16 @@ export class PaymentRefundService {
           initiatedBy: request.initiatedBy,
           notes: request.notes,
           status: 'pending',
-          traceId,
         },
       });
 
       // Log refund initiation
-      await this.auditLogger.logRefund(
-        payment.id,
-        refund.id,
-        'initiated',
-        { amount: refundAmount, reason: request.reason },
-        traceId
-      );
+      await this.auditLogger.logPaymentInitiated(traceId, 'refund', {
+        applicationId: request.paymentId,
+        userId: payment.user?.id,
+        amount: refundAmount,
+        currency: payment.currency || 'USD',
+      });
 
       // Process refund based on gateway
       const result = await this.processRefund(payment, refund, traceId);
@@ -95,18 +97,23 @@ export class PaymentRefundService {
     } catch (error) {
       const paymentError = error instanceof PaymentError
         ? error
-        : this.errorHandler.createError(
-            ErrorCode.REFUND_FAILED,
-            `Refund initiation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        : new PaymentError(
+            PaymentErrorCode.UNKNOWN_ERROR,
+            `Refund initiation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            PaymentErrorSeverity.MEDIUM,
+            500,
+            false
           );
 
       // Log error
-      await this.auditLogger.logError(
-        request.paymentId,
+      await this.auditLogger.logPaymentError(
+        traceId,
+        'refund',
         paymentError.code,
+        paymentError.severity,
         paymentError.message,
-        { refundRequest: request },
-        traceId
+        paymentError.statusCode,
+        { refundRequest: request }
       );
 
       throw paymentError;
@@ -139,9 +146,12 @@ export class PaymentRefundService {
           gatewayRefundId = await this.refundStripe(payment, refund, traceId);
           break;
         default:
-          throw this.errorHandler.createError(
-            ErrorCode.UNSUPPORTED_GATEWAY,
-            `Refund not supported for gateway: ${payment.paymentMethod}`
+          throw new PaymentError(
+            PaymentErrorCode.UNKNOWN_ERROR,
+            `Refund not supported for gateway: ${payment.paymentMethod}`,
+            PaymentErrorSeverity.MEDIUM,
+            400,
+            false
           );
       }
 
@@ -167,12 +177,12 @@ export class PaymentRefundService {
       });
 
       // Log successful refund
-      await this.auditLogger.logRefund(
-        payment.id,
-        refund.id,
-        'completed',
-        { gatewayRefundId, amount: refund.amount },
-        traceId
+      await this.auditLogger.logOperationCompleted(
+        traceId,
+        payment.paymentMethod,
+        PaymentAuditAction.REFUND_COMPLETED,
+        Date.now(),
+        refund.id
       );
 
       return {
@@ -234,9 +244,12 @@ export class PaymentRefundService {
 
       return response.data.result?.transaction;
     } catch (error) {
-      throw this.errorHandler.createError(
-        ErrorCode.GATEWAY_ERROR,
-        `Payme refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      throw new PaymentError(
+        PaymentErrorCode.GATEWAY_ERROR,
+        `Payme refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        PaymentErrorSeverity.HIGH,
+        500,
+        false
       );
     }
   }
@@ -280,9 +293,12 @@ export class PaymentRefundService {
 
       return response.data.reversal_id.toString();
     } catch (error) {
-      throw this.errorHandler.createError(
-        ErrorCode.GATEWAY_ERROR,
-        `Click refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      throw new PaymentError(
+        PaymentErrorCode.GATEWAY_ERROR,
+        `Click refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        PaymentErrorSeverity.HIGH,
+        500,
+        false
       );
     }
   }
@@ -333,9 +349,12 @@ export class PaymentRefundService {
 
       return response.data.transaction_id;
     } catch (error) {
-      throw this.errorHandler.createError(
-        ErrorCode.GATEWAY_ERROR,
-        `Uzum refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      throw new PaymentError(
+        PaymentErrorCode.GATEWAY_ERROR,
+        `Uzum refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        PaymentErrorSeverity.HIGH,
+        500,
+        false
       );
     }
   }
@@ -365,9 +384,12 @@ export class PaymentRefundService {
 
       return refundResult.id;
     } catch (error) {
-      throw this.errorHandler.createError(
-        ErrorCode.GATEWAY_ERROR,
-        `Stripe refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      throw new PaymentError(
+        PaymentErrorCode.GATEWAY_ERROR,
+        `Stripe refund failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        PaymentErrorSeverity.HIGH,
+        500,
+        false
       );
     }
   }
@@ -379,9 +401,12 @@ export class PaymentRefundService {
     // Check if payment is in a refundable status
     const refundableStatuses = ['completed', 'partially_refunded'];
     if (!refundableStatuses.includes(payment.status)) {
-      throw this.errorHandler.createError(
-        ErrorCode.INVALID_STATE,
-        `Cannot refund payment with status: ${payment.status}`
+      throw new PaymentError(
+        PaymentErrorCode.INVALID_STATE,
+        `Cannot refund payment with status: ${payment.status}`,
+        PaymentErrorSeverity.MEDIUM,
+        400,
+        false
       );
     }
 
@@ -392,9 +417,12 @@ export class PaymentRefundService {
     );
 
     if (daysSince > 180) {
-      throw this.errorHandler.createError(
-        ErrorCode.REFUND_WINDOW_EXPIRED,
-        `Refund window expired (180 days). Payment is ${daysSince} days old`
+      throw new PaymentError(
+        PaymentErrorCode.REFUND_WINDOW_EXPIRED,
+        `Refund window expired (180 days). Payment is ${daysSince} days old`,
+        PaymentErrorSeverity.MEDIUM,
+        400,
+        false
       );
     }
   }
@@ -419,9 +447,12 @@ export class PaymentRefundService {
     });
 
     if (!refund) {
-      throw this.errorHandler.createError(
-        ErrorCode.REFUND_NOT_FOUND,
-        `Refund ${refundId} not found`
+      throw new PaymentError(
+        PaymentErrorCode.REFUND_NOT_FOUND,
+        `Refund ${refundId} not found`,
+        PaymentErrorSeverity.LOW,
+        404,
+        false
       );
     }
 
@@ -437,16 +468,22 @@ export class PaymentRefundService {
     });
 
     if (!refund) {
-      throw this.errorHandler.createError(
-        ErrorCode.REFUND_NOT_FOUND,
-        `Refund ${refundId} not found`
+      throw new PaymentError(
+        PaymentErrorCode.REFUND_NOT_FOUND,
+        `Refund ${refundId} not found`,
+        PaymentErrorSeverity.LOW,
+        404,
+        false
       );
     }
 
     if (refund.status !== 'pending') {
-      throw this.errorHandler.createError(
-        ErrorCode.INVALID_STATE,
-        `Cannot cancel refund with status: ${refund.status}`
+      throw new PaymentError(
+        PaymentErrorCode.INVALID_STATE,
+        `Cannot cancel refund with status: ${refund.status}`,
+        PaymentErrorSeverity.MEDIUM,
+        400,
+        false
       );
     }
 

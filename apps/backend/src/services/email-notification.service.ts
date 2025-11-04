@@ -133,6 +133,7 @@ export class EmailNotificationService {
         transactionId: failureDetails.transactionId,
         amount: failureDetails.amount,
         currency: failureDetails.currency,
+        method: 'card',
         reason: failureDetails.reason,
         errorCode: failureDetails.errorCode,
         retryUrl: failureDetails.retryUrl,
@@ -181,12 +182,12 @@ export class EmailNotificationService {
 
       const html = this.emailTemplatesService.visaStatusUpdateTemplate({
         userName,
+        applicationId: 'default',
         country: statusDetails.country,
         visaType: statusDetails.visaType,
         status: statusDetails.newStatus,
         previousStatus: statusDetails.previousStatus,
-        updateDate: statusDetails.updateDate.toLocaleDateString(),
-        notes: statusDetails.notes,
+        date: statusDetails.updateDate.toISOString().split('T')[0],
       });
 
       const emailLog = await this.sendEmail(
@@ -213,7 +214,7 @@ export class EmailNotificationService {
     try {
       const html = this.emailTemplatesService.welcomeTemplate({
         userName,
-        supportEmail: process.env.SUPPORT_EMAIL || 'support@visabuddy.com',
+        email: userEmail,
       });
 
       const emailLog = await this.sendEmail(
@@ -265,12 +266,12 @@ export class EmailNotificationService {
         take: limit,
       });
 
-      return logs.map((log) => ({
+      return logs.map((log: any) => ({
         id: log.id,
         userId: log.userId,
         recipientEmail: log.recipientEmail,
         subject: log.subject,
-        type: log.type,
+        type: log.type || 'general',
         status: log.status as 'pending' | 'sent' | 'failed',
         error: log.error || undefined,
         sentAt: log.sentAt || undefined,
@@ -293,9 +294,9 @@ export class EmailNotificationService {
 
       const stats = {
         total: logs.length,
-        sent: logs.filter((l) => l.status === 'sent').length,
-        failed: logs.filter((l) => l.status === 'failed').length,
-        pending: logs.filter((l) => l.status === 'pending').length,
+        sent: logs.filter((l: any) => l.status === 'sent').length,
+        failed: logs.filter((l: any) => l.status === 'failed').length,
+        pending: logs.filter((l: any) => l.status === 'pending').length,
         byType: this.groupByType(logs),
       };
 
@@ -413,14 +414,14 @@ export class EmailNotificationService {
   /**
    * Private helper: Map email log
    */
-  private mapEmailLog(log: any): EmailLog {
+  private mapEmailLog(log: { id: string; userId: string; recipientEmail: string; subject: string; type: string | null; status: string; error: string | null; sentAt: Date | null; createdAt: Date }): EmailLog {
     return {
       id: log.id,
       userId: log.userId,
       recipientEmail: log.recipientEmail,
       subject: log.subject,
-      type: log.type,
-      status: log.status,
+      type: log.type || 'general',
+      status: (log.status as 'pending' | 'sent' | 'failed'),
       error: log.error || undefined,
       sentAt: log.sentAt || undefined,
       createdAt: log.createdAt,
@@ -430,11 +431,12 @@ export class EmailNotificationService {
   /**
    * Private helper: Group logs by type
    */
-  private groupByType(logs: any[]) {
+  private groupByType(logs: { type: string | null }[]) {
     const grouped: Record<string, number> = {};
 
-    logs.forEach((log) => {
-      grouped[log.type] = (grouped[log.type] || 0) + 1;
+    logs.forEach((log: typeof logs[0]) => {
+      const type = log.type || 'general';
+      grouped[type] = (grouped[type] || 0) + 1;
     });
 
     return grouped;

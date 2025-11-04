@@ -4,26 +4,26 @@ export declare class CountriesService {
      */
     static getAllCountries(search?: string): Promise<({
         visaTypes: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         }[];
     } & {
+        description: string | null;
         name: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
         code: string;
         flagEmoji: string;
-        description: string | null;
         requirements: string | null;
     })[]>;
     /**
@@ -31,26 +31,26 @@ export declare class CountriesService {
      */
     static getCountryById(countryId: string): Promise<{
         visaTypes: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         }[];
     } & {
+        description: string | null;
         name: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
         code: string;
         flagEmoji: string;
-        description: string | null;
         requirements: string | null;
     }>;
     /**
@@ -58,26 +58,26 @@ export declare class CountriesService {
      */
     static getCountryByCode(code: string): Promise<{
         visaTypes: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         }[];
     } & {
+        description: string | null;
         name: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
         code: string;
         flagEmoji: string;
-        description: string | null;
         requirements: string | null;
     }>;
     /**
@@ -85,26 +85,26 @@ export declare class CountriesService {
      */
     static getPopularCountries(): Promise<({
         visaTypes: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         }[];
     } & {
+        description: string | null;
         name: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
         code: string;
         flagEmoji: string;
-        description: string | null;
         requirements: string | null;
     })[]>;
     /**
@@ -112,23 +112,23 @@ export declare class CountriesService {
      */
     static getVisaType(visaTypeId: string): Promise<{
         country: {
+            description: string | null;
             name: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             code: string;
             flagEmoji: string;
-            description: string | null;
             requirements: string | null;
         };
     } & {
+        description: string | null;
         name: string;
         id: string;
         countryId: string;
         createdAt: Date;
         updatedAt: Date;
         fee: number;
-        description: string | null;
         requirements: string;
         processingDays: number;
         validity: string;
@@ -138,13 +138,13 @@ export declare class CountriesService {
      * Get all visa types for a country
      */
     static getVisaTypesByCountry(countryId: string): Promise<{
+        description: string | null;
         name: string;
         id: string;
         countryId: string;
         createdAt: Date;
         updatedAt: Date;
         fee: number;
-        description: string | null;
         requirements: string;
         processingDays: number;
         validity: string;
@@ -160,26 +160,34 @@ export declare class CountriesService {
         description?: string;
         requirements?: string;
     }): Promise<{
+        description: string | null;
         name: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
         code: string;
         flagEmoji: string;
-        description: string | null;
         requirements: string | null;
     }>;
     /**
      * Create visa type for a country (admin only)
      */
-    static createVisaType(countryId: string, data: any): Promise<{
+    static createVisaType(countryId: string, data: {
+        name: string;
+        description: string;
+        processingDays?: number;
+        validity?: string;
+        fee?: number;
+        requirements?: string;
+        documentTypes?: string[];
+    }): Promise<{
+        description: string | null;
         name: string;
         id: string;
         countryId: string;
         createdAt: Date;
         updatedAt: Date;
         fee: number;
-        description: string | null;
         requirements: string;
         processingDays: number;
         validity: string;

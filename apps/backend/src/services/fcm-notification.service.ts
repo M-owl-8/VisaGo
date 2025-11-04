@@ -30,11 +30,12 @@ interface NotificationPayload {
 interface NotificationLog {
   id: string;
   userId: string;
-  deviceToken: string;
+  deviceToken?: string;
   title: string;
+  body: string;
   type: string;
   status: 'sent' | 'failed';
-  error?: string;
+  failureReason?: string;
   createdAt: Date;
 }
 
@@ -287,7 +288,7 @@ export class FCMNotificationService {
         where: { userId, isActive: true },
       });
 
-      return tokens.map((token) => this.mapDeviceToken(token));
+      return tokens.map((token: any) => this.mapDeviceToken(token));
     } catch (error) {
       console.error('Error retrieving device tokens:', error);
       return [];
@@ -305,14 +306,15 @@ export class FCMNotificationService {
         take: limit,
       });
 
-      return logs.map((log) => ({
+      return logs.map((log: any) => ({
         id: log.id,
         userId: log.userId,
-        deviceToken: log.deviceToken,
+        deviceToken: log.deviceTokenId || undefined,
         title: log.title,
+        body: log.body,
         type: log.type,
         status: log.status as 'sent' | 'failed',
-        error: log.error || undefined,
+        failureReason: log.failureReason || undefined,
         createdAt: log.createdAt,
       }));
     } catch (error) {
@@ -403,8 +405,9 @@ export class FCMNotificationService {
           const log = await this.prisma.notificationLog.create({
             data: {
               userId,
-              deviceToken: device.token,
+              deviceTokenId: device.id,
               title: payload.title,
+              body: payload.body,
               type: notificationType,
               status: 'sent',
             },
@@ -431,11 +434,12 @@ export class FCMNotificationService {
           const log = await this.prisma.notificationLog.create({
             data: {
               userId,
-              deviceToken: device.token,
+              deviceTokenId: device.id,
               title: payload.title,
+              body: payload.body,
               type: notificationType,
               status: 'failed',
-              error: errorMessage,
+              failureReason: errorMessage,
             },
           });
 
@@ -473,11 +477,12 @@ export class FCMNotificationService {
     return {
       id: log.id,
       userId: log.userId,
-      deviceToken: log.deviceToken,
+      deviceToken: log.deviceTokenId || undefined,
       title: log.title,
+      body: log.body,
       type: log.type,
-      status: log.status,
-      error: log.error || undefined,
+      status: log.status as 'sent' | 'failed',
+      failureReason: log.failureReason || undefined,
       createdAt: log.createdAt,
     };
   }

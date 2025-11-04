@@ -11,7 +11,15 @@ const authenticateToken = (req, res, next) => {
     if (!token) {
         return res.status(401).json({ error: "Unauthorized", message: "No token provided" });
     }
-    jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET || "your-secret-key", (err, decoded) => {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+        console.error("🔴 CRITICAL: JWT_SECRET is not defined in environment variables!");
+        return res.status(500).json({
+            error: "Internal Server Error",
+            message: "Server configuration error"
+        });
+    }
+    jsonwebtoken_1.default.verify(token, jwtSecret, (err, decoded) => {
         if (err) {
             console.error("Token verification failed:", err.message);
             return res.status(403).json({ error: "Forbidden", message: "Invalid or expired token" });
@@ -23,7 +31,11 @@ const authenticateToken = (req, res, next) => {
 };
 exports.authenticateToken = authenticateToken;
 const generateToken = (userId, email) => {
-    return jsonwebtoken_1.default.sign({ id: userId, email }, process.env.JWT_SECRET || "your-secret-key", { expiresIn: "7d" });
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+        throw new Error("JWT_SECRET is not defined in environment variables!");
+    }
+    return jsonwebtoken_1.default.sign({ id: userId, email }, jwtSecret, { expiresIn: "7d" });
 };
 exports.generateToken = generateToken;
 //# sourceMappingURL=auth.js.map

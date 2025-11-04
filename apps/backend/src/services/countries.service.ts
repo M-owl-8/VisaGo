@@ -8,7 +8,7 @@ export class CountriesService {
    * Get all countries with visa types
    */
   static async getAllCountries(search?: string) {
-    const where: Prisma.CountryWhereInput = search
+    const where: any = search
       ? {
           OR: [
             { name: { contains: search } },
@@ -150,7 +150,7 @@ export class CountriesService {
   /**
    * Create visa type for a country (admin only)
    */
-  static async createVisaType(countryId: string, data: any) {
+  static async createVisaType(countryId: string, data: { name: string; description: string; processingDays?: number; validity?: string; fee?: number; requirements?: string; documentTypes?: string[] }) {
     // Verify country exists
     const country = await prisma.country.findUnique({
       where: { id: countryId },
@@ -181,7 +181,7 @@ export class CountriesService {
         validity: data.validity || "1 year",
         fee: data.fee || 0,
         requirements: data.requirements || "{}",
-        documentTypes: data.documentTypes || [],
+        documentTypes: JSON.stringify(data.documentTypes || []),
       },
     });
 

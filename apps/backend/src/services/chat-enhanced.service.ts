@@ -180,7 +180,7 @@ export class ChatEnhancedService {
         take: -limit, // Gets last N messages
       });
 
-      return messages.map((msg) => ({
+      return messages.map((msg: any) => ({
         sessionId: msg.sessionId,
         userId: msg.userId,
         role: msg.role as 'user' | 'assistant',
@@ -204,7 +204,7 @@ export class ChatEnhancedService {
         take: limit,
       });
 
-      return sessions.map((session) => ({
+      return sessions.map((session: any) => ({
         id: session.id,
         userId: session.userId,
         title: session.title,
@@ -354,7 +354,7 @@ export class ChatEnhancedService {
         where: { userId },
       });
 
-      const totalTokens = messages.reduce((sum, msg) => sum + (msg.tokensUsed || 0), 0);
+      const totalTokens = messages.reduce((sum: any, msg: any) => sum + (msg.tokensUsed || 0), 0);
 
       return {
         totalConversations: sessions.length,

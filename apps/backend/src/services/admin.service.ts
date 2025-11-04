@@ -102,8 +102,8 @@ class AdminService {
       });
 
       const totalRevenue = payments
-        .filter((p) => p.status === "completed")
-        .reduce((sum, p) => sum + p.amount, 0);
+        .filter((p: any) => p.status === "completed")
+        .reduce((sum: any, p: any) => sum + p.amount, 0);
 
       // Application breakdown
       const appBreakdown = await prisma.visaApplication.groupBy({
@@ -112,19 +112,19 @@ class AdminService {
       });
 
       const applicationsBreakdown = {
-        draft: appBreakdown.find((a) => a.status === "draft")?._count || 0,
-        submitted: appBreakdown.find((a) => a.status === "submitted")?._count || 0,
-        approved: appBreakdown.find((a) => a.status === "approved")?._count || 0,
-        rejected: appBreakdown.find((a) => a.status === "rejected")?._count || 0,
-        expired: appBreakdown.find((a) => a.status === "expired")?._count || 0,
+        draft: appBreakdown.find((a: any) => a.status === "draft")?._count || 0,
+        submitted: appBreakdown.find((a: any) => a.status === "submitted")?._count || 0,
+        approved: appBreakdown.find((a: any) => a.status === "approved")?._count || 0,
+        rejected: appBreakdown.find((a: any) => a.status === "rejected")?._count || 0,
+        expired: appBreakdown.find((a: any) => a.status === "expired")?._count || 0,
       };
 
       // Payment breakdown
       const paymentBreakdown = {
-        pending: payments.filter((p) => p.status === "pending").length,
-        completed: payments.filter((p) => p.status === "completed").length,
-        failed: payments.filter((p) => p.status === "failed").length,
-        refunded: payments.filter((p) => p.status === "refunded").length,
+        pending: payments.filter((p: any) => p.status === "pending").length,
+        completed: payments.filter((p: any) => p.status === "completed").length,
+        failed: payments.filter((p: any) => p.status === "failed").length,
+        refunded: payments.filter((p: any) => p.status === "refunded").length,
       };
 
       // Revenue by country
@@ -134,7 +134,7 @@ class AdminService {
       });
 
       const enrichedRevenue = await Promise.all(
-        revenueByCountry.map(async (item) => {
+        revenueByCountry.map(async (item: any) => {
           const country = await prisma.country.findUnique({
             where: { id: item.countryId },
             select: { name: true },
@@ -146,8 +146,8 @@ class AdminService {
           });
 
           const countryRevenue = applications
-            .filter((a) => a.payment?.status === "completed")
-            .reduce((sum, a) => sum + (a.payment?.amount || 0), 0);
+            .filter((a: any) => a.payment?.status === "completed")
+            .reduce((sum: any, a: any) => sum + (a.payment?.amount || 0), 0);
 
           return {
             country: country?.name || "Unknown",
@@ -219,7 +219,7 @@ class AdminService {
         prisma.user.count(),
       ]);
 
-      const data = users.map((user) => ({
+      const data = users.map((user: any) => ({
         id: user.id,
         email: user.email,
         firstName: user.firstName,
@@ -227,7 +227,7 @@ class AdminService {
         role: user.role,
         applicationCount: user.visaApplications.length,
         documentCount: user.documents.length,
-        totalSpent: user.payments.reduce((sum, p) => sum + (p.status === "completed" ? p.amount : 0), 0),
+        totalSpent: user.payments.reduce((sum: any, p: any) => sum + (p.status === "completed" ? p.amount : 0), 0),
         createdAt: user.createdAt,
       }));
 
@@ -268,7 +268,7 @@ class AdminService {
         ...user,
         password: undefined, // Never return password
         applicationCount: user.visaApplications.length,
-        totalSpent: user.payments.reduce((sum, p) => sum + (p.status === "completed" ? p.amount : 0), 0),
+        totalSpent: user.payments.reduce((sum: any, p: any) => sum + (p.status === "completed" ? p.amount : 0), 0),
       };
     } catch (error) {
       console.error("Error getting user details:", error);
@@ -297,7 +297,7 @@ class AdminService {
         prisma.visaApplication.count(),
       ]);
 
-      const data = applications.map((app) => ({
+      const data = applications.map((app: any) => ({
         id: app.id,
         userId: app.userId,
         userEmail: app.user.email,
@@ -307,7 +307,7 @@ class AdminService {
         status: app.status,
         progressPercentage: app.progressPercentage,
         documentCount: app.documents.length,
-        verifiedDocuments: app.documents.filter((d) => d.status === "verified").length,
+        verifiedDocuments: app.documents.filter((d: any) => d.status === "verified").length,
         paymentStatus: app.payment?.status || "no_payment",
         paymentAmount: app.payment?.amount || 0,
         submissionDate: app.submissionDate,
@@ -341,7 +341,7 @@ class AdminService {
         prisma.payment.count(),
       ]);
 
-      const data = payments.map((payment) => ({
+      const data = payments.map((payment: any) => ({
         id: payment.id,
         userId: payment.userId,
         userEmail: payment.user.email,
@@ -382,7 +382,7 @@ class AdminService {
         prisma.userDocument.count({ where: { status: "pending" } }),
       ]);
 
-      const data = documents.map((doc) => ({
+      const data = documents.map((doc: any) => ({
         id: doc.id,
         userId: doc.userId,
         userEmail: doc.user.email,
@@ -499,7 +499,7 @@ class AdminService {
         select: { amount: true },
       });
 
-      const revenueLastMonth = paymentsLast30Days.reduce((sum, p) => sum + p.amount, 0);
+      const revenueLastMonth = paymentsLast30Days.reduce((sum: any, p: any) => sum + p.amount, 0);
 
       // Get top countries
       const topCountries = await prisma.visaApplication.groupBy({
@@ -510,7 +510,7 @@ class AdminService {
       });
 
       const topCountriesData = await Promise.all(
-        topCountries.map(async (item) => {
+        topCountries.map(async (item: any) => {
           const country = await prisma.country.findUnique({
             where: { id: item.countryId },
             select: { name: true, flagEmoji: true },

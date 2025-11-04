@@ -110,17 +110,17 @@ class AnalyticsService {
       });
 
       // Calculate metrics
-      const signups = events.filter((e) => e.eventType === "signup").length;
-      const visaSelections = events.filter((e) => e.eventType === "visa_selected").length;
-      const paymentEvents = events.filter((e) => e.eventType === "payment_completed").length;
-      const documents = events.filter((e) => e.eventType === "document_uploaded").length;
-      const messages = events.filter((e) => e.eventType === "chat_message").length;
-      const activeUsers = new Set(events.map((e) => e.userId)).size;
+      const signups = events.filter((e: any) => e.eventType === "signup").length;
+      const visaSelections = events.filter((e: any) => e.eventType === "visa_selected").length;
+      const paymentEvents = events.filter((e: any) => e.eventType === "payment_completed").length;
+      const documents = events.filter((e: any) => e.eventType === "document_uploaded").length;
+      const messages = events.filter((e: any) => e.eventType === "chat_message").length;
+      const activeUsers = new Set(events.map((e: any) => e.userId)).size;
       const uniqueSignupUsers = new Set(
-        events.filter((e) => e.eventType === "signup").map((e) => e.userId)
+        events.filter((e: any) => e.eventType === "signup").map((e: any) => e.userId)
       ).size;
 
-      const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+      const totalRevenue = payments.reduce((sum: any, p: any) => sum + p.amount, 0);
       const conversionRate = signups > 0 ? (paymentEvents / signups) * 100 : 0;
 
       // Get top countries
@@ -172,13 +172,13 @@ class AnalyticsService {
     });
 
     const countryMap: Record<string, number> = {};
-    countries.forEach((app) => {
+    countries.forEach((app: any) => {
       countryMap[app.country.name] = (countryMap[app.country.name] || 0) + 1;
     });
 
     return Object.entries(countryMap)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
+      .map(([name, count]: [string, number]) => ({ name, count }))
+      .sort((a: { name: string; count: number }, b: { name: string; count: number }) => b.count - a.count)
       .slice(0, 10);
   }
 
@@ -199,13 +199,13 @@ class AnalyticsService {
     });
 
     const typeMap: Record<string, number> = {};
-    visaTypes.forEach((app) => {
+    visaTypes.forEach((app: any) => {
       typeMap[app.visaType.name] = (typeMap[app.visaType.name] || 0) + 1;
     });
 
     return Object.entries(typeMap)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
+      .map(([name, count]: any) => ({ name, count }))
+      .sort((a: any, b: any) => b.count - a.count)
       .slice(0, 10);
   }
 
@@ -224,7 +224,7 @@ class AnalyticsService {
     });
 
     const breakdown: Record<string, number> = {};
-    payments.forEach((p) => {
+    payments.forEach((p: any) => {
       breakdown[p.paymentMethod] = (breakdown[p.paymentMethod] || 0) + 1;
     });
 
@@ -263,10 +263,10 @@ class AnalyticsService {
         },
       });
 
-      const signups = dayEvents.filter((e) => e.eventType === "signup").length;
+      const signups = dayEvents.filter((e: any) => e.eventType === "signup").length;
       const payments = dayPayments.length;
-      const revenue = dayPayments.reduce((sum, p) => sum + p.amount, 0);
-      const activeUsers = new Set(dayEvents.map((e) => e.userId)).size;
+      const revenue = dayPayments.reduce((sum: any, p: any) => sum + p.amount, 0);
+      const activeUsers = new Set(dayEvents.map((e: any) => e.userId)).size;
 
       trends.push({
         date: dayStart.toISOString().split("T")[0],
@@ -331,8 +331,8 @@ class AnalyticsService {
         },
       });
 
-      const paymentsStarted = payments.filter((p) => p.status !== "pending").length;
-      const paymentsCompleted = payments.filter((p) => p.status === "completed").length;
+      const paymentsStarted = payments.filter((p: any) => p.status !== "pending").length;
+      const paymentsCompleted = payments.filter((p: any) => p.status === "completed").length;
 
       const documents = await prisma.analyticsEvent.count({
         where: {
@@ -386,7 +386,7 @@ class AnalyticsService {
       });
 
       const breakdown: Record<string, number> = {};
-      sources.forEach((source) => {
+      sources.forEach((source: any) => {
         if (source.source) {
           breakdown[source.source] = source._count.userId;
         }
@@ -460,7 +460,7 @@ class AnalyticsService {
         },
       });
 
-      const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+      const totalRevenue = payments.reduce((sum: any, p: any) => sum + p.amount, 0);
       const conversionRate = signups > 0 ? (payments.length / signups) * 100 : 0;
 
       // Upsert daily metrics

@@ -700,4 +700,101 @@ export class EmailTemplatesService {
 </html>
     `;
   }
+
+  /**
+   * Instance method wrapper for payment confirmation template
+   */
+  paymentConfirmationTemplate(params: {
+    userName: string;
+    transactionId?: string;
+    amount: number;
+    currency: string;
+    method: string;
+    date?: string;
+    applicationCountry?: string;
+    visaType?: string;
+  }): string {
+    return EmailTemplatesService.paymentConfirmation({
+      userName: params.userName,
+      transactionId: params.transactionId || 'TXN-' + Date.now(),
+      amount: params.amount,
+      currency: params.currency,
+      applicationId: '', // Will be populated as needed
+      visaType: params.visaType || 'Visa',
+      paymentMethod: params.method,
+      date: params.date ? new Date(params.date) : new Date(),
+      supportEmail: process.env.SMTP_REPLY_TO,
+    });
+  }
+
+  /**
+   * Instance method wrapper for payment failed template
+   */
+  paymentFailedTemplate(params: {
+    userName: string;
+    transactionId?: string;
+    amount: number;
+    currency: string;
+    method: string;
+    applicationId?: string;
+    visaType?: string;
+    reason?: string;
+    errorCode?: string;
+    retryUrl?: string;
+  }): string {
+    return EmailTemplatesService.paymentFailed({
+      userName: params.userName,
+      transactionId: params.transactionId,
+      amount: params.amount,
+      currency: params.currency,
+      applicationId: params.applicationId || '',
+      visaType: params.visaType || 'Visa',
+      reason: params.reason || 'An error occurred processing your payment',
+      retryUrl: params.retryUrl || `${process.env.SERVER_URL || 'https://visabuddy.com'}/payment/${params.applicationId}`,
+      supportEmail: process.env.SMTP_REPLY_TO,
+    });
+  }
+
+  /**
+   * Instance method wrapper for visa status update template
+   */
+  visaStatusUpdateTemplate(params: {
+    userName: string;
+    applicationId: string;
+    country: string;
+    visaType: string;
+    status: string;
+    previousStatus?: string;
+    date: string;
+  }): string {
+    // Map status to valid enum values
+    const validStatuses = ['submitted', 'processing', 'approved', 'rejected', 'on_hold'];
+    const normalizedStatus = validStatuses.includes(params.status.toLowerCase()) 
+      ? (params.status.toLowerCase() as 'submitted' | 'processing' | 'approved' | 'rejected' | 'on_hold')
+      : 'processing';
+    
+    return EmailTemplatesService.visaStatusUpdate({
+      userName: params.userName,
+      applicationId: params.applicationId,
+      visaType: params.visaType,
+      status: normalizedStatus,
+      message: `Your visa application status has been updated to: ${normalizedStatus}`,
+      dashboardUrl: `${process.env.SERVER_URL || 'https://visabuddy.com'}/applications/${params.applicationId}`,
+      supportEmail: process.env.SMTP_REPLY_TO,
+    });
+  }
+
+  /**
+   * Instance method wrapper for welcome template
+   */
+  welcomeTemplate(params: {
+    userName: string;
+    email: string;
+  }): string {
+    return EmailTemplatesService.welcome({
+      userName: params.userName,
+      email: params.email,
+      supportEmail: process.env.SMTP_REPLY_TO,
+    });
+  }
 }

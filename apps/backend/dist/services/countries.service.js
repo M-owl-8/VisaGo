@@ -152,7 +152,7 @@ class CountriesService {
                 validity: data.validity || "1 year",
                 fee: data.fee || 0,
                 requirements: data.requirements || "{}",
-                documentTypes: data.documentTypes || [],
+                documentTypes: JSON.stringify(data.documentTypes || []),
             },
         });
         return visaType;

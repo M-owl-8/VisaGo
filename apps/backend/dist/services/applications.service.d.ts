@@ -4,34 +4,34 @@ export declare class ApplicationsService {
      */
     static getUserApplications(userId: string): Promise<({
         country: {
+            description: string | null;
             name: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             code: string;
             flagEmoji: string;
-            description: string | null;
             requirements: string | null;
         };
         visaType: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         };
         checkpoints: {
-            id: string;
             title: string;
+            description: string | null;
+            id: string;
             createdAt: Date;
             updatedAt: Date;
-            description: string | null;
             order: number;
             isCompleted: boolean;
             completedAt: Date | null;
@@ -57,34 +57,34 @@ export declare class ApplicationsService {
      */
     static getApplication(applicationId: string, userId: string): Promise<{
         country: {
+            description: string | null;
             name: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             code: string;
             flagEmoji: string;
-            description: string | null;
             requirements: string | null;
         };
         visaType: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         };
         checkpoints: {
-            id: string;
             title: string;
+            description: string | null;
+            id: string;
             createdAt: Date;
             updatedAt: Date;
-            description: string | null;
             order: number;
             isCompleted: boolean;
             completedAt: Date | null;
@@ -114,34 +114,34 @@ export declare class ApplicationsService {
         notes?: string;
     }): Promise<{
         country: {
+            description: string | null;
             name: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             code: string;
             flagEmoji: string;
-            description: string | null;
             requirements: string | null;
         };
         visaType: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         };
         checkpoints: {
-            id: string;
             title: string;
+            description: string | null;
+            id: string;
             createdAt: Date;
             updatedAt: Date;
-            description: string | null;
             order: number;
             isCompleted: boolean;
             completedAt: Date | null;
@@ -167,34 +167,34 @@ export declare class ApplicationsService {
      */
     static updateApplicationStatus(applicationId: string, userId: string, status: string): Promise<{
         country: {
+            description: string | null;
             name: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             code: string;
             flagEmoji: string;
-            description: string | null;
             requirements: string | null;
         };
         visaType: {
+            description: string | null;
             name: string;
             id: string;
             countryId: string;
             createdAt: Date;
             updatedAt: Date;
             fee: number;
-            description: string | null;
             requirements: string;
             processingDays: number;
             validity: string;
             documentTypes: string;
         };
         checkpoints: {
-            id: string;
             title: string;
+            description: string | null;
+            id: string;
             createdAt: Date;
             updatedAt: Date;
-            description: string | null;
             order: number;
             isCompleted: boolean;
             completedAt: Date | null;
@@ -219,11 +219,11 @@ export declare class ApplicationsService {
      * Update checkpoint status
      */
     static updateCheckpoint(applicationId: string, userId: string, checkpointId: string, isCompleted: boolean): Promise<{
-        id: string;
         title: string;
+        description: string | null;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
-        description: string | null;
         order: number;
         isCompleted: boolean;
         completedAt: Date | null;

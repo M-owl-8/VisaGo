@@ -222,7 +222,7 @@ export class ApplicationsService {
       where: { applicationId },
     });
 
-    const completedCount = allCheckpoints.filter((c) => c.isCompleted).length;
+    const completedCount = allCheckpoints.filter((c: any) => c.isCompleted).length;
     const progressPercentage = Math.round((completedCount / allCheckpoints.length) * 100);
 
     await prisma.visaApplication.update({

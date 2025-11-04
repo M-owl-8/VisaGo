@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const chat_service_1 = require("../services/chat.service");
 const auth_1 = require("../middleware/auth");
+const input_validation_1 = require("../middleware/input-validation");
 const router = (0, express_1.Router)();
 // ============================================================================
 // MIDDLEWARE
@@ -16,10 +17,12 @@ router.use(auth_1.authenticateToken);
  * POST /api/chat
  * Send a message and get AI response (primary endpoint)
  */
-router.post("/", async (req, res) => {
+router.post("/", input_validation_1.validateRAGRequest, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { content, applicationId, conversationHistory } = req.body;
+        const { query, applicationId, conversationHistory } = req.body;
+        // Use 'query' from middleware validation, fallback to 'content' for backward compatibility
+        const content = query || req.body.content;
         // Validate required fields
         if (!content || !content.trim()) {
             return res.status(400).json({

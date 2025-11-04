@@ -61,8 +61,8 @@ export declare class ChatService {
                 role: string;
             }[];
         } & {
-            id: string;
             title: string;
+            id: string;
             createdAt: Date;
             updatedAt: Date;
             userId: string;
@@ -89,8 +89,8 @@ export declare class ChatService {
             feedback: string | null;
         }[];
     } & {
-        id: string;
         title: string;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         userId: string;
@@ -101,8 +101,8 @@ export declare class ChatService {
      * Rename a chat session
      */
     renameSession(sessionId: string, userId: string, newTitle: string): Promise<{
-        id: string;
         title: string;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         userId: string;
@@ -129,8 +129,8 @@ export declare class ChatService {
      * Delete a chat session
      */
     deleteSession(sessionId: string): Promise<{
-        id: string;
         title: string;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         userId: string;

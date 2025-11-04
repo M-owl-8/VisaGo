@@ -42,6 +42,7 @@ const helmet_1 = __importDefault(require("helmet"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const rate_limit_1 = require("./middleware/rate-limit");
+const csrf_1 = require("./middleware/csrf");
 // Import services
 const db_pool_service_1 = __importDefault(require("./services/db-pool.service"));
 const firebase_storage_service_1 = __importDefault(require("./services/firebase-storage.service"));
@@ -64,6 +65,8 @@ app.use((0, cors_1.default)({
     origin: process.env.CORS_ORIGIN || "*",
     credentials: true,
 }));
+// CSRF Protection
+app.use(csrf_1.csrfProtection);
 // Rate limiting
 const limiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -71,6 +74,8 @@ const limiter = (0, express_rate_limit_1.default)({
     message: "Too many requests, please try again later.",
 });
 app.use("/api/", limiter);
+// Webhook rate limiting (stricter limits)
+app.use("/api/payments/webhook", rate_limit_1.webhookLimiter);
 // Body parsing middleware
 app.use(express_1.default.json({ limit: "50mb" }));
 app.use(express_1.default.urlencoded({ limit: "50mb", extended: true }));
