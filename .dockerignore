@@ -6,7 +6,6 @@
 # Environment files (NEVER include secrets)
 .env
 .env.*
-!.env.example
 
 # Dependencies
 node_modules
