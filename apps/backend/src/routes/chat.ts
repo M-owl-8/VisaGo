@@ -44,9 +44,20 @@ router.post("/", validateRAGRequest, async (req: Request, res: Response) => {
       conversationHistory
     );
 
+    // Increment rate limit counter after successful message
+    const { incrementChatMessageCount, getChatRateLimitInfo } = await import("../middleware/chat-rate-limit");
+    await incrementChatMessageCount(userId);
+    const limitInfo = await getChatRateLimitInfo(userId);
+
     res.status(201).json({
       success: true,
       data: response,
+      quota: {
+        messagesUsed: limitInfo.messagesUsed,
+        messagesRemaining: limitInfo.messagesRemaining,
+        limit: 50,
+        resetTime: limitInfo.resetTime,
+      },
     });
   } catch (error: any) {
     console.error("Chat error:", error);
@@ -85,9 +96,20 @@ router.post("/send", async (req: Request, res: Response) => {
       conversationHistory
     );
 
+    // Increment rate limit counter after successful message
+    const { incrementChatMessageCount, getChatRateLimitInfo } = await import("../middleware/chat-rate-limit");
+    await incrementChatMessageCount(userId);
+    const limitInfo = await getChatRateLimitInfo(userId);
+
     res.status(201).json({
       success: true,
       data: response,
+      quota: {
+        messagesUsed: limitInfo.messagesUsed,
+        messagesRemaining: limitInfo.messagesRemaining,
+        limit: 50,
+        resetTime: limitInfo.resetTime,
+      },
     });
   } catch (error: any) {
     console.error("Chat error:", error);
@@ -437,6 +459,175 @@ router.post("/search", async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: results,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message,
+      },
+    });
+  }
+});
+
+// ============================================================================
+// QUOTA AND USAGE TRACKING ROUTES
+// ============================================================================
+
+/**
+ * GET /api/chat/quota
+ * Check user's remaining chat message quota for today
+ */
+router.get("/quota", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { getChatRateLimitInfo } = await import("../middleware/chat-rate-limit");
+    
+    const limitInfo = await getChatRateLimitInfo(userId);
+    
+    res.json({
+      success: true,
+      data: {
+        messagesUsed: limitInfo.messagesUsed,
+        messagesRemaining: limitInfo.messagesRemaining,
+        dailyLimit: limitInfo.messagesRemaining + limitInfo.messagesUsed,
+        resetTime: limitInfo.resetTime,
+        isLimited: limitInfo.isLimited,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message || "Failed to fetch quota information",
+      },
+    });
+  }
+});
+
+/**
+ * GET /api/chat/usage/daily
+ * Get daily usage and cost data
+ */
+router.get("/usage/daily", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    
+    const usage = await ChatService.getDailyUsage(userId);
+    
+    res.json({
+      success: true,
+      data: {
+        date: usage?.date || new Date(),
+        requests: usage?.totalRequests || 0,
+        tokens: usage?.totalTokens || 0,
+        cost: usage?.totalCost || 0,
+        avgResponseTime: usage?.avgResponseTime || 0,
+        errors: usage?.errorCount || 0,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * GET /api/chat/usage/weekly
+ * Get weekly usage and cost data
+ */
+router.get("/usage/weekly", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    
+    const usage = await ChatService.getWeeklyUsage(userId);
+    
+    res.json({
+      success: true,
+      data: usage,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * GET /api/chat/usage/monthly
+ * Get monthly usage and cost data
+ */
+router.get("/usage/monthly", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    
+    const usage = await ChatService.getMonthlyUsage(userId);
+    
+    res.json({
+      success: true,
+      data: usage,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * GET /api/chat/usage/cost-analysis
+ * Get comprehensive cost analysis across periods
+ */
+router.get("/usage/cost-analysis", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    
+    const costAnalysis = await ChatService.getCostAnalysis(userId);
+    
+    res.json({
+      success: true,
+      data: costAnalysis,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * POST /api/chat/increment-message-count
+ * Manually increment message count (for testing purposes)
+ */
+router.post("/increment-message-count", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { incrementChatMessageCount } = await import("../middleware/chat-rate-limit");
+    
+    const newCount = await incrementChatMessageCount(userId);
+    
+    const { getChatRateLimitInfo } = await import("../middleware/chat-rate-limit");
+    const limitInfo = await getChatRateLimitInfo(userId);
+    
+    res.json({
+      success: true,
+      data: {
+        messagesUsed: limitInfo.messagesUsed,
+        messagesRemaining: limitInfo.messagesRemaining,
+      },
     });
   } catch (error: any) {
     res.status(500).json({

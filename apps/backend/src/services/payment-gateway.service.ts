@@ -3,6 +3,7 @@ import { PaymeService } from "./payme.service";
 import { ClickService } from "./click.service";
 import { UzumService } from "./uzum.service";
 import { StripeService } from "./stripe.service";
+import { MockPaymentService } from "./mock-payment.service";
 import {
   PaymentError,
   PaymentErrorCode,
@@ -13,7 +14,7 @@ import { PaymentAuditLogger, PaymentAuditAction } from "./payment-audit-logger";
 import { PaymentRetry, DEFAULT_RETRY_CONFIG, RetryConfig } from "./payment-retry";
 import { WebhookSecurityService } from "./webhook-security";
 
-export type PaymentMethod = "payme" | "click" | "uzum" | "stripe";
+export type PaymentMethod = "payme" | "click" | "uzum" | "stripe" | "mock";
 export type FallbackStrategy = "sequential" | "random";
 
 interface PaymentGatewayConfig {
@@ -61,6 +62,7 @@ export class PaymentGatewayService {
   private clickService: ClickService | null = null;
   private uzumService: UzumService | null = null;
   private stripeService: StripeService | null = null;
+  private mockService: MockPaymentService | null = null;
   private prisma: PrismaClient;
   private auditLogger: PaymentAuditLogger;
   private retryService: PaymentRetry;
@@ -79,20 +81,42 @@ export class PaymentGatewayService {
     this.primaryMethod = config.primaryMethod || "payme";
 
     // Initialize available payment gateways
-    if (config.payme) {
-      this.paymeService = new PaymeService(config.payme, prisma);
+    // Only initialize if config is complete (has all required fields)
+    if (config.payme && config.payme.merchantId && config.payme.apiKey) {
+      try {
+        this.paymeService = new PaymeService(config.payme, prisma);
+      } catch (error) {
+        console.warn("⚠️  Payme service initialization skipped:", error instanceof Error ? error.message : error);
+      }
     }
 
-    if (config.click) {
-      this.clickService = new ClickService(config.click, prisma);
+    if (config.click && config.click.merchantId && config.click.apiKey) {
+      try {
+        this.clickService = new ClickService(config.click, prisma);
+      } catch (error) {
+        console.warn("⚠️  Click service initialization skipped:", error instanceof Error ? error.message : error);
+      }
     }
 
-    if (config.uzum) {
-      this.uzumService = new UzumService(config.uzum, prisma);
+    if (config.uzum && config.uzum.serviceId && config.uzum.apiKey) {
+      try {
+        this.uzumService = new UzumService(config.uzum, prisma);
+      } catch (error) {
+        console.warn("⚠️  Uzum service initialization skipped:", error instanceof Error ? error.message : error);
+      }
     }
 
-    if (config.stripe) {
-      this.stripeService = new StripeService(config.stripe, prisma);
+    if (config.stripe && config.stripe.apiKey) {
+      try {
+        this.stripeService = new StripeService(config.stripe, prisma);
+      } catch (error) {
+        console.warn("⚠️  Stripe service initialization skipped:", error instanceof Error ? error.message : error);
+      }
+    }
+
+    // Always enable mock service for development/testing
+    if (process.env.NODE_ENV === "development" || process.env.ENABLE_MOCK_PAYMENTS === "true") {
+      this.mockService = new MockPaymentService({}, prisma);
     }
   }
 
@@ -106,6 +130,7 @@ export class PaymentGatewayService {
     if (this.clickService) methods.push("click");
     if (this.uzumService) methods.push("uzum");
     if (this.stripeService) methods.push("stripe");
+    if (this.mockService) methods.push("mock");
 
     return methods;
   }
@@ -151,6 +176,15 @@ export class PaymentGatewayService {
           false
         );
         return this.stripeService;
+      case "mock":
+        if (!this.mockService) throw new PaymentError(
+          PaymentErrorCode.MISSING_CONFIGURATION,
+          "Mock payment gateway not available",
+          PaymentErrorSeverity.HIGH,
+          500,
+          false
+        );
+        return this.mockService;
       default:
         throw new PaymentError(
           PaymentErrorCode.UNKNOWN_ERROR,
@@ -672,6 +706,12 @@ export class PaymentGatewayService {
     supportsRefunds: boolean;
   } {
     const methodInfoMap = {
+      mock: {
+        name: "Mock Payment",
+        description: "Development/testing payment provider",
+        supportedCurrencies: ["USD", "UZS", "EUR"],
+        supportsRefunds: true,
+      },
       payme: {
         name: "Payme",
         description: "Popular payment gateway in Uzbekistan",

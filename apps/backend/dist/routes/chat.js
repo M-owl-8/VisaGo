@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const chat_service_1 = require("../services/chat.service");
@@ -33,9 +66,19 @@ router.post("/", input_validation_1.validateRAGRequest, async (req, res) => {
             });
         }
         const response = await chat_service_1.chatService.sendMessage(userId, content, applicationId, conversationHistory);
+        // Increment rate limit counter after successful message
+        const { incrementChatMessageCount, getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        await incrementChatMessageCount(userId);
+        const limitInfo = await getChatRateLimitInfo(userId);
         res.status(201).json({
             success: true,
             data: response,
+            quota: {
+                messagesUsed: limitInfo.messagesUsed,
+                messagesRemaining: limitInfo.messagesRemaining,
+                limit: 50,
+                resetTime: limitInfo.resetTime,
+            },
         });
     }
     catch (error) {
@@ -66,9 +109,19 @@ router.post("/send", async (req, res) => {
             });
         }
         const response = await chat_service_1.chatService.sendMessage(userId, content, applicationId, conversationHistory);
+        // Increment rate limit counter after successful message
+        const { incrementChatMessageCount, getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        await incrementChatMessageCount(userId);
+        const limitInfo = await getChatRateLimitInfo(userId);
         res.status(201).json({
             success: true,
             data: response,
+            quota: {
+                messagesUsed: limitInfo.messagesUsed,
+                messagesRemaining: limitInfo.messagesRemaining,
+                limit: 50,
+                resetTime: limitInfo.resetTime,
+            },
         });
     }
     catch (error) {
@@ -367,6 +420,161 @@ router.post("/search", async (req, res) => {
         res.json({
             success: true,
             data: results,
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: {
+                message: error.message,
+            },
+        });
+    }
+});
+// ============================================================================
+// QUOTA AND USAGE TRACKING ROUTES
+// ============================================================================
+/**
+ * GET /api/chat/quota
+ * Check user's remaining chat message quota for today
+ */
+router.get("/quota", async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const limitInfo = await getChatRateLimitInfo(userId);
+        res.json({
+            success: true,
+            data: {
+                messagesUsed: limitInfo.messagesUsed,
+                messagesRemaining: limitInfo.messagesRemaining,
+                dailyLimit: limitInfo.messagesRemaining + limitInfo.messagesUsed,
+                resetTime: limitInfo.resetTime,
+                isLimited: limitInfo.isLimited,
+            },
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: {
+                message: error.message || "Failed to fetch quota information",
+            },
+        });
+    }
+});
+/**
+ * GET /api/chat/usage/daily
+ * Get daily usage and cost data
+ */
+router.get("/usage/daily", async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const usage = await chat_service_1.chatService.getDailyUsage(userId);
+        res.json({
+            success: true,
+            data: {
+                date: usage?.date || new Date(),
+                requests: usage?.totalRequests || 0,
+                tokens: usage?.totalTokens || 0,
+                cost: usage?.totalCost || 0,
+                avgResponseTime: usage?.avgResponseTime || 0,
+                errors: usage?.errorCount || 0,
+            },
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: {
+                message: error.message,
+            },
+        });
+    }
+});
+/**
+ * GET /api/chat/usage/weekly
+ * Get weekly usage and cost data
+ */
+router.get("/usage/weekly", async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const usage = await chat_service_1.chatService.getWeeklyUsage(userId);
+        res.json({
+            success: true,
+            data: usage,
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: {
+                message: error.message,
+            },
+        });
+    }
+});
+/**
+ * GET /api/chat/usage/monthly
+ * Get monthly usage and cost data
+ */
+router.get("/usage/monthly", async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const usage = await chat_service_1.chatService.getMonthlyUsage(userId);
+        res.json({
+            success: true,
+            data: usage,
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: {
+                message: error.message,
+            },
+        });
+    }
+});
+/**
+ * GET /api/chat/usage/cost-analysis
+ * Get comprehensive cost analysis across periods
+ */
+router.get("/usage/cost-analysis", async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const costAnalysis = await chat_service_1.chatService.getCostAnalysis(userId);
+        res.json({
+            success: true,
+            data: costAnalysis,
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: {
+                message: error.message,
+            },
+        });
+    }
+});
+/**
+ * POST /api/chat/increment-message-count
+ * Manually increment message count (for testing purposes)
+ */
+router.post("/increment-message-count", async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { incrementChatMessageCount } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const newCount = await incrementChatMessageCount(userId);
+        const { getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const limitInfo = await getChatRateLimitInfo(userId);
+        res.json({
+            success: true,
+            data: {
+                messagesUsed: limitInfo.messagesUsed,
+                messagesRemaining: limitInfo.messagesRemaining,
+            },
         });
     }
     catch (error) {

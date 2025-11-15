@@ -1,0 +1,30 @@
+{
+  "name": "VisaBuddy",
+  "displayName": "VisaBuddy",
+  "description": "AI-powered visa application assistant for Uzbek travelers",
+  "version": "1.0.0",
+  "ios": {
+    "bundleIdentifier": "com.visabuddy.app",
+    "buildNumber": "1",
+    "supportsTablet": true,
+    "infoPlist": {
+      "NSCameraUsageDescription": "VisaBuddy needs camera access to take photos of your documents",
+      "NSPhotoLibraryUsageDescription": "VisaBuddy needs photo library access to select document images",
+      "NSPhotoLibraryAddUsageDescription": "VisaBuddy needs permission to save documents to your photo library"
+    }
+  },
+  "android": {
+    "package": "com.visabuddy.app",
+    "versionCode": 1,
+    "permissions": [
+      "CAMERA",
+      "READ_EXTERNAL_STORAGE",
+      "WRITE_EXTERNAL_STORAGE",
+      "INTERNET"
+    ],
+    "adaptiveIcon": {
+      "foregroundImage": "./src/assets/icon.png",
+      "backgroundColor": "#0A1929"
+    }
+  }
+}

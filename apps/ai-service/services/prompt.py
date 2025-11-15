@@ -266,23 +266,40 @@ Quyida keltirilgan bilim bazasidagi kontekstdan foydalanib, aniq, hozirgi vaqtda
     def _format_application_context(self, app_context: Dict[str, Any]) -> str:
         """Format visa application context for inclusion in prompt"""
         try:
-            required_docs = app_context.get("required_docs", [])
-            if isinstance(required_docs, list):
-                required_docs = ", ".join(required_docs)
+            missing_docs = app_context.get("missingDocuments", [])
+            if isinstance(missing_docs, list):
+                missing_docs_str = ", ".join(missing_docs) if missing_docs else "None"
+            else:
+                missing_docs_str = str(missing_docs)
             
-            return self.APPLICATION_CONTEXT_TEMPLATE.format(
-                country=app_context.get("country", "Unknown"),
-                country_code=app_context.get("country_code", "XX"),
-                visa_type=app_context.get("visa_type", "Not specified"),
-                status=app_context.get("status", "Draft"),
-                processing_days_normal=app_context.get("processing_days_normal", 14),
-                processing_days_expedited=app_context.get("processing_days_expedited", 7),
-                visa_fee=app_context.get("visa_fee", 0),
-                application_fee=app_context.get("application_fee", 0),
-                collected_docs=app_context.get("collected_docs", 0),
-                total_docs=app_context.get("total_docs", 0),
-                required_docs=required_docs,
-            )
+            context_str = f"""
+**USER'S CURRENT VISA APPLICATION:**
+
+**Destination**: {app_context.get("country", "Unknown")} ({app_context.get("countryCode", "XX")})
+**Visa Type**: {app_context.get("visaType", "Not specified")}
+**Application Status**: {app_context.get("status", "Draft")}
+**Processing Time**: {app_context.get("processingDays", 14)} days
+**Visa Fee**: ${app_context.get("fee", 0)}
+
+**DOCUMENT STATUS:**
+- Total Required: {app_context.get("documentsTotal", 0)}
+- Uploaded: {app_context.get("documentsUploaded", 0)}
+- Verified: {app_context.get("documentsVerified", 0)}
+- Pending Review: {app_context.get("documentsPending", 0)}
+- Rejected: {app_context.get("documentsRejected", 0)}
+
+**MISSING DOCUMENTS**: {missing_docs_str}
+
+**PROGRESS:**
+- Checkpoints Completed: {app_context.get("checkpointsCompleted", 0)} of {app_context.get("checkpointsTotal", 0)}
+- Next Step: {app_context.get("nextCheckpoint", "Complete all documents")}
+
+**IMPORTANT**: Use this specific application context to provide personalized advice. 
+If user asks about documents, refer to their specific missing documents.
+If user asks about next steps, refer to their next checkpoint.
+Always respond in {app_context.get("userLanguage", "en")} language.
+"""
+            return context_str
         except Exception as e:
             logger.error(f"Error formatting application context: {str(e)}")
             return ""

@@ -1,4 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import { 
+  detectSQLInjection, 
+  detectXSS, 
+  detectCommandInjection,
+  validateAndSanitize,
+  sanitizeObject 
+} from '../utils/input-sanitization';
 
 /**
  * Input Validation Middleware
@@ -153,40 +160,212 @@ export const validateRAGRequest = (req: Request, res: Response, next: NextFuncti
 };
 
 /**
- * Middleware to validate common input fields
+ * Middleware to validate common input fields with enhanced security
  */
 export const validateCommonInputs = (req: Request, res: Response, next: NextFunction) => {
-  const { email, url, title, description } = req.body;
+  const { email, url, title, description, ...otherFields } = req.body;
 
   // Validate email if provided
-  if (email && !validateEmail(email)) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        message: 'Invalid email format',
-        code: 'INVALID_EMAIL',
-      },
-    });
+  if (email) {
+    if (typeof email !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Email must be a string',
+          code: 'INVALID_EMAIL',
+        },
+      });
+    }
+
+    // Check for SQL injection and XSS in email
+    if (detectSQLInjection(email) || detectXSS(email)) {
+      console.warn('⚠️  Suspicious email input detected:', email.substring(0, 50));
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid email format',
+          code: 'INVALID_EMAIL',
+        },
+      });
+    }
+
+    if (!validateEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid email format',
+          code: 'INVALID_EMAIL',
+        },
+      });
+    }
   }
 
   // Validate URL if provided
-  if (url && !validateURL(url)) {
+  if (url) {
+    if (typeof url !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'URL must be a string',
+          code: 'INVALID_URL',
+        },
+      });
+    }
+
+    // Check for XSS and command injection in URL
+    if (detectXSS(url) || detectCommandInjection(url)) {
+      console.warn('⚠️  Suspicious URL input detected:', url.substring(0, 50));
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid URL format',
+          code: 'INVALID_URL',
+        },
+      });
+    }
+
+    if (!validateURL(url)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid URL format',
+          code: 'INVALID_URL',
+        },
+      });
+    }
+  }
+
+  // Sanitize and validate text fields
+  if (title && typeof title === 'string') {
+    const validation = validateAndSanitize(title, { maxLength: 500, required: false });
+    if (!validation.valid && validation.errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Title contains invalid characters',
+          code: 'INVALID_INPUT',
+          details: validation.errors,
+        },
+      });
+    }
+    req.body.title = validation.sanitized;
+  }
+
+  if (description && typeof description === 'string') {
+    const validation = validateAndSanitize(description, { maxLength: 5000, required: false });
+    if (!validation.valid && validation.errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Description contains invalid characters',
+          code: 'INVALID_INPUT',
+          details: validation.errors,
+        },
+      });
+    }
+    req.body.description = validation.sanitized;
+  }
+
+  // Sanitize other string fields in body
+  req.body = sanitizeObject(req.body, { maxLength: 10000 });
+
+  next();
+};
+
+/**
+ * Middleware to detect and prevent SQL injection in all inputs
+ */
+export const preventSQLInjection = (req: Request, res: Response, next: NextFunction) => {
+  const checkObject = (obj: any, path: string = ''): string[] => {
+    const issues: string[] = [];
+    
+    if (typeof obj === 'string') {
+      if (detectSQLInjection(obj)) {
+        issues.push(`${path}: Potential SQL injection detected`);
+      }
+    } else if (Array.isArray(obj)) {
+      obj.forEach((item, index) => {
+        issues.push(...checkObject(item, `${path}[${index}]`));
+      });
+    } else if (obj && typeof obj === 'object') {
+      for (const [key, value] of Object.entries(obj)) {
+        const newPath = path ? `${path}.${key}` : key;
+        issues.push(...checkObject(value, newPath));
+      }
+    }
+    
+    return issues;
+  };
+
+  const bodyIssues = checkObject(req.body, 'body');
+  const queryIssues = checkObject(req.query, 'query');
+  const paramsIssues = checkObject(req.params, 'params');
+
+  const allIssues = [...bodyIssues, ...queryIssues, ...paramsIssues];
+
+  if (allIssues.length > 0) {
+    console.warn('🚨 SQL injection attempt detected:', {
+      ip: req.ip,
+      path: req.path,
+      issues: allIssues,
+    });
+    
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Invalid URL format',
-        code: 'INVALID_URL',
+        message: 'Invalid input detected',
+        code: 'INVALID_INPUT',
       },
     });
   }
 
-  // Sanitize text fields
-  if (title && typeof title === 'string') {
-    req.body.title = title.trim().substring(0, 500);
-  }
+  next();
+};
 
-  if (description && typeof description === 'string') {
-    req.body.description = description.trim().substring(0, 5000);
+/**
+ * Middleware to detect and prevent XSS in all inputs
+ */
+export const preventXSS = (req: Request, res: Response, next: NextFunction) => {
+  const checkObject = (obj: any, path: string = ''): string[] => {
+    const issues: string[] = [];
+    
+    if (typeof obj === 'string') {
+      if (detectXSS(obj)) {
+        issues.push(`${path}: Potential XSS detected`);
+      }
+    } else if (Array.isArray(obj)) {
+      obj.forEach((item, index) => {
+        issues.push(...checkObject(item, `${path}[${index}]`));
+      });
+    } else if (obj && typeof obj === 'object') {
+      for (const [key, value] of Object.entries(obj)) {
+        const newPath = path ? `${path}.${key}` : key;
+        issues.push(...checkObject(value, newPath));
+      }
+    }
+    
+    return issues;
+  };
+
+  const bodyIssues = checkObject(req.body, 'body');
+  const queryIssues = checkObject(req.query, 'query');
+
+  const allIssues = [...bodyIssues, ...queryIssues];
+
+  if (allIssues.length > 0) {
+    console.warn('🚨 XSS attempt detected:', {
+      ip: req.ip,
+      path: req.path,
+      issues: allIssues,
+    });
+    
+    return res.status(400).json({
+      success: false,
+      error: {
+        message: 'Invalid input detected',
+        code: 'INVALID_INPUT',
+      },
+    });
   }
 
   next();

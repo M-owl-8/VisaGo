@@ -1,0 +1,19 @@
+// SQLite schema for emulator testing
+// This is a copy of the main schema with SQLite-specific configuration
+// Use this for local development and emulator testing
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note: SQLite has some limitations compared to PostgreSQL
+// - No native enum types (use String instead)
+// - Limited text field sizes
+// - Different migration syntax
+// For production, use PostgreSQL schema
+

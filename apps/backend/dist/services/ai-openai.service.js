@@ -49,7 +49,19 @@ class AIOpenAIService {
         }
         catch (error) {
             console.error("OpenAI API error:", error);
-            throw error;
+            // Provide user-friendly error message
+            if (error instanceof Error) {
+                if (error.message.includes('rate limit') || error.message.includes('429')) {
+                    throw new Error("AI service is busy. Please try again in a moment.");
+                }
+                if (error.message.includes('timeout') || error.message.includes('ECONNABORTED')) {
+                    throw new Error("AI service request timed out. Please try again.");
+                }
+                if (error.message.includes('API key') || error.message.includes('401')) {
+                    throw new Error("AI service configuration error. Please contact support.");
+                }
+            }
+            throw new Error("AI service temporarily unavailable. Please try again later.");
         }
     }
     /**

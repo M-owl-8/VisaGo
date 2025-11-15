@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -19,14 +19,18 @@ model User {
   phone             String?
   passwordHash      String?
   avatar            String?
-  language          String    @default("en") // en, uz, ru
+  language          String    @default("en")
   timezone          String?
   currency          String    @default("USD")
   emailVerified     Boolean   @default(false)
-  role              String    @default("user") // user, admin, super_admin
+  bio               String?   // JSON string containing questionnaire data
+  questionnaireCompleted Boolean @default(false)
+  role              String    @default("user")
+  resetToken        String?
+  resetTokenExpiry  DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-
+  // ... rest of the model stays the same
   // Relations
   visaApplications  VisaApplication[]
   documents         UserDocument[]

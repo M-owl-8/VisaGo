@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: visabuddy-postgres
+    environment:
+      POSTGRES_USER: visabuddy
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: visabuddy
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visabuddy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - visabuddy-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: visabuddy-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - visabuddy-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: visabuddy-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://visabuddy:${DB_PASSWORD:-changeme}@postgres:5432/visabuddy
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:19006}
+      # Add other environment variables from .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/backend/uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - visabuddy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Service
+  ai-service:
+    build:
+      context: ./apps/ai-service
+      dockerfile: Dockerfile
+    container_name: visabuddy-ai
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AI_SERVICE_URL: http://ai-service:8001
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    networks:
+      - visabuddy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  visabuddy-network:
+    driver: bridge
+
+
+
+
+
+
+
+
+

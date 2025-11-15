@@ -1,0 +1,190 @@
+version: '3.8'
+
+# ============================================================================
+# VisaBuddy Production Docker Compose Configuration
+# ============================================================================
+# 
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# Environment Variables:
+#   - Create .env.production file with all required variables
+#   - Or set environment variables in your deployment platform
+#
+# ============================================================================
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: visabuddy-postgres-prod
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-visabuddy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-visabuddy}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-visabuddy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - visabuddy-network
+    restart: unless-stopped
+    # Security: Don't expose port in production if using external database
+    # ports:
+    #   - "5432:5432"  # Remove this if using external database
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: visabuddy-redis-prod
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - visabuddy-network
+    restart: unless-stopped
+    # Security: Don't expose port in production if using external Redis
+    # ports:
+    #   - "6379:6379"  # Remove this if using external Redis
+
+  # Backend API
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: visabuddy-backend-prod
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Database
+      DATABASE_URL: ${DATABASE_URL}
+      # Security
+      JWT_SECRET: ${JWT_SECRET}
+      # CORS (REQUIRED - must be set)
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      # Redis
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # Storage
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      LOCAL_STORAGE_PATH: /app/uploads
+      # Firebase (if using)
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Payment Gateways
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PAYME_MERCHANT_ID: ${PAYME_MERCHANT_ID:-}
+      PAYME_API_KEY: ${PAYME_API_KEY:-}
+      CLICK_MERCHANT_ID: ${CLICK_MERCHANT_ID:-}
+      CLICK_API_KEY: ${CLICK_API_KEY:-}
+      UZUM_MERCHANT_ID: ${UZUM_MERCHANT_ID:-}
+      UZUM_API_KEY: ${UZUM_API_KEY:-}
+      # Email
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      # Frontend
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      # Feature Flags
+      ENABLE_RECONCILIATION: ${ENABLE_RECONCILIATION:-true}
+      ENABLE_MOCK_PAYMENTS: ${ENABLE_MOCK_PAYMENTS:-false}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/backend/uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - visabuddy-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health/live', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # AI Service
+  ai-service:
+    build:
+      context: ./apps/ai-service
+      dockerfile: Dockerfile
+    container_name: visabuddy-ai-prod
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AI_SERVICE_PORT: 8001
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      RAG_MODEL: ${RAG_MODEL:-gpt-4}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      MAX_TOKENS: ${MAX_TOKENS:-2000}
+      TEMPERATURE: ${TEMPERATURE:-0.7}
+    ports:
+      - "${AI_SERVICE_PORT:-8001}:8001"
+    restart: unless-stopped
+    networks:
+      - visabuddy-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  visabuddy-network:
+    driver: bridge
+
+
+
+
+
+
+
+

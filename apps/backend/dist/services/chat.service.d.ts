@@ -1,3 +1,7 @@
+/**
+ * Chat service
+ * Handles AI-powered chat functionality with RAG context
+ */
 export declare class ChatService {
     /**
      * Create or get a chat session
@@ -38,14 +42,14 @@ export declare class ChatService {
      * Get conversation history
      */
     getConversationHistory(userIdOrSessionId: string, applicationId?: string, limit?: number, offset?: number): Promise<{
-        id: string;
         model: string;
+        userId: string;
+        id: string;
         responseTime: number | null;
         sources: string | null;
         tokensUsed: number;
         content: string;
         createdAt: Date;
-        userId: string;
         role: string;
         sessionId: string;
         feedback: string | null;
@@ -62,10 +66,10 @@ export declare class ChatService {
             }[];
         } & {
             title: string;
+            userId: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            userId: string;
             applicationId: string | null;
             systemPrompt: string;
         })[];
@@ -78,8 +82,8 @@ export declare class ChatService {
      */
     getSessionDetails(sessionId: string, userId: string): Promise<{
         messages: {
-            id: string;
             model: string;
+            id: string;
             responseTime: number | null;
             sources: string | null;
             tokensUsed: number;
@@ -90,10 +94,10 @@ export declare class ChatService {
         }[];
     } & {
         title: string;
+        userId: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         applicationId: string | null;
         systemPrompt: string;
     }>;
@@ -102,10 +106,10 @@ export declare class ChatService {
      */
     renameSession(sessionId: string, userId: string, newTitle: string): Promise<{
         title: string;
+        userId: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         applicationId: string | null;
         systemPrompt: string;
     }>;
@@ -113,14 +117,14 @@ export declare class ChatService {
      * Add feedback to a message
      */
     addFeedback(messageId: string, feedback: string): Promise<{
-        id: string;
         model: string;
+        userId: string;
+        id: string;
         responseTime: number | null;
         sources: string | null;
         tokensUsed: number;
         content: string;
         createdAt: Date;
-        userId: string;
         role: string;
         sessionId: string;
         feedback: string | null;
@@ -130,13 +134,17 @@ export declare class ChatService {
      */
     deleteSession(sessionId: string): Promise<{
         title: string;
+        userId: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         applicationId: string | null;
         systemPrompt: string;
     }>;
+    /**
+     * Create a fallback response when AI service is unavailable
+     */
+    private createFallbackResponse;
     /**
      * Search documents in knowledge base with filters
      */
@@ -145,14 +153,14 @@ export declare class ChatService {
      * Add feedback to a message (thumbs up/down or detailed feedback)
      */
     addMessageFeedback(messageId: string, userId: string, feedback: "thumbs_up" | "thumbs_down" | string): Promise<{
-        id: string;
         model: string;
+        userId: string;
+        id: string;
         responseTime: number | null;
         sources: string | null;
         tokensUsed: number;
         content: string;
         createdAt: Date;
-        userId: string;
         role: string;
         sessionId: string;
         feedback: string | null;
@@ -173,6 +181,104 @@ export declare class ChatService {
         totalTokens: number;
         averageTokensPerMessage: number;
     }>;
+    /**
+     * Get user's daily usage and cost data
+     */
+    getDailyUsage(userId: string): Promise<{
+        userId: string;
+        id: string;
+        createdAt: Date;
+        date: Date;
+        totalRequests: number;
+        totalTokens: number;
+        totalCost: number;
+        avgResponseTime: number;
+        errorCount: number;
+    } | {
+        userId: string;
+        date: Date;
+        totalRequests: number;
+        totalTokens: number;
+        totalCost: number;
+        avgResponseTime: number;
+        errorCount: number;
+    } | null>;
+    /**
+     * Get user's weekly usage and cost data
+     */
+    getWeeklyUsage(userId: string): Promise<{
+        period: {
+            startDate: Date;
+            endDate: Date;
+            days: number;
+        };
+        dailyBreakdown: {
+            userId: string;
+            id: string;
+            createdAt: Date;
+            date: Date;
+            totalRequests: number;
+            totalTokens: number;
+            totalCost: number;
+            avgResponseTime: number;
+            errorCount: number;
+        }[];
+        totals: {
+            avgResponseTime: number;
+            totalRequests: number;
+            totalTokens: number;
+            totalCost: number;
+            errorCount: number;
+        };
+    } | null>;
+    /**
+     * Get user's monthly usage and cost data
+     */
+    getMonthlyUsage(userId: string): Promise<{
+        period: {
+            startDate: Date;
+            endDate: Date;
+            days: number;
+        };
+        dailyBreakdown: {
+            userId: string;
+            id: string;
+            createdAt: Date;
+            date: Date;
+            totalRequests: number;
+            totalTokens: number;
+            totalCost: number;
+            avgResponseTime: number;
+            errorCount: number;
+        }[];
+        totals: {
+            avgResponseTime: number;
+            totalRequests: number;
+            totalTokens: number;
+            totalCost: number;
+            errorCount: number;
+        };
+    } | null>;
+    /**
+     * Get user's cost analysis across different periods
+     */
+    getCostAnalysis(userId: string): Promise<{
+        today: {
+            cost: number;
+            requests: number;
+            tokens: number;
+        };
+        weekly: {
+            cost: number;
+            requests: number;
+            tokens: number;
+        };
+        monthly: {
+            cost: number;
+            requests: number;
+            tokens: number;
+        };
+    } | null>;
 }
 export declare const chatService: ChatService;
 export default chatService;

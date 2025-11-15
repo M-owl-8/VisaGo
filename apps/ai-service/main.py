@@ -460,6 +460,65 @@ async def startup_event():
     logger.info("✅ VisaBuddy AI Service ready!")
 
 
+# ============================================================================
+# RAG VALIDATION & TESTING ENDPOINTS
+# ============================================================================
+
+@app.post("/api/rag/validate")
+async def validate_rag():
+    """
+    Validate RAG system with test queries
+    Returns comprehensive validation report
+    """
+    try:
+        from services.rag import get_rag_service
+        from services.rag_validator import validate_rag_system
+        
+        rag_service = get_rag_service()
+        
+        if not rag_service.initialized:
+            raise HTTPException(
+                status_code=503,
+                detail="RAG service not initialized"
+            )
+        
+        logger.info("🧪 Starting RAG validation...")
+        validation_report = await validate_rag_system(rag_service)
+        
+        return {
+            "status": "success",
+            "validation": validation_report
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Validation error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/rag/diagnostics")
+async def rag_diagnostics():
+    """
+    Get RAG system diagnostics and health status
+    """
+    try:
+        from services.rag import get_rag_service
+        
+        rag_service = get_rag_service()
+        status = rag_service.get_status()
+        
+        return {
+            "status": "operational" if status.get("initialized") else "initializing",
+            "diagnostics": status,
+            "timestamp": __import__("datetime").datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Diagnostics error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Shutdown event"""

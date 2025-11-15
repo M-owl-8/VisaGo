@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import { ApplicationsService } from "../services/applications.service";
+import { AIApplicationService } from "../services/ai-application.service";
 import { authenticateToken } from "../middleware/auth";
 
 const router = express.Router();
@@ -121,6 +122,37 @@ router.delete("/:id", async (req: Request, res: Response, next: NextFunction) =>
     const result = await ApplicationsService.deleteApplication(req.params.id, req.userId!);
 
     res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/applications/ai-generate
+ * Generate application automatically using AI based on questionnaire data
+ */
+router.post("/ai-generate", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { questionnaireData } = req.body;
+
+    if (!questionnaireData) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: "Questionnaire data is required",
+        },
+      });
+    }
+
+    const result = await AIApplicationService.generateApplicationFromQuestionnaire(
+      req.userId!,
+      questionnaireData
+    );
+
+    res.status(201).json({
       success: true,
       data: result,
     });

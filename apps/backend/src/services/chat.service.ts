@@ -1,10 +1,26 @@
+/**
+ * Chat service
+ * Handles AI-powered chat functionality with RAG context
+ */
+
 import { PrismaClient } from "@prisma/client";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+import { usageTrackingService } from "./usage-tracking.service";
+import { getEnvConfig } from "../config/env";
+import { errors } from "../utils/errors";
+import { logError, logWarn } from "../middleware/logger";
 
 const prisma = new PrismaClient();
 
-const AI_SERVICE_URL =
-  process.env.AI_SERVICE_URL || "http://localhost:8001";
+/**
+ * Get AI service URL from environment
+ */
+function getAIServiceURL(): string {
+  const envConfig = getEnvConfig();
+  return process.env.AI_SERVICE_URL || "http://localhost:8001";
+}
+
+const AI_SERVICE_URL = getAIServiceURL();
 
 export class ChatService {
   /**
@@ -46,7 +62,29 @@ export class ChatService {
         include: {
           country: true,
           visaType: true,
-          documents: true,
+          documents: {
+            select: {
+              documentType: true,
+              documentName: true,
+              status: true,
+              uploadedAt: true,
+            },
+          },
+          checkpoints: {
+            select: {
+              title: true,
+              isCompleted: true,
+              order: true,
+            },
+            orderBy: { order: 'asc' },
+          },
+          user: {
+            select: {
+              firstName: true,
+              language: true,
+              bio: true,
+            },
+          },
         },
       });
 
@@ -54,25 +92,49 @@ export class ChatService {
         return null;
       }
 
-      const documentStatus = application.documents.reduce(
-        (acc: Record<string, string>, doc: typeof application.documents[0]) => {
-          acc[doc.documentType] = doc.status;
-          return acc;
-        },
-        {}
-      );
+      // Get required documents from visa type
+      const requiredDocuments = JSON.parse(application.visaType.documentTypes || "[]");
+      
+      // Calculate document statistics
+      const documentsUploaded = application.documents.length;
+      const documentsVerified = application.documents.filter(d => d.status === "verified").length;
+      const documentsPending = application.documents.filter(d => d.status === "pending").length;
+      const documentsRejected = application.documents.filter(d => d.status === "rejected").length;
+      
+      // Find missing documents
+      const uploadedTypes = application.documents.map(d => d.documentType);
+      const missingDocuments = requiredDocuments.filter((doc: string) => !uploadedTypes.includes(doc));
+      
+      // Find next incomplete checkpoint
+      const nextCheckpoint = application.checkpoints.find(c => !c.isCompleted);
 
       return {
         country: application.country.name,
+        countryCode: application.country.code,
         visaType: application.visaType.name,
         processingDays: application.visaType.processingDays,
         fee: application.visaType.fee,
-        requiredDocuments: JSON.parse(application.visaType.documentTypes || "[]"),
-        documentsCollected: application.documents.filter(
-          (d: typeof application.documents[0]) => d.status === "verified"
-        ).length,
-        totalDocuments: application.documents.length,
-        applicationStatus: application.status,
+        validity: application.visaType.validity,
+        status: application.status,
+        createdAt: application.createdAt,
+        
+        // Document statistics
+        documentsTotal: requiredDocuments.length,
+        documentsUploaded,
+        documentsVerified,
+        documentsPending,
+        documentsRejected,
+        missingDocuments,
+        
+        // Checkpoint progress
+        checkpointsTotal: application.checkpoints.length,
+        checkpointsCompleted: application.checkpoints.filter(c => c.isCompleted).length,
+        nextCheckpoint: nextCheckpoint ? nextCheckpoint.title : null,
+        
+        // User info
+        userName: application.user.firstName,
+        userLanguage: application.user.language || 'en',
+        userBio: application.user.bio ? JSON.parse(application.user.bio) : null,
       };
     } catch (error) {
       console.error("Failed to extract application context:", error);
@@ -122,22 +184,86 @@ User's Current Visa Application:
 - Visa Type: ${applicationContext.visaType}
 - Processing Time: ${applicationContext.processingDays} days
 - Fee: $${applicationContext.fee}
-- Documents Collected: ${applicationContext.documentsCollected}/${applicationContext.totalDocuments}
-- Required Documents: ${applicationContext.requiredDocuments.join(", ")}
-- Application Status: ${applicationContext.applicationStatus}
+- Documents Uploaded: ${applicationContext.documentsUploaded}/${applicationContext.documentsTotal}
+- Missing Documents: ${applicationContext.missingDocuments.length > 0 ? applicationContext.missingDocuments.join(", ") : "None"}
+- Application Status: ${applicationContext.status}
         `.trim();
       }
 
+      // Check if AI service is configured
+      const envConfig = getEnvConfig();
+      if (!envConfig.OPENAI_API_KEY) {
+        logWarn("OpenAI API key not configured, using fallback response", {
+          userId,
+          applicationId,
+        });
+
+        return this.createFallbackResponse(
+          userId,
+          applicationId,
+          sessionId,
+          content,
+          startTime,
+          "AI service not configured. Please configure OPENAI_API_KEY in environment variables."
+        );
+      }
+
       // Call AI service with full context
-      const aiResponse = await axios.post(`${AI_SERVICE_URL}/api/chat`, {
-        content,
-        user_id: userId,
-        application_id: applicationId,
-        conversation_history: history,
-        context: ragContext,
-        country: applicationContext?.country,
-        visa_type: applicationContext?.visaType,
-      });
+      let aiResponse;
+      try {
+        aiResponse = await axios.post(
+          `${AI_SERVICE_URL}/api/chat`,
+          {
+            content,
+            user_id: userId,
+            application_id: applicationId,
+            conversation_history: history,
+            context: ragContext,
+            country: applicationContext?.country,
+            visa_type: applicationContext?.visaType,
+          },
+          {
+            timeout: 30000, // 30 second timeout
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      } catch (axiosError) {
+        const error = axiosError as AxiosError;
+        
+        // Enhanced error handling with fallback
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+        const isNetworkError = !error.response && error.request;
+        const isConnectionError = error.code === "ECONNREFUSED" || error.code === "ENOTFOUND";
+        
+        if (isTimeout || isNetworkError || isConnectionError) {
+          const errorMessage = isTimeout
+            ? "AI service is taking longer than expected. Please try again in a moment."
+            : isConnectionError
+            ? "AI service is temporarily unavailable. Your message has been saved and we'll respond as soon as possible."
+            : "AI service is temporarily unavailable. Please try again in a moment.";
+          
+          logWarn("AI service unavailable, using fallback response", {
+            userId,
+            applicationId,
+            error: error.message,
+            errorCode: error.code,
+          });
+          
+          return this.createFallbackResponse(
+            userId,
+            applicationId,
+            sessionId,
+            content,
+            startTime,
+            errorMessage
+          );
+        }
+
+        // Re-throw other errors
+        throw error;
+      }
 
       const {
         message,
@@ -181,6 +307,14 @@ User's Current Visa Application:
         data: { updatedAt: new Date() },
       });
 
+      // Track usage for cost analytics (async, don't block response)
+      usageTrackingService.trackMessageUsage(
+        userId,
+        tokens_used,
+        model,
+        responseTime
+      ).catch((err) => console.error("Failed to track usage:", err));
+
       return {
         message,
         sources,
@@ -191,6 +325,11 @@ User's Current Visa Application:
       };
     } catch (error: any) {
       console.error("Chat service error:", error);
+
+      // Track error (async, don't block)
+      usageTrackingService.trackError(userId).catch((err) =>
+        console.error("Failed to track error:", err)
+      );
 
       // Fallback response if AI service is down
       if (error.response?.status >= 500 || error.code === "ECONNREFUSED") {
@@ -379,6 +518,64 @@ User's Current Visa Application:
   }
 
   /**
+   * Create a fallback response when AI service is unavailable
+   */
+  private async createFallbackResponse(
+    userId: string,
+    applicationId: string | undefined,
+    sessionId: string,
+    content: string,
+    startTime: number,
+    errorMessage: string
+  ) {
+    const responseTime = Date.now() - startTime;
+
+    // Save user message
+    await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        userId,
+        role: "user",
+        content,
+        sources: JSON.stringify([]),
+        model: "fallback",
+        responseTime: 0,
+      },
+    });
+
+    // Create fallback assistant message
+    const fallbackMessage = `I apologize, but I'm currently unable to process your request. ${errorMessage} Please try again in a few moments, or contact support if the issue persists.`;
+
+    const assistantMessage = await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        userId,
+        role: "assistant",
+        content: fallbackMessage,
+        sources: JSON.stringify([]),
+        model: "fallback",
+        tokensUsed: 0,
+        responseTime,
+      },
+    });
+
+    // Update session
+    await prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { updatedAt: new Date() },
+    });
+
+    return {
+      message: fallbackMessage,
+      sources: [],
+      tokens_used: 0,
+      model: "fallback",
+      id: assistantMessage.id,
+      applicationContext: null,
+    };
+  }
+
+  /**
    * Search documents in knowledge base with filters
    */
   async searchDocuments(
@@ -515,6 +712,54 @@ User's Current Visa Application:
       };
     } catch (error) {
       console.error("Stats error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's daily usage and cost data
+   */
+  async getDailyUsage(userId: string) {
+    try {
+      return await usageTrackingService.getDailyUsage(userId);
+    } catch (error) {
+      console.error("Error getting daily usage:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's weekly usage and cost data
+   */
+  async getWeeklyUsage(userId: string) {
+    try {
+      return await usageTrackingService.getWeeklyUsage(userId, 1);
+    } catch (error) {
+      console.error("Error getting weekly usage:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's monthly usage and cost data
+   */
+  async getMonthlyUsage(userId: string) {
+    try {
+      return await usageTrackingService.getMonthlyUsage(userId, 1);
+    } catch (error) {
+      console.error("Error getting monthly usage:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's cost analysis across different periods
+   */
+  async getCostAnalysis(userId: string) {
+    try {
+      return await usageTrackingService.getCostAnalysis(userId);
+    } catch (error) {
+      console.error("Error getting cost analysis:", error);
       throw error;
     }
   }

@@ -1,4 +1,8 @@
 "use strict";
+/**
+ * Chat service
+ * Handles AI-powered chat functionality with RAG context
+ */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -6,8 +10,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.chatService = exports.ChatService = void 0;
 const client_1 = require("@prisma/client");
 const axios_1 = __importDefault(require("axios"));
+const usage_tracking_service_1 = require("./usage-tracking.service");
+const env_1 = require("../config/env");
+const logger_1 = require("../middleware/logger");
 const prisma = new client_1.PrismaClient();
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8001";
+/**
+ * Get AI service URL from environment
+ */
+function getAIServiceURL() {
+    const envConfig = (0, env_1.getEnvConfig)();
+    return process.env.AI_SERVICE_URL || "http://localhost:8001";
+}
+const AI_SERVICE_URL = getAIServiceURL();
 class ChatService {
     /**
      * Create or get a chat session
@@ -106,16 +120,56 @@ User's Current Visa Application:
 - Application Status: ${applicationContext.applicationStatus}
         `.trim();
             }
+            // Check if AI service is configured
+            const envConfig = (0, env_1.getEnvConfig)();
+            if (!envConfig.OPENAI_API_KEY) {
+                (0, logger_1.logWarn)("OpenAI API key not configured, using fallback response", {
+                    userId,
+                    applicationId,
+                });
+                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, "AI service not configured. Please configure OPENAI_API_KEY in environment variables.");
+            }
             // Call AI service with full context
-            const aiResponse = await axios_1.default.post(`${AI_SERVICE_URL}/api/chat`, {
-                content,
-                user_id: userId,
-                application_id: applicationId,
-                conversation_history: history,
-                context: ragContext,
-                country: applicationContext?.country,
-                visa_type: applicationContext?.visaType,
-            });
+            let aiResponse;
+            try {
+                aiResponse = await axios_1.default.post(`${AI_SERVICE_URL}/api/chat`, {
+                    content,
+                    user_id: userId,
+                    application_id: applicationId,
+                    conversation_history: history,
+                    context: ragContext,
+                    country: applicationContext?.country,
+                    visa_type: applicationContext?.visaType,
+                }, {
+                    timeout: 30000, // 30 second timeout
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                });
+            }
+            catch (axiosError) {
+                const error = axiosError;
+                // Enhanced error handling with fallback
+                const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+                const isNetworkError = !error.response && error.request;
+                const isConnectionError = error.code === "ECONNREFUSED" || error.code === "ENOTFOUND";
+                if (isTimeout || isNetworkError || isConnectionError) {
+                    const errorMessage = isTimeout
+                        ? "AI service is taking longer than expected. Please try again in a moment."
+                        : isConnectionError
+                            ? "AI service is temporarily unavailable. Your message has been saved and we'll respond as soon as possible."
+                            : "AI service is temporarily unavailable. Please try again in a moment.";
+                    (0, logger_1.logWarn)("AI service unavailable, using fallback response", {
+                        userId,
+                        applicationId,
+                        error: error.message,
+                        errorCode: error.code,
+                    });
+                    return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, errorMessage);
+                }
+                // Re-throw other errors
+                throw error;
+            }
             const { message, sources = [], tokens_used = 0, model = "gpt-4", } = aiResponse.data;
             const responseTime = Date.now() - startTime;
             // Save user message
@@ -148,6 +202,8 @@ User's Current Visa Application:
                 where: { id: sessionId },
                 data: { updatedAt: new Date() },
             });
+            // Track usage for cost analytics (async, don't block response)
+            usage_tracking_service_1.usageTrackingService.trackMessageUsage(userId, tokens_used, model, responseTime).catch((err) => console.error("Failed to track usage:", err));
             return {
                 message,
                 sources,
@@ -159,6 +215,8 @@ User's Current Visa Application:
         }
         catch (error) {
             console.error("Chat service error:", error);
+            // Track error (async, don't block)
+            usage_tracking_service_1.usageTrackingService.trackError(userId).catch((err) => console.error("Failed to track error:", err));
             // Fallback response if AI service is down
             if (error.response?.status >= 500 || error.code === "ECONNREFUSED") {
                 try {
@@ -320,6 +378,51 @@ User's Current Visa Application:
         });
     }
     /**
+     * Create a fallback response when AI service is unavailable
+     */
+    async createFallbackResponse(userId, applicationId, sessionId, content, startTime, errorMessage) {
+        const responseTime = Date.now() - startTime;
+        // Save user message
+        await prisma.chatMessage.create({
+            data: {
+                sessionId,
+                userId,
+                role: "user",
+                content,
+                sources: JSON.stringify([]),
+                model: "fallback",
+                responseTime: 0,
+            },
+        });
+        // Create fallback assistant message
+        const fallbackMessage = `I apologize, but I'm currently unable to process your request. ${errorMessage} Please try again in a few moments, or contact support if the issue persists.`;
+        const assistantMessage = await prisma.chatMessage.create({
+            data: {
+                sessionId,
+                userId,
+                role: "assistant",
+                content: fallbackMessage,
+                sources: JSON.stringify([]),
+                model: "fallback",
+                tokensUsed: 0,
+                responseTime,
+            },
+        });
+        // Update session
+        await prisma.chatSession.update({
+            where: { id: sessionId },
+            data: { updatedAt: new Date() },
+        });
+        return {
+            message: fallbackMessage,
+            sources: [],
+            tokens_used: 0,
+            model: "fallback",
+            id: assistantMessage.id,
+            applicationContext: null,
+        };
+    }
+    /**
      * Search documents in knowledge base with filters
      */
     async searchDocuments(query, country, visaType, limit = 5) {
@@ -434,6 +537,54 @@ User's Current Visa Application:
         }
         catch (error) {
             console.error("Stats error:", error);
+            throw error;
+        }
+    }
+    /**
+     * Get user's daily usage and cost data
+     */
+    async getDailyUsage(userId) {
+        try {
+            return await usage_tracking_service_1.usageTrackingService.getDailyUsage(userId);
+        }
+        catch (error) {
+            console.error("Error getting daily usage:", error);
+            throw error;
+        }
+    }
+    /**
+     * Get user's weekly usage and cost data
+     */
+    async getWeeklyUsage(userId) {
+        try {
+            return await usage_tracking_service_1.usageTrackingService.getWeeklyUsage(userId, 1);
+        }
+        catch (error) {
+            console.error("Error getting weekly usage:", error);
+            throw error;
+        }
+    }
+    /**
+     * Get user's monthly usage and cost data
+     */
+    async getMonthlyUsage(userId) {
+        try {
+            return await usage_tracking_service_1.usageTrackingService.getMonthlyUsage(userId, 1);
+        }
+        catch (error) {
+            console.error("Error getting monthly usage:", error);
+            throw error;
+        }
+    }
+    /**
+     * Get user's cost analysis across different periods
+     */
+    async getCostAnalysis(userId) {
+        try {
+            return await usage_tracking_service_1.usageTrackingService.getCostAnalysis(userId);
+        }
+        catch (error) {
+            console.error("Error getting cost analysis:", error);
             throw error;
         }
     }

@@ -3,19 +3,27 @@ import { Request, Response, NextFunction } from 'express';
 
 /**
  * Middleware to handle validation errors
+ * Enhanced with user-friendly error messages
  */
 export const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const { formatValidationErrors } = require('../utils/user-friendly-errors');
+    
+    const errorDetails = errors.array().map((err: any) => ({
+      field: err.path || err.param || 'unknown',
+      message: err.msg,
+    }));
+    
+    const formatted = formatValidationErrors(errorDetails);
+    
     return res.status(400).json({
       success: false,
       error: {
         status: 400,
-        message: 'Validation failed',
-        details: errors.array().map((err: any) => ({
-          field: err.path || err.param || 'unknown',
-          message: err.msg,
-        })),
+        message: formatted.message,
+        code: 'VALIDATION_ERROR',
+        details: formatted.errors,
       },
     });
   }

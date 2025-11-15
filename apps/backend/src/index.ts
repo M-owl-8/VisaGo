@@ -3,29 +3,92 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
-import { loginLimiter, registerLimiter, apiLimiter, strictLimiter, webhookLimiter } from "./middleware/rate-limit";
+import { loginLimiter, registerLimiter, strictLimiter, webhookLimiter } from "./middleware/rate-limit";
 import { csrfProtection } from "./middleware/csrf";
-import { validateRAGRequest } from "./middleware/input-validation";
-
-// Import services
+import { preventSQLInjection, preventXSS } from "./middleware/input-validation";
+import { chatRateLimitMiddleware, attachChatLimitHeaders } from "./middleware/chat-rate-limit";
 import DatabasePoolService from "./services/db-pool.service";
 import FirebaseStorageService from "./services/firebase-storage.service";
 import LocalStorageService from "./services/local-storage.service";
-import StorageAdapter from "./services/storage-adapter";
 import { OptimizedCacheService } from "./services/cache.service.optimized";
+import { getCacheInvalidationService } from "./services/cache-invalidation.service";
+import { getSlowQueryLogger } from "./services/slow-query-logger";
 import AIOpenAIService from "./services/ai-openai.service";
 import db from "./db";
+import { getEnvConfig, validateCorsOrigin } from "./config/env";
+import { SERVER_CONFIG, RATE_LIMIT_CONFIG, API_MESSAGES, HTTP_STATUS } from "./config/constants";
+import { requestLogger, errorLogger } from "./middleware/logger";
+import authRoutes from "./routes/auth";
+import countriesRoutes from "./routes/countries";
+import visaTypesRoutes from "./routes/visa-types";
+import applicationsRoutes from "./routes/applications";
+import paymentRoutes from "./routes/payments-complete";
+import documentRoutes from "./routes/documents";
+import chatRoutes from "./routes/chat";
+import usersRoutes from "./routes/users";
+import notificationsRoutes from "./routes/notifications";
+import adminRoutes from "./routes/admin";
+import analyticsRoutes from "./routes/analytics";
+import legalRoutes from "./routes/legal";
+import monitoringRoutes from "./routes/monitoring";
+import healthRoutes from "./routes/health";
+import formRoutes from "./routes/forms";
+import documentChecklistRoutes from "./routes/document-checklist";
 
 // Load environment variables
 dotenv.config();
 
+// Validate environment variables
+let envConfig: ReturnType<typeof getEnvConfig>;
+try {
+  envConfig = getEnvConfig();
+  
+  // Additional security checks
+  if (envConfig.NODE_ENV === "production") {
+    // Check for production security requirements
+    if (!envConfig.CORS_ORIGIN || envConfig.CORS_ORIGIN === "*") {
+      console.error("❌ CRITICAL: CORS_ORIGIN cannot be '*' or empty in production!");
+      console.error("   Please set CORS_ORIGIN to specific allowed origins.");
+      process.exit(1);
+    }
+    
+    if (envConfig.JWT_SECRET.length < 32) {
+      console.error("❌ CRITICAL: JWT_SECRET must be at least 32 characters in production!");
+      console.error("   Generate a secure secret with: ./scripts/generate-secrets.sh");
+      process.exit(1);
+    }
+  }
+  
+  // Warn about missing optional but recommended variables
+  const warnings: string[] = [];
+  if (!envConfig.REDIS_URL) {
+    warnings.push("REDIS_URL not set - using in-memory cache (not recommended for production)");
+  }
+  if (!envConfig.OPENAI_API_KEY) {
+    warnings.push("OPENAI_API_KEY not set - AI chat feature will not work");
+  }
+  if (!envConfig.GOOGLE_CLIENT_ID || !envConfig.GOOGLE_CLIENT_SECRET) {
+    warnings.push("Google OAuth not configured - Google Sign-In will not work");
+  }
+  
+  if (warnings.length > 0 && envConfig.NODE_ENV === "production") {
+    console.warn("\n⚠️  Production Warnings:");
+    warnings.forEach(w => console.warn(`   - ${w}`));
+    console.warn("");
+  }
+} catch (error) {
+  console.error("❌ Environment validation failed:", error instanceof Error ? error.message : error);
+  console.error("\n💡 Tip: Run './scripts/validate-env.sh backend' to check your configuration");
+  process.exit(1);
+}
+
 const app: Express = express();
 const prisma = db; // Use shared instance
-const PORT = process.env.PORT || 3000;
-const NODE_ENV = process.env.NODE_ENV || "development";
+const PORT = envConfig.PORT || SERVER_CONFIG.DEFAULT_PORT;
+const NODE_ENV = envConfig.NODE_ENV || SERVER_CONFIG.DEFAULT_NODE_ENV;
 
 // Initialize Redis Cache Service
-const cacheService = new OptimizedCacheService(process.env.REDIS_URL);
+const cacheService = new OptimizedCacheService(envConfig.REDIS_URL);
 
 // ============================================================================
 // MIDDLEWARE
@@ -33,19 +96,56 @@ const cacheService = new OptimizedCacheService(process.env.REDIS_URL);
 
 // Security middleware
 app.use(helmet());
+
+// CORS configuration with validation
+let allowedOrigins: string[];
+try {
+  allowedOrigins = validateCorsOrigin();
+} catch (error) {
+  console.error("❌ CORS configuration error:", error instanceof Error ? error.message : error);
+  process.exit(1);
+}
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "*",
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // In development, allow all origins if CORS_ORIGIN is "*"
+    if (allowedOrigins.includes("*") && NODE_ENV === "development") {
+      return callback(null, true);
+    }
+
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    }
+  },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "X-Session-Id"],
+  exposedHeaders: ["X-CSRF-Token", "X-Session-Id"],
 }));
 
-// CSRF Protection
-app.use(csrfProtection);
+// CSRF Protection - Optional for mobile-only API (JWT provides protection)
+// For future web version, uncomment this:
+// app.use(csrfProtection);
 
-// Rate limiting
+// Input validation and security
+app.use(preventSQLInjection); // Check all inputs for SQL injection
+app.use(preventXSS); // Check all inputs for XSS
+
+// Rate limiting - General API protection
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: "Too many requests, please try again later.",
+  windowMs: RATE_LIMIT_CONFIG.WINDOW_MS,
+  max: RATE_LIMIT_CONFIG.MAX_REQUESTS,
+  message: API_MESSAGES.RATE_LIMIT_EXCEEDED,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use("/api/", limiter);
 
@@ -53,23 +153,14 @@ app.use("/api/", limiter);
 app.use("/api/payments/webhook", webhookLimiter);
 
 // Body parsing middleware
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: SERVER_CONFIG.MAX_REQUEST_SIZE }));
+app.use(express.urlencoded({ limit: SERVER_CONFIG.MAX_REQUEST_SIZE, extended: true }));
 
 // Static file serving for uploaded files (local storage)
-app.use("/uploads", express.static(process.env.LOCAL_STORAGE_PATH || "uploads"));
+app.use("/uploads", express.static(envConfig.LOCAL_STORAGE_PATH));
 
-// Custom middleware for request logging
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    console.log(
-      `[${new Date().toISOString()}] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`
-    );
-  });
-  next();
-});
+// Comprehensive request logging middleware
+app.use(requestLogger);
 
 // ============================================================================
 // ROUTES
@@ -77,6 +168,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Health check endpoint
 app.get("/health", (req: Request, res: Response) => {
+  // Generate session ID and CSRF token for app
+  const crypto = require('crypto');
+  const sessionId = crypto.randomBytes(16).toString('hex');
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  
+  // Set headers
+  res.setHeader('X-Session-Id', sessionId);
+  res.setHeader('X-CSRF-Token', csrfToken);
+  res.setHeader('Access-Control-Expose-Headers', 'X-CSRF-Token, X-Session-Id');
+  
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
@@ -93,27 +194,25 @@ app.get("/api/status", (req: Request, res: Response) => {
   });
 });
 
-// Import route handlers
-import authRoutes from "./routes/auth";
-import countriesRoutes from "./routes/countries";
-import applicationsRoutes from "./routes/applications";
-import paymentRoutes from "./routes/payments";
-import documentRoutes from "./routes/documents";
-import chatRoutes from "./routes/chat";
-import usersRoutes from "./routes/users";
-import notificationsRoutes from "./routes/notifications";
-import adminRoutes from "./routes/admin";
-import analyticsRoutes from "./routes/analytics";
-import legalRoutes from "./routes/legal";
-
 // Register routes
+// Health check routes (public, no auth required)
+app.use("/api/health", healthRoutes);
+// Rate limiters for auth endpoints
 app.use("/api/auth/login", loginLimiter); // 5 attempts per 15 minutes
 app.use("/api/auth/register", registerLimiter); // 3 attempts per hour
 app.use("/api/auth", authRoutes);
 app.use("/api/countries", countriesRoutes);
+app.use("/api/visa-types", visaTypesRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/documents", documentRoutes);
+// Form routes (pre-filling, validation, submission)
+app.use("/api/forms", formRoutes);
+// Document checklist routes (AI-generated checklists)
+app.use("/api/document-checklist", documentChecklistRoutes);
+// Chat routes with user-level rate limiting and cost tracking
+app.use("/api/chat", chatRateLimitMiddleware); // 50 messages per day per user
+app.use("/api/chat", attachChatLimitHeaders); // Attach quota info to response headers
 app.use("/api/chat", chatRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/notifications", notificationsRoutes);
@@ -121,6 +220,8 @@ app.use("/api/admin", strictLimiter); // Sensitive operations
 app.use("/api/admin", adminRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/legal", legalRoutes);
+// Monitoring routes (development/admin only)
+app.use("/api/monitoring", monitoringRoutes);
 
 // ============================================================================
 // ERROR HANDLING
@@ -128,30 +229,77 @@ app.use("/api/legal", legalRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: "Not Found",
-    message: `Route ${req.path} not found`,
-    path: req.path,
+  res.status(HTTP_STATUS.NOT_FOUND).json({
+    success: false,
+    error: {
+      status: HTTP_STATUS.NOT_FOUND,
+      message: API_MESSAGES.NOT_FOUND,
+      code: "NOT_FOUND",
+      path: req.path,
+    },
   });
 });
 
+// Error logging middleware (must be before global error handler)
+app.use(errorLogger);
+
 // Global error handler
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error("[ERROR]", err);
+app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
+  // Error already logged by errorLogger middleware
 
-  const status = err.status || 500;
-  const message = err.message || "Internal Server Error";
-  const code = err.code || null;
+  // Determine status code
+  const status = err.status || err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
+  const message = err.message || API_MESSAGES.INTERNAL_ERROR;
+  const code = err.code || "INTERNAL_ERROR";
 
-  res.status(status).json({
+  // Enhance error with user-friendly message
+  const { enhanceErrorResponse } = await import("./utils/user-friendly-errors");
+  const enhanced = enhanceErrorResponse(err, {
+    operation: req.method,
+    resource: req.path.split('/').pop(),
+  });
+
+  // Prepare error response
+  const errorResponse: any = {
     success: false,
     error: {
       status,
-      message,
-      code,
-      ...(NODE_ENV === "development" && { stack: err.stack }),
+      message: enhanced.message || message,
+      code: enhanced.code || code,
+      ...(enhanced.suggestion && { suggestion: enhanced.suggestion }),
+      ...(enhanced.field && { field: enhanced.field }),
     },
-  });
+  };
+
+  // NEVER expose stack traces or internal details in production
+  if (NODE_ENV === "development") {
+    // Only in development: include stack trace and details
+    errorResponse.error.stack = err.stack;
+    if (err.details) {
+      errorResponse.error.details = err.details;
+    }
+    // Include request context for debugging
+    errorResponse.error.requestId = req.requestId;
+    errorResponse.error.path = req.path;
+    errorResponse.error.method = req.method;
+    // Include original error message for debugging
+    if (enhanced.originalMessage && enhanced.originalMessage !== enhanced.message) {
+      errorResponse.error.originalMessage = enhanced.originalMessage;
+    }
+  } else {
+    // Production: Generic error messages for security
+    if (status === HTTP_STATUS.INTERNAL_SERVER_ERROR) {
+      errorResponse.error.message = API_MESSAGES.INTERNAL_ERROR;
+      errorResponse.error.code = "INTERNAL_ERROR";
+      // Remove suggestion for internal errors in production
+      delete errorResponse.error.suggestion;
+    }
+    
+    // Don't expose any internal error details
+    // Stack traces, file paths, line numbers are all hidden
+  }
+
+  res.status(status).json(errorResponse);
 });
 
 // ============================================================================
@@ -163,11 +311,11 @@ async function startServer() {
     console.log("🚀 Initializing VisaBuddy Backend Services...\n");
 
     // 1. Initialize Database Pool (skip for SQLite in development)
-    const isDatabaseSQLite = process.env.DATABASE_URL?.includes("file:");
+    const isDatabaseSQLite = envConfig.DATABASE_URL.includes("file:");
     if (!isDatabaseSQLite) {
       console.log("📊 Initializing PostgreSQL Connection Pool...");
       await DatabasePoolService.initialize({
-        connectionUrl: process.env.DATABASE_URL,
+        connectionUrl: envConfig.DATABASE_URL,
         max: 20,
       });
       console.log("✓ PostgreSQL Connection Pool ready");
@@ -175,41 +323,85 @@ async function startServer() {
       console.log("📊 Using SQLite (skipping PostgreSQL connection pool)");
     }
 
-    // 2. Test Prisma connection
+    // 2. Test Prisma connection with retry logic
     console.log("🔗 Testing Prisma Database Connection...");
-    try {
-      // Use a simple count query instead of SELECT 1 to avoid prepared statement issues
-      await prisma.user.count();
-      console.log("✓ Prisma Database Connection successful");
-    } catch (error) {
-      // If connection fails, still continue - the pool is ready
-      console.warn("⚠️  Prisma health check skipped, but pool is initialized");
+    const { checkDatabaseHealth, resilientOperation, DatabaseConnectionState } = await import("./utils/db-resilience");
+    
+    let connectionHealthy = false;
+    const maxConnectionAttempts = 3;
+    
+    for (let attempt = 1; attempt <= maxConnectionAttempts; attempt++) {
+      try {
+        const health = await checkDatabaseHealth(prisma);
+        if (health.healthy) {
+          connectionHealthy = true;
+          console.log(`✓ Prisma Database Connection successful (latency: ${health.latency}ms)`);
+          break;
+        } else {
+          console.warn(`⚠️  Connection attempt ${attempt}/${maxConnectionAttempts} failed: ${health.error}`);
+          if (attempt < maxConnectionAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️  Connection attempt ${attempt}/${maxConnectionAttempts} error:`, 
+          error instanceof Error ? error.message : 'Unknown error');
+        if (attempt < maxConnectionAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
     }
+    
+    if (!connectionHealthy) {
+      console.error("❌ Failed to establish database connection after multiple attempts");
+      console.error("   The server will start but database operations may fail");
+      console.error("   Please check your DATABASE_URL and ensure the database is accessible");
+    }
+    
+    // Start periodic health checks
+    const { startDatabaseHealthChecks } = await import("./db");
+    startDatabaseHealthChecks(30000); // Check every 30 seconds
 
-    // 3. Initialize Storage Service
-    const storageType = process.env.STORAGE_TYPE || "local";
+    // 3. Initialize Storage Service with fallback support
+    const storageType = envConfig.STORAGE_TYPE;
     console.log(`💾 Initializing ${storageType === "firebase" ? "Firebase Storage" : "Local Storage"}...`);
     
-    if (storageType === "firebase" && process.env.FIREBASE_PROJECT_ID) {
+    if (storageType === "firebase" && envConfig.FIREBASE_PROJECT_ID) {
       try {
         await FirebaseStorageService.initialize();
         console.log("✓ Firebase Storage initialized");
       } catch (error) {
         console.warn("⚠️  Firebase Storage initialization failed, falling back to local storage");
-        process.env.STORAGE_TYPE = "local";
+        // Note: In production, this should be handled more gracefully
       }
     } else if (storageType === "local") {
       try {
         await LocalStorageService.initialize();
-        console.log("✓ Local Storage initialized (uploads folder: " + (process.env.LOCAL_STORAGE_PATH || "uploads") + ")");
+        console.log(`✓ Local Storage initialized (uploads folder: ${envConfig.LOCAL_STORAGE_PATH})`);
       } catch (error) {
         console.error("✗ Local Storage initialization failed:", error);
         throw error;
       }
     }
 
-    // 4. Initialize AI Service
-    if (process.env.OPENAI_API_KEY) {
+    // 4. Validate OAuth Configuration
+    console.log("🔐 Validating Authentication Configuration...");
+    if (envConfig.GOOGLE_CLIENT_ID && envConfig.GOOGLE_CLIENT_SECRET) {
+      console.log("✓ Google OAuth configured");
+    } else {
+      console.warn("⚠️  Google OAuth not configured - Google Sign-In will not work");
+      console.warn("   See docs/SETUP_GOOGLE_OAUTH.md for setup instructions");
+    }
+    
+    if (envConfig.JWT_SECRET && envConfig.JWT_SECRET.length >= 32) {
+      console.log("✓ JWT authentication configured");
+    } else {
+      console.error("❌ JWT_SECRET is not properly configured!");
+      console.error("   Run: ./scripts/generate-secrets.sh");
+    }
+
+    // 5. Initialize AI Service
+    if (envConfig.OPENAI_API_KEY) {
       console.log("🤖 Initializing OpenAI Service...");
       try {
         AIOpenAIService.initialize(prisma);
@@ -219,14 +411,36 @@ async function startServer() {
       }
     }
 
-    // 5. Log Cache Service
-    console.log("💾 Cache Service ready (Redis)");
-    const cacheStats = cacheService.getStats?.();
-    if (cacheStats) {
-      console.log(`   - Cache service active`);
+    // 6. Initialize Cache Service with Invalidation Strategy
+    console.log("💾 Initializing Cache Service (Redis + Invalidation)...");
+    try {
+      const cacheStats = cacheService.getStats?.();
+      if (cacheStats) {
+        console.log(`✓ Cache Service active (Redis: ${cacheStats.redisConnected ? '✓' : '✗'})`);
+        console.log(`   - Hit Rate: ${cacheStats.hitRate.toFixed(1)}%`);
+        console.log(`   - Local Cache Size: ${cacheStats.localCacheSize} entries`);
+      }
+      
+      // Initialize cache invalidation strategy
+      const invalidationService = getCacheInvalidationService(cacheService);
+      console.log("✓ Cache Invalidation Strategy initialized");
+      console.log(`   - ${invalidationService.getRules().length} invalidation rules registered`);
+    } catch (error) {
+      console.warn("⚠️  Cache initialization warning:", error);
     }
 
-    // 6. Initialize Notification Services
+    // 7. Initialize Slow Query Logger
+    console.log("📊 Initializing Slow Query Logger...");
+    try {
+      const slowQueryLogger = getSlowQueryLogger(prisma);
+      console.log("✓ Slow Query Logger initialized");
+      console.log(`   - Warning Threshold: 500ms`);
+      console.log(`   - Critical Threshold: 2000ms`);
+    } catch (error) {
+      console.warn("⚠️  Slow Query Logger initialization skipped");
+    }
+
+    // 8. Initialize Notification Services
     console.log("📬 Initializing Notification Services...");
     try {
       const { emailService } = await import("./services/email.service");
@@ -237,6 +451,23 @@ async function startServer() {
       console.log("✓ Notification Scheduler ready (Bull + Redis)");
     } catch (error) {
       console.warn("⚠️  Notification Services initialization skipped:", error);
+    }
+
+    // 9. Initialize Payment Reconciliation Job
+    console.log("💳 Initializing Payment System...");
+    try {
+      const { PaymentReconciliationService } = await import("./services/payment-reconciliation.service");
+      const reconciliationService = PaymentReconciliationService.getInstance();
+      const enableReconciliation = envConfig.ENABLE_RECONCILIATION !== "false";
+      if (enableReconciliation) {
+        reconciliationService.startReconciliationJob();
+        console.log("✓ Payment Reconciliation Job started (runs daily at 2 AM UTC)");
+      } else {
+        console.log("✓ Payment Reconciliation Job available (disabled by ENABLE_RECONCILIATION env var)");
+      }
+      console.log("✓ Mock Payment Provider enabled for development/testing");
+    } catch (error) {
+      console.warn("⚠️  Payment services initialization partial:", error);
     }
 
     // Get pool statistics
@@ -250,16 +481,20 @@ async function startServer() {
 
     // Start Express server
     app.listen(PORT, () => {
-      const finalStorageType = process.env.STORAGE_TYPE === "firebase" ? "Firebase" : "Local";
+      const finalStorageType = envConfig.STORAGE_TYPE === "firebase" ? "Firebase" : "Local";
+      const envPadding = NODE_ENV.padEnd(42);
+      const portPadding = String(PORT).padEnd(52);
+      const storagePadding = finalStorageType.padEnd(44);
+      
       console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║         VisaBuddy Backend Server Started                    ║
 ╠════════════════════════════════════════════════════════════╣
-║ Environment: ${NODE_ENV.padEnd(42)} ║
-║ Port: ${String(PORT).padEnd(52)} ║
+║ Environment: ${envPadding} ║
+║ Port: ${portPadding} ║
 ║ Database: PostgreSQL (pooled)                              ║
 ║ Cache: Redis (optimized)                                   ║
-║ Storage: ${finalStorageType.padEnd(44)} ║
+║ Storage: ${storagePadding} ║
 ║ AI: OpenAI GPT-4 (RAG enabled)                             ║
 ║ Notifications: Email + Push + Job Scheduler                ║
 ║ API Docs: http://localhost:${PORT}/api/docs     ║

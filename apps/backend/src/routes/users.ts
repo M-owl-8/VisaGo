@@ -28,6 +28,8 @@ router.get("/me", authenticateToken, async (req: Request, res: Response, next: N
         timezone: true,
         currency: true,
         emailVerified: true,
+        bio: true,
+        questionnaireCompleted: true,
         createdAt: true,
         updatedAt: true,
         preferences: {
@@ -63,7 +65,7 @@ router.patch("/:userId", authenticateToken, async (req: Request, res: Response, 
   try {
     const userId = (req as any).userId;
     const targetUserId = req.params.userId;
-    const { firstName, lastName, phone, avatar, language, timezone, currency } = req.body;
+    const { firstName, lastName, phone, avatar, language, timezone, currency, bio, questionnaireCompleted } = req.body;
 
     // Verify user can only update their own profile
     if (userId !== targetUserId) {
@@ -86,6 +88,8 @@ router.patch("/:userId", authenticateToken, async (req: Request, res: Response, 
         ...(language !== undefined && { language }),
         ...(timezone !== undefined && { timezone }),
         ...(currency !== undefined && { currency }),
+        ...(bio !== undefined && { bio }),
+        ...(questionnaireCompleted !== undefined && { questionnaireCompleted }),
       },
       select: {
         id: true,
@@ -98,6 +102,8 @@ router.patch("/:userId", authenticateToken, async (req: Request, res: Response, 
         timezone: true,
         currency: true,
         emailVerified: true,
+        bio: true,
+        questionnaireCompleted: true,
         createdAt: true,
         updatedAt: true,
       },

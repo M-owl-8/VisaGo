@@ -1,0 +1,319 @@
+{
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "close": "Close",
+    "submit": "Submit",
+    "search": "Search"
+  },
+  "auth": {
+    "title": "Ketdik",
+    "signIn": "Sign In to Your Account",
+    "email": "Email Address",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "signInButton": "Sign In",
+    "orContinueWith": "Or continue with",
+    "dontHaveAccount": "Don't have an account? ",
+    "signUp": "Sign Up",
+    "comingSoon": "Coming Soon",
+    "facebookNotYet": "Facebook login not yet implemented",
+    "appleNotYet": "Apple Sign-In not yet implemented",
+    "registerTitle": "Create Your Account",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "confirmPassword": "Confirm Password",
+    "createAccount": "Create Account",
+    "alreadyHaveAccount": "Already have an account? ",
+    "fillAllFields": "Please fill in all fields",
+    "loginFailed": "Login Failed",
+    "loginSuccess": "Logged in successfully!",
+    "googleLoginSuccess": "Logged in with Google!",
+    "googleLoginFailed": "Google Login Failed",
+    "resetPassword": "Reset Password",
+    "sendResetLink": "Send Reset Link",
+    "passwordReset": "Password reset link sent to your email",
+    "loggedInWithGoogle": "Logged in with Google!"
+  },
+  "home": {
+    "welcomeBack": "Welcome back, {firstName}! 👋",
+    "letHelpYou": "Let's help you with your visa application",
+    "applications": "Applications",
+    "documents": "Documents",
+    "progress": "Progress",
+    "quickAccess": "Quick Access",
+    "browseCountries": "Browse Countries",
+    "exploreVisa": "Explore visa requirements",
+    "trackDocuments": "Track Documents",
+    "manageDocuments": "Manage your documents",
+    "aiAssistant": "AI Assistant",
+    "getVisaGuidance": "Get visa guidance",
+    "getStarted": "Get Started",
+    "createFirstApplication": "Create your first visa application and start tracking your documents",
+    "startNewApplication": "Start New Application",
+    "recentActivity": "Recent Activity",
+    "noRecentActivity": "No recent activity",
+    "selectDestination": "Select Destination",
+    "searchCountries": "Search countries...",
+    "noCountriesFound": "No countries found",
+    "freePromo": {
+      "title": "3 Months FREE! 🎉",
+      "subtitle": "Enjoy premium features",
+      "daysRemaining": "{days} days remaining",
+      "untilDate": "Until {date}"
+    },
+    "overallProgress": "Overall Progress",
+    "documentsUploaded": "{uploaded} of {total} documents uploaded",
+    "noApplications": {
+      "title": "No applications yet",
+      "subtitle": "Let's start your first visa application!",
+      "action": "Start Application"
+    }
+  },
+  "visa": {
+    "visaSelection": "Visa Selection",
+    "selectVisaType": "Select Visa Type",
+    "visaTypes": "Visa Types",
+    "fee": "Fee",
+    "processingTime": "Processing Time",
+    "validity": "Validity",
+    "requirements": "Requirements",
+    "overview": "Overview",
+    "destination": "Destination",
+    "requiredDocuments": "Required Documents",
+    "disclaimer": "Disclaimer",
+    "payAndContinue": "Pay & Continue",
+    "selectVisa": "Select a visa type",
+    "days": "days",
+    "year": "year",
+    "years": "years",
+    "applicationDetail": {
+      "title": "Application Details",
+      "status": "Status",
+      "createdOn": "Created",
+      "documentChecklist": "Document Checklist",
+      "timeline": "Application Timeline",
+      "aiRecommendations": "AI Recommendations",
+      "chatAboutThis": "Chat about this application",
+      "documentsProgress": "{uploaded} of {total} uploaded"
+    },
+    "documentStatus": {
+      "missing": "Not uploaded",
+      "pending": "Under review",
+      "verified": "Verified",
+      "rejected": "Rejected"
+    },
+    "actions": {
+      "upload": "Upload",
+      "view": "View",
+      "replace": "Replace",
+      "reupload": "Re-upload"
+    }
+  },
+  "documents": {
+    "checkpoint": "Checkpoint",
+    "documents": "Documents",
+    "uploadDocument": "Upload Document",
+    "preview": "Preview",
+    "requiredDocuments": "Required Documents",
+    "progressBar": "{collected} of {total} documents",
+    "documentStatus": {
+      "pending": "Needed",
+      "collected": "Collected",
+      "verified": "Verified",
+      "rejected": "Rejected"
+    },
+    "takePhoto": "Take Photo",
+    "chooseFromGallery": "Choose from Gallery",
+    "uploadPDF": "Upload PDF",
+    "uploadProgress": "Uploading {percent}%",
+    "uploadSuccess": "Document uploaded successfully",
+    "uploadFailed": "Failed to upload document",
+    "deleteDocument": "Delete Document",
+    "replaceDocument": "Replace Document",
+    "confirmDelete": "Are you sure you want to delete this document?",
+    "documentPreview": "Document Preview",
+    "noDocuments": "No documents uploaded yet"
+  },
+  "payment": {
+    "payment": "Payment",
+    "amount": "Amount",
+    "total": "Total",
+    "selectPaymentMethod": "Select Payment Method",
+    "paymentMethods": {
+      "payme": "Payme",
+      "click": "Click",
+      "uzum": "Uzum",
+      "stripe": "Stripe"
+    },
+    "proceedToPayment": "Proceed to Payment",
+    "paymentSuccess": "Payment Successful!",
+    "paymentFailed": "Payment Failed",
+    "paymentCancelled": "Payment Cancelled",
+    "tryAgain": "Try Again",
+    "transactionId": "Transaction ID: {id}",
+    "processingPayment": "Processing payment..."
+  },
+  "chat": {
+    "aiAssistant": "AI Assistant",
+    "getHelpWithVisa": "Get help with your visa application",
+    "startConversation": "Start a conversation",
+    "askAnything": "Ask me anything about your visa application or the visa process",
+    "whatDocuments": "📄 What documents do I need?",
+    "processingTime": "⏱️ What's the processing time?",
+    "financialRequirements": "💰 What are the financial requirements?",
+    "commonMistakes": "❌ What are common mistakes applicants make?",
+    "contactEmbassy": "🏛️ How can I contact the embassy?",
+    "statusUpdate": "📊 What's the status of my application?",
+    "messagePlaceholder": "Type your question...",
+    "send": "Send",
+    "sending": "Sending...",
+    "sources": "📚 Sources: {sources}",
+    "noMessages": "No messages yet",
+    "errorSending": "Error sending message"
+  },
+  "profile": {
+    "profile": "Profile",
+    "myProfile": "My Profile",
+    "personalInfo": "Personal Information",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "phone": "Phone",
+    "country": "Country",
+    "language": "Language",
+    "settings": "Settings",
+    "changeLanguage": "Change Language",
+    "logout": "Logout",
+    "logoutConfirm": "Are you sure you want to logout?",
+    "deleteAccount": "Delete Account",
+    "deleteAccountConfirm": "Are you sure you want to delete your account? This action cannot be undone.",
+    "applicationHistory": "Application History",
+    "noApplications": "No applications yet"
+  },
+  "language": {
+    "english": "English",
+    "russian": "Russian",
+    "uzbek": "Uzbek",
+    "selectLanguage": "Select Language",
+    "currentLanguage": "Current Language: {language}"
+  },
+  "errors": {
+    "genericError": "An error occurred",
+    "networkError": "Network error. Please check your connection.",
+    "tryAgain": "Try Again",
+    "goBack": "Go Back",
+    "loadFailed": "Failed to load data"
+  },
+  "questionnaire": {
+    "title": "Visa Plan",
+    "subtitle": "Help us find the best visa type for you",
+    "stepOf": "{current} of {total}",
+    "continue": "Continue",
+    "complete": "Complete",
+    "skip": "Skip",
+    "generating": "AI is creating your visa plan...",
+    "success": "Your visa plan is ready!",
+    "failed": "Failed to create visa plan",
+    "questions": {
+      "purpose": {
+        "title": "What is your purpose of travel?",
+        "subtitle": "Select the main reason for your travel",
+        "options": {
+          "study": "Study",
+          "work": "Work",
+          "tourism": "Tourism",
+          "business": "Business",
+          "immigration": "Immigration",
+          "other": "Other"
+        }
+      },
+      "country": {
+        "title": "Which country are you interested in?",
+        "subtitle": "Select your destination country",
+        "notSure": "Not sure yet",
+        "searchPlaceholder": "Search for a country..."
+      },
+      "duration": {
+        "title": "How long do you plan to stay?",
+        "subtitle": "Estimated duration of your stay",
+        "options": {
+          "less_than_1": "Less than 1 month",
+          "1_3_months": "1-3 months",
+          "3_6_months": "3-6 months",
+          "6_12_months": "6-12 months",
+          "more_than_1_year": "More than 1 year"
+        }
+      },
+      "traveledBefore": {
+        "title": "Have you traveled abroad before?",
+        "subtitle": "Previous international travel experience"
+      },
+      "currentStatus": {
+        "title": "What is your current status?",
+        "subtitle": "Your current employment or education status",
+        "options": {
+          "student": "Student",
+          "employee": "Employee",
+          "entrepreneur": "Entrepreneur",
+          "unemployed": "Unemployed",
+          "other": "Other"
+        }
+      },
+      "hasInvitation": {
+        "title": "Do you have an invitation/I-20/acceptance letter?",
+        "subtitle": "Required documents from host institution"
+      },
+      "financialSituation": {
+        "title": "What is your financial situation?",
+        "subtitle": "How you will fund your travel",
+        "options": {
+          "stable_income": "Stable income",
+          "sponsor": "Have sponsor",
+          "savings": "Savings",
+          "preparing": "Preparing"
+        }
+      },
+      "maritalStatus": {
+        "title": "What is your marital status?",
+        "subtitle": "Your current marital status",
+        "options": {
+          "single": "Single",
+          "married": "Married",
+          "divorced": "Divorced"
+        }
+      },
+      "hasChildren": {
+        "title": "Do you have children?",
+        "subtitle": "Number of dependent children",
+        "options": {
+          "no": "No",
+          "one": "Yes, 1 child",
+          "two_plus": "Yes, 2+ children"
+        }
+      },
+      "englishLevel": {
+        "title": "What is your English proficiency level?",
+        "subtitle": "Your English language skills",
+        "options": {
+          "beginner": "Beginner",
+          "intermediate": "Intermediate",
+          "advanced": "Advanced",
+          "native": "Native"
+        }
+      }
+    }
+  }
+}

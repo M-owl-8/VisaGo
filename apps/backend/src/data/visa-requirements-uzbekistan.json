@@ -1,0 +1,132 @@
+{
+  "nationality": "Uzbekistan",
+  "nationalityCode": "UZ",
+  "lastUpdated": "2025-01-14",
+  "regions": {
+    "europe": {
+      "name": "Europe",
+      "visaRequired": true,
+      "note": "Uzbekistan is not visa-free for Schengen",
+      "countries": [
+        { "name": "Austria", "code": "AT", "flagEmoji": "🇦🇹", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Belgium", "code": "BE", "flagEmoji": "🇧🇪", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Czech Republic", "code": "CZ", "flagEmoji": "🇨🇿", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Denmark", "code": "DK", "flagEmoji": "🇩🇰", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Estonia", "code": "EE", "flagEmoji": "🇪🇪", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Finland", "code": "FI", "flagEmoji": "🇫🇮", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "France", "code": "FR", "flagEmoji": "🇫🇷", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Germany", "code": "DE", "flagEmoji": "🇩🇪", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Greece", "code": "GR", "flagEmoji": "🇬🇷", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Hungary", "code": "HU", "flagEmoji": "🇭🇺", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Iceland", "code": "IS", "flagEmoji": "🇮🇸", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Italy", "code": "IT", "flagEmoji": "🇮🇹", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Latvia", "code": "LV", "flagEmoji": "🇱🇻", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Lithuania", "code": "LT", "flagEmoji": "🇱🇹", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Luxembourg", "code": "LU", "flagEmoji": "🇱🇺", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Malta", "code": "MT", "flagEmoji": "🇲🇹", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Netherlands", "code": "NL", "flagEmoji": "🇳🇱", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Norway", "code": "NO", "flagEmoji": "🇳🇴", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Poland", "code": "PL", "flagEmoji": "🇵🇱", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Portugal", "code": "PT", "flagEmoji": "🇵🇹", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Slovakia", "code": "SK", "flagEmoji": "🇸🇰", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Slovenia", "code": "SI", "flagEmoji": "🇸🇮", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Spain", "code": "ES", "flagEmoji": "🇪🇸", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Sweden", "code": "SE", "flagEmoji": "🇸🇪", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "Switzerland", "code": "CH", "flagEmoji": "🇨🇭", "visaRequired": true, "notes": "Schengen visa required" },
+        { "name": "United Kingdom", "code": "GB", "flagEmoji": "🇬🇧", "visaRequired": true, "notes": "UK visa required" },
+        { "name": "Ireland", "code": "IE", "flagEmoji": "🇮🇪", "visaRequired": true, "notes": "Irish visa required" },
+        { "name": "Albania", "code": "AL", "flagEmoji": "🇦🇱", "visaRequired": true, "notes": "Visa required for Uzbeks" }
+      ]
+    },
+    "northAmerica": {
+      "name": "North America",
+      "visaRequired": true,
+      "countries": [
+        { "name": "United States", "code": "US", "flagEmoji": "🇺🇸", "visaRequired": true, "notes": "US visa required" },
+        { "name": "Canada", "code": "CA", "flagEmoji": "🇨🇦", "visaRequired": true, "notes": "Canadian visa required" },
+        { "name": "Mexico", "code": "MX", "flagEmoji": "🇲🇽", "visaRequired": true, "notes": "Visa required in most cases unless you have US visa" },
+        { "name": "Cuba", "code": "CU", "flagEmoji": "🇨🇺", "visaRequired": true, "notes": "Cuban visa required" },
+        { "name": "Jamaica", "code": "JM", "flagEmoji": "🇯🇲", "visaRequired": true, "notes": "Jamaican visa required" },
+        { "name": "Dominican Republic", "code": "DO", "flagEmoji": "🇩🇴", "visaRequired": true, "notes": "Visa required" }
+      ]
+    },
+    "southAmerica": {
+      "name": "South America",
+      "visaRequired": false,
+      "note": "Most are visa-free EXCEPT:",
+      "countries": [
+        { "name": "Chile", "code": "CL", "flagEmoji": "🇨🇱", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Trinidad and Tobago", "code": "TT", "flagEmoji": "🇹🇹", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Suriname", "code": "SR", "flagEmoji": "🇸🇷", "visaRequired": true, "notes": "Visa required" }
+      ]
+    },
+    "oceania": {
+      "name": "Oceania",
+      "visaRequired": true,
+      "countries": [
+        { "name": "Australia", "code": "AU", "flagEmoji": "🇦🇺", "visaRequired": true, "notes": "Australian visa required" },
+        { "name": "New Zealand", "code": "NZ", "flagEmoji": "🇳🇿", "visaRequired": true, "notes": "New Zealand visa required" },
+        { "name": "Fiji", "code": "FJ", "flagEmoji": "🇫🇯", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Papua New Guinea", "code": "PG", "flagEmoji": "🇵🇬", "visaRequired": true, "notes": "Visa required" }
+      ]
+    },
+    "asia": {
+      "name": "Asia",
+      "visaRequired": false,
+      "note": "Some visa-free exist (e.g., UAE), but here are visa-required Asian countries:",
+      "countries": [
+        { "name": "Japan", "code": "JP", "flagEmoji": "🇯🇵", "visaRequired": true, "notes": "Japanese visa required" },
+        { "name": "South Korea", "code": "KR", "flagEmoji": "🇰🇷", "visaRequired": true, "notes": "South Korean visa required" },
+        { "name": "China", "code": "CN", "flagEmoji": "🇨🇳", "visaRequired": true, "notes": "Chinese visa required" },
+        { "name": "India", "code": "IN", "flagEmoji": "🇮🇳", "visaRequired": true, "notes": "Indian visa required" },
+        { "name": "Singapore", "code": "SG", "flagEmoji": "🇸🇬", "visaRequired": true, "notes": "Singapore visa required" },
+        { "name": "Malaysia", "code": "MY", "flagEmoji": "🇲🇾", "visaRequired": true, "notes": "Visa required for Uzbeks" },
+        { "name": "Vietnam", "code": "VN", "flagEmoji": "🇻🇳", "visaRequired": true, "notes": "Visa required unless e-visa" },
+        { "name": "Bahrain", "code": "BH", "flagEmoji": "🇧🇭", "visaRequired": true, "notes": "Visa required unless e-visa" },
+        { "name": "Qatar", "code": "QA", "flagEmoji": "🇶🇦", "visaRequired": true, "notes": "Visa required sometimes depending on conditions" },
+        { "name": "Saudi Arabia", "code": "SA", "flagEmoji": "🇸🇦", "visaRequired": true, "notes": "Tourist e-visa allowed but normal visa often required" },
+        { "name": "Kuwait", "code": "KW", "flagEmoji": "🇰🇼", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Oman", "code": "OM", "flagEmoji": "🇴🇲", "visaRequired": true, "notes": "E-visa available but visa required" },
+        { "name": "Iran", "code": "IR", "flagEmoji": "🇮🇷", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Lebanon", "code": "LB", "flagEmoji": "🇱🇧", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Israel", "code": "IL", "flagEmoji": "🇮🇱", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Jordan", "code": "JO", "flagEmoji": "🇯🇴", "visaRequired": true, "notes": "Visa required but e-visa possible" }
+      ]
+    },
+    "africa": {
+      "name": "Africa",
+      "visaRequired": true,
+      "note": "Most African countries require visas from Uzbekistan",
+      "countries": [
+        { "name": "Egypt", "code": "EG", "flagEmoji": "🇪🇬", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Morocco", "code": "MA", "flagEmoji": "🇲🇦", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Tunisia", "code": "TN", "flagEmoji": "🇹🇳", "visaRequired": true, "notes": "Visa required" },
+        { "name": "South Africa", "code": "ZA", "flagEmoji": "🇿🇦", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Kenya", "code": "KE", "flagEmoji": "🇰🇪", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Nigeria", "code": "NG", "flagEmoji": "🇳🇬", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Ghana", "code": "GH", "flagEmoji": "🇬🇭", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Ethiopia", "code": "ET", "flagEmoji": "🇪🇹", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Uganda", "code": "UG", "flagEmoji": "🇺🇬", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Tanzania", "code": "TZ", "flagEmoji": "🇹🇿", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Algeria", "code": "DZ", "flagEmoji": "🇩🇿", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Libya", "code": "LY", "flagEmoji": "🇱🇾", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Sudan", "code": "SD", "flagEmoji": "🇸🇩", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Angola", "code": "AO", "flagEmoji": "🇦🇴", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Congo", "code": "CG", "flagEmoji": "🇨🇬", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Botswana", "code": "BW", "flagEmoji": "🇧🇼", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Zimbabwe", "code": "ZW", "flagEmoji": "🇿🇼", "visaRequired": true, "notes": "Visa required" },
+        { "name": "Namibia", "code": "NA", "flagEmoji": "🇳🇦", "visaRequired": true, "notes": "Visa required" }
+      ]
+    }
+  },
+  "allVisaRequiredCountries": [
+    "Austria", "Belgium", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Iceland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Norway", "Poland", "Portugal", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "United Kingdom", "Ireland", "Albania",
+    "United States", "Canada", "Mexico", "Cuba", "Jamaica", "Dominican Republic",
+    "Chile", "Trinidad and Tobago", "Suriname",
+    "Australia", "New Zealand", "Fiji", "Papua New Guinea",
+    "Japan", "South Korea", "China", "India", "Singapore", "Malaysia", "Vietnam", "Bahrain", "Qatar", "Saudi Arabia", "Kuwait", "Oman", "Iran", "Lebanon", "Israel", "Jordan",
+    "Egypt", "Morocco", "Tunisia", "South Africa", "Kenya", "Nigeria", "Ghana", "Ethiopia", "Uganda", "Tanzania", "Algeria", "Libya", "Sudan", "Angola", "Congo", "Botswana", "Zimbabwe", "Namibia"
+  ]
+}
+
+

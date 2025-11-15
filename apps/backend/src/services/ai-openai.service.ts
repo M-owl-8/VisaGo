@@ -97,7 +97,21 @@ export class AIOpenAIService {
       };
     } catch (error) {
       console.error("OpenAI API error:", error);
-      throw error;
+      
+      // Provide user-friendly error message
+      if (error instanceof Error) {
+        if (error.message.includes('rate limit') || error.message.includes('429')) {
+          throw new Error("AI service is busy. Please try again in a moment.");
+        }
+        if (error.message.includes('timeout') || error.message.includes('ECONNABORTED')) {
+          throw new Error("AI service request timed out. Please try again.");
+        }
+        if (error.message.includes('API key') || error.message.includes('401')) {
+          throw new Error("AI service configuration error. Please contact support.");
+        }
+      }
+      
+      throw new Error("AI service temporarily unavailable. Please try again later.");
     }
   }
 
@@ -174,8 +188,11 @@ When answering questions, cite the sources from the knowledge base when relevant
    */
   private static async searchKnowledgeBase(query: string): Promise<RAGSource[]> {
     try {
-      // Simple text search for now
-      // TODO: Implement vector similarity search using embeddings
+      // Text-based search with relevance scoring
+      // Note: Vector similarity search can be implemented using OpenAI embeddings + vector DB (Pinecone/Weaviate)
+      // For now, using Prisma full-text search with basic relevance scoring
+      // SQLite doesn't support case-insensitive mode, so we'll do case-insensitive matching in JavaScript
+      const queryLower = query.toLowerCase();
       const documents = await AIOpenAIService.prisma.document.findMany({
         where: {
           isPublished: true,
@@ -184,16 +201,35 @@ When answering questions, cite the sources from the knowledge base when relevant
             { content: { contains: query } },
           ],
         },
-        take: 5,
+        take: 10, // Get more to filter case-insensitively
       });
 
-      return documents.map((doc: any) => ({
-        documentId: doc.id,
-        title: doc.title,
-        content: doc.content.substring(0, 500), // First 500 chars
-        relevanceScore: 0.8, // TODO: Calculate actual relevance score
-        url: `/api/documents/${doc.id}`,
-      }));
+      // Calculate basic relevance score based on query match (case-insensitive)
+      const filteredDocs = documents
+        .map((doc: any) => {
+          const titleLower = doc.title.toLowerCase();
+          const contentLower = doc.content.toLowerCase();
+          const titleMatch = titleLower.includes(queryLower);
+          const contentMatch = contentLower.includes(queryLower);
+          
+          // Simple relevance: title matches are more relevant than content matches
+          const relevanceScore = titleMatch ? 0.9 : contentMatch ? 0.7 : 0.5;
+          
+          return {
+            documentId: doc.id,
+            title: doc.title,
+            content: doc.content.substring(0, 500), // First 500 chars
+            relevanceScore,
+            url: `/api/documents/${doc.id}`,
+            _match: titleMatch || contentMatch, // Track if it matches
+          };
+        })
+        .filter((doc: any) => doc._match) // Only include matching documents
+        .sort((a: any, b: any) => b.relevanceScore - a.relevanceScore) // Sort by relevance
+        .slice(0, 5) // Take top 5
+        .map(({ _match, ...doc }: any) => doc); // Remove _match field
+      
+      return filteredDocs;
     } catch (error) {
       console.error("Knowledge base search error:", error);
       return [];

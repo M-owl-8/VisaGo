@@ -39,15 +39,15 @@ export declare class ApplicationsService {
             applicationId: string;
         }[];
     } & {
+        userId: string;
+        status: string;
         id: string;
         countryId: string;
         visaTypeId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         notes: string | null;
         expiryDate: Date | null;
-        status: string;
         progressPercentage: number;
         submissionDate: Date | null;
         approvalDate: Date | null;
@@ -92,15 +92,15 @@ export declare class ApplicationsService {
             applicationId: string;
         }[];
     } & {
+        userId: string;
+        status: string;
         id: string;
         countryId: string;
         visaTypeId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         notes: string | null;
         expiryDate: Date | null;
-        status: string;
         progressPercentage: number;
         submissionDate: Date | null;
         approvalDate: Date | null;
@@ -149,15 +149,15 @@ export declare class ApplicationsService {
             applicationId: string;
         }[];
     } & {
+        userId: string;
+        status: string;
         id: string;
         countryId: string;
         visaTypeId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         notes: string | null;
         expiryDate: Date | null;
-        status: string;
         progressPercentage: number;
         submissionDate: Date | null;
         approvalDate: Date | null;
@@ -202,15 +202,15 @@ export declare class ApplicationsService {
             applicationId: string;
         }[];
     } & {
+        userId: string;
+        status: string;
         id: string;
         countryId: string;
         visaTypeId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         notes: string | null;
         expiryDate: Date | null;
-        status: string;
         progressPercentage: number;
         submissionDate: Date | null;
         approvalDate: Date | null;

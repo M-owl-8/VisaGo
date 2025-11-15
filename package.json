@@ -4,13 +4,11 @@
   "description": "VisaBuddy - AI-Powered Visa Application Management System",
   "private": true,
   "workspaces": [
-    "apps/frontend",
     "apps/backend",
     "apps/ai-service"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces",
-    "dev:frontend": "npm run dev -w apps/frontend",
     "dev:backend": "npm run dev -w apps/backend",
     "dev:ai": "cd apps/ai-service && python -m uvicorn main:app --reload --port 8001",
     "build": "npm run build --workspaces",
@@ -19,5 +17,10 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.4",
+    "@ioredis/commands": "^1.5.0",
+    "ioredis": "^5.8.2"
   }
 }

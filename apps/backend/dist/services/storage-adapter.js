@@ -22,6 +22,18 @@ class StorageAdapter {
     }
     static async uploadFile(fileBuffer, fileName, fileType, userId, options = {}) {
         const storage = this.getStorage();
+        // If using Firebase, try with fallback to local storage
+        if (this.storageType === "firebase") {
+            try {
+                return await storage.uploadFile(fileBuffer, fileName, fileType, userId, options);
+            }
+            catch (error) {
+                console.warn(`Firebase storage upload failed, falling back to local storage:`, error instanceof Error ? error.message : 'Unknown error');
+                // Fallback to local storage
+                return local_storage_service_1.default.uploadFile(fileBuffer, fileName, fileType, userId, options);
+            }
+        }
+        // Direct call for local storage
         return storage.uploadFile(fileBuffer, fileName, fileType, userId, options);
     }
     static async deleteFile(fileName) {

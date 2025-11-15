@@ -3,17 +3,17 @@ export declare class DocumentService {
      * Upload a document for a visa application
      */
     uploadDocument(userId: string, applicationId: string, documentType: string, filePath: string, fileName: string): Promise<{
+        documentType: string;
+        userId: string;
         fileUrl: string;
         fileName: string;
         fileSize: number;
         uploadedAt: Date;
+        status: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
-        documentType: string;
         expiryDate: Date | null;
-        status: string;
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
@@ -22,17 +22,17 @@ export declare class DocumentService {
      * Get all documents for a user
      */
     getUserDocuments(userId: string): Promise<{
+        documentType: string;
+        userId: string;
         fileUrl: string;
         fileName: string;
         fileSize: number;
         uploadedAt: Date;
+        status: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
-        documentType: string;
         expiryDate: Date | null;
-        status: string;
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
@@ -41,17 +41,17 @@ export declare class DocumentService {
      * Get all documents for an application
      */
     getApplicationDocuments(applicationId: string, userId: string): Promise<{
+        documentType: string;
+        userId: string;
         fileUrl: string;
         fileName: string;
         fileSize: number;
         uploadedAt: Date;
+        status: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
-        documentType: string;
         expiryDate: Date | null;
-        status: string;
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
@@ -60,17 +60,17 @@ export declare class DocumentService {
      * Get a specific document
      */
     getDocument(documentId: string, userId: string): Promise<{
+        documentType: string;
+        userId: string;
         fileUrl: string;
         fileName: string;
         fileSize: number;
         uploadedAt: Date;
+        status: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
-        documentType: string;
         expiryDate: Date | null;
-        status: string;
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
@@ -85,17 +85,17 @@ export declare class DocumentService {
      * Update document status (for admin)
      */
     updateDocumentStatus(documentId: string, status: "pending" | "verified" | "rejected", verificationNotes?: string): Promise<{
+        documentType: string;
+        userId: string;
         fileUrl: string;
         fileName: string;
         fileSize: number;
         uploadedAt: Date;
+        status: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
-        documentType: string;
         expiryDate: Date | null;
-        status: string;
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;

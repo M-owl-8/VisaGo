@@ -1,0 +1,257 @@
+# ============================================================================
+# Cleanup Unnecessary Documentation Files
+# ============================================================================
+
+Write-Host ""
+Write-Host "Cleaning up unnecessary documentation files..." -ForegroundColor Cyan
+Write-Host ""
+
+$deleted = 0
+$errors = 0
+
+# List of files to DELETE (excluding essential ones)
+$filesToDelete = @(
+    "100_PERCENT_COMPLETE_PLAN.md",
+    "100_PERCENT_USER_READY_PLAN.md",
+    "2_WEEK_COMPLETE_GUIDE.md",
+    "2_WEEK_GUIDE_WITH_PAYMENT_FREEZE.md",
+    "ANALYSIS_EXECUTIVE_SUMMARY.md",
+    "ANDROID_BUILD_QUICKSTART.txt",
+    "APP_FUNCTIONALITY_VISUALIZATION.md",
+    "APP_RUNNING_STATUS.md",
+    "APP_STATUS_CHECK.md",
+    "BUILD_APP_TODAY.ps1",
+    "BUILD_FIX_RESOURCES_INDEX.md",
+    "BUILD_FIX_SUMMARY.md",
+    "BUILD_FOR_DEVICE_FIXED.ps1",
+    "BUILD_FOR_DEVICE.ps1",
+    "BUILD_IN_PROGRESS_GUIDE.md",
+    "BUILD_STATUS_TRACKING.md",
+    "CODE_QUALITY_IMPROVEMENTS_SUMMARY.md",
+    "CODE_QUALITY_TO_100_PERCENT.md",
+    "COMPLETE_APP_STATUS_AND_NEXT_STEPS.md",
+    "COMPREHENSIVE_APP_TEST_AND_READINESS_REPORT.md",
+    "COMPREHENSIVE_READINESS_ASSESSMENT.md",
+    "CREDENTIALS_SUMMARY.txt",
+    "CURRENT_FEATURES_AND_READINESS.md",
+    "CURRENT_READINESS_ASSESSMENT.md",
+    "DEEP_ANALYSIS_PLAY_STORE_READINESS.md",
+    "DEVICE_BUILD_START_HERE.md",
+    "DISABLE_CONFIRMATIONS.ps1",
+    "EMULATOR_QUICK_START.md",
+    "EMULATOR_QUICK_START.txt",
+    "EXECUTE_PHASE_1.ps1",
+    "EXECUTION_PROGRESS.md",
+    "EXECUTION_STATUS.md",
+    "FINAL_CODE_QUALITY_REPORT.md",
+    "FINAL_GRADLE_FIX_SUMMARY.md",
+    "FINAL_VERIFICATION.ps1",
+    "FIX_ANDROID_BUILD_GUIDE.md",
+    "FIX_ANDROID_BUILD_PERMANENTLY.ps1",
+    "FIX_BUNDLE_ERROR.ps1",
+    "FIX_DATABASE_CONNECTION_ERROR.md",
+    "FIXED_BUILD_READY_TO_GO.md",
+    "FIXES_SUMMARY.md",
+    "FLOW_CHANGES_SUMMARY.md",
+    "GRADLE_FIX_PERMANENT.md",
+    "IMPLEMENTATION_PLAN.md",
+    "IMPLEMENTATION_ROADMAP_80_PERCENT.md",
+    "IMPLEMENTATION_ROADMAP_PRIORITIZED.md",
+    "IMPLEMENTATION_STATUS.md",
+    "INDEPENDENT_WORK_PROGRESS.md",
+    "INDEPENDENT_WORK_SUMMARY.md",
+    "INDEPENDENT_WORK_TIMELINE.md",
+    "LAUNCH_ALL_THREE_TERMINALS.ps1",
+    "LAUNCH_ALL.ps1",
+    "MY_COMPLETION_CAPABILITY_ANALYSIS.md",
+    "NUCLEAR_FIX_APP_NOW.ps1",
+    "PAYMENT_FREEZE_CONFIGURATION.md",
+    "PERMANENT_FIX_NPM_SCRIPTS.ps1",
+    "PHASE_0_COMPLETION_CHECKLIST.md",
+    "PHASE_0_DELIVERABLES_INDEX.md",
+    "PHASE_0_IMPLEMENTATION_COMPLETE.md",
+    "PHASE_0_QUICK_START.ps1",
+    "PHASE_0_SECURITY_AUDIT_REPORT.md",
+    "PHASE_1_3_COMPLETE_SUMMARY.md",
+    "PHASE_1_4_COMPLETE_SUMMARY.md",
+    "PHASE_1_API_TEST.py",
+    "PHASE_1_COMPLETE_TEST_REPORT.md",
+    "PHASE_1_COMPLETE_TEST.ps1",
+    "PHASE_1_COMPLETION_CERTIFICATE.txt",
+    "PHASE_1_FINAL_VERIFICATION_SIMPLE.ps1",
+    "PHASE_1_FINAL_VERIFICATION.ps1",
+    "PHASE_1_PROGRESS_SUMMARY.md",
+    "PHASE_1_QUICK_REFERENCE.md",
+    "PHASE_1_RAG_COMPLETE.md",
+    "PHASE_1_RAG_IMPLEMENTATION_SUMMARY.md",
+    "PHASE_1_TEST.py",
+    "PHASE_1_TESTING_COMPLETE.txt",
+    "PHASE_1_TESTING_SUMMARY.md",
+    "PHASE_2_CHAT_INTEGRATION_COMPLETE.md",
+    "PHASE_2_COMPLETION_GUIDE.md",
+    "PHASE_2_FILES_INDEX.md",
+    "PHASE_2_IMPLEMENTATION_GUIDE.md",
+    "PHASE_2_QUICK_IMPLEMENTATION_GUIDE.md",
+    "PHASE_2_STEP_2_OCR_STATUS_COMPLETE.md",
+    "PHASE_3_COMPLETION_REPORT.txt",
+    "PHASE_3_EXTERNAL_SERVICES_COMPLETE.md",
+    "PHASE_3_START_HERE.txt",
+    "PHASE_3_STATUS.txt",
+    "PHASE_3_STEP_3_PAYMENT_INTEGRATION_COMPLETE.md",
+    "PHASE_4_COMPLETE_PACKAGE.md",
+    "PHASE_4_CORE_FLOWS_TESTING.md",
+    "PHASE_4_DELIVERY_SUMMARY.txt",
+    "PHASE_4_DETAILED_STEPS.md",
+    "PHASE_4_FUTURE_SETUP.md",
+    "PHASE_4_IMPLEMENTATION_ROADMAP.md",
+    "PHASE_4_START_HERE.txt",
+    "PHASE_4_STATUS.txt",
+    "PHASE_4_TESTING_VERIFICATION_START_HERE.md",
+    "PHASE_4_TROUBLESHOOTING.md",
+    "PHASE_4_VERIFICATION_CHECKLIST.md",
+    "PLAY_STORE_READINESS_ANALYSIS.md",
+    "PRECHECK_DEVICE_BUILD.ps1",
+    "PRIORITY_2_COMPLETION_CERTIFICATE.md",
+    "PRIORITY_2_COMPLETION_SUMMARY.md",
+    "PRIORITY_2_QUICK_REFERENCE.md",
+    "PRIORITY_2_TEST_GUIDE.md",
+    "PRIORITY_3_COMPLETION_VERIFIED.md",
+    "PRIORITY_3_FINAL_SUMMARY.md",
+    "PRIORITY_3_FULLY_OPERATIONAL.md",
+    "PRIORITY_3_IMPLEMENTATION_COMPLETE.md",
+    "PRIORITY_3_IMPLEMENTATION_GUIDE.md",
+    "PRIORITY_3_IMPLEMENTATION_STATUS.md",
+    "PRIORITY_3_QUICK_REFERENCE.md",
+    "PRIORITY_3_QUICK_START.md",
+    "PRIORITY_3_RUN_NOW.md",
+    "PRIORITY_3_SETUP_AND_DEPLOYMENT.md",
+    "PRIORITY_3_START_HERE.md",
+    "PRIORITY_4_COMPLETION_VERIFIED.md",
+    "PRIORITY_4_DEPLOYMENT_CHECKLIST.md",
+    "PRIORITY_4_FINAL_DEPLOYMENT.ps1",
+    "PRIORITY_4_OPTIMIZATION_GUIDE.md",
+    "PRIORITY_4_PAYMENT_TESTING_GUIDE.md",
+    "PRIORITY_4_QUICK_START.txt",
+    "PRIORITY_4_SYSTEM_ARCHITECTURE.md",
+    "PROJECT_ANALYSIS_COMPLETE.md",
+    "PROJECT_COMPLETION_SUMMARY.md",
+    "PROJECT_PHASES_ROADMAP.md",
+    "PROJECT_PRIORITIES_COMPLETE_ROADMAP.md",
+    "PROJECT_STATUS_DEEP_ANALYSIS.md",
+    "PROJECT_STATUS_ONE_PAGE.md",
+    "PROJECT_STATUS_TRACKER.md",
+    "QUICK_ACTION_AFTER_BUILD.txt",
+    "QUICK_BUILD_START.txt",
+    "QUICK_DEVICE_BUILD.txt",
+    "QUICK_FIX_CONFIRMATIONS.md",
+    "QUICK_FIX_DATABASE.md",
+    "QUICK_FIX_REFERENCE.txt",
+    "QUICK_IMPLEMENTATION_START.md",
+    "QUICK_REFERENCE_READINESS.md",
+    "QUICK_START_2_WEEKS.md",
+    "QUICK_START_AFTER_PHASE_3.md",
+    "QUICK_START_GUIDE.md",
+    "QUICK_STATUS_CARD.txt",
+    "RAG_QUICK_START.txt",
+    "RAILWAY_QUICK_START.md",
+    "RAILWAY_SETUP_GUIDE.md",
+    "READ_ME_FIRST.txt",
+    "READINESS_BREAKDOWN_25_PERCENT.md",
+    "READINESS_SUMMARY.md",
+    "README_FIX_COMPLETED.md",
+    "RECONNECT_EXPO.ps1",
+    "REVISED_PERCENTAGES_SUMMARY.md",
+    "REVISED_ROADMAP_REALISTIC.md",
+    "RUN_ANDROID.ps1",
+    "RUN_NOW.ps1",
+    "RUN_ON_EMULATOR_COMPLETE.md",
+    "RUN_ON_EMULATOR_TODAY.md",
+    "RUN_PRIORITY2_TESTS.ps1",
+    "SCRIPT_FIX_SUMMARY.md",
+    "SECURITY_CREDENTIAL_MANAGEMENT.md",
+    "SESSION_SUMMARY_PHASE_3.md",
+    "SETUP_100_PERCENT.ps1",
+    "SETUP_DEVICE.txt",
+    "SETUP_GITHUB_AND_DEPLOY.ps1",
+    "SETUP_GUIDE_COMPLETE.md",
+    "SETUP_PRODUCTION.ps1",
+    "SETUP_VERIFICATION_CHECKLIST.md",
+    "SETUP.ps1",
+    "SPECIFICATION_VS_IMPLEMENTATION_ACTION_PLAN.md",
+    "START_AND_TEST.ps1",
+    "START_APP_ANDROID.ps1",
+    "START_BACKEND_AND_ANDROID.ps1",
+    "START_BACKEND_SIMPLE.ps1",
+    "START_BACKEND.ps1",
+    "START_EMULATOR_AND_APP.ps1",
+    "START_EMULATOR_NOW.ps1",
+    "START_EMULATOR_SIMPLE.ps1",
+    "START_HERE_BUILD_FIXED.txt",
+    "START_HERE_ONE_PAGE.md",
+    "START_HERE_PRIORITY_3_COMPLETE.txt",
+    "START_PAYMENT_SETUP.ps1",
+    "START_PHASE_2_HERE.txt",
+    "START_VISABUDDY_PROPERLY.ps1",
+    "STEP_BY_STEP_API_CONFIGURATION_GUIDE.md",
+    "SUPABASE_CONNECTION_SETUP.md",
+    "TEST_NPM_SCRIPTS.ps1",
+    "TEST_ON_PHONE_GUIDE.md",
+    "UPDATE_DATABASE_CONNECTION.md",
+    "USER_READINESS_ASSESSMENT.md",
+    "USER_READINESS_CALCULATION.md",
+    "VALIDATE_PAYMENT_SETUP.ps1",
+    "VERIFY_PRIORITY_3_COMPLETE.ps1",
+    "VERIFY_RAG_CHECKLIST.md",
+    "VERIFY_WEEK2_COMPLETION.ps1",
+    "VISABUDDY_COMPREHENSIVE_ANALYSIS.md",
+    "VISABUDDY_VISUAL_OVERVIEW.md",
+    "WHAT_I_COMPLETED.md",
+    "apps\frontend\RUN_ON_EMULATOR.md",
+    "apps\frontend\FINAL_FIX_REQUIRE_ERROR.md",
+    "apps\frontend\WHAT_YOU_SHOULD_SEE.md",
+    "apps\frontend\EXPO_TESTING_GUIDE.md",
+    "apps\frontend\COMPLETE_EXPO_FIX.md",
+    "apps\frontend\EXPO_QUICK_START.md",
+    "apps\frontend\EXPO_FIXES_APPLIED.md"
+)
+
+# Also delete files with emoji prefixes (need to handle encoding)
+$emojiFiles = Get-ChildItem -Path . -File | Where-Object {
+    $_.Name -match "^[^\x00-\x7F]"
+}
+
+foreach ($file in $filesToDelete) {
+    $filePath = Join-Path (Get-Location) $file
+    if (Test-Path $filePath) {
+        try {
+            Remove-Item $filePath -Force
+            Write-Host "Deleted: $file" -ForegroundColor Green
+            $deleted++
+        } catch {
+            Write-Host "Error deleting $file : $_" -ForegroundColor Red
+            $errors++
+        }
+    }
+}
+
+# Delete emoji-prefixed files
+foreach ($file in $emojiFiles) {
+    if ($file.Name -like "*PHASE*" -or $file.Name -like "*PRIORITY*" -or $file.Name -like "*COMPLETE*" -or $file.Name -like "*SUMMARY*") {
+        try {
+            Remove-Item $file.FullName -Force
+            Write-Host "Deleted: $($file.Name)" -ForegroundColor Green
+            $deleted++
+        } catch {
+            Write-Host "Error deleting $($file.Name): $_" -ForegroundColor Red
+            $errors++
+        }
+    }
+}
+
+Write-Host ""
+Write-Host "Cleanup Summary" -ForegroundColor Cyan
+Write-Host "Deleted: $deleted files" -ForegroundColor Green
+if ($errors -gt 0) {
+    Write-Host "Errors: $errors files" -ForegroundColor Red
+}
+Write-Host ""

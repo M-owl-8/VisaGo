@@ -283,6 +283,37 @@ export class EmailService {
       text: `Missing Documents Reminder\n\nPlease upload: ${data.missingDocuments.join(', ')}`,
     };
   }
+
+  static passwordResetEmail(userName: string, email: string, resetLink: string): EmailPayload {
+    return {
+      to: email,
+      subject: '🔐 Reset Your VisaBuddy Password',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px;">
+          <h2>Password Reset Request</h2>
+          <p>Hi ${userName || 'there'},</p>
+          <p>We received a request to reset your password for your VisaBuddy account.</p>
+          <p>Click the button below to reset your password. This link will expire in 1 hour.</p>
+          <a href="${resetLink}" style="background: #1E88E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+            Reset Password
+          </a>
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="background: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-size: 12px;">${resetLink}</p>
+          <p style="color: #666; font-size: 12px;">If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
+          <br>
+          <p style="color: #666; font-size: 12px;">This link expires in 1 hour for security reasons.</p>
+        </div>
+      `,
+      text: `Password Reset Request\n\nHi ${userName || 'there'},\n\nClick this link to reset your password:\n${resetLink}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, please ignore this email.`,
+    };
+  }
+
+  async sendPasswordResetEmail(email: string, resetLink: string): Promise<boolean> {
+    // Extract user name from email (or use email as fallback)
+    const userName = email.split('@')[0];
+    const payload = EmailService.passwordResetEmail(userName, email, resetLink);
+    return await this.send(payload);
+  }
 }
 
 export const emailService = new EmailService();

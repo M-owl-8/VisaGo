@@ -37,8 +37,16 @@ export class PaymeService {
     this.config = config;
     this.prisma = prisma;
 
+    // Only validate config if not in development with mock payments enabled
+    // During payment freeze, credentials may not be needed
     if (!config.merchantId || !config.apiKey) {
-      throw new Error("Payme configuration incomplete: merchantId and apiKey required");
+      // Check if payments are frozen - if so, allow incomplete config
+      const { isPaymentFrozen } = require("../utils/payment-freeze");
+      if (!isPaymentFrozen() && process.env.NODE_ENV === "production") {
+        throw new Error("Payme configuration incomplete: merchantId and apiKey required");
+      }
+      // In development or when frozen, allow incomplete config but log warning
+      console.warn("⚠️  Payme configuration incomplete - payments may not work until configured");
     }
   }
 

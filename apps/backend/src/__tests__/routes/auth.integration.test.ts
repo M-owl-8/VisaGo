@@ -91,7 +91,13 @@ const createTestApp = () => {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      // In real code, would verify password hash
+      // Verify password - for testing, we check if password matches stored hash
+      // In real code, this would use bcrypt.compare
+      // Test setup stores 'hashed-password' for all users, so we compare against that
+      if (user.passwordHash !== password) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
       res.json({ token: 'test-token', user: { id: user.id, email } });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -242,7 +248,7 @@ describe('Auth Routes - Login', () => {
     const mockUser = {
       id: 'user-123',
       email: loginData.email,
-      passwordHash: 'hashed-password',
+      passwordHash: loginData.password, // Must match for successful login
     };
 
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
@@ -425,15 +431,24 @@ describe('Auth Routes - Security Headers', () => {
   });
 
   test('should return JSON response', async () => {
+    // Reset mocks to ensure clean state
+    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    (mockPrisma.user.create as jest.Mock).mockResolvedValue({
+      id: 'user-456',
+      email: 'test@example.com',
+      firstName: undefined,
+    });
+
     const response = await request(app)
       .post('/auth/register')
       .send({
         email: 'test@example.com',
         password: 'SecurePass123!',
       })
-      .expect(400);
+      .expect(201); // Should be 201 Created with valid data
 
     expect(response.type).toMatch(/json/);
+    expect(response.body).toHaveProperty('token');
   });
 
   test('should handle CORS headers', async () => {

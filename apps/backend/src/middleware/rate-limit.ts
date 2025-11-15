@@ -3,21 +3,85 @@ import RedisStore from 'rate-limit-redis';
 import { Request, Response } from 'express';
 import Redis from 'ioredis';
 
-// Initialize Redis client for rate limiting
-const redisClient = process.env.REDIS_URL 
-  ? new Redis(process.env.REDIS_URL)
-  : null;
+// Initialize Redis client for rate limiting with health checks
+let redisClient: Redis | null = null;
+let redisHealthy = false;
+let redisInitialized = false;
+
+if (process.env.REDIS_URL) {
+  try {
+    redisClient = new Redis(process.env.REDIS_URL, {
+      connectTimeout: 2000,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+      maxRetriesPerRequest: 3,
+    });
+
+    // Test connection
+    redisClient.ping()
+      .then(() => {
+        redisHealthy = true;
+        redisInitialized = true;
+        console.log('✅ Redis rate limiting connected successfully');
+      })
+      .catch((err) => {
+        console.warn('⚠️  Redis rate limiting connection failed, using in-memory store:', err.message);
+        redisClient = null;
+        redisInitialized = true;
+      });
+
+    // Handle connection errors
+    redisClient.on('error', (err) => {
+      console.warn('⚠️  Redis rate limiting error:', err.message);
+      redisHealthy = false;
+    });
+
+    redisClient.on('connect', () => {
+      redisHealthy = true;
+      console.log('✅ Redis rate limiting reconnected');
+    });
+  } catch (error) {
+    console.warn('⚠️  Failed to initialize Redis for rate limiting:', error);
+    redisClient = null;
+    redisInitialized = true;
+  }
+} else {
+  console.log('ℹ️  REDIS_URL not set - using in-memory rate limiting (not recommended for production)');
+  redisInitialized = true;
+}
 
 // Helper function to get store based on Redis availability
 const getStore = () => {
-  if (redisClient) {
-    return new RedisStore({
-      sendCommand: (command: string, ...args: any[]) => redisClient.call(command, ...args),
-      prefix: 'rl:',
-    });
+  if (redisClient && redisHealthy) {
+    try {
+      return new RedisStore({
+        sendCommand: (async (command: string, ...args: any[]) => {
+          if (!redisClient || !redisHealthy) {
+            throw new Error('Redis not available');
+          }
+          return await redisClient.call(command, ...args);
+        }) as any,
+        prefix: 'rl:',
+      });
+    } catch (error) {
+      console.warn('⚠️  Failed to create Redis store, falling back to memory:', error);
+      return undefined;
+    }
   }
   return undefined; // Falls back to memory store
 };
+
+// Export Redis health status for monitoring
+export function getRateLimitRedisStatus() {
+  return {
+    enabled: !!process.env.REDIS_URL,
+    connected: redisHealthy,
+    initialized: redisInitialized,
+    store: redisHealthy ? 'redis' : 'memory',
+  };
+}
 
 /**
  * Rate limiter for login attempts: 5 attempts per 15 minutes per IP

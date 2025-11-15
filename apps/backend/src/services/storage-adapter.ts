@@ -39,6 +39,23 @@ class StorageAdapter {
     options: UploadOptions = {}
   ): Promise<UploadResult> {
     const storage = this.getStorage();
+    
+    // If using Firebase, try with fallback to local storage
+    if (this.storageType === "firebase") {
+      try {
+        return await storage.uploadFile(fileBuffer, fileName, fileType, userId, options);
+      } catch (error) {
+        console.warn(
+          `Firebase storage upload failed, falling back to local storage:`,
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+        
+        // Fallback to local storage
+        return LocalStorageService.uploadFile(fileBuffer, fileName, fileType, userId, options);
+      }
+    }
+    
+    // Direct call for local storage
     return storage.uploadFile(fileBuffer, fileName, fileType, userId, options);
   }
 

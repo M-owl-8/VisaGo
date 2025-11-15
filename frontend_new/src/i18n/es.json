@@ -1,0 +1,60 @@
+{
+  "common": {
+    "welcome": "Bienvenido",
+    "hello": "Hola",
+    "goodbye": "Adiós",
+    "yes": "Sí",
+    "no": "No",
+    "ok": "OK",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "submit": "Enviar",
+    "search": "Buscar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "retry": "Reintentar",
+    "close": "Cerrar"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "register": "Registrarse",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "signInWithGoogle": "Iniciar sesión con Google"
+  },
+  "visa": {
+    "selectCountry": "Seleccionar país",
+    "selectVisaType": "Seleccionar tipo de visa",
+    "requirements": "Requisitos",
+    "documents": "Documentos",
+    "application": "Solicitud",
+    "status": "Estado",
+    "processingTime": "Tiempo de procesamiento",
+    "fee": "Tarifa"
+  },
+  "documents": {
+    "upload": "Subir documento",
+    "required": "Requerido",
+    "optional": "Opcional",
+    "verified": "Verificado",
+    "pending": "Pendiente"
+  },
+  "chat": {
+    "askQuestion": "Hacer una pregunta",
+    "send": "Enviar",
+    "typing": "Escribiendo...",
+    "noMessages": "No hay mensajes"
+  }
+}
+
+
+
+
