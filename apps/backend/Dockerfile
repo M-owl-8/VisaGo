@@ -1,11 +1,13 @@
 # Multi-stage build for optimized production image
+# This Dockerfile assumes build context is the repo root
 
 # Stage 1: Dependencies
 FROM node:20-alpine AS dependencies
 WORKDIR /app
 
-# Copy package files
+# Copy root package files
 COPY package*.json ./
+# Copy backend package files
 COPY apps/backend/package*.json ./apps/backend/
 
 # Install dependencies
