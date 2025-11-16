@@ -1,12 +1,12 @@
 # Multi-stage build for optimized production image
-# This Dockerfile assumes build context is the repo root
+# This Dockerfile works with repo root as build context
 
 # Stage 1: Dependencies
 FROM node:20-alpine AS dependencies
 WORKDIR /app
 
-# Copy root package files
-COPY package*.json ./
+# Copy root package files (including package-lock.json)
+COPY package.json package-lock.json ./
 # Copy backend package files
 COPY apps/backend/package*.json ./apps/backend/
 
@@ -17,8 +17,8 @@ RUN npm ci --only=production && npm cache clean --force
 FROM node:20-alpine AS build
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files (including package-lock.json)
+COPY package.json package-lock.json ./
 COPY apps/backend/package*.json ./apps/backend/
 COPY apps/backend/tsconfig.json ./apps/backend/
 COPY apps/backend/prisma ./apps/backend/prisma/
