@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,14 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { useNotificationStore } from '../../store/notifications';
+import {
+  useNotificationStore,
+  NotificationPreferences,
+} from '../../store/notifications';
+import {DEFAULT_TOPIC} from '../../services/pushNotifications';
 
 interface SettingItem {
-  key: keyof import('../../store/notifications').NotificationPreferences;
+  key: keyof NotificationPreferences;
   title: string;
   description: string;
   category: 'general' | 'content' | 'reminders';
@@ -64,8 +68,16 @@ const SETTINGS: SettingItem[] = [
 ];
 
 export const NotificationSettingsScreen: React.FC = () => {
-  const { preferences, isLoading, updatePreferences, loadPreferences } =
-    useNotificationStore();
+  const {
+    preferences,
+    isLoading,
+    updatePreferences,
+    loadPreferences,
+    setPushPermissionStatus,
+    deviceToken,
+    unsubscribeFromTopic,
+    clearDeviceToken,
+  } = useNotificationStore();
   const [localPreferences, setLocalPreferences] = useState(preferences);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -78,30 +90,39 @@ export const NotificationSettingsScreen: React.FC = () => {
   }, [preferences]);
 
   const handleToggle = async (key: string, value: boolean) => {
+    const previousValue =
+      localPreferences[key as keyof typeof localPreferences];
     const newPreferences = {
       ...localPreferences,
       [key]: value,
     };
     setLocalPreferences(newPreferences);
-  };
 
-  const handleSave = async () => {
     setIsSaving(true);
-    try {
-      const changes: Record<string, boolean> = {};
-      Object.keys(preferences).forEach((key) => {
-        if (preferences[key as keyof typeof preferences] !== localPreferences[key as keyof typeof localPreferences]) {
-          changes[key] = localPreferences[key as keyof typeof localPreferences];
-        }
-      });
 
-      if (Object.keys(changes).length === 0) {
-        Alert.alert('No Changes', 'Your preferences are already up to date.');
-      } else {
-        await updatePreferences(changes);
-        Alert.alert('Success', 'Your notification preferences have been updated.');
+    try {
+      await updatePreferences({
+        [key]: value,
+      } as Partial<NotificationPreferences>);
+
+      if (key === 'pushNotifications') {
+        if (value) {
+          setPushPermissionStatus('unknown');
+        } else {
+          setPushPermissionStatus('denied');
+          if (deviceToken) {
+            unsubscribeFromTopic(DEFAULT_TOPIC, deviceToken).catch(
+              () => undefined,
+            );
+          }
+          clearDeviceToken();
+        }
       }
     } catch (error) {
+      setLocalPreferences(current => ({
+        ...current,
+        [key]: previousValue,
+      }));
       Alert.alert('Error', 'Failed to update preferences. Please try again.');
     } finally {
       setIsSaving(false);
@@ -109,23 +130,25 @@ export const NotificationSettingsScreen: React.FC = () => {
   };
 
   const renderCategory = (category: string, categoryTitle: string) => {
-    const categorySettings = SETTINGS.filter((s) => s.category === category);
+    const categorySettings = SETTINGS.filter(s => s.category === category);
 
     return (
       <View key={category} style={styles.categoryContainer}>
         <Text style={styles.categoryTitle}>{categoryTitle}</Text>
 
-        {categorySettings.map((setting) => (
+        {categorySettings.map(setting => (
           <View key={setting.key} style={styles.settingItem}>
             <View style={styles.settingContent}>
               <Text style={styles.settingTitle}>{setting.title}</Text>
-              <Text style={styles.settingDescription}>{setting.description}</Text>
+              <Text style={styles.settingDescription}>
+                {setting.description}
+              </Text>
             </View>
 
             <Switch
               value={localPreferences[setting.key] as boolean}
-              onValueChange={(value) => handleToggle(setting.key, value)}
-              trackColor={{ false: '#ddd', true: '#81C784' }}
+              onValueChange={value => handleToggle(setting.key, value)}
+              trackColor={{false: '#ddd', true: '#81C784'}}
               thumbColor={localPreferences[setting.key] ? '#4CAF50' : '#f4f3f4'}
               disabled={isLoading || isSaving}
             />
@@ -164,7 +187,8 @@ export const NotificationSettingsScreen: React.FC = () => {
         <View style={styles.infoContainer}>
           <Text style={styles.infoTitle}>💡 Tip</Text>
           <Text style={styles.infoText}>
-            Enable push notifications to get real-time updates about your visa applications.
+            Enable push notifications to get real-time updates about your visa
+            applications.
           </Text>
         </View>
 

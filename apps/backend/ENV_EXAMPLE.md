@@ -43,7 +43,7 @@ LOCAL_STORAGE_PATH=uploads
 
 # Firebase configuration (if STORAGE_TYPE=firebase)
 FIREBASE_PROJECT_ID=your-firebase-project-id
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
+FIREBASE_PRIVATE_KEY=REPLACE_WITH_FIREBASE_PRIVATE_KEY
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
 
 # ============================================================================
@@ -82,6 +82,12 @@ PORT=3000
 # ============================================================================
 ENABLE_MOCK_PAYMENTS=true
 ENABLE_RECONCILIATION=false
+
+# ============================================================================
+# OBSERVABILITY (Optional)
+# ============================================================================
+# Sentry DSN for error and performance monitoring
+SENTRY_DSN=https://your_sentry_dsn.ingest.sentry.io/project-id
 ```
 
 ## Required Variables for Production
@@ -102,6 +108,4 @@ ENABLE_RECONCILIATION=false
 - Never commit `.env` file to git
 - Use strong, randomly generated secrets
 - In production, set `NODE_ENV=production`
-- In production, set specific CORS origins (not "*")
-
-
+- In production, set specific CORS origins (not "\*")

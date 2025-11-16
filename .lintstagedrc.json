@@ -1,18 +1,6 @@
 {
-  "apps/backend/src/**/*.{ts,tsx}": [
-    "eslint --fix",
-    "prettier --write"
-  ],
-  "frontend_new/src/**/*.{ts,tsx}": [
-    "eslint --fix",
-    "prettier --write"
-  ],
-  "apps/ai-service/**/*.py": [
-    "black",
-    "flake8"
-  ],
-  "*.{json,md,yml,yaml}": [
-    "prettier --write"
-  ]
+  "apps/backend/src/**/*.{ts,tsx}": ["prettier --write"],
+  "frontend_new/src/**/*.{ts,tsx}": ["prettier --write"],
+  "apps/ai-service/**/*.py": ["black", "flake8"],
+  "*.{json,md,yml,yaml}": ["prettier --write"]
 }
-

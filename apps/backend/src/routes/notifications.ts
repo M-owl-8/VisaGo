@@ -11,24 +11,61 @@ const router = Router();
 // Register device token for push notifications
 router.post('/register-device', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const { deviceToken } = req.body;
+    const { deviceToken, platform, deviceId, appVersion } = req.body;
     const userId = req.user?.id;
 
     if (!deviceToken || !userId) {
-      return res.status(400).json({ error: 'Device token and user ID required' });
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Device token and user ID required',
+        },
+      });
     }
 
-    // Store device token in database (you'll need to create a UserDeviceToken model)
-    // For now, we're just logging it
-    console.log(`📱 Device registered for user ${userId}: ${deviceToken.slice(0, 20)}...`);
+    const normalizedPlatform = typeof platform === 'string' ? platform : 'unknown';
+
+    const deviceRecord = await db.deviceToken.upsert({
+      where: { token: deviceToken },
+      update: {
+        userId,
+        platform: normalizedPlatform,
+        deviceId: deviceId || null,
+        lastUsedAt: new Date(),
+        isValid: true,
+        isActive: true,
+      },
+      create: {
+        token: deviceToken,
+        userId,
+        platform: normalizedPlatform,
+        deviceId: deviceId || null,
+        lastUsedAt: new Date(),
+        isValid: true,
+        isActive: true,
+      },
+    });
+
+    console.log(`📱 Device registered for user ${userId}: ${deviceToken.slice(0, 24)}…`);
 
     res.json({
       success: true,
-      message: 'Device token registered',
+      data: {
+        token: deviceRecord.token,
+        platform: deviceRecord.platform,
+        lastUsedAt: deviceRecord.lastUsedAt,
+        deviceId: deviceRecord.deviceId,
+        appVersion,
+      },
     });
   } catch (error) {
     console.error('Error registering device token:', error);
-    res.status(500).json({ error: 'Failed to register device token' });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to register device token',
+      },
+    });
   }
 });
 
@@ -165,26 +202,30 @@ router.get('/history', authenticateToken, async (req: Request, res: Response) =>
 });
 
 // Mark notification as read
-router.patch('/mark-read/:notificationId', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { notificationId } = req.params;
+router.patch(
+  '/mark-read/:notificationId',
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const { notificationId } = req.params;
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      console.log(`📖 Notification ${notificationId} marked as read`);
+
+      res.json({
+        success: true,
+        message: 'Notification marked as read',
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({ error: 'Failed to mark notification as read' });
     }
-
-    console.log(`📖 Notification ${notificationId} marked as read`);
-
-    res.json({
-      success: true,
-      message: 'Notification marked as read',
-    });
-  } catch (error) {
-    console.error('Error marking notification as read:', error);
-    res.status(500).json({ error: 'Failed to mark notification as read' });
   }
-});
+);
 
 // Send test notification
 router.post('/send-test', authenticateToken, async (req: Request, res: Response) => {

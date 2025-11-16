@@ -1,14 +1,29 @@
-import React, { useEffect, ErrorInfo, useState } from 'react';
-import { StatusBar, View, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import React, {useEffect, ErrorInfo, useState} from 'react';
+import {StatusBar, View, Text} from 'react-native';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuthStore } from './store/auth';
-import { initializeGoogleSignIn } from './services/google-oauth';
-import { GOOGLE_WEB_CLIENT_ID } from './config/constants';
+import {useAuthStore} from './store/auth';
+import {initializeGoogleSignIn} from './services/google-oauth';
+import {GOOGLE_WEB_CLIENT_ID} from './config/constants';
+import {
+  initializeErrorLogger,
+  logError,
+  setUserContext,
+} from './services/errorLogger';
+import {
+  startNetworkMonitoring,
+  stopNetworkMonitoring,
+} from './services/network';
+import {
+  initializePushNotifications,
+  cleanupPushNotifications,
+} from './services/pushNotifications';
+import {useNotificationStore} from './store/notifications';
+import {OfflineBanner} from './components/OfflineBanner';
 
 // Screens
 import SplashScreen from './screens/SplashScreen';
@@ -19,10 +34,10 @@ import QuestionnaireScreen from './screens/onboarding/QuestionnaireScreen';
 import HomeScreen from './screens/home/HomeScreen';
 import VisaApplicationScreen from './screens/visa/VisaApplicationScreen';
 import ApplicationDetailScreen from './screens/visa/ApplicationDetailScreen';
-import { ChatScreen } from './screens/chat/ChatScreen';
+import {ChatScreen} from './screens/chat/ChatScreen';
 import ProfileScreen from './screens/profile/ProfileScreen';
-import { DocumentUploadScreen } from './screens/documents/DocumentUploadScreen';
-import { DocumentPreviewScreen } from './screens/documents/DocumentPreviewScreen';
+import {DocumentUploadScreen} from './screens/documents/DocumentUploadScreen';
+import {DocumentPreviewScreen} from './screens/documents/DocumentPreviewScreen';
 
 // Theme colors
 const colors = {
@@ -48,9 +63,8 @@ function AuthStack() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.light },
-      }}
-    >
+        contentStyle: {backgroundColor: colors.light},
+      }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
@@ -64,9 +78,9 @@ function AuthStack() {
 function AppTabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({route}) => ({
         headerShown: true,
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({focused, color, size}) => {
           let iconName: string = '';
 
           switch (route.name) {
@@ -126,14 +140,18 @@ function AppTabs() {
         },
         headerBackTitleVisible: false,
         headerBackImage: () => (
-          <Icon name="arrow-back" size={24} color="#FFFFFF" style={{ marginLeft: 16 }} />
+          <Icon
+            name="arrow-back"
+            size={24}
+            color="#FFFFFF"
+            style={{marginLeft: 16}}
+          />
         ),
-      })}
-    >
+      })}>
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ 
+        options={{
           title: 'Progress',
           headerShown: false,
         }}
@@ -141,7 +159,7 @@ function AppTabs() {
       <Tab.Screen
         name="Applications"
         component={VisaApplicationScreen}
-        options={{ 
+        options={{
           title: 'Applications',
           headerShown: false,
         }}
@@ -149,14 +167,14 @@ function AppTabs() {
       <Tab.Screen
         name="Chat"
         component={ChatScreen}
-        options={{ 
+        options={{
           title: 'AI Assistant',
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: 'Profile' }}
+        options={{title: 'Profile'}}
       />
     </Tab.Navigator>
   );
@@ -170,27 +188,26 @@ function MainAppStack() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-      }}
-    >
+      }}>
       <Stack.Screen name="MainTabs" component={AppTabs} />
-      <Stack.Screen 
-        name="ApplicationDetail" 
+      <Stack.Screen
+        name="ApplicationDetail"
         component={ApplicationDetailScreen}
         options={{
           presentation: 'card',
           animation: 'slide_from_right',
         }}
       />
-      <Stack.Screen 
-        name="DocumentUpload" 
+      <Stack.Screen
+        name="DocumentUpload"
         component={DocumentUploadScreen}
         options={{
           presentation: 'modal',
           animation: 'slide_from_bottom',
         }}
       />
-      <Stack.Screen 
-        name="DocumentPreview" 
+      <Stack.Screen
+        name="DocumentPreview"
         component={DocumentPreviewScreen}
         options={{
           presentation: 'modal',
@@ -204,34 +221,56 @@ function MainAppStack() {
 // ERROR BOUNDARY
 // ============================================================================
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error?: Error }
+  {children: React.ReactNode},
+  {hasError: boolean; error?: Error}
 > {
-  constructor(props: { children: React.ReactNode }) {
+  constructor(props: {children: React.ReactNode}) {
     super(props);
-    this.state = { hasError: false };
+    this.state = {hasError: false};
   }
 
   static getDerivedStateFromError(error: Error) {
     console.error('=== ERROR BOUNDARY: getDerivedStateFromError ===', error);
-    return { hasError: true, error };
+    return {hasError: true, error};
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('=== ERROR BOUNDARY: componentDidCatch ===', error, errorInfo);
+    logError(error, {
+      source: 'AppErrorBoundary',
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#fff' }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#000' }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+            backgroundColor: '#fff',
+          }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              marginBottom: 10,
+              color: '#000',
+            }}>
             App Error
           </Text>
-          <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+          <Text style={{fontSize: 14, color: '#666', textAlign: 'center'}}>
             {this.state.error?.message || 'An unexpected error occurred'}
           </Text>
-          <Text style={{ fontSize: 12, color: '#999', marginTop: 20, textAlign: 'center' }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: '#999',
+              marginTop: 20,
+              textAlign: 'center',
+            }}>
             {this.state.error?.stack}
           </Text>
         </View>
@@ -246,15 +285,21 @@ class ErrorBoundary extends React.Component<
 // MAIN APP COMPONENT
 // ============================================================================
 function AppContent() {
-  const isLoading = useAuthStore((state) => state.isLoading);
-  const isSignedIn = useAuthStore((state) => state.isSignedIn);
-  const user = useAuthStore((state) => state.user);
-  const initializeApp = useAuthStore((state) => state.initializeApp);
+  const isLoading = useAuthStore(state => state.isLoading);
+  const isSignedIn = useAuthStore(state => state.isSignedIn);
+  const user = useAuthStore(state => state.user);
+  const initializeApp = useAuthStore(state => state.initializeApp);
+  const loadNotificationPreferences = useNotificationStore(
+    state => state.loadPreferences,
+  );
+  const pushNotificationsEnabled = useNotificationStore(
+    state => state.preferences.pushNotifications,
+  );
   const [forceShow, setForceShow] = useState(false);
-  
+
   // Check if questionnaire is completed - this will automatically update when user state changes
   const needsQuestionnaire = isSignedIn && user && !user.questionnaireCompleted;
-  
+
   // Debug logging - watch for user changes
   useEffect(() => {
     console.log('=== APP.TSX: User state changed ===', {
@@ -268,9 +313,9 @@ function AppContent() {
 
   useEffect(() => {
     console.log('=== APP.TSX: useEffect Starting ===');
-    
+
     let mounted = true;
-    
+
     // Initialize app on launch with timeout fallback
     const initApp = async () => {
       try {
@@ -283,41 +328,53 @@ function AppContent() {
           // The store should handle this, but ensure we don't stay stuck
           setTimeout(() => {
             if (mounted) {
-              console.log('=== APP.TSX: Force setting loading to false after error ===');
+              console.log(
+                '=== APP.TSX: Force setting loading to false after error ===',
+              );
             }
           }, 1000);
         }
       }
     };
-    
+
     // Add a safety timeout - if initialization takes more than 10 seconds, force continue
     const safetyTimeout = setTimeout(() => {
       if (mounted) {
         // Only log in development, suppress in production
         if (__DEV__) {
-          console.warn('=== APP.TSX: Safety timeout - initialization taking too long ===');
+          console.warn(
+            '=== APP.TSX: Safety timeout - initialization taking too long ===',
+          );
         }
       }
     }, 10000);
-    
+
     initApp();
-    
+
     // Initialize Google Sign-In (non-blocking)
-    if (GOOGLE_WEB_CLIENT_ID && GOOGLE_WEB_CLIENT_ID !== 'YOUR_GOOGLE_WEB_CLIENT_ID_HERE') {
-      initializeGoogleSignIn(GOOGLE_WEB_CLIENT_ID).catch((error) => {
+    if (
+      GOOGLE_WEB_CLIENT_ID &&
+      GOOGLE_WEB_CLIENT_ID !== 'YOUR_GOOGLE_WEB_CLIENT_ID_HERE'
+    ) {
+      initializeGoogleSignIn(GOOGLE_WEB_CLIENT_ID).catch(error => {
         // Only log in development, suppress in production
         if (__DEV__) {
-          console.warn('=== APP.TSX: Failed to initialize Google Sign-In ===', error);
+          console.warn(
+            '=== APP.TSX: Failed to initialize Google Sign-In ===',
+            error,
+          );
         }
         // Continue anyway - Google OAuth is optional
       });
     } else {
       // Only log in development, suppress in production
       if (__DEV__) {
-        console.log('=== APP.TSX: Google Web Client ID not configured (optional feature) ===');
+        console.log(
+          '=== APP.TSX: Google Web Client ID not configured (optional feature) ===',
+        );
       }
     }
-    
+
     return () => {
       mounted = false;
       clearTimeout(safetyTimeout);
@@ -325,39 +382,93 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    startNetworkMonitoring();
+    return () => {
+      stopNetworkMonitoring();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isSignedIn) {
+      loadNotificationPreferences().catch(error => {
+        logError(error, {
+          scope: 'AppContent',
+          message: 'Failed to load notification preferences',
+        });
+      });
+    }
+  }, [isSignedIn, loadNotificationPreferences]);
+
+  useEffect(() => {
+    if (user) {
+      setUserContext({
+        id: user.id,
+        email: user.email,
+      });
+    } else {
+      setUserContext(null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (isSignedIn && pushNotificationsEnabled) {
+      initializePushNotifications().catch(error => {
+        logError(error, {
+          scope: 'AppContent',
+          message: 'Failed to initialize push notifications',
+        });
+      });
+    } else {
+      cleanupPushNotifications();
+    }
+
+    return () => {
+      if (!isSignedIn || !pushNotificationsEnabled) {
+        cleanupPushNotifications();
+      }
+    };
+  }, [isSignedIn, pushNotificationsEnabled]);
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
       setForceShow(true);
     }, 4000);
     return () => clearTimeout(timeout);
   }, []);
-  
-  console.log('=== APP.TSX: Render ===', { isLoading, isSignedIn });
+
+  console.log('=== APP.TSX: Render ===', {isLoading, isSignedIn});
 
   if (isLoading && !forceShow) {
     return <SplashScreen />;
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{flex: 1}}>
       <SafeAreaProvider>
-        <NavigationContainer>
-          <StatusBar
-            barStyle="light-content"
-            backgroundColor={colors.primary}
-            translucent={false}
-          />
-          {isSignedIn ? (
-            needsQuestionnaire ? (
-              <Stack.Navigator screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="Questionnaire" component={QuestionnaireScreen} />
-              </Stack.Navigator>
+        <View style={{flex: 1}}>
+          <OfflineBanner />
+          <NavigationContainer>
+            <StatusBar
+              barStyle="light-content"
+              backgroundColor={colors.primary}
+              translucent={false}
+            />
+            {isSignedIn ? (
+              needsQuestionnaire ? (
+                <Stack.Navigator screenOptions={{headerShown: false}}>
+                  <Stack.Screen
+                    name="Questionnaire"
+                    component={QuestionnaireScreen}
+                  />
+                </Stack.Navigator>
+              ) : (
+                <MainAppStack />
+              )
             ) : (
-              <MainAppStack />
-            )
-          ) : (
-            <AuthStack />
-          )}
-        </NavigationContainer>
+              <AuthStack />
+            )}
+          </NavigationContainer>
+        </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

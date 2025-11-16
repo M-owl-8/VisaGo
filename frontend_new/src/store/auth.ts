@@ -1,5 +1,6 @@
-import { create } from 'zustand';
+import {create} from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useNotificationStore} from './notifications';
 
 // Lazy import to avoid circular dependency
 let apiClient: any = null;
@@ -93,18 +94,31 @@ interface AuthState {
   isLoading: boolean;
   userApplications: UserApplication[];
   paymentHistory: PaymentHistory[];
-  
+
   // Actions
   initializeApp: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
-  loginWithGoogle: (googleId: string, email: string, firstName?: string, lastName?: string, avatar?: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+  ) => Promise<void>;
+  loginWithGoogle: (
+    googleId: string,
+    email: string,
+    firstName?: string,
+    lastName?: string,
+    avatar?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   fetchUserProfile: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
-  updatePreferences: (preferences: Partial<User['preferences']> & { language?: string }) => Promise<void>;
+  updatePreferences: (
+    preferences: Partial<User['preferences']> & {language?: string},
+  ) => Promise<void>;
   fetchUserApplications: () => Promise<void>;
   fetchPaymentHistory: () => Promise<void>;
 }
@@ -122,12 +136,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initializeApp: async () => {
     try {
       console.log('=== AUTH STORE: initializeApp Starting ===');
-      
+
       // Add timeout to prevent hanging
       const initPromise = (async () => {
         const storedToken = await AsyncStorage.getItem('@auth_token');
         const storedUser = await AsyncStorage.getItem('@user');
-        
+
         console.log('=== AUTH STORE: Retrieved from storage ===', {
           hasToken: !!storedToken,
           hasUser: !!storedUser,
@@ -153,13 +167,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             });
             console.log('=== AUTH STORE: User restored from storage ===');
           } catch (parseError) {
-            console.error('=== AUTH STORE: Failed to parse user data ===', parseError);
+            console.error(
+              '=== AUTH STORE: Failed to parse user data ===',
+              parseError,
+            );
             // Clear corrupted data
             await AsyncStorage.removeItem('@auth_token');
             await AsyncStorage.removeItem('@user');
           }
         } else {
-          console.log('=== AUTH STORE: No stored credentials, showing login ===');
+          console.log(
+            '=== AUTH STORE: No stored credentials, showing login ===',
+          );
         }
       })();
 
@@ -174,22 +193,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Ensure we always set loading to false, even on error
     } finally {
       console.log('=== AUTH STORE: Setting isLoading to false ===');
-      set({ isLoading: false });
+      set({isLoading: false});
     }
   },
 
   // Email/Password Login
   login: async (email: string, password: string) => {
     try {
-      set({ isLoading: true });
-      
+      set({isLoading: true});
+
       const response = await getApiClient().login(email, password);
 
       if (!response.success || !response.data) {
         throw new Error(response.error?.message || 'Login failed');
       }
 
-      const { user, token } = response.data;
+      const {user, token} = response.data;
 
       // Store tokens and user
       await AsyncStorage.setItem('@auth_token', token);
@@ -212,22 +231,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Login failed:', error.message);
       throw error;
     } finally {
-      set({ isLoading: false });
+      set({isLoading: false});
     }
   },
 
   // Register
-  register: async (email: string, password: string, firstName: string, lastName: string) => {
+  register: async (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+  ) => {
     try {
-      set({ isLoading: true });
+      set({isLoading: true});
 
-      const response = await getApiClient().register(email, password, firstName, lastName);
+      const response = await getApiClient().register(
+        email,
+        password,
+        firstName,
+        lastName,
+      );
 
       if (!response.success || !response.data) {
         throw new Error(response.error?.message || 'Registration failed');
       }
 
-      const { user, token } = response.data;
+      const {user, token} = response.data;
 
       // Store tokens and user
       await AsyncStorage.setItem('@auth_token', token);
@@ -250,22 +279,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Registration failed:', error.message);
       throw error;
     } finally {
-      set({ isLoading: false });
+      set({isLoading: false});
     }
   },
 
   // Google OAuth Login
-  loginWithGoogle: async (googleId: string, email: string, firstName?: string, lastName?: string, avatar?: string) => {
+  loginWithGoogle: async (
+    googleId: string,
+    email: string,
+    firstName?: string,
+    lastName?: string,
+    avatar?: string,
+  ) => {
     try {
-      set({ isLoading: true });
+      set({isLoading: true});
 
-      const response = await getApiClient().loginWithGoogle(googleId, email, firstName || '', lastName || '', avatar);
+      const response = await getApiClient().loginWithGoogle(
+        googleId,
+        email,
+        firstName || '',
+        lastName || '',
+        avatar,
+      );
 
       if (!response.success || !response.data) {
         throw new Error(response.error?.message || 'Google login failed');
       }
 
-      const { user, token } = response.data;
+      const {user, token} = response.data;
 
       // Store tokens and user
       await AsyncStorage.setItem('@auth_token', token);
@@ -289,7 +330,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Google login failed:', error.message);
       throw error;
     } finally {
-      set({ isLoading: false });
+      set({isLoading: false});
     }
   },
 
@@ -313,21 +354,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         refreshToken: null,
         isSignedIn: false,
       });
+
+      try {
+        const notificationStore = useNotificationStore.getState();
+        notificationStore.clearDeviceToken();
+        notificationStore.clearNotifications();
+      } catch (error) {
+        console.warn('Failed to clear notification state on logout', error);
+      }
     }
   },
 
   // Set user
-  setUser: (user: User | null) => set({ user }),
+  setUser: (user: User | null) => set({user}),
 
   // Set token
-  setToken: (token: string | null) => set({ token }),
+  setToken: (token: string | null) => set({token}),
 
   // Fetch user profile from backend
   fetchUserProfile: async () => {
     try {
-      set({ isLoading: true });
+      set({isLoading: true});
       const user = get().user;
-      
+
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
@@ -349,21 +398,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Update AsyncStorage
       await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
 
-      set({ user: updatedUser });
+      set({user: updatedUser});
     } catch (error: any) {
       console.error('Failed to fetch profile:', error.message);
       throw error;
     } finally {
-      set({ isLoading: false });
+      set({isLoading: false});
     }
   },
 
   // Update user profile
   updateProfile: async (data: Partial<User>) => {
     try {
-      set({ isLoading: true });
+      set({isLoading: true});
       const user = get().user;
-      
+
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
@@ -384,8 +433,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Update AsyncStorage
       await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
 
-      set({ user: updatedUser });
-      
+      set({user: updatedUser});
+
       console.log('=== AUTH STORE: User profile updated ===', {
         questionnaireCompleted: updatedUser.questionnaireCompleted,
         hasBio: !!updatedUser.bio,
@@ -394,24 +443,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Failed to update profile:', error.message);
       throw error;
     } finally {
-      set({ isLoading: false });
+      set({isLoading: false});
     }
   },
 
   // Update user preferences
-  updatePreferences: async (preferences: Partial<User['preferences']> & { language?: string }) => {
+  updatePreferences: async (
+    preferences: Partial<User['preferences']> & {language?: string},
+  ) => {
     try {
-      set({ isLoading: true });
+      set({isLoading: true});
       const user = get().user;
-      
+
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
 
-      const response = await getApiClient().updateUserPreferences(user.id, preferences);
+      const response = await getApiClient().updateUserPreferences(
+        user.id,
+        preferences,
+      );
 
       if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to update preferences');
+        throw new Error(
+          response.error?.message || 'Failed to update preferences',
+        );
       }
 
       // Update user language if provided
@@ -421,14 +477,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           language: preferences.language,
         };
         await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
-        set({ user: updatedUser });
+        set({user: updatedUser});
       }
 
       // Update preferences in user object
-      if (preferences.notificationsEnabled !== undefined || 
-          preferences.emailNotifications !== undefined ||
-          preferences.pushNotifications !== undefined ||
-          preferences.twoFactorEnabled !== undefined) {
+      if (
+        preferences.notificationsEnabled !== undefined ||
+        preferences.emailNotifications !== undefined ||
+        preferences.pushNotifications !== undefined ||
+        preferences.twoFactorEnabled !== undefined
+      ) {
         const updatedUser = {
           ...user,
           preferences: {
@@ -437,13 +495,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           },
         };
         await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
-        set({ user: updatedUser });
+        set({user: updatedUser});
       }
     } catch (error: any) {
       console.error('Failed to update preferences:', error.message);
       throw error;
     } finally {
-      set({ isLoading: false });
+      set({isLoading: false});
     }
   },
 
@@ -451,7 +509,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   fetchUserApplications: async () => {
     try {
       const user = get().user;
-      
+
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
@@ -459,10 +517,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const response = await getApiClient().getUserApplications(user.id);
 
       if (!response.success || !response.data) {
-        throw new Error(response.error?.message || 'Failed to fetch applications');
+        throw new Error(
+          response.error?.message || 'Failed to fetch applications',
+        );
       }
 
-      set({ userApplications: response.data });
+      set({userApplications: response.data});
     } catch (error: any) {
       console.error('Failed to fetch applications:', error.message);
       throw error;
@@ -473,7 +533,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   fetchPaymentHistory: async () => {
     try {
       const user = get().user;
-      
+
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
@@ -481,10 +541,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const response = await getApiClient().getUserPaymentHistory(user.id);
 
       if (!response.success || !response.data) {
-        throw new Error(response.error?.message || 'Failed to fetch payment history');
+        throw new Error(
+          response.error?.message || 'Failed to fetch payment history',
+        );
       }
 
-      set({ paymentHistory: response.data });
+      set({paymentHistory: response.data});
     } catch (error: any) {
       console.error('Failed to fetch payment history:', error.message);
       throw error;

@@ -3,7 +3,7 @@
  * Update these values with your actual configuration from Google Cloud Console
  */
 
-import { Platform } from 'react-native';
+import {Platform} from 'react-native';
 
 /**
  * Google OAuth Web Client ID
@@ -13,7 +13,7 @@ import { Platform } from 'react-native';
  * 3. Enable Google+ API
  * 4. Create OAuth 2.0 credentials (Web application)
  * 5. Copy the Web Client ID (looks like: 123456789-abcdefg.apps.googleusercontent.com)
- * 
+ *
  * IMPORTANT: Also create OAuth credentials for Android:
  * 1. In OAuth 2.0 credentials, create "Android" credentials
  * 2. Use package name: com.visabuddy.app
@@ -22,12 +22,15 @@ import { Platform } from 'react-native';
 /**
  * Google OAuth Web Client ID
  * Get from: https://console.cloud.google.com/apis/credentials
- * 
+ *
  * In Expo, use EXPO_PUBLIC_ prefix for environment variables
  */
 const getGoogleClientId = (): string => {
   // Expo environment variables (available at build time)
-  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
+  if (
+    typeof process !== 'undefined' &&
+    process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+  ) {
     return process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   }
   // Fallback for other environments
@@ -55,10 +58,14 @@ const getApiBaseUrl = (): string => {
     // In emulator, use 10.0.2.2 instead of localhost
     // Check if we're on Android (emulator uses 10.0.2.2 for localhost)
     if (typeof Platform !== 'undefined' && Platform.OS === 'android') {
-      return __DEV__ ? 'http://10.0.2.2:3000' : 'https://visabuddy-backend-production.up.railway.app';
+      return __DEV__
+        ? 'http://10.0.2.2:3000'
+        : 'https://visabuddy-backend-production.up.railway.app';
     }
     // Fallback to localhost in development
-    return __DEV__ ? 'http://localhost:3000' : 'https://visabuddy-backend-production.up.railway.app';
+    return __DEV__
+      ? 'http://localhost:3000'
+      : 'https://visabuddy-backend-production.up.railway.app';
   }
 
   // Expo environment variables (available at build time)
@@ -68,7 +75,10 @@ const getApiBaseUrl = (): string => {
   if (process.env?.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
-  if (process.env?.API_BASE_URL && process.env.API_BASE_URL !== 'http://localhost:3000') {
+  if (
+    process.env?.API_BASE_URL &&
+    process.env.API_BASE_URL !== 'http://localhost:3000'
+  ) {
     return process.env.API_BASE_URL;
   }
   // Production default (Railway)
@@ -81,6 +91,18 @@ const getApiBaseUrl = (): string => {
 };
 
 export const API_BASE_URL = getApiBaseUrl();
+
+const getSentryDsn = (): string | undefined => {
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SENTRY_DSN) {
+    return process.env.EXPO_PUBLIC_SENTRY_DSN;
+  }
+  if (typeof process !== 'undefined' && process.env?.SENTRY_DSN) {
+    return process.env.SENTRY_DSN;
+  }
+  return undefined;
+};
+
+export const SENTRY_DSN = getSentryDsn();
 
 /**
  * App Version

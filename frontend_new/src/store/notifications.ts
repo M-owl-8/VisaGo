@@ -1,16 +1,12 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-// Note: Push notifications will be implemented later with @react-native-community/push-notification-ios
-// For now, using a stub implementation
-const Notifications = {
-  setNotificationHandler: () => {},
-  requestPermissionsAsync: async () => ({ status: 'granted' }),
-  getPermissionsAsync: async () => ({ status: 'granted' }),
-  scheduleNotificationAsync: async () => '',
-  cancelScheduledNotificationAsync: async () => {},
-  cancelAllScheduledNotificationsAsync: async () => {},
-  addNotificationReceivedListener: () => ({ remove: () => {} }),
-  addNotificationResponseReceivedListener: () => ({ remove: () => {} }),
+import {create} from 'zustand';
+import {persist} from 'zustand/middleware';
+
+let apiClient: any = null;
+const getApiClient = () => {
+  if (!apiClient) {
+    apiClient = require('../services/api').apiClient;
+  }
+  return apiClient;
 };
 
 export interface Notification {
@@ -51,19 +47,37 @@ export interface NotificationStore {
   preferences: NotificationPreferences;
   isLoading: boolean;
   error: string | null;
+  pushPermissionStatus: 'unknown' | 'granted' | 'denied' | 'provisional';
+  deviceToken: string | null;
+  lastSyncedToken: string | null;
+  lastTokenSyncAt: number | null;
+  preferencesLoaded: boolean;
 
   // Actions
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  addNotification: (
+    notification: Omit<Notification, 'id' | 'timestamp' | 'read'>,
+  ) => void;
   removeNotification: (id: string) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
   loadNotificationHistory: () => Promise<void>;
   loadPreferences: () => Promise<void>;
-  updatePreferences: (preferences: Partial<NotificationPreferences>) => Promise<void>;
-  registerDeviceToken: (token: string) => Promise<void>;
+  updatePreferences: (
+    preferences: Partial<NotificationPreferences>,
+  ) => Promise<void>;
+  registerDeviceToken: (
+    token: string,
+    platform?: string,
+    deviceId?: string,
+    appVersion?: string,
+  ) => Promise<void>;
   subscribeToTopic: (topic: string, token: string) => Promise<void>;
   unsubscribeFromTopic: (topic: string, token: string) => Promise<void>;
+  setPushPermissionStatus: (
+    status: 'unknown' | 'granted' | 'denied' | 'provisional',
+  ) => void;
+  clearDeviceToken: () => void;
 }
 
 export const useNotificationStore = create<NotificationStore>()(
@@ -83,9 +97,14 @@ export const useNotificationStore = create<NotificationStore>()(
       },
       isLoading: false,
       error: null,
+      pushPermissionStatus: 'unknown',
+      deviceToken: null,
+      lastSyncedToken: null,
+      lastTokenSyncAt: null,
+      preferencesLoaded: false,
 
       // Add notification
-      addNotification: (notification) => {
+      addNotification: notification => {
         const id = Date.now().toString();
         const newNotification: Notification = {
           ...notification,
@@ -94,7 +113,7 @@ export const useNotificationStore = create<NotificationStore>()(
           read: false,
         };
 
-        set((state) => ({
+        set(state => ({
           notifications: [newNotification, ...state.notifications],
           unreadCount: state.unreadCount + 1,
           error: null,
@@ -109,11 +128,11 @@ export const useNotificationStore = create<NotificationStore>()(
       },
 
       // Remove notification
-      removeNotification: (id) => {
-        set((state) => {
-          const notification = state.notifications.find((n) => n.id === id);
+      removeNotification: id => {
+        set(state => {
+          const notification = state.notifications.find(n => n.id === id);
           return {
-            notifications: state.notifications.filter((n) => n.id !== id),
+            notifications: state.notifications.filter(n => n.id !== id),
             unreadCount:
               state.unreadCount - (notification && !notification.read ? 1 : 0),
           };
@@ -121,10 +140,10 @@ export const useNotificationStore = create<NotificationStore>()(
       },
 
       // Mark as read
-      markAsRead: (id) => {
-        set((state) => ({
-          notifications: state.notifications.map((n) =>
-            n.id === id ? { ...n, read: true } : n,
+      markAsRead: id => {
+        set(state => ({
+          notifications: state.notifications.map(n =>
+            n.id === id ? {...n, read: true} : n,
           ),
           unreadCount: Math.max(0, state.unreadCount - 1),
         }));
@@ -132,8 +151,8 @@ export const useNotificationStore = create<NotificationStore>()(
 
       // Mark all as read
       markAllAsRead: () => {
-        set((state) => ({
-          notifications: state.notifications.map((n) => ({ ...n, read: true })),
+        set(state => ({
+          notifications: state.notifications.map(n => ({...n, read: true})),
           unreadCount: 0,
         }));
       },
@@ -148,25 +167,17 @@ export const useNotificationStore = create<NotificationStore>()(
 
       // Load notification history from backend
       loadNotificationHistory: async () => {
-        set({ isLoading: true, error: null });
+        set({isLoading: true, error: null});
         try {
-          const response = await fetch('/api/notifications/history', {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-          });
-
-          if (!response.ok) throw new Error('Failed to load notification history');
-
-          const data = await response.json();
-          const notifications = data.notifications.map(
+          const data = await getApiClient().getNotificationHistory();
+          const notifications = (data.notifications || []).map(
             (n: any): Notification => ({
               ...n,
-              timestamp: new Date(n.timestamp),
+              timestamp: new Date(n.timestamp || Date.now()),
             }),
           );
 
-          const unreadCount = notifications.filter((n: Notification) => !n.read).length;
+          const unreadCount = notifications.filter(n => !n.read).length;
 
           set({
             notifications,
@@ -175,7 +186,10 @@ export const useNotificationStore = create<NotificationStore>()(
           });
         } catch (error) {
           set({
-            error: error instanceof Error ? error.message : 'Failed to load notifications',
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to load notifications',
             isLoading: false,
           });
         }
@@ -183,92 +197,87 @@ export const useNotificationStore = create<NotificationStore>()(
 
       // Load preferences from backend
       loadPreferences: async () => {
-        set({ isLoading: true, error: null });
+        set({isLoading: true, error: null});
         try {
-          const response = await fetch('/api/notifications/preferences', {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-          });
-
-          if (!response.ok) throw new Error('Failed to load preferences');
-
-          const preferences = await response.json();
-          set({ preferences, isLoading: false });
+          const preferences = await getApiClient().getNotificationPreferences();
+          set({preferences, isLoading: false, preferencesLoaded: true});
         } catch (error) {
           set({
-            error: error instanceof Error ? error.message : 'Failed to load preferences',
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to load preferences',
             isLoading: false,
+            preferencesLoaded: false,
           });
         }
       },
 
       // Update preferences
-      updatePreferences: async (updates) => {
-        set({ isLoading: true, error: null });
+      updatePreferences: async updates => {
+        set({error: null});
         try {
-          const response = await fetch('/api/notifications/preferences', {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-            body: JSON.stringify(updates),
-          });
-
-          if (!response.ok) throw new Error('Failed to update preferences');
-
-          set((state) => ({
-            preferences: { ...state.preferences, ...updates },
-            isLoading: false,
+          await getApiClient().updateNotificationPreferences(updates);
+          set(state => ({
+            preferences: {...state.preferences, ...updates},
           }));
         } catch (error) {
           set({
-            error: error instanceof Error ? error.message : 'Failed to update preferences',
-            isLoading: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to update preferences',
           });
           throw error;
         }
       },
 
       // Register device token
-      registerDeviceToken: async (token) => {
+      registerDeviceToken: async (
+        token,
+        platform = 'unknown',
+        deviceId,
+        appVersion,
+      ) => {
+        const state = get();
+
+        if (
+          state.lastSyncedToken === token &&
+          state.lastTokenSyncAt &&
+          Date.now() - state.lastTokenSyncAt < 1000 * 60 * 15
+        ) {
+          set({deviceToken: token});
+          return;
+        }
+
         try {
-          const response = await fetch('/api/notifications/register-device', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-            body: JSON.stringify({ deviceToken: token }),
-          });
-
-          if (!response.ok) throw new Error('Failed to register device token');
-
-          console.log('✅ Device token registered');
-        } catch (error) {
-          console.error('Failed to register device token:', error);
+          await getApiClient().registerDeviceToken(
+            token,
+            platform,
+            deviceId,
+            appVersion,
+          );
           set({
-            error: error instanceof Error ? error.message : 'Failed to register device token',
+            deviceToken: token,
+            lastSyncedToken: token,
+            lastTokenSyncAt: Date.now(),
+            error: null,
           });
+        } catch (error) {
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to register device token',
+          });
+          throw error;
         }
       },
 
       // Subscribe to topic
       subscribeToTopic: async (topic, token) => {
         try {
-          const response = await fetch('/api/notifications/subscribe-topic', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-            body: JSON.stringify({ deviceToken: token, topic }),
-          });
-
-          if (!response.ok) throw new Error('Failed to subscribe to topic');
-
-          console.log(`✅ Subscribed to ${topic}`);
+          await getApiClient().subscribeToTopic(topic, token);
         } catch (error) {
           console.error(`Failed to subscribe to ${topic}:`, error);
         }
@@ -277,28 +286,30 @@ export const useNotificationStore = create<NotificationStore>()(
       // Unsubscribe from topic
       unsubscribeFromTopic: async (topic, token) => {
         try {
-          const response = await fetch('/api/notifications/unsubscribe-topic', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            },
-            body: JSON.stringify({ deviceToken: token, topic }),
-          });
-
-          if (!response.ok) throw new Error('Failed to unsubscribe from topic');
-
-          console.log(`✅ Unsubscribed from ${topic}`);
+          await getApiClient().unsubscribeFromTopic(topic, token);
         } catch (error) {
           console.error(`Failed to unsubscribe from ${topic}:`, error);
         }
       },
+
+      setPushPermissionStatus: status => {
+        set({pushPermissionStatus: status});
+      },
+
+      clearDeviceToken: () => {
+        set({deviceToken: null, lastSyncedToken: null, lastTokenSyncAt: null});
+      },
     }),
     {
       name: 'notification-store',
-      partialize: (state) => ({
+      partialize: state => ({
         notifications: state.notifications,
         preferences: state.preferences,
+        pushPermissionStatus: state.pushPermissionStatus,
+        deviceToken: state.deviceToken,
+        lastSyncedToken: state.lastSyncedToken,
+        lastTokenSyncAt: state.lastTokenSyncAt,
+        preferencesLoaded: state.preferencesLoaded,
       }),
     },
   ),
