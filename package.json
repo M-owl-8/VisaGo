@@ -13,7 +13,10 @@
     "dev:ai": "cd apps/ai-service && python -m uvicorn main:app --reload --port 8001",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
-    "install-all": "npm install && npm run install-all --workspaces"
+    "install-all": "npm install && npm run install-all --workspaces",
+    "prepare": "husky install",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -22,5 +25,9 @@
     "@babel/runtime": "^7.28.4",
     "@ioredis/commands": "^1.5.0",
     "ioredis": "^5.8.2"
+  },
+  "devDependencies": {
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0"
   }
 }

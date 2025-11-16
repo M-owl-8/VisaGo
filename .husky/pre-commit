@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+echo ""
+
+# Run lint-staged for staged files
+npx lint-staged
+
+# Check for secrets in staged files
+echo "🔒 Checking for secrets..."
+git diff --cached --name-only | while read file; do
+  if [ -f "$file" ]; then
+    # Check for common secret patterns
+    if grep -iE "(api_key|apikey|password|secret|token|private_key).*['\"].*['\"]" "$file"; then
+      echo "❌ Error: Potential secret found in $file"
+      echo "Please remove hardcoded secrets before committing."
+      exit 1
+    fi
+  fi
+done
+
+# Check for .env files (should never be committed)
+if git diff --cached --name-only | grep -E "^\.env$|^apps/.*\.env$|^frontend_new/\.env$"; then
+  echo "❌ Error: .env file found in staged files"
+  echo "Please never commit .env files with secrets."
+  echo "Use .env.example instead."
+  exit 1
+fi
+
+echo "✅ Pre-commit checks passed!"
+

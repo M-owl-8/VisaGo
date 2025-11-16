@@ -1,0 +1,214 @@
+name: Security Scan
+
+on:
+  schedule:
+    # Run every Monday at 9:00 AM UTC
+    - cron: '0 9 * * 1'
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  NODE_VERSION: '20.x'
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  # ============================================================================
+  # BACKEND SECURITY
+  # ============================================================================
+  backend-dependency-audit:
+    name: Backend - Dependency Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          echo "🔍 Running npm audit..."
+          npm audit --audit-level=moderate || true
+          echo ""
+          echo "📊 Generating audit report..."
+          npm audit --json > audit-report.json || true
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-audit-report
+          path: apps/backend/audit-report.json
+
+  backend-secret-scan:
+    name: Backend - Secret Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "🔍 Scanning for hardcoded secrets..."
+          
+          # Check for common secret patterns
+          echo "Checking for API keys..."
+          grep -r "api_key\s*=\s*['\"]" apps/backend/ || echo "✅ No API keys found"
+          
+          echo "Checking for passwords..."
+          grep -r "password\s*=\s*['\"]" apps/backend/ || echo "✅ No passwords found"
+          
+          echo "Checking for tokens..."
+          grep -r "token\s*=\s*['\"]" apps/backend/ || echo "✅ No tokens found"
+          
+          echo "✅ Secret scan completed"
+        continue-on-error: true
+
+  # ============================================================================
+  # FRONTEND SECURITY
+  # ============================================================================
+  frontend-dependency-audit:
+    name: Frontend - Dependency Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend_new
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend_new/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          echo "🔍 Running npm audit..."
+          npm audit --audit-level=moderate || true
+          echo ""
+          echo "📊 Generating audit report..."
+          npm audit --json > audit-report.json || true
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-audit-report
+          path: frontend_new/audit-report.json
+
+  # ============================================================================
+  # AI SERVICE SECURITY
+  # ============================================================================
+  ai-service-dependency-audit:
+    name: AI Service - Dependency Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ai-service
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run safety check
+        run: |
+          pip install safety
+          echo "🔍 Running safety check..."
+          safety check --json > safety-report.json || true
+          cat safety-report.json
+
+      - name: Upload safety report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-service-safety-report
+          path: apps/ai-service/safety-report.json
+
+  # ============================================================================
+  # CODEQL ANALYSIS (Advanced Security)
+  # ============================================================================
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript', 'python']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ============================================================================
+  # SECURITY SUMMARY
+  # ============================================================================
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs:
+      - backend-dependency-audit
+      - backend-secret-scan
+      - frontend-dependency-audit
+      - ai-service-dependency-audit
+      - codeql-analysis
+    if: always()
+    
+    steps:
+      - name: Display security summary
+        run: |
+          echo "🔒 Security Scan Summary"
+          echo "======================="
+          echo ""
+          echo "Backend Dependency Audit: ${{ needs.backend-dependency-audit.result }}"
+          echo "Backend Secret Scan: ${{ needs.backend-secret-scan.result }}"
+          echo "Frontend Dependency Audit: ${{ needs.frontend-dependency-audit.result }}"
+          echo "AI Service Dependency Audit: ${{ needs.ai-service-dependency-audit.result }}"
+          echo "CodeQL Analysis: ${{ needs.codeql-analysis.result }}"
+          echo ""
+          echo "📊 Check artifacts for detailed reports"
+          echo "💡 Review any security issues and create fixes"
+

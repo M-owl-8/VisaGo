@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Validate commit message format
+# Format: type(scope): message
+# Example: feat(auth): add Google OAuth support
+
+commit_msg=$(cat "$1")
+
+# Check if commit message follows conventional commits format
+if ! echo "$commit_msg" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?: .{1,}"; then
+  echo "❌ Invalid commit message format!"
+  echo ""
+  echo "Commit message must follow the format:"
+  echo "  type(scope): message"
+  echo ""
+  echo "Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci"
+  echo ""
+  echo "Examples:"
+  echo "  feat(auth): add Google OAuth support"
+  echo "  fix(payments): resolve webhook signature verification"
+  echo "  docs(readme): update setup instructions"
+  echo ""
+  exit 1
+fi
+
+echo "✅ Commit message format valid"
+

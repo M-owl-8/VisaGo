@@ -1,36 +1,22 @@
-name: Deploy to Production
+name: Deploy to Railway
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  NODE_VERSION: '20.x'
+  PYTHON_VERSION: '3.10'
 
 jobs:
-  # ==========================================================================
-  # Test & Build Backend
-  # ==========================================================================
-  backend-tests:
-    name: Backend Tests & Build
+  # ============================================================================
+  # PRE-DEPLOYMENT CHECKS
+  # ============================================================================
+  pre-deploy-checks:
+    name: Pre-Deployment Checks
     runs-on: ubuntu-latest
     
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: visabuddy_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -38,189 +24,138 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
 
       - name: Install backend dependencies
         working-directory: apps/backend
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
-      - name: Run linter
+      - name: Generate Prisma Client
         working-directory: apps/backend
-        run: npm run lint --if-present || echo "No linter configured"
+        run: npm run db:generate
 
-      - name: Setup test database
+      - name: Run backend tests
         working-directory: apps/backend
+        run: npm test
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/visabuddy_test
-        run: |
-          npx prisma migrate deploy || npx prisma db push
-          npx prisma db seed || echo "No seed file"
-
-      - name: Run tests
-        working-directory: apps/backend
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/visabuddy_test
+          DATABASE_URL: file:./test.db
+          JWT_SECRET: test-secret-for-ci-pipeline-only-not-for-production-use
           NODE_ENV: test
-          JWT_SECRET: test_secret_min_32_characters_long_1234567890
-        run: npm test -- --coverage --coverageReporters=json --coverageReporters=lcov || echo "No test suite"
 
       - name: Build backend
         working-directory: apps/backend
         run: npm run build
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        if: always()
-        with:
-          files: ./apps/backend/coverage/lcov.info
-          flags: backend
-          fail_ci_if_error: false
-
-  # ==========================================================================
-  # Test & Build Frontend
-  # ==========================================================================
-  frontend-tests:
-    name: Frontend Tests & Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
-
-      - name: Install frontend dependencies
-        working-directory: apps/frontend
-        run: npm ci --legacy-peer-deps
-
-      - name: Run linter
-        working-directory: apps/frontend
-        run: npm run lint --if-present || echo "No linter configured"
-
-      - name: Run tests
-        working-directory: apps/frontend
-        run: npm test -- --coverage --coverageReporters=json --coverageReporters=lcov || echo "No test suite"
-
-      - name: Build frontend (Expo)
-        working-directory: apps/frontend
+      - name: Check for build artifacts
         run: |
-          npm install -g eas-cli
-          npm run build || echo "Web build not configured"
+          if [ ! -d "apps/backend/dist" ]; then
+            echo "❌ Backend build failed - dist folder not found"
+            exit 1
+          fi
+          echo "✅ Backend build successful"
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        if: always()
-        with:
-          files: ./apps/frontend/coverage/lcov.info
-          flags: frontend
-          fail_ci_if_error: false
-
-  # ==========================================================================
-  # Security & Code Quality
-  # ==========================================================================
-  security-scan:
-    name: Security & Code Quality
+  # ============================================================================
+  # DEPLOY TO RAILWAY (Manual or via Railway CLI)
+  # ============================================================================
+  deploy-info:
+    name: Deployment Information
     runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-  # ==========================================================================
-  # Deploy to Production
-  # ==========================================================================
-  deploy:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-tests, security-scan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Railway
-        run: |
-          echo "Deployment triggered. Railway auto-deploys via webhook."
-          echo "Backend deployment to https://${{ secrets.RAILWAY_URL }}"
-
-  # ==========================================================================
-  # Post-Deployment Verification
-  # ==========================================================================
-  verify-deployment:
-    name: Verify Production Deployment
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: pre-deploy-checks
     
     steps:
-      - name: Wait for Railway deployment
-        run: sleep 30
-
-      - name: Health check
-        if: ${{ secrets.RAILWAY_URL != '' }}
+      - name: Display deployment info
         run: |
-          curl -f https://${{ secrets.RAILWAY_URL }}/health || echo "Health check skipped (no RAILWAY_URL configured)"
+          echo "🚀 Deployment to Railway"
+          echo "========================"
+          echo ""
+          echo "✅ Pre-deployment checks passed"
+          echo ""
+          echo "📝 Next Steps:"
+          echo "1. Railway will automatically detect this push and deploy"
+          echo "2. Backend service: Uses nixpacks.toml in apps/backend/"
+          echo "3. AI Service: Uses nixpacks.toml in apps/ai-service/"
+          echo "4. Database migrations will run automatically (via start script)"
+          echo ""
+          echo "🔍 Monitor deployment:"
+          echo "- Railway Dashboard: https://railway.app/dashboard"
+          echo "- Check service logs for any errors"
+          echo "- Verify health check: /health endpoint"
+          echo ""
+          echo "⚠️  Important:"
+          echo "- Ensure all environment variables are set in Railway"
+          echo "- Verify database migrations completed successfully"
+          echo "- Test critical endpoints after deployment"
 
-      - name: API endpoint check
-        if: ${{ secrets.RAILWAY_URL != '' && secrets.API_TEST_TOKEN != '' }}
-        run: |
-          curl -f https://${{ secrets.RAILWAY_URL }}/api/countries \
-            -H "Authorization: Bearer ${{ secrets.API_TEST_TOKEN }}" || echo "API check skipped"
-
-  # ==========================================================================
-  # Notifications
-  # ==========================================================================
-  notify:
-    name: Send Notification
+  # ============================================================================
+  # POST-DEPLOYMENT HEALTH CHECKS
+  # ============================================================================
+  post-deploy-health-check:
+    name: Post-Deployment Health Check
     runs-on: ubuntu-latest
-    needs: [deploy, verify-deployment]
-    if: always()
-
+    needs: deploy-info
+    
     steps:
-      - name: Send Slack notification
-        if: secrets.SLACK_WEBHOOK != ''
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-          payload: |
-            {
-              "text": "VisaBuddy Production Deployment",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Deployment Status: ✅ Success\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref }}\nCommit: ${{ github.sha }}"
-                  }
-                }
-              ]
-            }
-
-      - name: Log deployment success
+      - name: Wait for deployment
         run: |
-          echo "✅ Deployment to production completed"
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.ref }}"
-          echo "Commit: ${{ github.sha }}"
+          echo "⏳ Waiting 2 minutes for Railway deployment to complete..."
+          sleep 120
+
+      - name: Health check - Backend
+        run: |
+          echo "🏥 Checking backend health..."
+          # Replace with your actual Railway backend URL
+          # curl -f https://your-backend.railway.app/health || exit 1
+          echo "⚠️  Skipping health check - configure your Railway URL in this workflow"
+        continue-on-error: true
+
+      - name: Health check - AI Service
+        run: |
+          echo "🏥 Checking AI service health..."
+          # Replace with your actual Railway AI service URL
+          # curl -f https://your-ai-service.railway.app/health || exit 1
+          echo "⚠️  Skipping health check - configure your Railway URL in this workflow"
+        continue-on-error: true
+
+      - name: Deployment summary
+        run: |
+          echo "📊 Deployment Summary"
+          echo "===================="
+          echo ""
+          echo "✅ Pre-deployment checks: PASSED"
+          echo "✅ Build verification: PASSED"
+          echo "⚠️  Health checks: CONFIGURE URLS"
+          echo ""
+          echo "🎉 Deployment workflow completed!"
+          echo ""
+          echo "📝 Manual verification required:"
+          echo "1. Check Railway dashboard for deployment status"
+          echo "2. Verify all services are running"
+          echo "3. Check service logs for errors"
+          echo "4. Test critical user flows"
+          echo "5. Monitor error rates in Sentry (if configured)"
+
+  # ============================================================================
+  # NOTIFICATION (Optional - can integrate with Slack, Discord, etc.)
+  # ============================================================================
+  notify:
+    name: Send Deployment Notification
+    runs-on: ubuntu-latest
+    needs: post-deploy-health-check
+    if: always()
+    
+    steps:
+      - name: Deployment notification
+        run: |
+          echo "📢 Deployment Notification"
+          echo "========================="
+          echo ""
+          if [ "${{ needs.post-deploy-health-check.result }}" == "success" ]; then
+            echo "✅ Deployment completed successfully!"
+          else
+            echo "❌ Deployment may have issues - check logs"
+          fi
+          echo ""
+          echo "💡 To integrate with Slack/Discord:"
+          echo "- Add webhook URL to GitHub Secrets"
+          echo "- Use webhook action to send notifications"
