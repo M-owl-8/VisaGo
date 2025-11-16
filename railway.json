@@ -4,8 +4,8 @@
     "backend": {
       "name": "VisaBuddy Backend",
       "image": "railway:latest",
-      "context": "./apps/backend",
-      "dockerfile": "./Dockerfile",
+      "context": ".",
+      "dockerfile": "./apps/backend/Dockerfile",
       "port": 3000,
       "replicas": 1,
       "variables": {
