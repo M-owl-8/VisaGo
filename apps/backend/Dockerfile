@@ -1,31 +1,45 @@
 # Multi-stage build for optimized production image
 # This Dockerfile works with repo root as build context
+# If Railway context is apps/backend, update Railway settings to use repo root
 
 # Stage 1: Dependencies
 FROM node:20-alpine AS dependencies
 WORKDIR /app
 
-# Copy root package files (including package-lock.json)
-COPY package.json package-lock.json ./
+# Copy root package files (including package-lock.json if available)
+COPY package.json ./
+COPY package-lock.json* ./
 # Copy backend package files
 COPY apps/backend/package*.json ./apps/backend/
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies - use npm install if package-lock.json is missing
+RUN if [ -f package-lock.json ]; then \
+      npm ci --only=production; \
+    else \
+      echo "Warning: package-lock.json not found, using npm install"; \
+      npm install --only=production; \
+    fi && \
+    npm cache clean --force
 
 # Stage 2: Build
 FROM node:20-alpine AS build
 WORKDIR /app
 
-# Copy package files (including package-lock.json)
-COPY package.json package-lock.json ./
+# Copy package files (including package-lock.json if available)
+COPY package.json ./
+COPY package-lock.json* ./
 COPY apps/backend/package*.json ./apps/backend/
 COPY apps/backend/tsconfig.json ./apps/backend/
 COPY apps/backend/prisma ./apps/backend/prisma/
 COPY apps/backend/src ./apps/backend/src/
 
-# Install all dependencies (including dev)
-RUN npm ci
+# Install all dependencies (including dev) - use npm install if package-lock.json is missing
+RUN if [ -f package-lock.json ]; then \
+      npm ci; \
+    else \
+      echo "Warning: package-lock.json not found, using npm install"; \
+      npm install; \
+    fi
 
 # Generate Prisma client
 WORKDIR /app/apps/backend
