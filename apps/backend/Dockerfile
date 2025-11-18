@@ -3,7 +3,8 @@
 # Settings: Root Directory = empty (or /), Dockerfile Path = apps/backend/Dockerfile
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS dependencies
+# Use Debian-based image (node:20-slim) instead of Alpine for better sharp compatibility
+FROM node:20-slim AS dependencies
 WORKDIR /app
 
 # Copy root package files (repo root context required)
@@ -17,11 +18,11 @@ COPY apps/backend/package*.json ./apps/backend/
 RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 
 # Stage 2: Build
-FROM node:20-alpine AS build
+FROM node:20-slim AS build
 WORKDIR /app
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl libc6-compat
+# Install OpenSSL for Prisma (Debian uses apt instead of apk)
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Copy package files (repo root context required)
 COPY package.json ./
@@ -43,12 +44,11 @@ RUN npx prisma generate
 RUN npm run build
 
 # Stage 3: Production
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 WORKDIR /app
 
-# Install OpenSSL for Prisma
-# Note: We use SHARP_IGNORE_GLOBAL_LIBVIPS=1 to force sharp to use its own binaries
-RUN apk add --no-cache openssl libc6-compat
+# Install OpenSSL for Prisma (Debian uses apt instead of apk)
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Copy root package.json for workspace resolution
 COPY --from=dependencies /app/package.json ./package.json
@@ -58,28 +58,16 @@ COPY --from=dependencies /app/apps/backend/package.json ./apps/backend/package.j
 
 # Install production dependencies directly in production stage
 # This ensures all workspace dependencies are properly installed and hoisted
+# With Debian-based image, sharp will automatically install with correct binaries
 WORKDIR /app
 RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
-
-# Remove sharp completely (installed with wrong binaries) and reinstall with Alpine/musl binaries
-# Sharp must be reinstalled with platform-specific binaries for Alpine Linux
-# Use aggressive removal: delete directory, uninstall, clear cache, then reinstall
-RUN rm -rf /app/node_modules/sharp /app/apps/backend/node_modules/sharp 2>/dev/null || true
-RUN npm uninstall sharp --no-save || true
-RUN npm cache clean --force
-# Set environment variable to force sharp to use its own binaries (not system libvips)
-ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1
-# Reinstall sharp with correct platform flags - this should download the correct binaries
-RUN npm install --os=linux --libc=musl --cpu=x64 sharp@^0.33.1 --include=optional --no-save --force
-# Verify sharp binaries exist (check for platform-specific directory)
-RUN test -d /app/node_modules/sharp/lib || (echo "ERROR: sharp lib directory not found" && ls -la /app/node_modules/sharp 2>/dev/null || echo "sharp directory missing" && exit 1)
 
 # Verify critical dependencies are installed (express should be in root node_modules)
 # This will fail the build early if dependencies are missing
 RUN test -d /app/node_modules/express || (echo "ERROR: express not found in /app/node_modules" && ls -la /app/node_modules | head -20 && exit 1)
 RUN test -d /app/node_modules/cors || (echo "ERROR: cors not found" && exit 1)
 RUN test -d /app/node_modules/helmet || (echo "ERROR: helmet not found" && exit 1)
-RUN test -d /app/node_modules/sharp || (echo "ERROR: sharp not found after reinstall" && exit 1)
+RUN test -d /app/node_modules/sharp || (echo "ERROR: sharp not found" && exit 1)
 
 # Install Prisma CLI (needed for prisma db push in start script)
 # Prisma CLI is a devDependency but needed in production for migrations
@@ -115,9 +103,8 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health/live', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
+# Create non-root user for security (Debian uses different user commands)
+RUN groupadd -r nodejs && useradd -r -g nodejs nodejs && \
     chown -R nodejs:nodejs /app
 USER nodejs
 
