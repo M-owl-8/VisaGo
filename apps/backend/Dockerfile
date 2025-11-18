@@ -52,10 +52,9 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modules
 
 # Copy Prisma generated files (including query engine binaries)
+# Prisma is installed at root level in monorepo
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=build /app/apps/backend/node_modules/.prisma ./apps/backend/node_modules/.prisma
-COPY --from=build /app/apps/backend/node_modules/@prisma ./apps/backend/node_modules/@prisma
 
 # Copy built files
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
