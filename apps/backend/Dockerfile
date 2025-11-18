@@ -64,10 +64,12 @@ RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 
 # Verify critical dependencies are installed (express should be in root node_modules)
 # This will fail the build early if dependencies are missing
+# Note: sharp is optional - app will work without it (image processing will be disabled)
 RUN test -d /app/node_modules/express || (echo "ERROR: express not found in /app/node_modules" && ls -la /app/node_modules | head -20 && exit 1)
 RUN test -d /app/node_modules/cors || (echo "ERROR: cors not found" && exit 1)
 RUN test -d /app/node_modules/helmet || (echo "ERROR: helmet not found" && exit 1)
-RUN test -d /app/node_modules/sharp || (echo "ERROR: sharp not found" && exit 1)
+# Sharp is optional - don't fail if it's missing
+RUN test -d /app/node_modules/sharp && echo "Sharp found" || echo "WARNING: Sharp not found - image processing will be disabled"
 
 # Install Prisma CLI (needed for prisma db push in start script)
 # Prisma CLI is a devDependency but needed in production for migrations

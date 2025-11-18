@@ -1,7 +1,12 @@
-import fs from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
-import sharp from "sharp";
+import fs from 'fs/promises';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  compressImage,
+  generateThumbnail,
+  getImageMetadata,
+  isSharpAvailable,
+} from '../utils/sharp-wrapper';
 
 /**
  * Local Storage Service
@@ -30,8 +35,8 @@ export interface UploadResult {
 }
 
 export class LocalStorageService {
-  private static baseDir = process.env.LOCAL_STORAGE_PATH || "uploads";
-  private static serverUrl = process.env.SERVER_URL || "http://localhost:3000";
+  private static baseDir = process.env.LOCAL_STORAGE_PATH || 'uploads';
+  private static serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
 
   /**
    * Initialize storage directory
@@ -39,10 +44,10 @@ export class LocalStorageService {
   static async initialize(): Promise<void> {
     try {
       await fs.mkdir(this.baseDir, { recursive: true });
-      await fs.mkdir(path.join(this.baseDir, "uploads"), { recursive: true });
-      await fs.mkdir(path.join(this.baseDir, "thumbnails"), { recursive: true });
+      await fs.mkdir(path.join(this.baseDir, 'uploads'), { recursive: true });
+      await fs.mkdir(path.join(this.baseDir, 'thumbnails'), { recursive: true });
     } catch (error) {
-      console.error("Failed to initialize storage directory:", error);
+      console.error('Failed to initialize storage directory:', error);
       throw error;
     }
   }
@@ -61,26 +66,24 @@ export class LocalStorageService {
 
     const {
       maxFileSize = 50 * 1024 * 1024, // 50MB
-      allowedFormats = ["pdf", "jpg", "jpeg", "png", "doc", "docx"],
+      allowedFormats = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
       compress = true,
       generateThumbnail = false,
     } = options;
 
     // Validate file size
     if (fileBuffer.length > maxFileSize) {
-      throw new Error(
-        `File size exceeds limit. Max: ${maxFileSize / 1024 / 1024}MB`
-      );
+      throw new Error(`File size exceeds limit. Max: ${maxFileSize / 1024 / 1024}MB`);
     }
 
     // Validate file format
-    const fileExtension = fileName.split(".").pop()?.toLowerCase();
+    const fileExtension = fileName.split('.').pop()?.toLowerCase();
     if (fileExtension && !allowedFormats.includes(fileExtension)) {
-      throw new Error(`File format not allowed. Allowed: ${allowedFormats.join(", ")}`);
+      throw new Error(`File format not allowed. Allowed: ${allowedFormats.join(', ')}`);
     }
 
     // Create user directory structure
-    const userDir = path.join(this.baseDir, "uploads", userId, fileType);
+    const userDir = path.join(this.baseDir, 'uploads', userId, fileType);
     await fs.mkdir(userDir, { recursive: true });
 
     // Generate unique file name
@@ -91,17 +94,12 @@ export class LocalStorageService {
     let mimeType = fileType;
     let metadata: any = {};
 
-    // Compress images if requested
-    if (compress && ["jpg", "jpeg", "png"].includes(fileExtension!)) {
+    // Compress images if requested (only if sharp is available)
+    if (compress && ['jpg', 'jpeg', 'png'].includes(fileExtension!) && isSharpAvailable()) {
       try {
-        uploadBuffer = await sharp(fileBuffer)
-          .resize(2000, 2000, {
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .toBuffer();
+        uploadBuffer = await compressImage(fileBuffer, 2000, 2000);
       } catch (error) {
-        console.error("Image compression failed:", error);
+        console.error('Image compression failed:', error);
         // Continue with original buffer if compression fails
       }
     }
@@ -109,14 +107,16 @@ export class LocalStorageService {
     // Save file
     await fs.writeFile(filePath, uploadBuffer);
 
-    // Generate thumbnail if requested
-    if (generateThumbnail && ["jpg", "jpeg", "png"].includes(fileExtension!)) {
+    // Generate thumbnail if requested (only if sharp is available)
+    if (
+      generateThumbnail &&
+      ['jpg', 'jpeg', 'png'].includes(fileExtension!) &&
+      isSharpAvailable()
+    ) {
       try {
-        const thumbnailBuffer = await sharp(fileBuffer)
-          .resize(200, 200, { fit: "cover" })
-          .toBuffer();
+        const thumbnailBuffer = await generateThumbnail(fileBuffer, 200, 200);
 
-        const thumbDir = path.join(this.baseDir, "thumbnails", userId, fileType);
+        const thumbDir = path.join(this.baseDir, 'thumbnails', userId, fileType);
         await fs.mkdir(thumbDir, { recursive: true });
 
         const thumbnailFileName = `thumb-${uniqueFileName}`;
@@ -127,11 +127,11 @@ export class LocalStorageService {
         metadata.thumbnailUrl = `${this.serverUrl}/uploads/thumbnails/${userId}/${fileType}/${thumbnailFileName}`;
 
         // Extract image dimensions
-        const imageMetadata = await sharp(fileBuffer).metadata();
+        const imageMetadata = await getImageMetadata(fileBuffer);
         metadata.width = imageMetadata.width;
         metadata.height = imageMetadata.height;
       } catch (error) {
-        console.error("Thumbnail generation failed:", error);
+        console.error('Thumbnail generation failed:', error);
         // Continue without thumbnail if generation fails
       }
     }
@@ -154,10 +154,10 @@ export class LocalStorageService {
    */
   static async deleteFile(fileName: string): Promise<void> {
     try {
-      const filePath = path.join(this.baseDir, "uploads", fileName);
+      const filePath = path.join(this.baseDir, 'uploads', fileName);
       await fs.unlink(filePath);
     } catch (error) {
-      console.error("Failed to delete file:", error);
+      console.error('Failed to delete file:', error);
       throw error;
     }
   }
@@ -167,17 +167,17 @@ export class LocalStorageService {
    */
   static async getFileMetadata(fileName: string): Promise<any> {
     try {
-      const filePath = path.join(this.baseDir, "uploads", fileName);
+      const filePath = path.join(this.baseDir, 'uploads', fileName);
       const stat = await fs.stat(filePath);
 
       return {
         size: stat.size,
-        contentType: "application/octet-stream",
+        contentType: 'application/octet-stream',
         created: stat.birthtime,
         updated: stat.mtime,
       };
     } catch (error) {
-      console.error("Failed to get file metadata:", error);
+      console.error('Failed to get file metadata:', error);
       throw error;
     }
   }
@@ -187,10 +187,10 @@ export class LocalStorageService {
    */
   static async listFiles(prefix: string): Promise<string[]> {
     try {
-      const dirPath = path.join(this.baseDir, "uploads", prefix);
+      const dirPath = path.join(this.baseDir, 'uploads', prefix);
       const files: string[] = [];
 
-      const walkDir = async (dir: string, rel: string = "") => {
+      const walkDir = async (dir: string, rel: string = '') => {
         const entries = await fs.readdir(dir, { withFileTypes: true });
 
         for (const entry of entries) {
@@ -208,7 +208,7 @@ export class LocalStorageService {
       await walkDir(dirPath);
       return files;
     } catch (error) {
-      console.error("Failed to list files:", error);
+      console.error('Failed to list files:', error);
       return [];
     }
   }
@@ -218,8 +218,8 @@ export class LocalStorageService {
    */
   static async copyFile(sourceName: string, destName: string): Promise<void> {
     try {
-      const sourceFile = path.join(this.baseDir, "uploads", sourceName);
-      const destFile = path.join(this.baseDir, "uploads", destName);
+      const sourceFile = path.join(this.baseDir, 'uploads', sourceName);
+      const destFile = path.join(this.baseDir, 'uploads', destName);
 
       // Ensure destination directory exists
       const destDir = path.dirname(destFile);
@@ -228,7 +228,7 @@ export class LocalStorageService {
       // Copy file
       await fs.copyFile(sourceFile, destFile);
     } catch (error) {
-      console.error("Failed to copy file:", error);
+      console.error('Failed to copy file:', error);
       throw error;
     }
   }
@@ -247,10 +247,10 @@ export class LocalStorageService {
    */
   static async getFile(fileName: string): Promise<Buffer> {
     try {
-      const filePath = path.join(this.baseDir, "uploads", fileName);
+      const filePath = path.join(this.baseDir, 'uploads', fileName);
       return await fs.readFile(filePath);
     } catch (error) {
-      console.error("Failed to get file:", error);
+      console.error('Failed to get file:', error);
       throw error;
     }
   }

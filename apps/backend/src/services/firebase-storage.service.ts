@@ -1,6 +1,11 @@
-import * as admin from "firebase-admin";
-import { v4 as uuidv4 } from "uuid";
-import sharp from "sharp";
+import * as admin from 'firebase-admin';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  compressImage,
+  generateThumbnail,
+  getImageMetadata,
+  isSharpAvailable,
+} from '../utils/sharp-wrapper';
 
 /**
  * Firebase Storage Service
@@ -63,22 +68,20 @@ export class FirebaseStorageService {
 
     const {
       maxFileSize = 50 * 1024 * 1024, // 50MB
-      allowedFormats = ["pdf", "jpg", "jpeg", "png", "doc", "docx"],
+      allowedFormats = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
       compress = true,
       generateThumbnail = false,
     } = options;
 
     // Validate file size
     if (fileBuffer.length > maxFileSize) {
-      throw new Error(
-        `File size exceeds limit. Max: ${maxFileSize / 1024 / 1024}MB`
-      );
+      throw new Error(`File size exceeds limit. Max: ${maxFileSize / 1024 / 1024}MB`);
     }
 
     // Validate file format
-    const fileExtension = fileName.split(".").pop()?.toLowerCase();
+    const fileExtension = fileName.split('.').pop()?.toLowerCase();
     if (fileExtension && !allowedFormats.includes(fileExtension)) {
-      throw new Error(`File format not allowed. Allowed: ${allowedFormats.join(", ")}`);
+      throw new Error(`File format not allowed. Allowed: ${allowedFormats.join(', ')}`);
     }
 
     // Generate unique file name
@@ -88,51 +91,48 @@ export class FirebaseStorageService {
     let mimeType = fileType;
     let metadata: any = {};
 
-    // Compress images if requested
-    if (compress && ["jpg", "jpeg", "png"].includes(fileExtension!)) {
+    // Compress images if requested (only if sharp is available)
+    if (compress && ['jpg', 'jpeg', 'png'].includes(fileExtension!) && isSharpAvailable()) {
       try {
-        uploadBuffer = await sharp(fileBuffer)
-          .resize(2000, 2000, {
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .toBuffer();
+        uploadBuffer = await compressImage(fileBuffer, 2000, 2000);
       } catch (error) {
-        console.error("Image compression failed:", error);
+        console.error('Image compression failed:', error);
         // Continue with original buffer if compression fails
       }
     }
 
-    // Generate thumbnail if requested
-    if (generateThumbnail && ["jpg", "jpeg", "png"].includes(fileExtension!)) {
+    // Generate thumbnail if requested (only if sharp is available)
+    if (
+      generateThumbnail &&
+      ['jpg', 'jpeg', 'png'].includes(fileExtension!) &&
+      isSharpAvailable()
+    ) {
       try {
-        const thumbnailBuffer = await sharp(fileBuffer)
-          .resize(200, 200, { fit: "cover" })
-          .toBuffer();
+        const thumbnailBuffer = await generateThumbnail(fileBuffer, 200, 200);
 
         const thumbnailName = `${userId}/${fileType}/thumbnails/${uuidv4()}-thumb-${fileName}`;
         const thumbnailFile = FirebaseStorageService.bucket.file(thumbnailName);
 
         await thumbnailFile.save(thumbnailBuffer, {
           metadata: {
-            contentType: "image/jpeg",
+            contentType: 'image/jpeg',
           },
         });
 
         const [thumbnailUrl] = await thumbnailFile.getSignedUrl({
-          version: "v4",
-          action: "read",
+          version: 'v4',
+          action: 'read',
           expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
         });
 
         metadata.thumbnailUrl = thumbnailUrl;
 
         // Extract image dimensions
-        const imageMetadata = await sharp(fileBuffer).metadata();
+        const imageMetadata = await getImageMetadata(fileBuffer);
         metadata.width = imageMetadata.width;
         metadata.height = imageMetadata.height;
       } catch (error) {
-        console.error("Thumbnail generation failed:", error);
+        console.error('Thumbnail generation failed:', error);
         // Continue without thumbnail if generation fails
       }
     }
@@ -152,8 +152,8 @@ export class FirebaseStorageService {
 
     // Get signed URL (valid for 1 year)
     const [fileUrl] = await file.getSignedUrl({
-      version: "v4",
-      action: "read",
+      version: 'v4',
+      action: 'read',
       expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     });
 
@@ -202,7 +202,7 @@ export class FirebaseStorageService {
     await this.initialize();
 
     if (!FirebaseStorageService.bucket) {
-      throw new Error("Firebase Storage bucket is not initialized");
+      throw new Error('Firebase Storage bucket is not initialized');
     }
 
     const [files] = await FirebaseStorageService.bucket.getFiles({
@@ -227,16 +227,13 @@ export class FirebaseStorageService {
   /**
    * Get signed URL for a file (for temporary access)
    */
-  static async getSignedUrl(
-    fileName: string,
-    expiresInDays: number = 7
-  ): Promise<string> {
+  static async getSignedUrl(fileName: string, expiresInDays: number = 7): Promise<string> {
     await this.initialize();
 
     const file = FirebaseStorageService.bucket.file(fileName);
     const [url] = await file.getSignedUrl({
-      version: "v4",
-      action: "read",
+      version: 'v4',
+      action: 'read',
       expires: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
     });
 
