@@ -25,6 +25,8 @@ import db from './db';
 import { getEnvConfig, validateCorsOrigin } from './config/env';
 import { SERVER_CONFIG, RATE_LIMIT_CONFIG, API_MESSAGES, HTTP_STATUS } from './config/constants';
 import { requestLogger, errorLogger } from './middleware/logger';
+import { performanceMiddleware, performanceHeadersMiddleware } from './middleware/performanceMiddleware';
+import { securityHeaders, removeSensitiveHeaders, cacheControl } from './middleware/securityHeaders';
 import authRoutes from './routes/auth';
 import countriesRoutes from './routes/countries';
 import visaTypesRoutes from './routes/visa-types';
@@ -38,6 +40,7 @@ import adminRoutes from './routes/admin';
 import analyticsRoutes from './routes/analytics';
 import legalRoutes from './routes/legal';
 import monitoringRoutes from './routes/monitoring';
+import securityRoutes from './routes/security';
 import healthRoutes from './routes/health';
 import formRoutes from './routes/forms';
 import documentChecklistRoutes from './routes/document-checklist';
@@ -95,11 +98,12 @@ try {
 const sentryEnabled = Boolean(envConfig.SENTRY_DSN);
 
 if (sentryEnabled) {
+  const integrations = [Sentry.expressIntegration(), nodeProfilingIntegration()];
   Sentry.init({
     dsn: envConfig.SENTRY_DSN,
     environment: envConfig.NODE_ENV,
     tracesSampleRate: envConfig.NODE_ENV === 'production' ? 0.2 : 1.0,
-    integrations: [nodeProfilingIntegration()],
+    integrations,
   });
 }
 
@@ -111,10 +115,7 @@ const NODE_ENV = envConfig.NODE_ENV || SERVER_CONFIG.DEFAULT_NODE_ENV;
 // Initialize Redis Cache Service
 const cacheService = new OptimizedCacheService(envConfig.REDIS_URL);
 
-if (sentryEnabled) {
-  app.use(Sentry.Handlers.requestHandler());
-  app.use(Sentry.Handlers.tracingHandler());
-}
+// Sentry request context is automatically captured via expressIntegration
 
 // ============================================================================
 // MIDDLEWARE
@@ -122,6 +123,9 @@ if (sentryEnabled) {
 
 // Security middleware
 app.use(helmet());
+app.use(removeSensitiveHeaders);
+app.use(securityHeaders);
+app.use(cacheControl);
 
 // CORS configuration with validation
 let allowedOrigins: string[];
@@ -190,6 +194,10 @@ app.use('/uploads', express.static(envConfig.LOCAL_STORAGE_PATH));
 // Comprehensive request logging middleware
 app.use(requestLogger);
 
+// Performance monitoring middleware
+app.use(performanceHeadersMiddleware);
+app.use(performanceMiddleware);
+
 // ============================================================================
 // ROUTES
 // ============================================================================
@@ -250,6 +258,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/legal', legalRoutes);
 // Monitoring routes (development/admin only)
 app.use('/api/monitoring', monitoringRoutes);
+// Security routes (admin only)
+app.use('/api/security', securityRoutes);
 
 // ============================================================================
 // ERROR HANDLING
@@ -268,12 +278,11 @@ app.use((req: Request, res: Response) => {
   });
 });
 
+// Sentry error handling is automatically done via expressIntegration()
+// Manual error capture is handled in the global error handler below
+
 // Error logging middleware (must be before global error handler)
 app.use(errorLogger);
-
-if (sentryEnabled) {
-  app.use(Sentry.Handlers.errorHandler());
-}
 
 // Global error handler
 app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
@@ -297,6 +306,11 @@ app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
     operation: req.method,
     resource: req.path.split('/').pop(),
   });
+
+  // Capture error to Sentry if enabled
+  if (sentryEnabled && status >= 500) {
+    Sentry.captureException(err);
+  }
 
   // Prepare error response
   const errorResponse: any = {
@@ -611,3 +625,4 @@ startServer();
 
 export default app;
 export { cacheService };
+
