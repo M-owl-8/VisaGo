@@ -52,11 +52,13 @@ RUN apk add --no-cache openssl libc6-compat
 # Copy root package.json for workspace resolution
 COPY --from=dependencies /app/package.json ./package.json
 COPY --from=dependencies /app/package-lock.json ./package-lock.json
+# Copy backend package.json
+COPY --from=dependencies /app/apps/backend/package.json ./apps/backend/package.json
 
-# Copy production node_modules from dependencies stage
-# In npm workspaces, dependencies are hoisted to root node_modules
-COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modules
+# Install production dependencies directly in production stage
+# This ensures all workspace dependencies are properly installed and hoisted
+WORKDIR /app
+RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 
 # Verify critical dependencies are installed (express should be in root node_modules)
 # This will fail the build early if dependencies are missing
