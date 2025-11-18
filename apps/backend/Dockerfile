@@ -13,7 +13,8 @@ COPY package-lock.json ./
 COPY apps/backend/package*.json ./apps/backend/
 
 # Install dependencies (skip scripts to avoid husky install in production)
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+# Use npm install instead of npm ci to handle workspace dependencies better
+RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 
 # Stage 2: Build
 FROM node:20-alpine AS build
@@ -31,7 +32,8 @@ COPY apps/backend/prisma ./apps/backend/prisma/
 COPY apps/backend/src ./apps/backend/src/
 
 # Install all dependencies (including dev)
-RUN npm ci
+# Use npm install to ensure all workspace dependencies are resolved
+RUN npm install
 
 # Generate Prisma client
 WORKDIR /app/apps/backend
