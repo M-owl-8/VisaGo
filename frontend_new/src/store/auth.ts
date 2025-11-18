@@ -1,6 +1,7 @@
 import {create} from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNotificationStore} from './notifications';
+import { DEFAULT_TOPIC } from '../services/pushNotifications';
 
 // Lazy import to avoid circular dependency
 let apiClient: any = null;
@@ -342,6 +343,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Logout endpoint error:', error);
     } finally {
+      const notificationState = useNotificationStore.getState();
+      if (notificationState.deviceToken) {
+        notificationState
+          .unsubscribeFromTopic(DEFAULT_TOPIC, notificationState.deviceToken)
+          .catch(() => undefined);
+      }
+      notificationState.clearDeviceToken();
+
       // Clear stored data - use correct key names
       await AsyncStorage.removeItem('@auth_token');
       await AsyncStorage.removeItem('@refresh_token');

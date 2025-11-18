@@ -1,29 +1,22 @@
-import React, {useEffect, ErrorInfo, useState} from 'react';
-import {StatusBar, View, Text} from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {GestureHandlerRootView} from 'react-native-gesture-handler';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
+import React, { useEffect, ErrorInfo, useState } from 'react';
+import { StatusBar, View, Text } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {useAuthStore} from './store/auth';
-import {initializeGoogleSignIn} from './services/google-oauth';
-import {GOOGLE_WEB_CLIENT_ID} from './config/constants';
-import {
-  initializeErrorLogger,
-  logError,
-  setUserContext,
-} from './services/errorLogger';
-import {
-  startNetworkMonitoring,
-  stopNetworkMonitoring,
-} from './services/network';
-import {
-  initializePushNotifications,
-  cleanupPushNotifications,
-} from './services/pushNotifications';
-import {useNotificationStore} from './store/notifications';
-import {OfflineBanner} from './components/OfflineBanner';
+import { shallow } from 'zustand/shallow';
+import { useAuthStore } from './store/auth';
+import { initializeGoogleSignIn } from './services/google-oauth';
+import { GOOGLE_WEB_CLIENT_ID } from './config/constants';
+import { initializeErrorLogger, logError, setUserContext } from './services/errorLogger';
+import { startNetworkMonitoring, stopNetworkMonitoring } from './services/network';
+import { OfflineBanner } from './components/OfflineBanner';
+import { useNotificationStore } from './store/notifications';
+import { initializePushNotifications, cleanupPushNotifications } from './services/pushNotifications';
+
+initializeErrorLogger();
 
 // Screens
 import SplashScreen from './screens/SplashScreen';
@@ -285,17 +278,25 @@ class ErrorBoundary extends React.Component<
 // MAIN APP COMPONENT
 // ============================================================================
 function AppContent() {
-  const isLoading = useAuthStore(state => state.isLoading);
-  const isSignedIn = useAuthStore(state => state.isSignedIn);
-  const user = useAuthStore(state => state.user);
-  const initializeApp = useAuthStore(state => state.initializeApp);
-  const loadNotificationPreferences = useNotificationStore(
-    state => state.loadPreferences,
-  );
-  const pushNotificationsEnabled = useNotificationStore(
-    state => state.preferences.pushNotifications,
-  );
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const isSignedIn = useAuthStore((state) => state.isSignedIn);
+  const user = useAuthStore((state) => state.user);
+  const initializeApp = useAuthStore((state) => state.initializeApp);
   const [forceShow, setForceShow] = useState(false);
+  const {
+    preferences,
+    preferencesLoaded,
+    loadPreferences,
+    clearDeviceToken,
+  } = useNotificationStore(
+    (state) => ({
+      preferences: state.preferences,
+      preferencesLoaded: state.preferencesLoaded,
+      loadPreferences: state.loadPreferences,
+      clearDeviceToken: state.clearDeviceToken,
+    }),
+    shallow
+  );
 
   // Check if questionnaire is completed - this will automatically update when user state changes
   const needsQuestionnaire = isSignedIn && user && !user.questionnaireCompleted;
@@ -389,17 +390,6 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (isSignedIn) {
-      loadNotificationPreferences().catch(error => {
-        logError(error, {
-          scope: 'AppContent',
-          message: 'Failed to load notification preferences',
-        });
-      });
-    }
-  }, [isSignedIn, loadNotificationPreferences]);
-
-  useEffect(() => {
     if (user) {
       setUserContext({
         id: user.id,
@@ -411,23 +401,53 @@ function AppContent() {
   }, [user]);
 
   useEffect(() => {
-    if (isSignedIn && pushNotificationsEnabled) {
-      initializePushNotifications().catch(error => {
+    if (isSignedIn && !preferencesLoaded) {
+      loadPreferences().catch((error) =>
         logError(error, {
-          scope: 'AppContent',
-          message: 'Failed to initialize push notifications',
-        });
-      });
-    } else {
+          scope: 'NotificationPreferences',
+          message: 'Failed to load notification preferences',
+        })
+      );
+    }
+  }, [isSignedIn, preferencesLoaded, loadPreferences]);
+
+  useEffect(() => {
+    if (!isSignedIn) {
       cleanupPushNotifications();
+      clearDeviceToken();
+      return;
     }
 
-    return () => {
-      if (!isSignedIn || !pushNotificationsEnabled) {
-        cleanupPushNotifications();
+    if (!preferencesLoaded) {
+      return;
+    }
+
+    if (!preferences.pushNotifications) {
+      cleanupPushNotifications();
+      clearDeviceToken();
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await initializePushNotifications();
+      } catch (error) {
+        if (!cancelled) {
+          logError(error, {
+            scope: 'PushNotifications',
+            message: 'Failed to initialize push notifications',
+          });
+        }
       }
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanupPushNotifications();
     };
-  }, [isSignedIn, pushNotificationsEnabled]);
+  }, [isSignedIn, preferencesLoaded, preferences.pushNotifications, clearDeviceToken]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {

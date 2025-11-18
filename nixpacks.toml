@@ -1,3 +1,7 @@
+# Root-level nixpacks.toml for Railway backend deployment
+# This file is used when Railway auto-detects nixpacks
+# Railway should use the Dockerfile instead, but this is a fallback
+
 [phases.setup]
 nixPkgs = ["nodejs-20_x"]
 

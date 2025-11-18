@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Alert,
+  TouchableOpacity,
+  Linking,
 } from 'react-native';
 import {
   useNotificationStore,
@@ -77,6 +79,7 @@ export const NotificationSettingsScreen: React.FC = () => {
     deviceToken,
     unsubscribeFromTopic,
     clearDeviceToken,
+    pushPermissionStatus,
   } = useNotificationStore();
   const [localPreferences, setLocalPreferences] = useState(preferences);
   const [isSaving, setIsSaving] = useState(false);
@@ -127,6 +130,28 @@ export const NotificationSettingsScreen: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const formatPermissionStatus = () => {
+    switch (pushPermissionStatus) {
+      case 'granted':
+        return 'Granted';
+      case 'provisional':
+        return 'Provisional';
+      case 'denied':
+        return 'Denied';
+      default:
+        return 'Unknown';
+    }
+  };
+
+  const openDeviceSettings = () => {
+    Linking.openSettings().catch(() => {
+      Alert.alert(
+        'Unable to open settings',
+        'Please open your device settings manually to update notification permissions.',
+      );
+    });
   };
 
   const renderCategory = (category: string, categoryTitle: string) => {
@@ -183,6 +208,19 @@ export const NotificationSettingsScreen: React.FC = () => {
         {renderCategory('general', 'General')}
         {renderCategory('content', 'Content & Updates')}
         {renderCategory('reminders', 'Reminders')}
+
+        <View style={styles.permissionContainer}>
+          <Text style={styles.permissionTitle}>Device Permission Status</Text>
+          <Text style={styles.permissionValue}>{formatPermissionStatus()}</Text>
+          {(pushPermissionStatus === 'denied' ||
+            pushPermissionStatus === 'unknown') && (
+            <TouchableOpacity
+              style={styles.permissionButton}
+              onPress={openDeviceSettings}>
+              <Text style={styles.permissionButtonText}>Open Device Settings</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View style={styles.infoContainer}>
           <Text style={styles.infoTitle}>💡 Tip</Text>
@@ -296,6 +334,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1565C0',
     lineHeight: 18,
+  },
+  permissionContainer: {
+    marginHorizontal: 8,
+    marginTop: 16,
+    backgroundColor: '#FFF3E0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FB8C00',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  permissionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E65100',
+    marginBottom: 4,
+  },
+  permissionValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#BF360C',
+  },
+  permissionButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#E65100',
+    borderRadius: 6,
+  },
+  permissionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
   buttonContainer: {
     marginHorizontal: 8,

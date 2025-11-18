@@ -12,8 +12,8 @@ COPY package-lock.json ./
 # Copy backend package files
 COPY apps/backend/package*.json ./apps/backend/
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies (skip scripts to avoid husky install in production)
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Stage 2: Build
 FROM node:20-alpine AS build

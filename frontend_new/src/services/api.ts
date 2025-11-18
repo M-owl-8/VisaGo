@@ -56,9 +56,7 @@ const CACHE_DEFAULT_TTL_MS = 1000 * 60 * 10; // 10 minutes
 const OFFLINE_QUEUE_STORAGE_KEY = '@visabuddy_request_queue_v1';
 const MAX_OFFLINE_QUEUE_SIZE = 25;
 
-type ApiRequestConfig<D = any> = AxiosRequestConfig<D> & {
-  metadata?: RequestMetadata;
-};
+type ApiRequestConfig<T = any> = AxiosRequestConfig<T> & { metadata?: RequestMetadata };
 
 type CachedApiEntry = {
   data: any;
@@ -670,11 +668,11 @@ class ApiClient {
     ) => Promise<AxiosResponse<T>>,
     config: ApiRequestConfig<D>,
   ): Promise<AxiosResponse<T>> {
-    const normalizedConfig: AxiosRequestConfig<D> = {
+    const normalizedConfig: ApiRequestConfig<D> = {
       ...config,
     };
 
-    const metadata: RequestMetadata = config.metadata || {};
+    const metadata: RequestMetadata = (normalizedConfig as any).metadata || {};
     delete (normalizedConfig as any).metadata;
     const method = (normalizedConfig.method || 'get').toLowerCase();
     normalizedConfig.method = method as AxiosRequestConfig<D>['method'];
