@@ -19,6 +19,9 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl1.1-compat
+
 # Copy package files (repo root context required)
 COPY package.json ./
 COPY package-lock.json ./
@@ -41,9 +44,18 @@ RUN npm run build
 FROM node:20-alpine AS production
 WORKDIR /app
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl1.1-compat
+
 # Install only production dependencies
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modules
+
+# Copy Prisma generated files (including query engine binaries)
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /app/apps/backend/node_modules/.prisma ./apps/backend/node_modules/.prisma
+COPY --from=build /app/apps/backend/node_modules/@prisma ./apps/backend/node_modules/@prisma
 
 # Copy built files
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
