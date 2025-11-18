@@ -67,9 +67,12 @@ export class DatabasePoolService {
       return;
     }
 
+    // Get connection string
+    const connectionString = config?.connectionUrl || process.env.DATABASE_URL;
+
     // Optimize for high concurrency (200+ connections)
     const poolConfig: any = {
-      connectionString: config?.connectionUrl || process.env.DATABASE_URL,
+      connectionString,
       max: config?.max || 30, // Increased for high concurrency
       idleTimeoutMillis: config?.idleTimeoutMillis || 30000,
       connectionTimeoutMillis: config?.connectionTimeoutMillis || 5000, // Increased timeout
@@ -78,11 +81,24 @@ export class DatabasePoolService {
       application_name: 'visabuddy-backend',
     };
 
-    // SSL configuration - Railway uses self-signed certificates
-    // For production hosting (Railway, Heroku, etc.), we need to accept self-signed certs
-    poolConfig.ssl = {
-      rejectUnauthorized: false, // Accept self-signed certificates from Railway/hosting providers
-    };
+    // SSL configuration - CRITICAL for Railway/Heroku hosted databases
+    // Railway uses self-signed certificates, we MUST accept them
+    // This is safe because Railway's internal network is secure
+    if (connectionString && connectionString.includes('railway.app')) {
+      // Railway-specific SSL handling
+      poolConfig.ssl = {
+        rejectUnauthorized: false,
+        sslmode: 'require',
+      };
+    } else if (process.env.NODE_ENV === 'production') {
+      // Generic production SSL (accept self-signed certs from hosting providers)
+      poolConfig.ssl = {
+        rejectUnauthorized: false,
+      };
+    } else {
+      // Development - no SSL
+      poolConfig.ssl = false;
+    }
 
     DatabasePoolService.instance = new Pool(poolConfig);
     DatabasePoolService.startTime = Date.now();
