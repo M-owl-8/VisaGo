@@ -1,11 +1,11 @@
-import { Pool, PoolClient } from "pg";
-import type { QueryResult } from "pg";
+import { Pool, PoolClient } from 'pg';
+import type { QueryResult } from 'pg';
 
 /**
  * PostgreSQL Connection Pool Service
  * Manages database connections efficiently for high concurrent load
  * Optimized for 200+ concurrent connections with comprehensive monitoring
- * 
+ *
  * Features:
  * - Connection pooling (prevents connection exhaustion)
  * - Connection timeout handling
@@ -78,58 +78,50 @@ export class DatabasePoolService {
       application_name: 'visabuddy-backend',
     };
 
-    // SSL configuration for production
-    if (process.env.NODE_ENV === "production") {
-      poolConfig.ssl = {
-        rejectUnauthorized: true,
-      };
-    } else {
-      poolConfig.ssl = {
-        rejectUnauthorized: false,
-      };
-      if (!process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-      }
-    }
+    // SSL configuration - Railway uses self-signed certificates
+    // For production hosting (Railway, Heroku, etc.), we need to accept self-signed certs
+    poolConfig.ssl = {
+      rejectUnauthorized: false, // Accept self-signed certificates from Railway/hosting providers
+    };
 
     DatabasePoolService.instance = new Pool(poolConfig);
     DatabasePoolService.startTime = Date.now();
 
     // Handle pool errors with reconnection logic
-    DatabasePoolService.instance.on("error", (err: Error) => {
-      console.error("❌ Unexpected pool error:", err.message);
+    DatabasePoolService.instance.on('error', (err: Error) => {
+      console.error('❌ Unexpected pool error:', err.message);
       DatabasePoolService.failedQueries++;
-      
+
       // Attempt to reconnect
       DatabasePoolService.handlePoolError(err);
     });
 
     // Handle client errors
-    DatabasePoolService.instance.on("connect", () => {
-      console.debug("✓ New database connection established");
+    DatabasePoolService.instance.on('connect', () => {
+      console.debug('✓ New database connection established');
       DatabasePoolService.reconnectAttempts = 0;
     });
 
     // Test connection
     try {
       const client = await DatabasePoolService.instance.connect();
-      
+
       // Run a test query to ensure connectivity
-      await client.query("SELECT 1");
-      
-      console.log("✅ PostgreSQL connection pool initialized successfully");
+      await client.query('SELECT 1');
+
+      console.log('✅ PostgreSQL connection pool initialized successfully');
       console.log(`   Max connections: ${poolConfig.max}`);
       console.log(`   Idle timeout: ${poolConfig.idleTimeoutMillis}ms`);
       console.log(`   Query timeout: ${poolConfig.statement_timeout}ms`);
       console.log(`   Waiting client queue: ${poolConfig.maxWaitingClients}`);
-      
+
       client.release();
       DatabasePoolService.isConnected = true;
 
       // Start health check interval
       DatabasePoolService.startHealthCheck();
     } catch (error) {
-      console.error("✗ Failed to initialize database pool:", error);
+      console.error('✗ Failed to initialize database pool:', error);
       throw error;
     }
   }
@@ -140,17 +132,20 @@ export class DatabasePoolService {
   private static handlePoolError(err: Error): void {
     if (DatabasePoolService.reconnectAttempts < DatabasePoolService.MAX_RECONNECT_ATTEMPTS) {
       DatabasePoolService.reconnectAttempts++;
-      const backoffDelay = Math.min(1000 * Math.pow(2, DatabasePoolService.reconnectAttempts), 30000);
-      
+      const backoffDelay = Math.min(
+        1000 * Math.pow(2, DatabasePoolService.reconnectAttempts),
+        30000
+      );
+
       console.warn(
         `⚠️  Connection pool error. Reconnection attempt ${DatabasePoolService.reconnectAttempts}/${DatabasePoolService.MAX_RECONNECT_ATTEMPTS} ` +
-        `in ${backoffDelay}ms`
+          `in ${backoffDelay}ms`
       );
 
       setTimeout(() => {
         if (DatabasePoolService.instance) {
           // The pool will handle reconnection automatically
-          console.log("Attempting to recover pool connection...");
+          console.log('Attempting to recover pool connection...');
         }
       }, backoffDelay);
     } else {
@@ -171,27 +166,26 @@ export class DatabasePoolService {
     DatabasePoolService.healthCheckInterval = setInterval(async () => {
       try {
         const stats = DatabasePoolService.getPoolStats();
-        
+
         // Alert on high connection usage
         if (stats.idleConnections === 0) {
           console.warn(
             `⚠️  ALERT: No idle connections available. ` +
-            `Active: ${stats.totalConnections - stats.idleConnections}/${stats.totalConnections}`
+              `Active: ${stats.totalConnections - stats.idleConnections}/${stats.totalConnections}`
           );
         }
 
         // Alert on high query failure rate
-        const failureRate = stats.totalQueries > 0 
-          ? (stats.failedQueries / stats.totalQueries) * 100 
-          : 0;
-        
+        const failureRate =
+          stats.totalQueries > 0 ? (stats.failedQueries / stats.totalQueries) * 100 : 0;
+
         if (failureRate > 5) {
           console.warn(`⚠️  ALERT: High query failure rate: ${failureRate.toFixed(2)}%`);
         }
 
         DatabasePoolService.lastHealthCheck = Date.now();
       } catch (error) {
-        console.error("Health check error:", error);
+        console.error('Health check error:', error);
       }
     }, 30000); // Check every 30 seconds
   }
@@ -201,13 +195,13 @@ export class DatabasePoolService {
    */
   static async getClient(): Promise<PoolClient> {
     if (!DatabasePoolService.instance) {
-      throw new Error("Database pool not initialized. Call initialize() first.");
+      throw new Error('Database pool not initialized. Call initialize() first.');
     }
 
     try {
       return await DatabasePoolService.instance.connect();
     } catch (error) {
-      console.error("Failed to get client from pool:", error);
+      console.error('Failed to get client from pool:', error);
       throw error;
     }
   }
@@ -217,20 +211,20 @@ export class DatabasePoolService {
    */
   static async query(text: string, params?: any[]): Promise<any> {
     if (!DatabasePoolService.instance) {
-      throw new Error("Database pool not initialized");
+      throw new Error('Database pool not initialized');
     }
 
     const startTime = Date.now();
     try {
       const result = await DatabasePoolService.instance.query(text, params);
       const duration = Date.now() - startTime;
-      
+
       DatabasePoolService.totalQueries++;
       DatabasePoolService.queryTimes.push(duration);
       if (DatabasePoolService.queryTimes.length > DatabasePoolService.MAX_QUERY_HISTORY) {
         DatabasePoolService.queryTimes.shift();
       }
-      
+
       return result;
     } catch (error) {
       DatabasePoolService.failedQueries++;
@@ -243,26 +237,24 @@ export class DatabasePoolService {
   /**
    * Execute transaction with monitoring
    */
-  static async transaction<T>(
-    callback: (client: PoolClient) => Promise<T>
-  ): Promise<T> {
+  static async transaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await this.getClient();
     const startTime = Date.now();
 
     try {
-      await client.query("BEGIN");
+      await client.query('BEGIN');
       const result = await callback(client);
-      await client.query("COMMIT");
-      
+      await client.query('COMMIT');
+
       DatabasePoolService.totalQueries++;
       DatabasePoolService.queryTimes.push(Date.now() - startTime);
       if (DatabasePoolService.queryTimes.length > DatabasePoolService.MAX_QUERY_HISTORY) {
         DatabasePoolService.queryTimes.shift();
       }
-      
+
       return result;
     } catch (error) {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
       DatabasePoolService.failedQueries++;
       throw error;
     } finally {
@@ -276,7 +268,7 @@ export class DatabasePoolService {
   static getPoolStats(): PoolMetrics {
     if (!DatabasePoolService.instance) {
       return {
-        status: "not_initialized",
+        status: 'not_initialized',
         totalConnections: 0,
         availableConnections: 0,
         idleConnections: 0,
@@ -289,20 +281,24 @@ export class DatabasePoolService {
       };
     }
 
-    const avgQueryTime = DatabasePoolService.queryTimes.length > 0
-      ? Math.round(DatabasePoolService.queryTimes.reduce((a, b) => a + b, 0) / DatabasePoolService.queryTimes.length)
-      : 0;
+    const avgQueryTime =
+      DatabasePoolService.queryTimes.length > 0
+        ? Math.round(
+            DatabasePoolService.queryTimes.reduce((a, b) => a + b, 0) /
+              DatabasePoolService.queryTimes.length
+          )
+        : 0;
 
-    const maxQueryTime = DatabasePoolService.queryTimes.length > 0
-      ? Math.max(...DatabasePoolService.queryTimes)
-      : 0;
+    const maxQueryTime =
+      DatabasePoolService.queryTimes.length > 0 ? Math.max(...DatabasePoolService.queryTimes) : 0;
 
     const uptime = Date.now() - DatabasePoolService.startTime;
 
     return {
-      status: DatabasePoolService.isConnected ? "connected" : "disconnected",
+      status: DatabasePoolService.isConnected ? 'connected' : 'disconnected',
       totalConnections: DatabasePoolService.instance.totalCount,
-      availableConnections: DatabasePoolService.instance.totalCount - DatabasePoolService.instance.idleCount,
+      availableConnections:
+        DatabasePoolService.instance.totalCount - DatabasePoolService.instance.idleCount,
       idleConnections: DatabasePoolService.instance.idleCount,
       waitingCount: (DatabasePoolService.instance as any).waitingCount || 0,
       totalQueries: DatabasePoolService.totalQueries,
@@ -320,7 +316,7 @@ export class DatabasePoolService {
     if (DatabasePoolService.instance) {
       await DatabasePoolService.instance.end();
       DatabasePoolService.isConnected = false;
-      console.log("✓ Database pool closed");
+      console.log('✓ Database pool closed');
     }
   }
 
@@ -347,10 +343,10 @@ export class DatabasePoolService {
    */
   static async healthCheck(): Promise<boolean> {
     try {
-      const result = await this.query("SELECT NOW()");
+      const result = await this.query('SELECT NOW()');
       return !!result.rows[0];
     } catch (error) {
-      console.error("Health check failed:", error);
+      console.error('Health check failed:', error);
       return false;
     }
   }
