@@ -53,6 +53,11 @@ RUN apk add --no-cache openssl libc6-compat
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modules
 
+# Reinstall sharp with Alpine/musl platform-specific binaries
+# This ensures sharp works correctly on Alpine Linux
+# Sharp is hoisted to root node_modules in workspace setup
+RUN npm install --os=linux --libc=musl --cpu=x64 sharp@^0.33.1 --include=optional --no-save
+
 # Copy Prisma generated files (including query engine binaries)
 # Prisma is installed at root level in monorepo
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
