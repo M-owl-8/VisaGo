@@ -30,7 +30,6 @@ COPY package-lock.json ./
 COPY apps/backend/package*.json ./apps/backend/
 COPY apps/backend/tsconfig.json ./apps/backend/
 COPY apps/backend/prisma ./apps/backend/prisma/
-COPY apps/backend/data ./apps/backend/data/
 COPY apps/backend/src ./apps/backend/src/
 
 # Install all dependencies (including dev)
@@ -44,8 +43,8 @@ RUN npx prisma generate
 # Build TypeScript
 RUN npm run build
 
-# Copy static data files into dist (needed at runtime)
-RUN mkdir -p /app/apps/backend/dist/data && cp -R /app/apps/backend/data/. /app/apps/backend/dist/data/
+# Copy static data files from src/data into dist/data (needed at runtime)
+RUN mkdir -p /app/apps/backend/dist/data && cp -R /app/apps/backend/src/data/. /app/apps/backend/dist/data/
 
 # Stage 3: Production
 FROM node:20-slim AS production
