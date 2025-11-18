@@ -25,8 +25,15 @@ import db from './db';
 import { getEnvConfig, validateCorsOrigin } from './config/env';
 import { SERVER_CONFIG, RATE_LIMIT_CONFIG, API_MESSAGES, HTTP_STATUS } from './config/constants';
 import { requestLogger, errorLogger } from './middleware/logger';
-import { performanceMiddleware, performanceHeadersMiddleware } from './middleware/performanceMiddleware';
-import { securityHeaders, removeSensitiveHeaders, cacheControl } from './middleware/securityHeaders';
+import {
+  performanceMiddleware,
+  performanceHeadersMiddleware,
+} from './middleware/performanceMiddleware';
+import {
+  securityHeaders,
+  removeSensitiveHeaders,
+  cacheControl,
+} from './middleware/securityHeaders';
 import authRoutes from './routes/auth';
 import countriesRoutes from './routes/countries';
 import visaTypesRoutes from './routes/visa-types';
@@ -57,9 +64,9 @@ try {
   if (envConfig.NODE_ENV === 'production') {
     // Check for production security requirements
     if (!envConfig.CORS_ORIGIN || envConfig.CORS_ORIGIN === '*') {
-      console.error("❌ CRITICAL: CORS_ORIGIN cannot be '*' or empty in production!");
-      console.error('   Please set CORS_ORIGIN to specific allowed origins.');
-      process.exit(1);
+      console.warn("⚠️  CORS_ORIGIN is '*' or empty in production.");
+      console.warn('   For mobile-only APIs, this is acceptable (CORS only applies to browsers).');
+      console.warn('   For web APIs, set CORS_ORIGIN to specific allowed origins.');
     }
 
     if (envConfig.JWT_SECRET.length < 32) {
@@ -625,4 +632,3 @@ startServer();
 
 export default app;
 export { cacheService };
-

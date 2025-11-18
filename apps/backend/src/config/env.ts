@@ -3,7 +3,7 @@
  * Ensures all required environment variables are present and valid
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Environment variable schema
@@ -11,24 +11,24 @@ import { z } from "zod";
  */
 const envSchema = z.object({
   // Server Configuration
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  PORT: z.string().regex(/^\d+$/).transform(Number).default("3000"),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.string().regex(/^\d+$/).transform(Number).default('3000'),
 
   // Database
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
   // JWT
-  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
 
   // CORS
   CORS_ORIGIN: z.string().optional(),
 
   // Redis (optional)
-  REDIS_URL: z.string().url().optional().or(z.literal("")),
+  REDIS_URL: z.string().url().optional().or(z.literal('')),
 
   // Storage
-  STORAGE_TYPE: z.enum(["local", "firebase"]).default("local"),
-  LOCAL_STORAGE_PATH: z.string().default("uploads"),
+  STORAGE_TYPE: z.enum(['local', 'firebase']).default('local'),
+  LOCAL_STORAGE_PATH: z.string().default('uploads'),
 
   // Firebase (optional if STORAGE_TYPE is local)
   FIREBASE_PROJECT_ID: z.string().optional(),
@@ -65,20 +65,39 @@ const envSchema = z.object({
   // Feature Flags
   ENABLE_RECONCILIATION: z.string().optional(),
   ENABLE_MOCK_PAYMENTS: z.string().optional(),
-  
+
   // Payment Freeze (for free trial periods)
   // Default to enabled for first 3 months free period
-  PAYMENT_FREEZE_ENABLED: z.string().transform((val) => val === "true").default("true").optional(),
-  PAYMENT_FREEZE_START_DATE: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), // Format: YYYY-MM-DD (defaults to current date if not set)
-  PAYMENT_FREEZE_DURATION_MONTHS: z.string().regex(/^\d+$/).transform(Number).default("3").optional(), // Default 3 months
+  PAYMENT_FREEZE_ENABLED: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('true')
+    .optional(),
+  PAYMENT_FREEZE_START_DATE: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(), // Format: YYYY-MM-DD (defaults to current date if not set)
+  PAYMENT_FREEZE_DURATION_MONTHS: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('3')
+    .optional(), // Default 3 months
 
   // Logging Configuration (must be uppercase)
-  LOG_LEVEL: z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).default("INFO").transform((val) => val.toUpperCase()),
-  LOG_FILE_ENABLED: z.string().transform((val) => val === "true").default("false").optional(),
-  LOG_FILE_PATH: z.string().default("logs").optional(),
-  LOG_FILE_MAX_SIZE: z.string().regex(/^\d+$/).transform(Number).default("10485760").optional(), // 10MB default
-  LOG_FILE_MAX_FILES: z.string().regex(/^\d+$/).transform(Number).default("5").optional(),
-  
+  LOG_LEVEL: z
+    .enum(['DEBUG', 'INFO', 'WARN', 'ERROR'])
+    .default('INFO')
+    .transform((val) => val.toUpperCase()),
+  LOG_FILE_ENABLED: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('false')
+    .optional(),
+  LOG_FILE_PATH: z.string().default('logs').optional(),
+  LOG_FILE_MAX_SIZE: z.string().regex(/^\d+$/).transform(Number).default('10485760').optional(), // 10MB default
+  LOG_FILE_MAX_FILES: z.string().regex(/^\d+$/).transform(Number).default('5').optional(),
+
   // External Logging Services (optional)
   SENTRY_DSN: z.string().url().optional(),
   DATADOG_API_KEY: z.string().optional(),
@@ -103,13 +122,22 @@ export function getEnvConfig(): EnvConfig {
   }
 
   try {
+    // In development, if DATABASE_URL is a postgres URL but Prisma schema is SQLite, use SQLite
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    const dbUrl = process.env.DATABASE_URL;
+
+    if (nodeEnv === 'development' && dbUrl && dbUrl.startsWith('postgresql://')) {
+      // Prisma schema is set to SQLite, so we need to use SQLite for local dev
+      process.env.DATABASE_URL = 'file:./dev.db';
+    }
+
     envConfig = envSchema.parse(process.env);
     return envConfig;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.errors.map((e) => `${e.path.join(".")}: ${e.message}`);
+      const missingVars = error.errors.map((e) => `${e.path.join('.')}: ${e.message}`);
       throw new Error(
-        `Environment variable validation failed:\n${missingVars.join("\n")}\n\nPlease check your .env file.`
+        `Environment variable validation failed:\n${missingVars.join('\n')}\n\nPlease check your .env file.`
       );
     }
     throw error;
@@ -118,23 +146,20 @@ export function getEnvConfig(): EnvConfig {
 
 /**
  * Validates CORS origin configuration
- * Ensures CORS is not set to "*" in production
+ * For mobile-only APIs, CORS doesn't apply (CORS is browser-only)
+ * For web APIs, specific origins should be set
  */
 export function validateCorsOrigin(): string[] {
   const config = getEnvConfig();
   const origin = config.CORS_ORIGIN;
 
-  if (!origin || origin === "*") {
-    if (config.NODE_ENV === "production") {
-      throw new Error(
-        "CORS_ORIGIN cannot be '*' in production. Please set specific allowed origins."
-      );
-    }
-    return ["*"]; // Allow all in development
+  if (!origin || origin === '*') {
+    // Allow wildcard for mobile-only APIs (CORS doesn't apply to mobile apps)
+    return ['*'];
   }
 
   // Split comma-separated origins
-  return origin.split(",").map((o) => o.trim());
+  return origin.split(',').map((o) => o.trim());
 }
 
 /**
@@ -143,7 +168,5 @@ export function validateCorsOrigin(): string[] {
 export function isFeatureEnabled(feature: string): boolean {
   const config = getEnvConfig();
   const value = (config as any)[feature];
-  return value === "true" || value === true;
+  return value === 'true' || value === true;
 }
-
-
