@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -56,6 +56,11 @@ model UserPreferences {
   notificationsEnabled Boolean @default(true)
   emailNotifications Boolean   @default(true)
   pushNotifications Boolean    @default(true)
+  paymentConfirmations Boolean @default(true)
+  documentUpdates Boolean      @default(true)
+  visaStatusUpdates Boolean    @default(true)
+  dailyReminders Boolean       @default(true)
+  newsUpdates Boolean          @default(false)
   twoFactorEnabled  Boolean   @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
