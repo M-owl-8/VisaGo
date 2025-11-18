@@ -47,6 +47,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install OpenSSL for Prisma
+# Note: We use SHARP_IGNORE_GLOBAL_LIBVIPS=1 to force sharp to use its own binaries
 RUN apk add --no-cache openssl libc6-compat
 
 # Copy root package.json for workspace resolution
@@ -60,10 +61,18 @@ COPY --from=dependencies /app/apps/backend/package.json ./apps/backend/package.j
 WORKDIR /app
 RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 
-# Remove sharp (installed with wrong binaries) and reinstall with Alpine/musl binaries
+# Remove sharp completely (installed with wrong binaries) and reinstall with Alpine/musl binaries
 # Sharp must be reinstalled with platform-specific binaries for Alpine Linux
+# Use aggressive removal: delete directory, uninstall, clear cache, then reinstall
+RUN rm -rf /app/node_modules/sharp /app/apps/backend/node_modules/sharp 2>/dev/null || true
 RUN npm uninstall sharp --no-save || true
-RUN npm install --os=linux --libc=musl --cpu=x64 sharp@^0.33.1 --include=optional --no-save
+RUN npm cache clean --force
+# Set environment variable to force sharp to use its own binaries (not system libvips)
+ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1
+# Reinstall sharp with correct platform flags - this should download the correct binaries
+RUN npm install --os=linux --libc=musl --cpu=x64 sharp@^0.33.1 --include=optional --no-save --force
+# Verify sharp binaries exist (check for platform-specific directory)
+RUN test -d /app/node_modules/sharp/lib || (echo "ERROR: sharp lib directory not found" && ls -la /app/node_modules/sharp 2>/dev/null || echo "sharp directory missing" && exit 1)
 
 # Verify critical dependencies are installed (express should be in root node_modules)
 # This will fail the build early if dependencies are missing
