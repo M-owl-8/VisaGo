@@ -58,6 +58,12 @@ COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modu
 # Sharp is hoisted to root node_modules in workspace setup
 RUN npm install --os=linux --libc=musl --cpu=x64 sharp@^0.33.1 --include=optional --no-save
 
+# Install Prisma CLI (needed for prisma db push in start script)
+# Prisma CLI is a devDependency but needed in production for migrations
+WORKDIR /app/apps/backend
+RUN npm install prisma@^5.21.1 --no-save
+WORKDIR /app
+
 # Copy Prisma generated files (including query engine binaries)
 # Prisma is installed at root level in monorepo
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
