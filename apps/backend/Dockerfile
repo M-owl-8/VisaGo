@@ -85,6 +85,10 @@ RUN mkdir -p /app/apps/backend/uploads
 # Set working directory
 WORKDIR /app/apps/backend
 
+# Set NODE_PATH to include root node_modules for workspace module resolution
+# This allows Node.js to find modules hoisted to root in monorepo setup
+ENV NODE_PATH=/app/node_modules
+
 # Expose port
 EXPOSE 3000
 
