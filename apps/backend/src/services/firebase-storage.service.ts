@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 import {
   compressImage,
-  generateThumbnail,
+  generateThumbnail as generateThumbnailImage,
   getImageMetadata,
   isSharpAvailable,
 } from '../utils/sharp-wrapper';
@@ -108,7 +108,7 @@ export class FirebaseStorageService {
       isSharpAvailable()
     ) {
       try {
-        const thumbnailBuffer = await generateThumbnail(fileBuffer, 200, 200);
+        const thumbnailBuffer = await generateThumbnailImage(fileBuffer, 200, 200);
 
         const thumbnailName = `${userId}/${fileType}/thumbnails/${uuidv4()}-thumb-${fileName}`;
         const thumbnailFile = FirebaseStorageService.bucket.file(thumbnailName);

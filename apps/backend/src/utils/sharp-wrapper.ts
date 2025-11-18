@@ -33,9 +33,9 @@ export interface SharpMetadata {
 /**
  * Check if sharp is available
  */
-export function isSharpAvailable(): boolean {
+export const isSharpAvailable = (): boolean => {
   return sharpAvailable;
-}
+};
 
 /**
  * Resize image buffer
