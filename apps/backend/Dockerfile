@@ -58,6 +58,9 @@ COPY --from=dependencies /app/package-lock.json ./package-lock.json
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/apps/backend/node_modules ./apps/backend/node_modules
 
+# Verify critical dependencies are installed (express should be in root node_modules)
+RUN test -d /app/node_modules/express || (echo "ERROR: express not found in node_modules" && exit 1)
+
 # Reinstall sharp with Alpine/musl platform-specific binaries
 # This ensures sharp works correctly on Alpine Linux
 # Sharp is hoisted to root node_modules in workspace setup
