@@ -93,7 +93,8 @@ WORKDIR /app/apps/backend
 
 # Set NODE_PATH to include root node_modules for workspace module resolution
 # This allows Node.js to find modules hoisted to root in monorepo setup
-ENV NODE_PATH=/app/node_modules
+# Also include workspace node_modules as fallback
+ENV NODE_PATH=/app/node_modules:/app/apps/backend/node_modules
 
 # Expose port
 EXPOSE 3000
@@ -109,4 +110,5 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nodejs
 
 # Start application
-CMD ["npm", "start"]
+# Use node directly with NODE_PATH to ensure module resolution works
+CMD ["sh", "-c", "NODE_PATH=/app/node_modules:/app/apps/backend/node_modules npm start"]
