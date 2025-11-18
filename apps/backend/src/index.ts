@@ -128,6 +128,10 @@ const cacheService = new OptimizedCacheService(envConfig.REDIS_URL);
 // MIDDLEWARE
 // ============================================================================
 
+// Trust proxy - CRITICAL for Railway/Heroku/Cloud hosting
+// This allows Express to read X-Forwarded-For headers correctly
+app.set('trust proxy', true);
+
 // Security middleware
 app.use(helmet());
 app.use(removeSensitiveHeaders);
