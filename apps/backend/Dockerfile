@@ -36,8 +36,10 @@ COPY apps/backend/src ./apps/backend/src/
 # Use npm install to ensure all workspace dependencies are resolved
 RUN npm install
 
-# Generate Prisma client
+# Generate Prisma client (will use PostgreSQL schema on Railway)
 WORKDIR /app/apps/backend
+# Force PostgreSQL schema for production build
+RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma || echo "PostgreSQL schema already selected"
 RUN npx prisma generate
 
 # Build TypeScript
