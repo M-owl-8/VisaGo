@@ -1,13 +1,13 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiClient } from "../services/api";
+import {create} from 'zustand';
+import {persist, createJSONStorage} from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {apiClient} from '../services/api';
 
 export interface ChatMessage {
   id: string;
   userId: string;
   applicationId?: string;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   sources: string[];
   model: string;
@@ -57,16 +57,23 @@ interface ChatStore {
   sendMessage: (
     content: string,
     applicationId?: string,
-    conversationHistory?: ChatMessage[]
+    conversationHistory?: ChatMessage[],
   ) => Promise<void>;
-  searchDocuments: (query: string, country?: string, visaType?: string) => Promise<any>;
+  searchDocuments: (
+    query: string,
+    country?: string,
+    visaType?: string,
+  ) => Promise<any>;
   clearChatHistory: (applicationId?: string) => Promise<void>;
   loadStats: () => Promise<void>;
   loadSessions: (limit?: number, offset?: number) => Promise<void>;
   loadSessionDetails: (sessionId: string) => Promise<void>;
   renameSession: (sessionId: string, newTitle: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  addMessageFeedback: (messageId: string, feedback: "thumbs_up" | "thumbs_down") => Promise<void>;
+  addMessageFeedback: (
+    messageId: string,
+    feedback: 'thumbs_up' | 'thumbs_down',
+  ) => Promise<void>;
   setCurrentApplicationId: (applicationId: string | null) => void;
   setCurrentSessionId: (sessionId: string | null) => void;
   clearError: () => void;
@@ -89,24 +96,24 @@ export const useChatStore = create<ChatStore>()(
       // Load chat history
       loadChatHistory: async (applicationId?: string, limit = 50) => {
         try {
-          set({ isLoading: true, error: null });
-          
+          set({isLoading: true, error: null});
+
           // Verify user is signed in before loading
-          const { useAuthStore } = await import('./auth');
+          const {useAuthStore} = await import('./auth.js');
           const authState = useAuthStore.getState();
           if (!authState.isSignedIn || !authState.token) {
-            set({ 
+            set({
               error: 'Please log in to view chat history',
-              isLoading: false 
+              isLoading: false,
             });
             return;
           }
-          
+
           const response = await apiClient.getChatHistory(applicationId, limit);
 
           if (response.success) {
-            const key = applicationId || "general";
-            set((state) => ({
+            const key = applicationId || 'general';
+            set(state => ({
               conversations: {
                 ...state.conversations,
                 [key]: response.data,
@@ -116,18 +123,21 @@ export const useChatStore = create<ChatStore>()(
               isLoading: false,
             }));
           } else {
-            set({ error: response.error?.message || "Failed to load chat history" });
+            set({
+              error: response.error?.message || 'Failed to load chat history',
+            });
           }
         } catch (error: any) {
           // Handle authentication errors more gracefully
           if (error.response?.status === 401) {
             set({
-              error: "Your session has expired. You can still view previous messages, but please log in to send new messages.",
+              error:
+                'Your session has expired. You can still view previous messages, but please log in to send new messages.',
               isLoading: false,
             });
           } else {
             set({
-              error: error.message || "Failed to load chat history",
+              error: error.message || 'Failed to load chat history',
               isLoading: false,
             });
           }
@@ -138,31 +148,31 @@ export const useChatStore = create<ChatStore>()(
       sendMessage: async (
         content: string,
         applicationId?: string,
-        conversationHistory?: ChatMessage[]
+        conversationHistory?: ChatMessage[],
       ) => {
         try {
-          set({ isSending: true, error: null });
-          
+          set({isSending: true, error: null});
+
           // Verify user is signed in before sending
-          const { useAuthStore } = await import('./auth');
+          const {useAuthStore} = await import('./auth.js');
           const authState = useAuthStore.getState();
           if (!authState.isSignedIn || !authState.token) {
-            set({ 
+            set({
               error: 'Please log in to use the AI assistant',
-              isSending: false 
+              isSending: false,
             });
             return;
           }
-          
+
           const response = await apiClient.sendMessage(
             content,
             applicationId,
-            conversationHistory
+            conversationHistory,
           );
 
           if (response.success) {
-            const key = applicationId || "general";
-            set((state) => {
+            const key = applicationId || 'general';
+            set(state => {
               const conversation = state.conversations[key] || {
                 messages: [],
                 total: 0,
@@ -175,23 +185,23 @@ export const useChatStore = create<ChatStore>()(
                 ...conversation.messages,
                 {
                   id: `user-${Date.now()}`,
-                  userId: "",
+                  userId: '',
                   applicationId: applicationId,
-                  role: "user" as const,
+                  role: 'user' as const,
                   content,
                   sources: [],
-                  model: "user",
+                  model: 'user',
                   tokensUsed: 0,
                   createdAt: new Date().toISOString(),
                 },
                 {
                   id: response.data.id,
-                  userId: "",
+                  userId: '',
                   applicationId: applicationId,
-                  role: "assistant" as const,
+                  role: 'assistant' as const,
                   content: response.data.message,
                   sources: response.data.sources || [],
-                  model: response.data.model || "gpt-4",
+                  model: response.data.model || 'gpt-4',
                   tokensUsed: response.data.tokens_used || 0,
                   createdAt: new Date().toISOString(),
                 },
@@ -210,18 +220,19 @@ export const useChatStore = create<ChatStore>()(
               };
             });
           } else {
-            set({ error: response.error?.message || "Failed to send message" });
+            set({error: response.error?.message || 'Failed to send message'});
           }
         } catch (error: any) {
           // Handle authentication errors more gracefully
           if (error.response?.status === 401) {
             set({
-              error: "Your session has expired. Please log in again.",
+              error: 'Your session has expired. Please log in again.',
               isSending: false,
             });
           } else {
             set({
-              error: error.message || "Failed to send message. Please try again.",
+              error:
+                error.message || 'Failed to send message. Please try again.',
               isSending: false,
             });
           }
@@ -234,7 +245,7 @@ export const useChatStore = create<ChatStore>()(
           const response = await apiClient.searchDocuments(query);
           return response.data;
         } catch (error: any) {
-          set({ error: error.message || "Failed to search documents" });
+          set({error: error.message || 'Failed to search documents'});
           return null;
         }
       },
@@ -245,20 +256,22 @@ export const useChatStore = create<ChatStore>()(
           const response = await apiClient.clearChatHistory(applicationId);
 
           if (response.success) {
-            const key = applicationId || "general";
-            set((state) => {
-              const newConversations = { ...state.conversations };
+            const key = applicationId || 'general';
+            set(state => {
+              const newConversations = {...state.conversations};
               delete newConversations[key];
 
               return {
                 conversations: newConversations,
                 currentConversation:
-                  state.currentApplicationId === applicationId ? null : state.currentConversation,
+                  state.currentApplicationId === applicationId
+                    ? null
+                    : state.currentConversation,
               };
             });
           }
         } catch (error: any) {
-          set({ error: error.message || "Failed to clear chat history" });
+          set({error: error.message || 'Failed to clear chat history'});
         }
       },
 
@@ -268,22 +281,22 @@ export const useChatStore = create<ChatStore>()(
           const response = await apiClient.getChatStats();
 
           if (response.success) {
-            set({ stats: response.data });
+            set({stats: response.data});
           }
         } catch (error: any) {
-          console.error("Failed to load chat stats:", error);
+          console.error('Failed to load chat stats:', error);
         }
       },
 
       // Set current application ID
       setCurrentApplicationId: (applicationId: string | null) => {
-        set({ currentApplicationId: applicationId });
+        set({currentApplicationId: applicationId});
       },
 
       // Load chat sessions
       loadSessions: async (limit = 20, offset = 0) => {
         try {
-          set({ isLoading: true, error: null });
+          set({isLoading: true, error: null});
           const response = await apiClient.getChatSessions(limit, offset);
 
           if (response.success) {
@@ -292,11 +305,11 @@ export const useChatStore = create<ChatStore>()(
               isLoading: false,
             });
           } else {
-            set({ error: response.error?.message || "Failed to load sessions" });
+            set({error: response.error?.message || 'Failed to load sessions'});
           }
         } catch (error: any) {
           set({
-            error: error.message || "Failed to load sessions",
+            error: error.message || 'Failed to load sessions',
             isLoading: false,
           });
         }
@@ -305,12 +318,12 @@ export const useChatStore = create<ChatStore>()(
       // Load session details
       loadSessionDetails: async (sessionId: string) => {
         try {
-          set({ isLoading: true, error: null });
+          set({isLoading: true, error: null});
           const response = await apiClient.getSessionDetails(sessionId);
 
           if (response.success) {
             const session = response.data;
-            set((state) => ({
+            set(state => ({
               conversations: {
                 ...state.conversations,
                 [sessionId]: {
@@ -330,11 +343,11 @@ export const useChatStore = create<ChatStore>()(
               isLoading: false,
             }));
           } else {
-            set({ error: response.error?.message || "Failed to load session" });
+            set({error: response.error?.message || 'Failed to load session'});
           }
         } catch (error: any) {
           set({
-            error: error.message || "Failed to load session",
+            error: error.message || 'Failed to load session',
             isLoading: false,
           });
         }
@@ -346,16 +359,16 @@ export const useChatStore = create<ChatStore>()(
           const response = await apiClient.renameSession(sessionId, newTitle);
 
           if (response.success) {
-            set((state) => ({
-              sessions: state.sessions.map((s) =>
-                s.id === sessionId ? { ...s, title: newTitle } : s
+            set(state => ({
+              sessions: state.sessions.map(s =>
+                s.id === sessionId ? {...s, title: newTitle} : s,
               ),
             }));
           } else {
-            set({ error: response.error?.message || "Failed to rename session" });
+            set({error: response.error?.message || 'Failed to rename session'});
           }
         } catch (error: any) {
-          set({ error: error.message || "Failed to rename session" });
+          set({error: error.message || 'Failed to rename session'});
         }
       },
 
@@ -365,45 +378,47 @@ export const useChatStore = create<ChatStore>()(
           const response = await apiClient.deleteSession(sessionId);
 
           if (response.success) {
-            set((state) => ({
-              sessions: state.sessions.filter((s) => s.id !== sessionId),
+            set(state => ({
+              sessions: state.sessions.filter(s => s.id !== sessionId),
               currentSessionId:
-                state.currentSessionId === sessionId ? null : state.currentSessionId,
+                state.currentSessionId === sessionId
+                  ? null
+                  : state.currentSessionId,
             }));
           } else {
-            set({ error: response.error?.message || "Failed to delete session" });
+            set({error: response.error?.message || 'Failed to delete session'});
           }
         } catch (error: any) {
-          set({ error: error.message || "Failed to delete session" });
+          set({error: error.message || 'Failed to delete session'});
         }
       },
 
       // Add message feedback
       addMessageFeedback: async (
         messageId: string,
-        feedback: "thumbs_up" | "thumbs_down"
+        feedback: 'thumbs_up' | 'thumbs_down',
       ) => {
         try {
           await apiClient.addMessageFeedback(messageId, feedback);
         } catch (error: any) {
-          console.error("Failed to send feedback:", error);
+          console.error('Failed to send feedback:', error);
         }
       },
 
       // Set current session ID
       setCurrentSessionId: (sessionId: string | null) => {
-        set({ currentSessionId: sessionId });
+        set({currentSessionId: sessionId});
       },
 
       // Clear error
-      clearError: () => set({ error: null }),
+      clearError: () => set({error: null}),
     }),
     {
-      name: "@visabuddy_chat",
+      name: '@visabuddy_chat',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({
+      partialize: state => ({
         conversations: state.conversations,
       }),
-    }
-  )
+    },
+  ),
 );

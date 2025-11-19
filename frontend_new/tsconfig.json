@@ -2,9 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "Node16",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "jsx": "react-native",
     "declaration": true,
     "outDir": "./dist",
@@ -15,18 +13,8 @@
     "resolveJsonModule": true,
     "moduleResolution": "node16",
     "allowSyntheticDefaultImports": true,
-    "types": [
-      "react-native",
-      "jest",
-      "@testing-library/react-native"
-    ]
+    "types": ["react-native", "jest", "@testing-library/react-native"]
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ],
-  "extends": "expo/tsconfig.base"
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
 }
