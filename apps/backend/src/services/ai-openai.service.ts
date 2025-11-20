@@ -110,8 +110,18 @@ export class AIOpenAIService {
       const outputTokens = response.usage?.completion_tokens || 0;
       const cost = this.calculateCost(inputTokens, outputTokens);
 
+      const aiMessage = response.choices[0]?.message?.content || '';
+
+      if (!aiMessage) {
+        console.error('[AIOpenAIService] Empty response from OpenAI:', {
+          choices: response.choices,
+          model: this.MODEL,
+        });
+        throw new Error('Received empty response from AI service');
+      }
+
       return {
-        message: response.choices[0]?.message?.content || '',
+        message: aiMessage,
         tokensUsed: inputTokens + outputTokens,
         cost,
         model: this.MODEL,
@@ -207,8 +217,18 @@ When answering questions, cite the sources from the knowledge base when relevant
       const outputTokens = response.usage?.completion_tokens || 0;
       const cost = this.calculateCost(inputTokens, outputTokens);
 
+      const aiMessage = response.choices[0]?.message?.content || '';
+
+      if (!aiMessage) {
+        console.error('[AIOpenAIService] Empty response from OpenAI (RAG):', {
+          choices: response.choices,
+          model: this.MODEL,
+        });
+        throw new Error('Received empty response from AI service');
+      }
+
       return {
-        message: response.choices[0]?.message?.content || '',
+        message: aiMessage,
         sources: ragSources,
         tokensUsed: inputTokens + outputTokens,
         cost,

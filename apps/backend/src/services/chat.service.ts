@@ -313,9 +313,19 @@ User's Current Visa Application:
 
       const { message, sources = [], tokens_used = 0, model = 'gpt-4' } = aiResponse.data;
 
+      // Validate response has a message
+      if (!message || !message.trim()) {
+        console.error('[ChatService] Empty message in response:', {
+          hasData: !!aiResponse.data,
+          dataKeys: Object.keys(aiResponse.data || {}),
+        });
+        throw new Error('AI service returned empty response');
+      }
+
       console.log('[ChatService] AI response received:', {
         messageLength: message?.length || 0,
         hasMessage: !!message,
+        messagePreview: message.substring(0, 50),
         sourcesCount: sources?.length || 0,
         tokensUsed: tokens_used,
         model,
