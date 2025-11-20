@@ -250,29 +250,45 @@ User's Current Visa Application:
           // Format response
           const formattedResponse = {
             message: response.message,
-            sources: response.sources?.map((s: any) => ({
-              title: s.title,
-              content: s.content,
-              relevanceScore: s.relevanceScore,
-            })) || [],
+            sources:
+              response.sources?.map((s: any) => ({
+                title: s.title,
+                content: s.content,
+                relevanceScore: s.relevanceScore,
+              })) || [],
             tokens_used: response.tokensUsed,
             model: response.model,
           };
 
           aiResponse = { data: formattedResponse };
-        } catch (chatError) {
+        } catch (chatError: any) {
           // Final fallback if both RAG and regular chat fail
-          console.warn('Chat service failed, using fallback:', chatError);
-          const fallbackResponse = await AIOpenAIService.chat(openaiMessages, systemPrompt);
-          
-          const formattedResponse = {
-            message: fallbackResponse.message,
-            sources: [],
-            tokens_used: fallbackResponse.tokensUsed,
-            model: fallbackResponse.model,
-          };
+          console.error('Chat service failed:', chatError);
 
-          aiResponse = { data: formattedResponse };
+          // Check if it's a configuration error
+          if (
+            chatError.message?.includes('not configured') ||
+            chatError.message?.includes('not initialized')
+          ) {
+            throw chatError; // Re-throw configuration errors to be handled by outer catch
+          }
+
+          // Try regular chat as last resort
+          try {
+            const fallbackResponse = await AIOpenAIService.chat(openaiMessages, systemPrompt);
+
+            const formattedResponse = {
+              message: fallbackResponse.message,
+              sources: [],
+              tokens_used: fallbackResponse.tokensUsed,
+              model: fallbackResponse.model,
+            };
+
+            aiResponse = { data: formattedResponse };
+          } catch (finalError: any) {
+            // If even regular chat fails, throw the error
+            throw finalError;
+          }
         }
       } catch (openaiError: any) {
         logError('OpenAI service error', openaiError, {
@@ -550,8 +566,9 @@ User's Current Visa Application:
    */
   private buildSystemPrompt(applicationContext: any, ragContext: string): string {
     const userLanguage = applicationContext?.userLanguage || 'en';
-    const languageName = userLanguage === 'ru' ? 'Russian' : userLanguage === 'uz' ? 'Uzbek' : 'English';
-    
+    const languageName =
+      userLanguage === 'ru' ? 'Russian' : userLanguage === 'uz' ? 'Uzbek' : 'English';
+
     let prompt = `You are VisaBuddy, an expert AI assistant specializing in visa applications and immigration processes. Your goal is to provide accurate, helpful, and personalized guidance to users.
 
 Core Guidelines:
