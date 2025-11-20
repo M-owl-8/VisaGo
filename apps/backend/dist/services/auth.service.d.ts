@@ -92,6 +92,11 @@ export declare class AuthService {
             notificationsEnabled: boolean;
             emailNotifications: boolean;
             pushNotifications: boolean;
+            paymentConfirmations: boolean;
+            documentUpdates: boolean;
+            visaStatusUpdates: boolean;
+            dailyReminders: boolean;
+            newsUpdates: boolean;
             twoFactorEnabled: boolean;
         } | null;
         createdAt: Date;
@@ -126,5 +131,14 @@ export declare class AuthService {
         lastName?: string;
         avatar?: string;
     }): Promise<AuthResponse>;
+    /**
+   * Request password reset
+   * Generates a reset token and sends email
+   */
+    static requestPasswordReset(email: string): Promise<void>;
+    /**
+     * Reset password with token
+     */
+    static resetPassword(token: string, newPassword: string): Promise<void>;
 }
 //# sourceMappingURL=auth.service.d.ts.map

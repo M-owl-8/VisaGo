@@ -22,7 +22,15 @@ router.use(authenticateToken);
  */
 router.post("/", validateRAGRequest, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const { query, applicationId, conversationHistory } = req.body;
     // Use 'query' from middleware validation, fallback to 'content' for backward compatibility
     const content = query || req.body.content;
@@ -76,7 +84,15 @@ router.post("/", validateRAGRequest, async (req: Request, res: Response) => {
  */
 router.post("/send", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const { content, applicationId, conversationHistory } = req.body;
 
     // Validate required fields
@@ -128,7 +144,15 @@ router.post("/send", async (req: Request, res: Response) => {
  */
 router.get("/history", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const applicationId = req.query.applicationId as string | undefined;
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -203,7 +227,15 @@ router.post("/search", async (req: Request, res: Response) => {
  */
 router.delete("/history", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const applicationId = req.query.applicationId as string | undefined;
 
     const result = await ChatService.clearConversationHistory(
@@ -231,7 +263,15 @@ router.delete("/history", async (req: Request, res: Response) => {
  */
 router.get("/stats", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
 
     const stats = await ChatService.getChatStats(userId);
 
@@ -259,7 +299,15 @@ router.get("/stats", async (req: Request, res: Response) => {
  */
 router.get("/sessions", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
@@ -285,7 +333,15 @@ router.get("/sessions", async (req: Request, res: Response) => {
  */
 router.get("/sessions/:sessionId", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const { sessionId } = req.params;
 
     const session = await ChatService.getSessionDetails(sessionId, userId);
@@ -318,7 +374,15 @@ router.get("/sessions/:sessionId", async (req: Request, res: Response) => {
  */
 router.patch("/sessions/:sessionId", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const { sessionId } = req.params;
     const { title } = req.body;
 
@@ -365,7 +429,15 @@ router.patch("/sessions/:sessionId", async (req: Request, res: Response) => {
  */
 router.delete("/sessions/:sessionId", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const { sessionId } = req.params;
 
     const result = await ChatService.deleteSession(sessionId);
@@ -397,7 +469,15 @@ router.post(
   "/messages/:messageId/feedback",
   async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.id;
+      const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
       const { messageId } = req.params;
       const { feedback } = req.body;
 
@@ -480,7 +560,15 @@ router.post("/search", async (req: Request, res: Response) => {
  */
 router.get("/quota", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const { getChatRateLimitInfo } = await import("../middleware/chat-rate-limit");
     
     const limitInfo = await getChatRateLimitInfo(userId);
@@ -511,7 +599,15 @@ router.get("/quota", async (req: Request, res: Response) => {
  */
 router.get("/usage/daily", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     
     const usage = await ChatService.getDailyUsage(userId);
     
@@ -542,7 +638,15 @@ router.get("/usage/daily", async (req: Request, res: Response) => {
  */
 router.get("/usage/weekly", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     
     const usage = await ChatService.getWeeklyUsage(userId);
     
@@ -566,7 +670,15 @@ router.get("/usage/weekly", async (req: Request, res: Response) => {
  */
 router.get("/usage/monthly", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     
     const usage = await ChatService.getMonthlyUsage(userId);
     
@@ -590,7 +702,15 @@ router.get("/usage/monthly", async (req: Request, res: Response) => {
  */
 router.get("/usage/cost-analysis", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     
     const costAnalysis = await ChatService.getCostAnalysis(userId);
     
@@ -614,7 +734,15 @@ router.get("/usage/cost-analysis", async (req: Request, res: Response) => {
  */
 router.post("/increment-message-count", async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: "User not authenticated",
+        },
+      });
+    }
     const { incrementChatMessageCount } = await import("../middleware/chat-rate-limit");
     
     const newCount = await incrementChatMessageCount(userId);

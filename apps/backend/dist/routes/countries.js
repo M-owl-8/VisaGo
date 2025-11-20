@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const countries_service_1 = require("../services/countries.service");
+const visa_requirements_service_1 = require("../services/visa-requirements.service");
 const router = express_1.default.Router();
 /**
  * GET /api/countries
@@ -82,6 +83,67 @@ router.get("/:countryId/visa-types", async (req, res, next) => {
         res.json({
             success: true,
             data: visaTypes,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * GET /api/countries/visa-requirements/check
+ * Check visa requirement for a country (for Uzbek citizens by default)
+ * Query params: countryName (required), nationalityCode (optional, default: UZ)
+ */
+router.get("/visa-requirements/check", async (req, res, next) => {
+    try {
+        const { countryName, nationalityCode } = req.query;
+        if (!countryName) {
+            return res.status(400).json({
+                success: false,
+                error: { message: "countryName query parameter is required" },
+            });
+        }
+        const requirement = await (0, visa_requirements_service_1.checkVisaRequirement)(countryName, nationalityCode || 'UZ');
+        res.json({
+            success: true,
+            data: requirement,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * GET /api/countries/visa-requirements/all
+ * Get all countries that require visas (for Uzbek citizens by default)
+ * Query params: nationalityCode (optional, default: UZ)
+ */
+router.get("/visa-requirements/all", async (req, res, next) => {
+    try {
+        const { nationalityCode } = req.query;
+        const countries = (0, visa_requirements_service_1.getAllVisaRequiredCountries)(nationalityCode || 'UZ');
+        res.json({
+            success: true,
+            data: countries,
+            count: countries.length,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * GET /api/countries/visa-requirements/regions
+ * Get visa requirements organized by region (for Uzbek citizens by default)
+ * Query params: nationalityCode (optional, default: UZ)
+ */
+router.get("/visa-requirements/regions", async (req, res, next) => {
+    try {
+        const { nationalityCode } = req.query;
+        const regions = (0, visa_requirements_service_1.getVisaRequirementsByRegion)(nationalityCode || 'UZ');
+        res.json({
+            success: true,
+            data: regions,
         });
     }
     catch (error) {

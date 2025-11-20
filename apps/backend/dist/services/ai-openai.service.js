@@ -123,8 +123,11 @@ When answering questions, cite the sources from the knowledge base when relevant
      */
     static async searchKnowledgeBase(query) {
         try {
-            // Simple text search for now
-            // TODO: Implement vector similarity search using embeddings
+            // Text-based search with relevance scoring
+            // Note: Vector similarity search can be implemented using OpenAI embeddings + vector DB (Pinecone/Weaviate)
+            // For now, using Prisma full-text search with basic relevance scoring
+            // SQLite doesn't support case-insensitive mode, so we'll do case-insensitive matching in JavaScript
+            const queryLower = query.toLowerCase();
             const documents = await AIOpenAIService.prisma.document.findMany({
                 where: {
                     isPublished: true,
@@ -133,15 +136,31 @@ When answering questions, cite the sources from the knowledge base when relevant
                         { content: { contains: query } },
                     ],
                 },
-                take: 5,
+                take: 10, // Get more to filter case-insensitively
             });
-            return documents.map((doc) => ({
-                documentId: doc.id,
-                title: doc.title,
-                content: doc.content.substring(0, 500), // First 500 chars
-                relevanceScore: 0.8, // TODO: Calculate actual relevance score
-                url: `/api/documents/${doc.id}`,
-            }));
+            // Calculate basic relevance score based on query match (case-insensitive)
+            const filteredDocs = documents
+                .map((doc) => {
+                const titleLower = doc.title.toLowerCase();
+                const contentLower = doc.content.toLowerCase();
+                const titleMatch = titleLower.includes(queryLower);
+                const contentMatch = contentLower.includes(queryLower);
+                // Simple relevance: title matches are more relevant than content matches
+                const relevanceScore = titleMatch ? 0.9 : contentMatch ? 0.7 : 0.5;
+                return {
+                    documentId: doc.id,
+                    title: doc.title,
+                    content: doc.content.substring(0, 500), // First 500 chars
+                    relevanceScore,
+                    url: `/api/documents/${doc.id}`,
+                    _match: titleMatch || contentMatch, // Track if it matches
+                };
+            })
+                .filter((doc) => doc._match) // Only include matching documents
+                .sort((a, b) => b.relevanceScore - a.relevanceScore) // Sort by relevance
+                .slice(0, 5) // Take top 5
+                .map(({ _match, ...doc }) => doc); // Remove _match field
+            return filteredDocs;
         }
         catch (error) {
             console.error("Knowledge base search error:", error);
@@ -207,6 +226,69 @@ If you don't know something, say so clearly and suggest how to find the informat
             return "Visa fees vary by country and type. Please check your specific visa type in the application for the exact fee.";
         }
         return "Thank you for your question. For detailed information, please check the documentation in your visa application or contact support.";
+    }
+    /**
+     * Generate document checklist for visa application
+     */
+    static async generateChecklist(userContext, country, visaType) {
+        try {
+            const systemPrompt = `You are a visa application assistant. Generate a comprehensive document checklist for a ${visaType} visa application to ${country}.
+
+Based on the user's context, create a detailed checklist of all required and optional documents. Format your response as a JSON object with this structure:
+{
+  "type": "${visaType}",
+  "checklist": [
+    {
+      "document": "Document name",
+      "required": true/false,
+      "description": "Brief description of what this document is and why it's needed"
+    }
+  ]
+}
+
+Include all standard documents for this visa type, plus any specific documents based on the user's profile.`;
+            const userPrompt = `Generate a document checklist for:
+- Country: ${country}
+- Visa Type: ${visaType}
+- User Context: ${JSON.stringify(userContext, null, 2)}
+
+Provide a complete checklist with all required documents.`;
+            const response = await AIOpenAIService.openai.chat.completions.create({
+                model: this.MODEL,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt },
+                ],
+                max_tokens: 2000,
+                temperature: 0.3, // Lower temperature for more consistent checklist generation
+                response_format: { type: "json_object" },
+            });
+            const content = response.choices[0]?.message?.content || "{}";
+            const parsed = JSON.parse(content);
+            // Ensure the response has the correct structure
+            if (!parsed.checklist || !Array.isArray(parsed.checklist)) {
+                throw new Error("Invalid checklist format from AI");
+            }
+            return {
+                type: parsed.type || visaType,
+                checklist: parsed.checklist,
+            };
+        }
+        catch (error) {
+            console.error("Checklist generation error:", error);
+            // Return a basic fallback checklist
+            return {
+                type: visaType,
+                checklist: [
+                    { document: "Passport", required: true, description: "Valid passport with at least 6 months validity" },
+                    { document: "Visa Application Form", required: true, description: "Completed and signed visa application form" },
+                    { document: "Passport Photos", required: true, description: "Recent passport-sized photographs" },
+                    { document: "Travel Itinerary", required: false, description: "Flight bookings and travel plans" },
+                    { document: "Accommodation Proof", required: false, description: "Hotel reservations or accommodation details" },
+                    { document: "Financial Proof", required: true, description: "Bank statements or proof of sufficient funds" },
+                ],
+            };
+        }
     }
     /**
      * Track AI usage for billing

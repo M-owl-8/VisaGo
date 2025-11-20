@@ -15,20 +15,32 @@ export declare class ChatService {
      * Send a message and get AI response with RAG context
      */
     sendMessage(userId: string, content: string, applicationId?: string, conversationHistory?: any[]): Promise<{
-        message: any;
-        sources: any;
-        tokens_used: any;
-        model: any;
+        message: string;
+        sources: never[];
+        tokens_used: number;
+        model: string;
         id: string;
         applicationContext: {
             country: string;
+            countryCode: string;
             visaType: string;
             processingDays: number;
             fee: number;
-            requiredDocuments: any;
-            documentsCollected: number;
-            totalDocuments: number;
-            applicationStatus: string;
+            validity: string;
+            status: string;
+            createdAt: Date;
+            documentsTotal: any;
+            documentsUploaded: number;
+            documentsVerified: number;
+            documentsPending: number;
+            documentsRejected: number;
+            missingDocuments: any;
+            checkpointsTotal: number;
+            checkpointsCompleted: number;
+            nextCheckpoint: string | null;
+            userName: string | null;
+            userLanguage: string;
+            userBio: any;
         } | null;
     } | {
         message: string;
@@ -142,6 +154,10 @@ export declare class ChatService {
         systemPrompt: string;
     }>;
     /**
+     * Build system prompt with application context
+     */
+    private buildSystemPrompt;
+    /**
      * Create a fallback response when AI service is unavailable
      */
     private createFallbackResponse;
@@ -152,7 +168,7 @@ export declare class ChatService {
     /**
      * Add feedback to a message (thumbs up/down or detailed feedback)
      */
-    addMessageFeedback(messageId: string, userId: string, feedback: "thumbs_up" | "thumbs_down" | string): Promise<{
+    addMessageFeedback(messageId: string, userId: string, feedback: 'thumbs_up' | 'thumbs_down' | string): Promise<{
         model: string;
         userId: string;
         id: string;

@@ -28,6 +28,7 @@ export const ChatScreen = ({ route }: any) => {
     isSending,
     error,
     loadChatHistory,
+    loadSessions,
     sendMessage,
   } = useChatStore();
 
@@ -37,9 +38,11 @@ export const ChatScreen = ({ route }: any) => {
 
   useEffect(() => {
     if (isSignedIn && user) {
+      // Load both sessions list and chat history
+      loadSessions().catch(console.error);
       loadChatHistory(applicationId);
     }
-  }, [applicationId, isSignedIn, user, loadChatHistory]);
+  }, [applicationId, isSignedIn, user, loadChatHistory, loadSessions]);
 
   useEffect(() => {
     if (currentConversation && currentConversation.messages.length > 0) {

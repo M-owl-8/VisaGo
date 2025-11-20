@@ -160,3 +160,4 @@ apps/ai-service/
 - All AI calls now use the centralized system prompt
 - Fallback responses are 100% professional and aligned with VisaBuddy requirements
 
+

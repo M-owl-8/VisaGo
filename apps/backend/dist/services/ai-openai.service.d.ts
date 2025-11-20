@@ -67,6 +67,17 @@ export declare class AIOpenAIService {
      */
     static getFallbackResponse(userMessage: string): string;
     /**
+     * Generate document checklist for visa application
+     */
+    static generateChecklist(userContext: any, country: string, visaType: string): Promise<{
+        checklist: Array<{
+            document: string;
+            required: boolean;
+            description?: string;
+        }>;
+        type: string;
+    }>;
+    /**
      * Track AI usage for billing
      */
     static trackUsage(userId: string, tokensUsed: number, cost: number): Promise<void>;

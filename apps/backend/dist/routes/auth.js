@@ -243,5 +243,63 @@ router.get("/status", async (req, res) => {
         (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.INTERNAL_SERVER_ERROR, "Failed to check authentication status", "STATUS_CHECK_ERROR");
     }
 });
+/**
+ * POST /api/auth/forgot-password
+ * Request password reset
+ *
+ * @route POST /api/auth/forgot-password
+ * @access Public
+ * @body {string} email - User email address
+ * @returns {object} Success message
+ */
+router.post("/forgot-password", (0, request_validation_1.validateRequest)({
+    body: {
+        required: ["email"],
+        sanitize: ["email"],
+        validate: {
+            email: (val) => (0, validation_2.isValidEmail)(val),
+        },
+    },
+}), async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        await auth_service_1.AuthService.requestPasswordReset(email);
+        // Always return success to prevent user enumeration
+        (0, response_1.successResponse)(res, {
+            message: "If an account exists with this email, a password reset link has been sent.",
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * POST /api/auth/reset-password
+ * Reset password with token
+ *
+ * @route POST /api/auth/reset-password
+ * @access Public
+ * @body {string} token - Password reset token
+ * @body {string} password - New password
+ * @returns {object} Success message
+ */
+router.post("/reset-password", (0, request_validation_1.validateRequest)({
+    body: {
+        required: ["token", "password"],
+        sanitize: [],
+        validate: {},
+    },
+}), async (req, res, next) => {
+    try {
+        const { token, password } = req.body;
+        await auth_service_1.AuthService.resetPassword(token, password);
+        (0, response_1.successResponse)(res, {
+            message: "Password has been reset successfully.",
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 exports.default = router;
 //# sourceMappingURL=auth.js.map

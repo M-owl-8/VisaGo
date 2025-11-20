@@ -1,4 +1,4 @@
-import { PoolClient } from "pg";
+import { PoolClient } from 'pg';
 /**
  * PostgreSQL Connection Pool Service
  * Manages database connections efficiently for high concurrent load

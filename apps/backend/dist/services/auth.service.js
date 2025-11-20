@@ -3,6 +3,39 @@
  * Authentication service
  * Handles user registration, login, and authentication-related operations
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -321,6 +354,78 @@ class AuthService {
             }
             throw errors_1.errors.internalServer("Failed to authenticate with Google. Please try again.");
         }
+    }
+    /**
+   * Request password reset
+   * Generates a reset token and sends email
+   */
+    static async requestPasswordReset(email) {
+        const normalizedEmail = (0, validation_1.validateAndNormalizeEmail)(email);
+        const user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+        });
+        // Don't reveal if user exists (security best practice)
+        if (!user) {
+            return;
+        }
+        // Generate reset token (32 character random string)
+        const crypto = require('crypto');
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+        // Save reset token to database
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                resetToken,
+                resetTokenExpiry,
+            },
+        });
+        // Send password reset email
+        const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:19006'}/reset-password?token=${resetToken}`;
+        try {
+            const { emailService } = await Promise.resolve().then(() => __importStar(require("./email.service")));
+            const userName = user.firstName || user.email.split('@')[0];
+            await emailService.sendPasswordResetEmail(user.email, resetLink);
+        }
+        catch (error) {
+            // Log reset token if email service fails (for development)
+            console.log(`Password reset token for ${normalizedEmail}: ${resetToken}`);
+            console.log(`Reset link: ${resetLink}`);
+            console.warn("Email service not available, reset token logged to console");
+        }
+    }
+    /**
+     * Reset password with token
+     */
+    static async resetPassword(token, newPassword) {
+        // Validate password
+        const passwordValidation = (0, validation_1.validatePassword)(newPassword);
+        if (!passwordValidation.isValid) {
+            throw errors_1.errors.validationError(passwordValidation.errors.join(", "), { field: "password", errors: passwordValidation.errors });
+        }
+        // Find user by reset token
+        const user = await prisma.user.findFirst({
+            where: {
+                resetToken: token,
+                resetTokenExpiry: {
+                    gt: new Date(), // Token not expired
+                },
+            },
+        });
+        if (!user) {
+            throw errors_1.errors.unauthorized("Invalid or expired reset token");
+        }
+        // Hash new password
+        const passwordHash = await bcryptjs_1.default.hash(newPassword, constants_1.SECURITY_CONFIG.PASSWORD_HASH_ROUNDS);
+        // Update password and clear reset token
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                passwordHash,
+                resetToken: null,
+                resetTokenExpiry: null,
+            },
+        });
     }
 }
 exports.AuthService = AuthService;

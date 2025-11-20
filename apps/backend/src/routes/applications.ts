@@ -5,6 +5,7 @@ import { AIApplicationService } from "../services/ai-application.service";
 import { authenticateToken } from "../middleware/auth";
 import { buildAIUserContext, getQuestionnaireSummary } from "../services/ai-context.service";
 import { logError, logInfo } from "../middleware/logger";
+import { AIOpenAIService } from "../services/ai-openai.service";
 
 const router = express.Router();
 
@@ -229,82 +230,51 @@ router.post("/:id/generate-checklist", async (req: Request, res: Response, next:
       });
     }
 
-    // Step 3: Call AI service checklist endpoint
-    const aiServiceURL = getAIServiceURL();
-    const checklistEndpoint = `${aiServiceURL}/api/checklist/generate`;
-
-    logInfo("Calling AI service for checklist generation", {
-      url: checklistEndpoint,
-      applicationId,
-      userId,
-    });
-
+    // Step 3: Generate checklist using OpenAI directly
     try {
-      const aiResponse = await axios.post(
-        checklistEndpoint,
-        {
-          user_input: "Generate a complete document checklist for my visa application",
-          application_id: applicationId,
-          auth_token: req.headers.authorization?.replace("Bearer ", ""), // Pass JWT token for internal API calls
-          // Do NOT pass mock_context - use real context from backend
-        },
-        {
-          timeout: 60000, // 60 second timeout for AI generation
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      const application = await ApplicationsService.getApplication(applicationId, userId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          error: "APPLICATION_NOT_FOUND",
+          message: "Application not found",
+        });
+      }
+
+      logInfo("Generating checklist using OpenAI", {
+        applicationId,
+        userId,
+        country: application.country.name,
+        visaType: application.visaType.name,
+      });
+
+      const checklist = await AIOpenAIService.generateChecklist(
+        aiUserContext,
+        application.country.name,
+        application.visaType.name
       );
 
-      if (aiResponse.data.success && aiResponse.data.data) {
-        const checklist = aiResponse.data.data;
-
-        logInfo("Checklist generated successfully", {
-          userId,
-          applicationId,
-          checklistType: checklist.type,
-          itemCount: checklist.checklist?.length || 0,
-        });
-
-        return res.json({
-          success: true,
-          checklist: checklist,
-        });
-      } else {
-        throw new Error(
-          aiResponse.data.error || "AI service returned unsuccessful response"
-        );
-      }
-    } catch (axiosError) {
-      const error = axiosError as AxiosError;
-      
-      // Handle timeout
-      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
-        logError("AI service timeout", error, {
-          userId,
-          applicationId,
-          url: checklistEndpoint,
-        });
-        return res.status(504).json({
-          success: false,
-          error: "CHECKLIST_FAILED",
-          message: "VisaBuddy could not generate your checklist. The request timed out. Please try again later.",
-        });
-      }
-
-      // Handle other errors
-      logError("AI service call failed", error, {
+      logInfo("Checklist generated successfully", {
         userId,
         applicationId,
-        url: checklistEndpoint,
-        status: error.response?.status,
-        data: error.response?.data,
+        checklistType: checklist.type,
+        itemCount: checklist.checklist?.length || 0,
+      });
+
+      return res.json({
+        success: true,
+        checklist: checklist,
+      });
+    } catch (error: any) {
+      logError("Checklist generation failed", error, {
+        userId,
+        applicationId,
       });
 
       return res.status(500).json({
         success: false,
         error: "CHECKLIST_FAILED",
-        message: "VisaBuddy could not generate your checklist. Please try again later.",
+        message: error.message || "VisaBuddy could not generate your checklist. Please try again later.",
       });
     }
   } catch (error) {

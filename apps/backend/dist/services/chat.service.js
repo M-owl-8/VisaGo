@@ -13,13 +13,14 @@ const axios_1 = __importDefault(require("axios"));
 const usage_tracking_service_1 = require("./usage-tracking.service");
 const env_1 = require("../config/env");
 const logger_1 = require("../middleware/logger");
+const ai_openai_service_1 = require("./ai-openai.service");
 const prisma = new client_1.PrismaClient();
 /**
  * Get AI service URL from environment
  */
 function getAIServiceURL() {
     const envConfig = (0, env_1.getEnvConfig)();
-    return process.env.AI_SERVICE_URL || "http://localhost:8001";
+    return process.env.AI_SERVICE_URL || 'http://localhost:8001';
 }
 const AI_SERVICE_URL = getAIServiceURL();
 class ChatService {
@@ -40,7 +41,7 @@ class ChatService {
             data: {
                 userId,
                 applicationId: applicationId || null,
-                title: applicationId ? `Chat for ${applicationId}` : "General Chat",
+                title: applicationId ? `Chat for ${applicationId}` : 'General Chat',
             },
         });
         return newSession.id;
@@ -55,29 +56,74 @@ class ChatService {
                 include: {
                     country: true,
                     visaType: true,
-                    documents: true,
+                    documents: {
+                        select: {
+                            documentType: true,
+                            documentName: true,
+                            status: true,
+                            uploadedAt: true,
+                        },
+                    },
+                    checkpoints: {
+                        select: {
+                            title: true,
+                            isCompleted: true,
+                            order: true,
+                        },
+                        orderBy: { order: 'asc' },
+                    },
+                    user: {
+                        select: {
+                            firstName: true,
+                            language: true,
+                            bio: true,
+                        },
+                    },
                 },
             });
             if (!application) {
                 return null;
             }
-            const documentStatus = application.documents.reduce((acc, doc) => {
-                acc[doc.documentType] = doc.status;
-                return acc;
-            }, {});
+            // Get required documents from visa type
+            const requiredDocuments = JSON.parse(application.visaType.documentTypes || '[]');
+            // Calculate document statistics
+            const documentsUploaded = application.documents.length;
+            const documentsVerified = application.documents.filter((d) => d.status === 'verified').length;
+            const documentsPending = application.documents.filter((d) => d.status === 'pending').length;
+            const documentsRejected = application.documents.filter((d) => d.status === 'rejected').length;
+            // Find missing documents
+            const uploadedTypes = application.documents.map((d) => d.documentType);
+            const missingDocuments = requiredDocuments.filter((doc) => !uploadedTypes.includes(doc));
+            // Find next incomplete checkpoint
+            const nextCheckpoint = application.checkpoints.find((c) => !c.isCompleted);
             return {
                 country: application.country.name,
+                countryCode: application.country.code,
                 visaType: application.visaType.name,
                 processingDays: application.visaType.processingDays,
                 fee: application.visaType.fee,
-                requiredDocuments: JSON.parse(application.visaType.documentTypes || "[]"),
-                documentsCollected: application.documents.filter((d) => d.status === "verified").length,
-                totalDocuments: application.documents.length,
-                applicationStatus: application.status,
+                validity: application.visaType.validity,
+                status: application.status,
+                createdAt: application.createdAt,
+                // Document statistics
+                documentsTotal: requiredDocuments.length,
+                documentsUploaded,
+                documentsVerified,
+                documentsPending,
+                documentsRejected,
+                missingDocuments,
+                // Checkpoint progress
+                checkpointsTotal: application.checkpoints.length,
+                checkpointsCompleted: application.checkpoints.filter((c) => c.isCompleted).length,
+                nextCheckpoint: nextCheckpoint ? nextCheckpoint.title : null,
+                // User info
+                userName: application.user.firstName,
+                userLanguage: application.user.language || 'en',
+                userBio: application.user.bio ? JSON.parse(application.user.bio) : null,
             };
         }
         catch (error) {
-            console.error("Failed to extract application context:", error);
+            console.error('Failed to extract application context:', error);
             return null;
         }
     }
@@ -94,7 +140,7 @@ class ChatService {
             if (!history.length) {
                 const recentMessages = await prisma.chatMessage.findMany({
                     where: { sessionId },
-                    orderBy: { createdAt: "desc" },
+                    orderBy: { createdAt: 'desc' },
                     take: 10,
                 });
                 history = recentMessages
@@ -107,7 +153,7 @@ class ChatService {
                 applicationContext = await this.extractApplicationContext(applicationId);
             }
             // Build context string for RAG
-            let ragContext = "";
+            let ragContext = '';
             if (applicationContext) {
                 ragContext = `
 User's Current Visa Application:
@@ -115,69 +161,64 @@ User's Current Visa Application:
 - Visa Type: ${applicationContext.visaType}
 - Processing Time: ${applicationContext.processingDays} days
 - Fee: $${applicationContext.fee}
-- Documents Collected: ${applicationContext.documentsCollected}/${applicationContext.totalDocuments}
-- Required Documents: ${applicationContext.requiredDocuments.join(", ")}
-- Application Status: ${applicationContext.applicationStatus}
+- Documents Uploaded: ${applicationContext.documentsUploaded}/${applicationContext.documentsTotal}
+- Missing Documents: ${applicationContext.missingDocuments.length > 0 ? applicationContext.missingDocuments.join(', ') : 'None'}
+- Application Status: ${applicationContext.status}
         `.trim();
             }
             // Check if AI service is configured
             const envConfig = (0, env_1.getEnvConfig)();
             if (!envConfig.OPENAI_API_KEY) {
-                (0, logger_1.logWarn)("OpenAI API key not configured, using fallback response", {
+                (0, logger_1.logWarn)('OpenAI API key not configured, using fallback response', {
                     userId,
                     applicationId,
                 });
-                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, "AI service not configured. Please configure OPENAI_API_KEY in environment variables.");
+                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, 'AI service not configured. Please configure OPENAI_API_KEY in environment variables.');
             }
-            // Call AI service with full context
+            // Use OpenAI service directly (simplified ChatGPT-like experience)
             let aiResponse;
             try {
-                aiResponse = await axios_1.default.post(`${AI_SERVICE_URL}/api/chat`, {
-                    content,
-                    user_id: userId,
-                    application_id: applicationId,
-                    conversation_history: history,
-                    context: ragContext,
-                    country: applicationContext?.country,
-                    visa_type: applicationContext?.visaType,
-                }, {
-                    timeout: 30000, // 30 second timeout
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
+                // Build system prompt with context
+                const systemPrompt = this.buildSystemPrompt(applicationContext, ragContext);
+                // Convert history to OpenAI format
+                const openaiMessages = history.map((msg) => ({
+                    role: (msg.role === 'user' ? 'user' : 'assistant'),
+                    content: msg.content || '',
+                }));
+                // Add current user message
+                openaiMessages.push({
+                    role: 'user',
+                    content: content,
                 });
+                // Call OpenAI directly
+                aiResponse = await ai_openai_service_1.AIOpenAIService.chat(openaiMessages, systemPrompt);
+                // Format response to match expected structure
+                const formattedResponse = {
+                    message: aiResponse.message,
+                    sources: [],
+                    tokens_used: aiResponse.tokensUsed,
+                    model: aiResponse.model,
+                };
+                aiResponse = { data: formattedResponse };
             }
-            catch (axiosError) {
-                const error = axiosError;
-                // Enhanced error handling with fallback
-                const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
-                const isNetworkError = !error.response && error.request;
-                const isConnectionError = error.code === "ECONNREFUSED" || error.code === "ENOTFOUND";
-                if (isTimeout || isNetworkError || isConnectionError) {
-                    const errorMessage = isTimeout
-                        ? "AI service is taking longer than expected. Please try again in a moment."
-                        : isConnectionError
-                            ? "AI service is temporarily unavailable. Your message has been saved and we'll respond as soon as possible."
-                            : "AI service is temporarily unavailable. Please try again in a moment.";
-                    (0, logger_1.logWarn)("AI service unavailable, using fallback response", {
-                        userId,
-                        applicationId,
-                        error: error.message,
-                        errorCode: error.code,
-                    });
-                    return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, errorMessage);
-                }
-                // Re-throw other errors
-                throw error;
+            catch (openaiError) {
+                (0, logger_1.logError)('OpenAI service error', openaiError, {
+                    userId,
+                    applicationId,
+                });
+                // Provide user-friendly error message
+                const errorMessage = openaiError.message ||
+                    'AI service temporarily unavailable. Please try again in a moment.';
+                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, errorMessage);
             }
-            const { message, sources = [], tokens_used = 0, model = "gpt-4", } = aiResponse.data;
+            const { message, sources = [], tokens_used = 0, model = 'gpt-4' } = aiResponse.data;
             const responseTime = Date.now() - startTime;
             // Save user message
             await prisma.chatMessage.create({
                 data: {
                     sessionId,
                     userId,
-                    role: "user",
+                    role: 'user',
                     content,
                     sources: JSON.stringify([]),
                     model,
@@ -189,7 +230,7 @@ User's Current Visa Application:
                 data: {
                     sessionId,
                     userId,
-                    role: "assistant",
+                    role: 'assistant',
                     content: message,
                     sources: JSON.stringify(sources || []),
                     model,
@@ -203,7 +244,9 @@ User's Current Visa Application:
                 data: { updatedAt: new Date() },
             });
             // Track usage for cost analytics (async, don't block response)
-            usage_tracking_service_1.usageTrackingService.trackMessageUsage(userId, tokens_used, model, responseTime).catch((err) => console.error("Failed to track usage:", err));
+            usage_tracking_service_1.usageTrackingService
+                .trackMessageUsage(userId, tokens_used, model, responseTime)
+                .catch((err) => console.error('Failed to track usage:', err));
             return {
                 message,
                 sources,
@@ -214,11 +257,13 @@ User's Current Visa Application:
             };
         }
         catch (error) {
-            console.error("Chat service error:", error);
+            console.error('Chat service error:', error);
             // Track error (async, don't block)
-            usage_tracking_service_1.usageTrackingService.trackError(userId).catch((err) => console.error("Failed to track error:", err));
+            usage_tracking_service_1.usageTrackingService
+                .trackError(userId)
+                .catch((err) => console.error('Failed to track error:', err));
             // Fallback response if AI service is down
-            if (error.response?.status >= 500 || error.code === "ECONNREFUSED") {
+            if (error.response?.status >= 500 || error.code === 'ECONNREFUSED') {
                 try {
                     const sessionId = await this.getOrCreateSession(userId, applicationId);
                     // Save user message anyway
@@ -227,7 +272,7 @@ User's Current Visa Application:
                         data: {
                             sessionId,
                             userId,
-                            role: "user",
+                            role: 'user',
                             content,
                             sources: JSON.stringify([]),
                             responseTime,
@@ -235,13 +280,13 @@ User's Current Visa Application:
                     });
                 }
                 catch (saveError) {
-                    console.error("Failed to save message:", saveError);
+                    console.error('Failed to save message:', saveError);
                 }
                 return {
                     message: "AI service is temporarily unavailable. Your message has been saved and we'll respond as soon as possible.",
                     sources: [],
                     tokens_used: 0,
-                    model: "fallback",
+                    model: 'fallback',
                 };
             }
             throw error;
@@ -269,7 +314,7 @@ User's Current Visa Application:
                         in: sessionIds,
                     },
                 },
-                orderBy: { createdAt: "desc" },
+                orderBy: { createdAt: 'desc' },
                 skip: offset,
                 take: limit,
             });
@@ -280,7 +325,7 @@ User's Current Visa Application:
             const sessionId = userIdOrSessionId;
             const messages = await prisma.chatMessage.findMany({
                 where: { sessionId },
-                orderBy: { createdAt: "desc" },
+                orderBy: { createdAt: 'desc' },
                 take: limit,
             });
             return messages.reverse();
@@ -292,12 +337,12 @@ User's Current Visa Application:
     async getUserSessions(userId, limit = 20, offset = 0) {
         const sessions = await prisma.chatSession.findMany({
             where: { userId },
-            orderBy: { updatedAt: "desc" },
+            orderBy: { updatedAt: 'desc' },
             skip: offset,
             take: limit,
             include: {
                 messages: {
-                    orderBy: { createdAt: "desc" },
+                    orderBy: { createdAt: 'desc' },
                     take: 1,
                     select: {
                         content: true,
@@ -325,7 +370,7 @@ User's Current Visa Application:
             where: { id: sessionId, userId },
             include: {
                 messages: {
-                    orderBy: { createdAt: "asc" },
+                    orderBy: { createdAt: 'asc' },
                     select: {
                         id: true,
                         role: true,
@@ -341,7 +386,7 @@ User's Current Visa Application:
             },
         });
         if (!session) {
-            throw new Error("Session not found");
+            throw new Error('Session not found');
         }
         return session;
     }
@@ -353,7 +398,7 @@ User's Current Visa Application:
             where: { id: sessionId, userId },
         });
         if (!session) {
-            throw new Error("Session not found");
+            throw new Error('Session not found');
         }
         return await prisma.chatSession.update({
             where: { id: sessionId },
@@ -378,6 +423,32 @@ User's Current Visa Application:
         });
     }
     /**
+     * Build system prompt with application context
+     */
+    buildSystemPrompt(applicationContext, ragContext) {
+        let prompt = `You are a helpful AI assistant for visa applications. You help users with visa-related questions, document requirements, application processes, and general guidance.
+
+Guidelines:
+- Be friendly, professional, and helpful
+- Provide accurate information about visa processes
+- If you don't know something, say so honestly
+- Keep responses concise but informative
+- Support multiple languages (English, Uzbek, Russian)`;
+        if (applicationContext) {
+            prompt += `\n\nCurrent User Context:
+- Country: ${applicationContext.country}
+- Visa Type: ${applicationContext.visaType}
+- Processing Time: ${applicationContext.processingDays} days
+- Application Status: ${applicationContext.status}
+- Documents Uploaded: ${applicationContext.documentsUploaded}/${applicationContext.documentsTotal}
+${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${applicationContext.missingDocuments.join(', ')}` : ''}`;
+        }
+        if (ragContext) {
+            prompt += `\n\n${ragContext}`;
+        }
+        return prompt;
+    }
+    /**
      * Create a fallback response when AI service is unavailable
      */
     async createFallbackResponse(userId, applicationId, sessionId, content, startTime, errorMessage) {
@@ -387,10 +458,10 @@ User's Current Visa Application:
             data: {
                 sessionId,
                 userId,
-                role: "user",
+                role: 'user',
                 content,
                 sources: JSON.stringify([]),
-                model: "fallback",
+                model: 'fallback',
                 responseTime: 0,
             },
         });
@@ -400,10 +471,10 @@ User's Current Visa Application:
             data: {
                 sessionId,
                 userId,
-                role: "assistant",
+                role: 'assistant',
                 content: fallbackMessage,
                 sources: JSON.stringify([]),
-                model: "fallback",
+                model: 'fallback',
                 tokensUsed: 0,
                 responseTime,
             },
@@ -417,7 +488,7 @@ User's Current Visa Application:
             message: fallbackMessage,
             sources: [],
             tokens_used: 0,
-            model: "fallback",
+            model: 'fallback',
             id: assistantMessage.id,
             applicationContext: null,
         };
@@ -437,7 +508,7 @@ User's Current Visa Application:
             return response.data.data || response.data.results || [];
         }
         catch (error) {
-            console.error("Search error:", error);
+            console.error('Search error:', error);
             return [];
         }
     }
@@ -451,10 +522,10 @@ User's Current Visa Application:
                 where: { id: messageId, userId },
             });
             if (!message) {
-                throw new Error("Message not found");
+                throw new Error('Message not found');
             }
             // If it's a new thumbs_down, don't overwrite if already exists
-            if (feedback === "thumbs_down" && message.feedback === "thumbs_down") {
+            if (feedback === 'thumbs_down' && message.feedback === 'thumbs_down') {
                 return message;
             }
             return await prisma.chatMessage.update({
@@ -463,7 +534,7 @@ User's Current Visa Application:
             });
         }
         catch (error) {
-            console.error("Feedback error:", error);
+            console.error('Feedback error:', error);
             throw error;
         }
     }
@@ -499,7 +570,7 @@ User's Current Visa Application:
             };
         }
         catch (error) {
-            console.error("Clear history error:", error);
+            console.error('Clear history error:', error);
             throw error;
         }
     }
@@ -536,7 +607,7 @@ User's Current Visa Application:
             };
         }
         catch (error) {
-            console.error("Stats error:", error);
+            console.error('Stats error:', error);
             throw error;
         }
     }
@@ -548,7 +619,7 @@ User's Current Visa Application:
             return await usage_tracking_service_1.usageTrackingService.getDailyUsage(userId);
         }
         catch (error) {
-            console.error("Error getting daily usage:", error);
+            console.error('Error getting daily usage:', error);
             throw error;
         }
     }
@@ -560,7 +631,7 @@ User's Current Visa Application:
             return await usage_tracking_service_1.usageTrackingService.getWeeklyUsage(userId, 1);
         }
         catch (error) {
-            console.error("Error getting weekly usage:", error);
+            console.error('Error getting weekly usage:', error);
             throw error;
         }
     }
@@ -572,7 +643,7 @@ User's Current Visa Application:
             return await usage_tracking_service_1.usageTrackingService.getMonthlyUsage(userId, 1);
         }
         catch (error) {
-            console.error("Error getting monthly usage:", error);
+            console.error('Error getting monthly usage:', error);
             throw error;
         }
     }
@@ -584,7 +655,7 @@ User's Current Visa Application:
             return await usage_tracking_service_1.usageTrackingService.getCostAnalysis(userId);
         }
         catch (error) {
-            console.error("Error getting cost analysis:", error);
+            console.error('Error getting cost analysis:', error);
             throw error;
         }
     }

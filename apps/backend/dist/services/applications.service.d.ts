@@ -2,56 +2,7 @@ export declare class ApplicationsService {
     /**
      * Get all applications for a user
      */
-    static getUserApplications(userId: string): Promise<({
-        country: {
-            description: string | null;
-            name: string;
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            code: string;
-            flagEmoji: string;
-            requirements: string | null;
-        };
-        visaType: {
-            description: string | null;
-            name: string;
-            id: string;
-            countryId: string;
-            createdAt: Date;
-            updatedAt: Date;
-            fee: number;
-            requirements: string;
-            processingDays: number;
-            validity: string;
-            documentTypes: string;
-        };
-        checkpoints: {
-            title: string;
-            description: string | null;
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            order: number;
-            isCompleted: boolean;
-            completedAt: Date | null;
-            dueDate: Date | null;
-            applicationId: string;
-        }[];
-    } & {
-        userId: string;
-        status: string;
-        id: string;
-        countryId: string;
-        visaTypeId: string;
-        createdAt: Date;
-        updatedAt: Date;
-        notes: string | null;
-        expiryDate: Date | null;
-        progressPercentage: number;
-        submissionDate: Date | null;
-        approvalDate: Date | null;
-    })[]>;
+    static getUserApplications(userId: string): Promise<any[]>;
     /**
      * Get single application
      */
@@ -86,10 +37,10 @@ export declare class ApplicationsService {
             createdAt: Date;
             updatedAt: Date;
             order: number;
+            applicationId: string;
             isCompleted: boolean;
             completedAt: Date | null;
             dueDate: Date | null;
-            applicationId: string;
         }[];
     } & {
         userId: string;
@@ -143,10 +94,10 @@ export declare class ApplicationsService {
             createdAt: Date;
             updatedAt: Date;
             order: number;
+            applicationId: string;
             isCompleted: boolean;
             completedAt: Date | null;
             dueDate: Date | null;
-            applicationId: string;
         }[];
     } & {
         userId: string;
@@ -196,10 +147,10 @@ export declare class ApplicationsService {
             createdAt: Date;
             updatedAt: Date;
             order: number;
+            applicationId: string;
             isCompleted: boolean;
             completedAt: Date | null;
             dueDate: Date | null;
-            applicationId: string;
         }[];
     } & {
         userId: string;
@@ -225,10 +176,10 @@ export declare class ApplicationsService {
         createdAt: Date;
         updatedAt: Date;
         order: number;
+        applicationId: string;
         isCompleted: boolean;
         completedAt: Date | null;
         dueDate: Date | null;
-        applicationId: string;
     }>;
     /**
      * Delete application
