@@ -31,19 +31,26 @@ export const LanguageScreen = ({ navigation }: any) => {
 
   const handleLanguageChange = async (languageCode: string) => {
     try {
+      // Change language in i18n
       await i18n.changeLanguage(languageCode);
+      
+      // Save to AsyncStorage for persistence
       await AsyncStorage.setItem('app_language', languageCode);
       setSelectedLanguage(languageCode);
       
-      // Reload user applications after language change to prevent them from disappearing
+      // Sync language preference to user profile on backend (if logged in)
       try {
         const { useAuthStore } = require('../../store/auth');
         const authStore = useAuthStore.getState();
         if (authStore.isSignedIn && authStore.user) {
+          // Update user profile language preference
+          await authStore.updatePreferences({ language: languageCode });
+          
+          // Reload user applications after language change to prevent them from disappearing
           await authStore.fetchUserApplications();
         }
       } catch (error) {
-        console.warn('Failed to reload applications after language change:', error);
+        console.warn('Failed to sync language to profile or reload applications:', error);
       }
     } catch (error) {
       console.error('Failed to change language:', error);

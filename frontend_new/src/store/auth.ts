@@ -289,6 +289,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isSignedIn: true,
       });
 
+      // Sync user's language preference to i18n and AsyncStorage immediately
+      if (fullUser.language) {
+        try {
+          const { default: i18n } = require('../i18n');
+          await i18n.changeLanguage(fullUser.language);
+          await AsyncStorage.setItem('app_language', fullUser.language);
+        } catch (error) {
+          console.warn('Failed to sync user language to i18n on login:', error);
+        }
+      }
+
       // Fetch complete user profile from server (includes all fields)
       try {
         await get().fetchUserProfile();
@@ -545,6 +556,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
 
       set({user: updatedUser});
+
+      // Sync user's language preference to i18n and AsyncStorage
+      if (updatedUser.language) {
+        try {
+          const { default: i18n } = require('../i18n');
+          await i18n.changeLanguage(updatedUser.language);
+          await AsyncStorage.setItem('app_language', updatedUser.language);
+        } catch (error) {
+          console.warn('Failed to sync user language to i18n:', error);
+        }
+      }
 
       // Load questionnaire data if it exists
       if (updatedUser.bio) {

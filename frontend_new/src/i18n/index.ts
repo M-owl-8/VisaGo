@@ -87,17 +87,40 @@ const getDeviceLanguage = (): string => {
  */
 const initializeI18n = async () => {
   try {
-    // Check if user has saved a language preference
-    const savedLanguage = await AsyncStorage.getItem('app_language');
+    // Priority order:
+    // 1. User's saved language from profile (if logged in)
+    // 2. Saved language from AsyncStorage
+    // 3. Device language (first install)
+    // 4. Default to English
     
     let initialLanguage = 'en';
     
-    if (savedLanguage && resources[savedLanguage as keyof typeof resources]) {
-      // Use saved preference if available
-      initialLanguage = savedLanguage;
-    } else {
-      // Use device language on first install
-      initialLanguage = getDeviceLanguage();
+    // Check if user is logged in and has a language preference
+    try {
+      const userJson = await AsyncStorage.getItem('@user');
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        if (user.language && resources[user.language as keyof typeof resources]) {
+          initialLanguage = user.language;
+          // Also save to app_language for consistency
+          await AsyncStorage.setItem('app_language', user.language);
+        }
+      }
+    } catch (error) {
+      // If user data doesn't exist or is invalid, continue to next check
+    }
+    
+    // If no user language, check AsyncStorage
+    if (initialLanguage === 'en') {
+      const savedLanguage = await AsyncStorage.getItem('app_language');
+      if (savedLanguage && resources[savedLanguage as keyof typeof resources]) {
+        initialLanguage = savedLanguage;
+      } else {
+        // Use device language on first install
+        initialLanguage = getDeviceLanguage();
+        // Save device language for future use
+        await AsyncStorage.setItem('app_language', initialLanguage);
+      }
     }
     
     await i18next
@@ -114,11 +137,6 @@ const initializeI18n = async () => {
           useSuspense: false, // Disable suspense for React Native
         },
       });
-    
-    // Save the initial language if it wasn't saved before
-    if (!savedLanguage) {
-      await AsyncStorage.setItem('app_language', initialLanguage);
-    }
     
     return initialLanguage;
   } catch (error) {
