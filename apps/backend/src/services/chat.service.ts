@@ -208,7 +208,7 @@ User's Current Visa Application:
         );
       }
 
-      // Use OpenAI service directly (simplified ChatGPT-like experience)
+      // Use OpenAI service with RAG for better, context-aware responses
       let aiResponse;
       try {
         // Build system prompt with context
@@ -228,18 +228,43 @@ User's Current Visa Application:
           content: content,
         });
 
-        // Call OpenAI directly
-        aiResponse = await AIOpenAIService.chat(openaiMessages, systemPrompt);
+        // Use RAG for better responses (searches knowledge base)
+        // Falls back to regular chat if RAG fails
+        try {
+          const ragResponse = await AIOpenAIService.chatWithRAG(
+            openaiMessages,
+            userId,
+            applicationId,
+            systemPrompt
+          );
 
-        // Format response to match expected structure
-        const formattedResponse = {
-          message: aiResponse.message,
-          sources: [],
-          tokens_used: aiResponse.tokensUsed,
-          model: aiResponse.model,
-        };
+          // Format response with RAG sources
+          const formattedResponse = {
+            message: ragResponse.message,
+            sources: ragResponse.sources?.map((s: any) => ({
+              title: s.title,
+              content: s.content,
+              relevanceScore: s.relevanceScore,
+            })) || [],
+            tokens_used: ragResponse.tokensUsed,
+            model: ragResponse.model,
+          };
 
-        aiResponse = { data: formattedResponse };
+          aiResponse = { data: formattedResponse };
+        } catch (ragError) {
+          // Fallback to regular chat if RAG fails
+          console.warn('RAG search failed, using regular chat:', ragError);
+          const regularResponse = await AIOpenAIService.chat(openaiMessages, systemPrompt);
+          
+          const formattedResponse = {
+            message: regularResponse.message,
+            sources: [],
+            tokens_used: regularResponse.tokensUsed,
+            model: regularResponse.model,
+          };
+
+          aiResponse = { data: formattedResponse };
+        }
       } catch (openaiError: any) {
         logError('OpenAI service error', openaiError, {
           userId,
@@ -262,6 +287,15 @@ User's Current Visa Application:
       }
 
       const { message, sources = [], tokens_used = 0, model = 'gpt-4' } = aiResponse.data;
+
+      // Log RAG usage if sources are present
+      if (sources && sources.length > 0) {
+        logWarn('RAG sources used in response', {
+          userId,
+          applicationId,
+          sourceCount: sources.length,
+        });
+      }
 
       const responseTime = Date.now() - startTime;
 
@@ -342,7 +376,7 @@ User's Current Visa Application:
 
         return {
           message:
-            "AI service is temporarily unavailable. Your message has been saved and we'll respond as soon as possible.",
+            "I'm currently experiencing technical difficulties. Your message has been saved, and I'll respond as soon as the service is restored. Thank you for your patience!",
           sources: [],
           tokens_used: 0,
           model: 'fallback',
@@ -506,28 +540,47 @@ User's Current Visa Application:
    * Build system prompt with application context
    */
   private buildSystemPrompt(applicationContext: any, ragContext: string): string {
-    let prompt = `You are a helpful AI assistant for visa applications. You help users with visa-related questions, document requirements, application processes, and general guidance.
+    const userLanguage = applicationContext?.userLanguage || 'en';
+    const languageName = userLanguage === 'ru' ? 'Russian' : userLanguage === 'uz' ? 'Uzbek' : 'English';
+    
+    let prompt = `You are VisaBuddy, an expert AI assistant specializing in visa applications and immigration processes. Your goal is to provide accurate, helpful, and personalized guidance to users.
 
-Guidelines:
-- Be friendly, professional, and helpful
-- Provide accurate information about visa processes
-- If you don't know something, say so honestly
-- Keep responses concise but informative
-- Support multiple languages (English, Uzbek, Russian)`;
+Core Guidelines:
+- Be friendly, professional, and empathetic
+- Provide accurate, up-to-date information about visa processes
+- If you don't know something, say so honestly and suggest where they can find the information
+- Keep responses concise but comprehensive
+- Always respond in ${languageName} (${userLanguage})
+- Use clear, simple language that's easy to understand
+- Provide actionable advice and next steps when possible
+- Be encouraging and supportive, especially for complex visa processes`;
 
     if (applicationContext) {
-      prompt += `\n\nCurrent User Context:
-- Country: ${applicationContext.country}
+      prompt += `\n\nCurrent User's Visa Application Context:
+- Destination Country: ${applicationContext.country}
 - Visa Type: ${applicationContext.visaType}
 - Processing Time: ${applicationContext.processingDays} days
+- Application Fee: $${applicationContext.fee}
 - Application Status: ${applicationContext.status}
-- Documents Uploaded: ${applicationContext.documentsUploaded}/${applicationContext.documentsTotal}
-${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${applicationContext.missingDocuments.join(', ')}` : ''}`;
+- Documents Progress: ${applicationContext.documentsUploaded} of ${applicationContext.documentsTotal} documents uploaded
+${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${applicationContext.missingDocuments.join(', ')}` : '- All required documents uploaded'}
+${applicationContext.nextCheckpoint ? `- Next Step: ${applicationContext.nextCheckpoint}` : ''}
+
+Use this context to provide personalized, relevant advice. Reference their specific application when helpful.`;
+
+      // Add helpful suggestions based on status
+      if (applicationContext.status === 'draft') {
+        prompt += `\n\nThe user's application is in draft status. Encourage them to complete document uploads and provide guidance on next steps.`;
+      } else if (applicationContext.status === 'in_progress') {
+        prompt += `\n\nThe user's application is being processed. Provide reassurance and explain what happens during this stage.`;
+      }
     }
 
     if (ragContext) {
       prompt += `\n\n${ragContext}`;
     }
+
+    prompt += `\n\nRemember: Always be helpful, accurate, and supportive. If you reference information from the knowledge base, mention it naturally in your response.`;
 
     return prompt;
   }
@@ -558,8 +611,8 @@ ${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${appl
       },
     });
 
-    // Create fallback assistant message
-    const fallbackMessage = `I apologize, but I'm currently unable to process your request. ${errorMessage} Please try again in a few moments, or contact support if the issue persists.`;
+    // Create fallback assistant message with helpful tone
+    const fallbackMessage = `I apologize, but I'm currently unable to process your request. ${errorMessage}\n\nYour message has been saved, and I'll do my best to help you once the service is restored. In the meantime, you can:\n- Check your application status in the Applications section\n- Review your uploaded documents\n- Contact our support team if you need immediate assistance\n\nThank you for your understanding!`;
 
     const assistantMessage = await prisma.chatMessage.create({
       data: {
