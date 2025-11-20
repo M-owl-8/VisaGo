@@ -147,7 +147,7 @@ router.post(
             itemCount: checklist.checklist?.length || 0,
             hasNotes: Array.isArray(checklist.notes),
             // Check for US F-1 specific documents (if student visa to US)
-            expectedDocuments: [] as string[],
+            expectedDocuments: [] as Array<{ name: string; found: boolean }>,
           };
 
           if (
