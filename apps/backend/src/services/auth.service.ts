@@ -3,14 +3,14 @@
  * Handles user registration, login, and authentication-related operations
  */
 
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import { generateToken } from "../middleware/auth";
-import { errors, ApiError } from "../utils/errors";
-import { validatePassword, validateAndNormalizeEmail } from "../utils/validation";
-import { SECURITY_CONFIG } from "../config/constants";
-import { resilientOperation, getDatabaseErrorMessage } from "../utils/db-resilience";
-import db from "../db";
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import { generateToken } from '../middleware/auth';
+import { errors, ApiError } from '../utils/errors';
+import { validatePassword, validateAndNormalizeEmail } from '../utils/validation';
+import { SECURITY_CONFIG } from '../config/constants';
+import { resilientOperation, getDatabaseErrorMessage } from '../utils/db-resilience';
+import db from '../db';
 
 const prisma = db; // Use shared resilient instance
 
@@ -53,11 +53,11 @@ export interface AuthResponse {
 export class AuthService {
   /**
    * Register a new user with email and password
-   * 
+   *
    * @param payload - Registration data
    * @returns Authentication response with token and user data
    * @throws {ApiError} If validation fails or user already exists
-   * 
+   *
    * @example
    * ```typescript
    * const result = await AuthService.register({
@@ -74,37 +74,35 @@ export class AuthService {
 
     // Validate password
     if (!payload.password) {
-      throw errors.validationError("Password is required");
+      throw errors.validationError('Password is required');
     }
 
     const passwordValidation = validatePassword(payload.password);
     if (!passwordValidation.isValid) {
-      throw errors.validationError(
-        passwordValidation.errors.join(", "),
-        { field: "password", errors: passwordValidation.errors }
-      );
+      throw errors.validationError(passwordValidation.errors.join(', '), {
+        field: 'password',
+        errors: passwordValidation.errors,
+      });
     }
 
     // Check if user already exists (with resilience)
     const existingUser = await resilientOperation(
       prisma,
-      () => prisma.user.findUnique({
-        where: { email: normalizedEmail },
-      }),
+      () =>
+        prisma.user.findUnique({
+          where: { email: normalizedEmail },
+        }),
       { retry: { maxAttempts: 2 } }
     ).catch((error) => {
       throw errors.internalServer(getDatabaseErrorMessage(error));
     });
 
     if (existingUser) {
-      throw errors.conflict("Email");
+      throw errors.conflict('Email');
     }
 
     // Hash password with configured rounds for production security
-    const passwordHash = await bcrypt.hash(
-      payload.password,
-      SECURITY_CONFIG.PASSWORD_HASH_ROUNDS
-    );
+    const passwordHash = await bcrypt.hash(payload.password, SECURITY_CONFIG.PASSWORD_HASH_ROUNDS);
 
     // Create user
     const user = await prisma.user.create({
@@ -136,11 +134,11 @@ export class AuthService {
 
   /**
    * Login with email and password
-   * 
+   *
    * @param payload - Login credentials
    * @returns Authentication response with token and user data
    * @throws {ApiError} If credentials are invalid
-   * 
+   *
    * @example
    * ```typescript
    * const result = await AuthService.login({
@@ -155,33 +153,47 @@ export class AuthService {
     try {
       normalizedEmail = validateAndNormalizeEmail(payload.email);
     } catch (error) {
-      throw errors.validationError("Please enter a valid email address");
+      throw errors.validationError('Please enter a valid email address');
     }
 
     // Validate password
     if (!payload.password) {
-      throw errors.validationError("Password is required");
+      throw errors.validationError('Password is required');
     }
 
     if (payload.password.length < 8) {
-      throw errors.validationError("Password must be at least 8 characters");
+      throw errors.validationError('Password must be at least 8 characters');
     }
 
     try {
-      // Find user
-      const user = await prisma.user.findUnique({
-        where: { email: normalizedEmail },
+      // Find user with resilience for database connection issues
+      const user = await resilientOperation(
+        prisma,
+        () =>
+          prisma.user.findUnique({
+            where: { email: normalizedEmail },
+          }),
+        { retry: { maxAttempts: 2 } }
+      ).catch((error) => {
+        // Log database connection errors for debugging
+        console.error('Database error during login:', {
+          email: normalizedEmail,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw errors.internalServer(
+          'Authentication service temporarily unavailable. Please try again.'
+        );
       });
 
       if (!user) {
         // Use generic message to prevent user enumeration
-        throw errors.unauthorized("Invalid email or password");
+        throw errors.unauthorized('Invalid email or password');
       }
 
       if (!user.passwordHash) {
         // User exists but has no password (likely signed up with Google)
         throw errors.unauthorized(
-          "This account was created with Google Sign-In. Please use Google to sign in, or reset your password."
+          'This account was created with Google Sign-In. Please use Google to sign in, or reset your password.'
         );
       }
 
@@ -190,7 +202,7 @@ export class AuthService {
 
       if (!isPasswordValid) {
         // Use generic message to prevent user enumeration
-        throw errors.unauthorized("Invalid email or password");
+        throw errors.unauthorized('Invalid email or password');
       }
 
       // Generate token
@@ -211,13 +223,19 @@ export class AuthService {
       if (error instanceof ApiError) {
         throw error;
       }
-      
+
       // Database errors
       if (error && typeof error === 'object' && 'code' in error) {
-        throw errors.internalServer("Authentication service temporarily unavailable. Please try again.");
+        console.error('Database error during login:', {
+          email: normalizedEmail,
+          errorCode: (error as any).code,
+        });
+        throw errors.internalServer(
+          'Authentication service temporarily unavailable. Please try again.'
+        );
       }
-      
-      throw errors.internalServer("Login failed. Please try again.");
+
+      throw errors.internalServer('Login failed. Please try again.');
     }
   }
 
@@ -231,7 +249,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw errors.notFound("User");
+      throw errors.notFound('User');
     }
 
     return {
@@ -254,7 +272,15 @@ export class AuthService {
    * Update user profile
    */
   static async updateProfile(userId: string, updates: any) {
-    const allowedFields = ["firstName", "lastName", "phone", "avatar", "language", "timezone", "currency"];
+    const allowedFields = [
+      'firstName',
+      'lastName',
+      'phone',
+      'avatar',
+      'language',
+      'timezone',
+      'currency',
+    ];
     const filteredUpdates: any = {};
 
     Object.keys(updates).forEach((key) => {
@@ -288,7 +314,7 @@ export class AuthService {
    */
   static async refreshToken(userId: string): Promise<string> {
     if (!userId) {
-      throw errors.unauthorized("User ID is required for token refresh");
+      throw errors.unauthorized('User ID is required for token refresh');
     }
 
     try {
@@ -302,7 +328,7 @@ export class AuthService {
       });
 
       if (!user) {
-        throw errors.unauthorized("User not found. Please log in again.");
+        throw errors.unauthorized('User not found. Please log in again.');
       }
 
       // Generate new token with same expiry as original
@@ -311,7 +337,7 @@ export class AuthService {
       if (error instanceof ApiError) {
         throw error;
       }
-      throw errors.internalServer("Failed to refresh token. Please log in again.");
+      throw errors.internalServer('Failed to refresh token. Please log in again.');
     }
   }
 
@@ -328,7 +354,7 @@ export class AuthService {
   }): Promise<AuthResponse> {
     // Validate required fields
     if (!payload.googleId || !payload.email) {
-      throw errors.validationError("Google ID and email are required for Google Sign-In");
+      throw errors.validationError('Google ID and email are required for Google Sign-In');
     }
 
     // Validate email format
@@ -336,7 +362,7 @@ export class AuthService {
 
     // Validate Google ID format (should be numeric string)
     if (!/^\d+$/.test(payload.googleId)) {
-      throw errors.validationError("Invalid Google ID format");
+      throw errors.validationError('Invalid Google ID format');
     }
 
     try {
@@ -374,7 +400,7 @@ export class AuthService {
       } else if (user.googleId !== payload.googleId) {
         // Google ID mismatch - security issue
         throw errors.forbidden(
-          "This email is already associated with a different Google account. Please use the original account or contact support."
+          'This email is already associated with a different Google account. Please use the original account or contact support.'
         );
       }
 
@@ -395,103 +421,100 @@ export class AuthService {
       if (error instanceof ApiError) {
         throw error;
       }
-      
+
       // Database errors
       if (error && typeof error === 'object' && 'code' in error) {
         if (error.code === 'P2002') {
-          throw errors.conflict("Email or Google ID");
+          throw errors.conflict('Email or Google ID');
         }
       }
-      
-      throw errors.internalServer("Failed to authenticate with Google. Please try again.");
+
+      throw errors.internalServer('Failed to authenticate with Google. Please try again.');
     }
   }
-    /**
+  /**
    * Request password reset
    * Generates a reset token and sends email
    */
-    static async requestPasswordReset(email: string): Promise<void> {
-      const normalizedEmail = validateAndNormalizeEmail(email);
-      
-      const user = await prisma.user.findUnique({
-        where: { email: normalizedEmail },
-      });
-      
-      // Don't reveal if user exists (security best practice)
-      if (!user) {
-        return;
-      }
-      
-      // Generate reset token (32 character random string)
-      const crypto = require('crypto');
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-      
-      // Save reset token to database
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          resetToken,
-          resetTokenExpiry,
-        },
-      });
-      
-      // Send password reset email
-      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:19006'}/reset-password?token=${resetToken}`;
-      
-      try {
-        const { emailService } = await import("./email.service");
-        const userName = user.firstName || user.email.split('@')[0];
-        await emailService.sendPasswordResetEmail(user.email, resetLink);
-      } catch (error) {
-        // Log reset token if email service fails (for development)
-        console.log(`Password reset token for ${normalizedEmail}: ${resetToken}`);
-        console.log(`Reset link: ${resetLink}`);
-        console.warn("Email service not available, reset token logged to console");
-      }
+  static async requestPasswordReset(email: string): Promise<void> {
+    const normalizedEmail = validateAndNormalizeEmail(email);
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    // Don't reveal if user exists (security best practice)
+    if (!user) {
+      return;
     }
-  
-    /**
-     * Reset password with token
-     */
-    static async resetPassword(token: string, newPassword: string): Promise<void> {
-      // Validate password
-      const passwordValidation = validatePassword(newPassword);
-      if (!passwordValidation.isValid) {
-        throw errors.validationError(
-          passwordValidation.errors.join(", "),
-          { field: "password", errors: passwordValidation.errors }
-        );
-      }
-      
-      // Find user by reset token
-      const user = await prisma.user.findFirst({
-        where: {
-          resetToken: token,
-          resetTokenExpiry: {
-            gt: new Date(), // Token not expired
-          },
-        },
-      });
-      
-      if (!user) {
-        throw errors.unauthorized("Invalid or expired reset token");
-      }
-      
-      // Hash new password
-      const passwordHash = await bcrypt.hash(
-        newPassword,
-        SECURITY_CONFIG.PASSWORD_HASH_ROUNDS
-      );
-      
-      // Update password and clear reset token
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          passwordHash,
-          resetToken: null,
-          resetTokenExpiry: null,
-        },
-      });
+
+    // Generate reset token (32 character random string)
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Save reset token to database
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken,
+        resetTokenExpiry,
+      },
+    });
+
+    // Send password reset email
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:19006'}/reset-password?token=${resetToken}`;
+
+    try {
+      const { emailService } = await import('./email.service');
+      const userName = user.firstName || user.email.split('@')[0];
+      await emailService.sendPasswordResetEmail(user.email, resetLink);
+    } catch (error) {
+      // Log reset token if email service fails (for development)
+      console.log(`Password reset token for ${normalizedEmail}: ${resetToken}`);
+      console.log(`Reset link: ${resetLink}`);
+      console.warn('Email service not available, reset token logged to console');
     }
   }
+
+  /**
+   * Reset password with token
+   */
+  static async resetPassword(token: string, newPassword: string): Promise<void> {
+    // Validate password
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      throw errors.validationError(passwordValidation.errors.join(', '), {
+        field: 'password',
+        errors: passwordValidation.errors,
+      });
+    }
+
+    // Find user by reset token
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: {
+          gt: new Date(), // Token not expired
+        },
+      },
+    });
+
+    if (!user) {
+      throw errors.unauthorized('Invalid or expired reset token');
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, SECURITY_CONFIG.PASSWORD_HASH_ROUNDS);
+
+    // Update password and clear reset token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+  }
+}
