@@ -31,8 +31,7 @@ const getApiBaseUrl = (): string => {
   }
 
   // Default production Railway URL
-  // TODO: Replace with your actual Railway backend URL
-  return 'https://visabuddy-backend-production.up.railway.app';
+  return 'https://visago-production.up.railway.app';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -47,7 +46,9 @@ const CACHE_DEFAULT_TTL_MS = 1000 * 60 * 10; // 10 minutes
 const OFFLINE_QUEUE_STORAGE_KEY = '@visabuddy_request_queue_v1';
 const MAX_OFFLINE_QUEUE_SIZE = 25;
 
-type ApiRequestConfig<T = any> = AxiosRequestConfig<T> & { metadata?: RequestMetadata };
+type ApiRequestConfig<T = any> = AxiosRequestConfig<T> & {
+  metadata?: RequestMetadata;
+};
 
 type CachedApiEntry = {
   data: any;

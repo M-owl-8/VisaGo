@@ -60,12 +60,12 @@ const getApiBaseUrl = (): string => {
     if (typeof Platform !== 'undefined' && Platform.OS === 'android') {
       return __DEV__
         ? 'http://10.0.2.2:3000'
-        : 'https://visabuddy-backend-production.up.railway.app';
+        : 'https://visago-production.up.railway.app';
     }
     // Fallback to localhost in development
     return __DEV__
       ? 'http://localhost:3000'
-      : 'https://visabuddy-backend-production.up.railway.app';
+      : 'https://visago-production.up.railway.app';
   }
 
   // Expo environment variables (available at build time)
@@ -83,7 +83,7 @@ const getApiBaseUrl = (): string => {
   }
   // Production default (Railway)
   if (process.env?.NODE_ENV === 'production') {
-    return 'https://visabuddy-backend-production.up.railway.app';
+    return 'https://visago-production.up.railway.app';
   }
   // Development fallback - use 10.0.2.2 for Android emulator
   // Note: For emulator, set EXPO_PUBLIC_API_URL=http://10.0.2.2:3000

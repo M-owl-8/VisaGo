@@ -3,8 +3,8 @@
  * Handles streaming responses for AI chat with progressive text rendering
  */
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Platform} from 'react-native';
 
 // Determine API URL based on environment
 const getApiBaseUrl = (): string => {
@@ -12,10 +12,14 @@ const getApiBaseUrl = (): string => {
   if (typeof process === 'undefined') {
     // In Android emulator, use 10.0.2.2 instead of localhost
     if (Platform.OS === 'android') {
-      return __DEV__ ? 'http://10.0.2.2:3000' : 'https://visabuddy-backend-production.up.railway.app';
+      return __DEV__
+        ? 'http://10.0.2.2:3000'
+        : 'https://visago-production.up.railway.app';
     }
     // Fallback to localhost in development, production URL otherwise
-    return __DEV__ ? 'http://localhost:3000' : 'https://visabuddy-backend-production.up.railway.app';
+    return __DEV__
+      ? 'http://localhost:3000'
+      : 'https://visago-production.up.railway.app';
   }
 
   // Expo environment variables
@@ -25,7 +29,7 @@ const getApiBaseUrl = (): string => {
   if (process.env?.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
-  return "https://visabuddy-backend-production.up.railway.app";
+  return 'https://visago-production.up.railway.app';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -34,7 +38,7 @@ export interface StreamingOptions {
   onChunk: (chunk: string) => void;
   onComplete: (fullText: string) => void;
   onError: (error: Error) => void;
-  language?: "en" | "uz" | "ru";
+  language?: 'en' | 'uz' | 'ru';
   applicationId?: string;
   conversationHistory?: any[];
 }
@@ -51,20 +55,20 @@ export class StreamingApiClient {
    */
   async sendMessageStream(
     content: string,
-    options: StreamingOptions
-  ): Promise<{ abort: () => void; messageId: string }> {
+    options: StreamingOptions,
+  ): Promise<{abort: () => void; messageId: string}> {
     const streamId = `stream_${Date.now()}`;
     const abortController = new AbortController();
     this.abortControllers.set(streamId, abortController);
 
-    let messageId = "";
-    let fullText = "";
+    let messageId = '';
+    let fullText = '';
 
     try {
       // Get token from storage
-      const token = await AsyncStorage.getItem("@auth_token");
+      const token = await AsyncStorage.getItem('@auth_token');
       if (!token) {
-        throw new Error("No authentication token found");
+        throw new Error('No authentication token found');
       }
 
       // Prepare request payload
@@ -72,16 +76,16 @@ export class StreamingApiClient {
         content,
         applicationId: options.applicationId,
         conversationHistory: options.conversationHistory || [],
-        language: options.language || "en",
+        language: options.language || 'en',
       };
 
       // Start streaming request
       const response = await fetch(`${this.baseURL}/chat/stream`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          "Accept": "text/event-stream",
+          Accept: 'text/event-stream',
         },
         body: JSON.stringify(payload),
         signal: abortController.signal,
@@ -90,18 +94,19 @@ export class StreamingApiClient {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`
+          errorData.error?.message ||
+            `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 
       // Handle response based on platform
-      if (Platform.OS === "web") {
+      if (Platform.OS === 'web') {
         // Web: Use ReadableStream
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
 
         while (true) {
-          const { done, value } = await reader.read();
+          const {done, value} = await reader.read();
           if (done) break;
 
           const chunk = decoder.decode(value);
@@ -113,20 +118,20 @@ export class StreamingApiClient {
       } else {
         // Native: Parse JSON responses
         const text = await response.text();
-        const lines = text.split("\n").filter((line) => line.trim());
+        const lines = text.split('\n').filter(line => line.trim());
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
+          if (line.startsWith('data: ')) {
             const data = line.slice(6);
             try {
               const parsed = JSON.parse(data);
-              if (parsed.type === "chunk") {
+              if (parsed.type === 'chunk') {
                 fullText += parsed.content;
                 options.onChunk(parsed.content);
-              } else if (parsed.type === "complete") {
+              } else if (parsed.type === 'complete') {
                 messageId = parsed.id;
                 fullText = parsed.content;
-              } else if (parsed.type === "error") {
+              } else if (parsed.type === 'error') {
                 throw new Error(parsed.message);
               }
             } catch (e) {
@@ -138,7 +143,7 @@ export class StreamingApiClient {
 
       options.onComplete(fullText);
     } catch (error: any) {
-      if (error.name !== "AbortError") {
+      if (error.name !== 'AbortError') {
         const err = error instanceof Error ? error : new Error(String(error));
         options.onError(err);
       }
@@ -158,21 +163,21 @@ export class StreamingApiClient {
   private processStreamChunk(
     chunk: string,
     options: StreamingOptions,
-    setIds: (id: string, text: string) => void
+    setIds: (id: string, text: string) => void,
   ): void {
-    const lines = chunk.split("\n");
+    const lines = chunk.split('\n');
 
     for (const line of lines) {
-      if (line.startsWith("data: ")) {
+      if (line.startsWith('data: ')) {
         const data = line.slice(6);
         try {
           const parsed = JSON.parse(data);
 
-          if (parsed.type === "chunk") {
+          if (parsed.type === 'chunk') {
             options.onChunk(parsed.content);
-          } else if (parsed.type === "complete") {
+          } else if (parsed.type === 'complete') {
             setIds(parsed.id, parsed.content);
-          } else if (parsed.type === "error") {
+          } else if (parsed.type === 'error') {
             throw new Error(parsed.message);
           }
         } catch (e) {
