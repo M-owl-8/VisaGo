@@ -355,7 +355,7 @@ router.post('/test-probability', async (req: Request, res: Response, next: NextF
             : 'unknown';
         } else if (questionnaireSummary.appLanguage === 'ru') {
           // Check for Cyrillic characters
-          languageVerification.warningLanguage = /[Р°-СЏРђ-РЇС‘РЃ]/.test(warning)
+          languageVerification.warningLanguage = /\p{Script=Cyrillic}/u.test(warning)
             ? 'ru'
             : 'unknown';
         } else {
