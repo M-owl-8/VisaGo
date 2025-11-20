@@ -6,7 +6,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { shallow } from 'zustand/shallow';
 import { useAuthStore } from './store/auth';
 import { initializeGoogleSignIn } from './services/google-oauth';
 import { GOOGLE_WEB_CLIENT_ID } from './config/constants';
@@ -14,7 +13,11 @@ import { initializeErrorLogger, logError, setUserContext } from './services/erro
 import { startNetworkMonitoring, stopNetworkMonitoring } from './services/network';
 import { OfflineBanner } from './components/OfflineBanner';
 import { useNotificationStore } from './store/notifications';
-import { initializePushNotifications, cleanupPushNotifications } from './services/pushNotifications';
+import { initializePushNotifications, cleanupPushNotifications, handleBackgroundNotification } from './services/pushNotifications';
+import { initializeFirebase, setupBackgroundMessageHandler } from './services/firebase';
+import './i18n'; // Initialize i18next
+import { useTranslation } from 'react-i18next';
+import { isHomePageFrozen } from './config/features';
 
 initializeErrorLogger();
 
@@ -24,13 +27,17 @@ import LoginScreen from './screens/auth/LoginScreen';
 import RegisterScreen from './screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './screens/auth/ForgotPasswordScreen';
 import QuestionnaireScreen from './screens/onboarding/QuestionnaireScreen';
-import HomeScreen from './screens/home/HomeScreen';
 import VisaApplicationScreen from './screens/visa/VisaApplicationScreen';
 import ApplicationDetailScreen from './screens/visa/ApplicationDetailScreen';
 import {ChatScreen} from './screens/chat/ChatScreen';
 import ProfileScreen from './screens/profile/ProfileScreen';
 import {DocumentUploadScreen} from './screens/documents/DocumentUploadScreen';
 import {DocumentPreviewScreen} from './screens/documents/DocumentPreviewScreen';
+import {ProfileEditScreen} from './screens/profile/ProfileEditScreen';
+import {LanguageScreen} from './screens/profile/LanguageScreen';
+import {SecurityScreen} from './screens/profile/SecurityScreen';
+import {HelpSupportScreen} from './screens/profile/HelpSupportScreen';
+import NotificationSettingsScreen from './screens/notifications/NotificationSettingsScreen';
 
 // Theme colors
 const colors = {
@@ -69,17 +76,17 @@ function AuthStack() {
 // APP TABS (Main Screen)
 // ============================================================================
 function AppTabs() {
+  const { t } = useTranslation();
+  
   return (
     <Tab.Navigator
+      initialRouteName="Applications"
       screenOptions={({route}) => ({
         headerShown: true,
         tabBarIcon: ({focused, color, size}) => {
           let iconName: string = '';
 
           switch (route.name) {
-            case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
             case 'Applications':
               iconName = focused ? 'document-text' : 'document-text-outline';
               break;
@@ -90,7 +97,7 @@ function AppTabs() {
               iconName = focused ? 'person' : 'person-outline';
               break;
             default:
-              iconName = 'home-outline';
+              iconName = 'document-text-outline';
           }
 
           return <Icon name={iconName} size={size} color={color} />;
@@ -142,18 +149,10 @@ function AppTabs() {
         ),
       })}>
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          title: 'Progress',
-          headerShown: false,
-        }}
-      />
-      <Tab.Screen
         name="Applications"
         component={VisaApplicationScreen}
         options={{
-          title: 'Applications',
+          title: t('applications.title'),
           headerShown: false,
         }}
       />
@@ -161,13 +160,13 @@ function AppTabs() {
         name="Chat"
         component={ChatScreen}
         options={{
-          title: 'AI Assistant',
+          title: t('chat.aiAssistant'),
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{title: 'Profile'}}
+        options={{title: t('profile.profile')}}
       />
     </Tab.Navigator>
   );
@@ -204,6 +203,60 @@ function MainAppStack() {
         component={DocumentPreviewScreen}
         options={{
           presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="ProfileEdit"
+        component={ProfileEditScreen}
+        options={{
+          presentation: 'card',
+          animation: 'slide_from_right',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Questionnaire"
+        component={QuestionnaireScreen}
+        options={{
+          presentation: 'card',
+          animation: 'slide_from_right',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Language"
+        component={LanguageScreen}
+        options={{
+          presentation: 'card',
+          animation: 'slide_from_right',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+        options={{
+          presentation: 'card',
+          animation: 'slide_from_right',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Security"
+        component={SecurityScreen}
+        options={{
+          presentation: 'card',
+          animation: 'slide_from_right',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="HelpSupport"
+        component={HelpSupportScreen}
+        options={{
+          presentation: 'card',
+          animation: 'slide_from_right',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>
@@ -283,23 +336,11 @@ function AppContent() {
   const user = useAuthStore((state) => state.user);
   const initializeApp = useAuthStore((state) => state.initializeApp);
   const [forceShow, setForceShow] = useState(false);
-  const {
-    preferences,
-    preferencesLoaded,
-    loadPreferences,
-    clearDeviceToken,
-  } = useNotificationStore(
-    (state) => ({
-      preferences: state.preferences,
-      preferencesLoaded: state.preferencesLoaded,
-      loadPreferences: state.loadPreferences,
-      clearDeviceToken: state.clearDeviceToken,
-    }),
-    shallow
-  );
-
-  // Check if questionnaire is completed - this will automatically update when user state changes
-  const needsQuestionnaire = isSignedIn && user && !user.questionnaireCompleted;
+  // Use separate selectors to avoid getSnapshot warning
+  const preferences = useNotificationStore((state) => state.preferences);
+  const preferencesLoaded = useNotificationStore((state) => state.preferencesLoaded);
+  const loadPreferences = useNotificationStore((state) => state.loadPreferences);
+  const clearDeviceToken = useNotificationStore((state) => state.clearDeviceToken);
 
   // Debug logging - watch for user changes
   useEffect(() => {
@@ -307,10 +348,8 @@ function AppContent() {
       isSignedIn,
       hasUser: !!user,
       userId: user?.id,
-      questionnaireCompleted: user?.questionnaireCompleted,
-      needsQuestionnaire,
     });
-  }, [isSignedIn, user, needsQuestionnaire]);
+  }, [isSignedIn, user]);
 
   useEffect(() => {
     console.log('=== APP.TSX: useEffect Starting ===');
@@ -326,31 +365,80 @@ function AppContent() {
         console.error('=== APP.TSX: initializeApp Error ===', error);
         // Force loading to false if initialization fails
         if (mounted) {
-          // The store should handle this, but ensure we don't stay stuck
-          setTimeout(() => {
-            if (mounted) {
-              console.log(
-                '=== APP.TSX: Force setting loading to false after error ===',
-              );
-            }
-          }, 1000);
+          const authState = useAuthStore.getState();
+          if (authState.isLoading) {
+            useAuthStore.setState({ isLoading: false });
+            console.log('=== APP.TSX: Force set isLoading to false after error ===');
+          }
         }
       }
     };
 
-    // Add a safety timeout - if initialization takes more than 10 seconds, force continue
+    // Add a safety timeout - if initialization takes more than 3 seconds, force continue
     const safetyTimeout = setTimeout(() => {
       if (mounted) {
-        // Only log in development, suppress in production
-        if (__DEV__) {
-          console.warn(
-            '=== APP.TSX: Safety timeout - initialization taking too long ===',
-          );
+        const authState = useAuthStore.getState();
+        if (authState.isLoading) {
+          console.warn('=== APP.TSX: Safety timeout - forcing isLoading to false ===');
+          useAuthStore.setState({ isLoading: false });
         }
       }
-    }, 10000);
+    }, 3000);
 
     initApp();
+
+    // Cleanup function
+    return () => {
+      mounted = false;
+      clearTimeout(safetyTimeout);
+    };
+
+    // Initialize Firebase (non-blocking)
+    // This must happen before any Firebase services are used
+    // React Native Firebase auto-initializes from google-services.json
+    // We just need to verify it's ready and set up handlers
+    initializeFirebase()
+      .then((initialized) => {
+        if (initialized) {
+          // Set up background message handler after Firebase is initialized
+          setupBackgroundMessageHandler(handleBackgroundNotification).catch(
+            (error) => {
+              // Silently fail - background handler is optional
+              if (__DEV__) {
+                console.warn(
+                  '[Firebase] Background message handler setup failed:',
+                  error?.message || error
+                );
+              }
+            }
+          );
+        } else {
+          // Firebase not configured - this is okay, app can work without it
+          // Only log in development to avoid console noise
+          if (__DEV__) {
+            console.info(
+              '[Firebase] Firebase not configured. Push notifications will not be available. ' +
+              'This is normal if Firebase setup is incomplete.'
+            );
+          }
+        }
+      })
+      .catch((error) => {
+        // Silently handle errors - Firebase is optional
+        // Only log unexpected errors in development
+        if (__DEV__) {
+          const errorMessage = error?.message || '';
+          // Don't log the expected "no app" error
+          if (!errorMessage.includes('No Firebase App') && 
+              !errorMessage.includes('has been created')) {
+            console.warn(
+              '[Firebase] Unexpected error during initialization:',
+              errorMessage
+            );
+          }
+        }
+        // Continue anyway - Firebase is optional for basic app functionality
+      });
 
     // Initialize Google Sign-In (non-blocking)
     if (
@@ -450,9 +538,16 @@ function AppContent() {
   }, [isSignedIn, preferencesLoaded, preferences.pushNotifications, clearDeviceToken]);
 
   useEffect(() => {
+    // Force show app after 2 seconds max - prevents infinite loading
     const timeout = setTimeout(() => {
       setForceShow(true);
-    }, 4000);
+      // Also ensure isLoading is false
+      const authState = useAuthStore.getState();
+      if (authState.isLoading) {
+        console.log('=== APP.TSX: Force timeout - setting isLoading to false ===');
+        useAuthStore.setState({ isLoading: false });
+      }
+    }, 2000);
     return () => clearTimeout(timeout);
   }, []);
 
@@ -474,16 +569,7 @@ function AppContent() {
               translucent={false}
             />
             {isSignedIn ? (
-              needsQuestionnaire ? (
-                <Stack.Navigator screenOptions={{headerShown: false}}>
-                  <Stack.Screen
-                    name="Questionnaire"
-                    component={QuestionnaireScreen}
-                  />
-                </Stack.Navigator>
-              ) : (
-                <MainAppStack />
-              )
+              <MainAppStack />
             ) : (
               <AuthStack />
             )}

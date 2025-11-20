@@ -171,6 +171,7 @@
     "getHelpWithVisa": "Visa arizangiz bilan yordam oling",
     "startConversation": "Suhbatni boshlang",
     "askAnything": "Visa ariza yoki visa jarayoni haqida xohlagan savolingizni bering",
+    "quickQuestions": "Tezkor savollar",
     "whatDocuments": "📄 Qanday hujjatlar kerak?",
     "processingTime": "⏱️ Qayta ishlash vaqti qanday?",
     "financialRequirements": "💰 Moliyaviy talablar nima?",
@@ -182,18 +183,53 @@
     "sending": "Yuborilmoqda...",
     "sources": "📚 Manbalari: {sources}",
     "noMessages": "Xabarlar yo'q",
-    "errorSending": "Xabar yuborishda xato"
+    "errorSending": "Xabar yuborishda xato",
+    "quickActions": {
+      "documents": "Qanday hujjatlar kerak?",
+      "timeline": "Qayta ishlash vaqti?",
+      "requirements": "Moliyaviy talablar?",
+      "mistakes": "Keng tarqalgan xatolar?"
+    },
+    "quickMessages": {
+      "documents": "Arizam uchun qanday hujjatlarni yuklashim kerak?",
+      "timeline": "Vizamning kutilayotgan qayta ishlash vaqti qancha?",
+      "requirements": "Arizam uchun moliyaviy talablar qanday?",
+      "mistakes": "Arizachilar qanday keng tarqalgan xatolar qiladi?"
+    }
+  },
+  "applications": {
+    "title": "Arizalar",
+    "startNewApplications": "Yangi ariza boshlash",
+    "myApplications": "Mening arizalarim",
+    "manageYourApplications": "Viza arizalaringizni boshqaring",
+    "loadingApplications": "Arizalar yuklanmoqda...",
+    "noApplicationsYet": "Hali arizalar yo'q",
+    "startNewApplicationHint": "Yuqoridagi qo'shish belgisini bosib yangi ariza boshlang",
+    "complete": "Tugallangan",
+    "draft": "Qoralama",
+    "submitted": "Yuborilgan",
+    "underReview": "Ko'rib chiqilmoqda",
+    "approved": "Tasdiqlangan",
+    "rejected": "Rad etilgan"
   },
   "profile": {
     "profile": "Profil",
     "myProfile": "Mening profilim",
     "personalInfo": "Shaxsiy ma'lumot",
+    "updateProfileDetails": "Profil ma'lumotlarini yangilash",
     "firstName": "Ism",
     "lastName": "Familiya",
     "email": "Email",
     "phone": "Telefon",
     "country": "Mamlakat",
     "language": "Til",
+    "changeAppLanguage": "Ilova tilini o'zgartirish",
+    "notifications": "Bildirishnomalar",
+    "manageNotificationSettings": "Bildirishnoma sozlamalarini boshqarish",
+    "security": "Xavfsizlik",
+    "passwordAndSecurity": "Parol va xavfsizlik sozlamalari",
+    "helpSupport": "Yordam va qo'llab-quvvatlash",
+    "getHelpWithApplication": "Arizangiz bo'yicha yordam oling",
     "settings": "Sozlamalar",
     "changeLanguage": "Tilni o'zgartirish",
     "logout": "Chiqish",
@@ -201,7 +237,19 @@
     "deleteAccount": "Hisobni o'chirish",
     "deleteAccountConfirm": "Hisobingizni o'chirishni xohlaysizmi? Bu amalni bekor qilib bo'lmaydi.",
     "applicationHistory": "Ariza tarixi",
-    "noApplications": "Hali arizalar yo'q"
+    "noApplications": "Hali arizalar yo'q",
+    "editProfile": "Profilni tahrirlash",
+    "saveChanges": "O'zgarishlarni saqlash",
+    "phoneNumber": "Telefon raqami",
+    "enterPhoneNumber": "Telefon raqamini kiriting",
+    "phoneHint": "Mamlakat kodi bilan (masalan, +998 90 123-45-67)",
+    "yourInformation": "Sizning ma'lumotlaringiz",
+    "informationSaved": "Bu ma'lumotlar saqlanadi va AI tomonidan viza arizalaringizga yordam berish uchun ishlatiladi. Ular Arizalar sahifasida ko'rsatiladi va saqlangandan keyin o'zgartirib bo'lmaydi.",
+    "profileUpdated": "Profil muvaffaqiyatli yangilandi",
+    "profileUpdateFailed": "Profilni saqlashda xato",
+    "validationError": "Tekshirish xatosi",
+    "firstNameRequired": "Ism majburiy",
+    "invalidPhoneFormat": "Noto'g'ri telefon raqami formati"
   },
   "language": {
     "english": "Ingliz tili",
@@ -227,6 +275,7 @@
     "generating": "AI sizning viza rejangizni yaratmoqda...",
     "success": "Sizning viza rejangiz tayyor!",
     "failed": "Viza rejasini yaratishda xato",
+    "saveError": "Savolnomaniz saqlandi. Biroq, biz avtomatik ravishda ariza yarata olmadik.\n\nXato: {error}\n\nSiz Arizalar sahifasidan qo'lda arizalar yaratishingiz mumkin.",
     "questions": {
       "purpose": {
         "title": "Sayohat maqsadingiz nima?",
@@ -244,7 +293,8 @@
         "title": "Qaysi davlatga bormoqchisiz?",
         "subtitle": "Borishni xohlagan davlatingizni tanlang",
         "notSure": "Hali bilmayman",
-        "searchPlaceholder": "Davlatni qidiring..."
+        "searchPlaceholder": "Davlatni qidiring...",
+        "required": "Davom etish uchun mamlakatni tanlang"
       },
       "duration": {
         "title": "Qancha vaqt qolmoqchisiz?",
@@ -315,5 +365,56 @@
         }
       }
     }
+  },
+  "security": {
+    "title": "Xavfsizlik",
+    "securitySettings": "Xavfsizlik sozlamalari",
+    "comingSoon": "Parol va xavfsizlik sozlamalari tez orada mavjud bo'ladi."
+  },
+  "helpSupport": {
+    "title": "Yordam va qo'llab-quvvatlash",
+    "emailSupport": "Email orqali yordam",
+    "phoneSupport": "Telefon orqali yordam",
+    "needHelp": "Yordam kerakmi?",
+    "supportAvailable": "Bizning yordam jamoamiz 24/7 sizning barcha savollaringiz va muammolaringizga yordam berish uchun mavjud.",
+    "supportEmail": "support@visabuddy.com",
+    "supportPhone": "+1 (234) 567-890"
+  },
+  "notifications": {
+    "title": "Bildirishnoma sozlamalari",
+    "save": "Sozlamalarni saqlash",
+    "saving": "Saqlanmoqda...",
+    "saved": "Sozlamalar muvaffaqiyatli saqlandi",
+    "saveFailed": "Sozlamalarni saqlashda xato",
+    "emailNotifications": "Email bildirishnomalari",
+    "emailDescription": "Email orqali yangilanishlar oling",
+    "pushNotifications": "Push bildirishnomalari",
+    "pushDescription": "Qurilmangizda bildirishnomalar oling",
+    "paymentConfirmations": "To'lov tasdiqlashlari",
+    "paymentDescription": "To'lovlar qayta ishlanganda xabar oling",
+    "documentUpdates": "Hujjat yangilanishlari",
+    "documentDescription": "Hujjat tekshirish holati haqida xabar oling",
+    "visaStatusUpdates": "Viza holati yangilanishlari",
+    "visaStatusDescription": "Viza arizalaringizdagi o'zgarishlar haqida xabar oling",
+    "dailyReminders": "Kunlik eslatmalar",
+    "dailyRemindersDescription": "Yetishmayotgan hujjatlar haqida eslatmalar oling",
+    "newsUpdates": "Yangiliklar",
+    "newsDescription": "Viza siyosati o'zgarishlari haqida yangilanishlar oling"
+  },
+  "applicationDetail": {
+    "uploadProgress": "Yuklash jarayoni",
+    "documentsUploaded": "{uploaded} / {total} hujjatlar yuklangan",
+    "aiGeneratedList": "AI tomonidan yaratilgan hujjatlar ro'yxati",
+    "basedOnAnswers": "Sizning javoblaringiz asosida",
+    "needHelp": "Yordam kerakmi?",
+    "helpText": "Har bir hujjatni yuklang va bizning AI talablarga javob berishini tekshiradi.",
+    "chatAboutApplication": "Ushbu ariza haqida suhbatlashish",
+    "unknownCountry": "Noma'lum mamlakat",
+    "unknownVisaType": "Noma'lum viza turi"
+  },
+  "countries": {
+    "searchPlaceholder": "Mamlakat qidirish...",
+    "noCountriesFound": "Mamlakatlar topilmadi",
+    "loading": "Mamlakatlar yuklanmoqda..."
   }
 }

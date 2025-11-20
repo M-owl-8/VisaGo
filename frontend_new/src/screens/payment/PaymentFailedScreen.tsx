@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
+  
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -105,7 +106,7 @@ export default function PaymentFailedScreen({ navigation, route }: any) {
   };
 
   const handleGoHome = () => {
-    navigation.navigate("Home");
+    navigation.navigate("Applications");
   };
 
   if (isLoading) {

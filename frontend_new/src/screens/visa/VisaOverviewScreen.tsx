@@ -115,7 +115,7 @@ export default function VisaOverviewScreen({
         [
           {
             text: 'OK',
-            onPress: () => navigation?.navigate('Home'),
+            onPress: () => navigation?.navigate('Applications'),
           },
         ]
       );

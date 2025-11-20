@@ -2,6 +2,7 @@ import {create} from 'zustand';
 import {persist, createJSONStorage} from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {apiClient} from '../services/api';
+import {useAuthStore} from './auth';
 
 export interface ChatMessage {
   id: string;
@@ -99,7 +100,6 @@ export const useChatStore = create<ChatStore>()(
           set({isLoading: true, error: null});
 
           // Verify user is signed in before loading
-          const {useAuthStore} = await import('./auth.js');
           const authState = useAuthStore.getState();
           if (!authState.isSignedIn || !authState.token) {
             set({
@@ -154,7 +154,6 @@ export const useChatStore = create<ChatStore>()(
           set({isSending: true, error: null});
 
           // Verify user is signed in before sending
-          const {useAuthStore} = await import('./auth.js');
           const authState = useAuthStore.getState();
           if (!authState.isSignedIn || !authState.token) {
             set({
@@ -419,6 +418,12 @@ export const useChatStore = create<ChatStore>()(
       partialize: state => ({
         conversations: state.conversations,
       }),
+      // Add error handling for storage operations
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[ChatStore] Failed to rehydrate:', error);
+        }
+      },
     },
   ),
 );

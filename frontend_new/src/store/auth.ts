@@ -138,57 +138,110 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       console.log('=== AUTH STORE: initializeApp Starting ===');
 
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging - reduced to 2 seconds
       const initPromise = (async () => {
-        const storedToken = await AsyncStorage.getItem('@auth_token');
-        const storedUser = await AsyncStorage.getItem('@user');
+        try {
+          const storedToken = await AsyncStorage.getItem('@auth_token');
+          const storedUser = await AsyncStorage.getItem('@user');
 
-        console.log('=== AUTH STORE: Retrieved from storage ===', {
-          hasToken: !!storedToken,
-          hasUser: !!storedUser,
-        });
+          console.log('=== AUTH STORE: Retrieved from storage ===', {
+            hasToken: !!storedToken,
+            hasUser: !!storedUser,
+          });
 
-        if (storedToken && storedUser) {
-          try {
-            const user = JSON.parse(storedUser);
-            set({
-              token: storedToken,
-              user: {
+          if (storedToken && storedUser) {
+            try {
+              const user = JSON.parse(storedUser);
+              const restoredUser = {
                 id: user.id,
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                phone: user.phone,
+                avatar: user.avatar,
                 language: user.language || 'en',
                 currency: user.currency || 'USD',
                 emailVerified: user.emailVerified,
                 bio: user.bio,
-                questionnaireCompleted: user.questionnaireCompleted,
-              },
-              isSignedIn: true,
-            });
-            console.log('=== AUTH STORE: User restored from storage ===');
-          } catch (parseError) {
-            console.error(
-              '=== AUTH STORE: Failed to parse user data ===',
-              parseError,
+                questionnaireCompleted: user.questionnaireCompleted || false,
+              };
+              
+              set({
+                token: storedToken,
+                user: restoredUser,
+                isSignedIn: true,
+              });
+              console.log('=== AUTH STORE: User restored from storage ===');
+
+              // Load questionnaire data from user bio
+              if (restoredUser.bio) {
+                try {
+                  const { useOnboardingStore } = require('./onboarding');
+                  const onboardingStore = useOnboardingStore.getState();
+                  onboardingStore.loadFromUserBio(restoredUser.bio);
+                } catch (error) {
+                  console.warn('Failed to load questionnaire data on init:', error);
+                }
+              }
+
+              // Fetch fresh data from server to ensure everything is up to date
+              // Do this in background to not block initialization
+              // Note: This timeout is intentionally not cleaned up as it's in a store method
+              // and should complete even if component unmounts to ensure data is fresh
+              setTimeout(async () => {
+                try {
+                  await get().fetchUserProfile();
+                  await get().fetchUserApplications();
+                  
+                  // Reload questionnaire data after fetching fresh profile
+                  const updatedUser = get().user;
+                  if (updatedUser?.bio) {
+                    try {
+                      const { useOnboardingStore } = require('./onboarding');
+                      const onboardingStore = useOnboardingStore.getState();
+                      onboardingStore.loadFromUserBio(updatedUser.bio);
+                    } catch (error) {
+                      console.warn('Failed to reload questionnaire data after profile fetch:', error);
+                    }
+                  }
+                } catch (fetchError) {
+                  console.warn('Failed to fetch fresh data on init, using stored data:', fetchError);
+                }
+              }, 100);
+            } catch (parseError) {
+              console.error(
+                '=== AUTH STORE: Failed to parse user data ===',
+                parseError,
+              );
+              // Clear corrupted data
+              await AsyncStorage.removeItem('@auth_token');
+              await AsyncStorage.removeItem('@user');
+            }
+          } else {
+            console.log(
+              '=== AUTH STORE: No stored credentials, showing login ===',
             );
-            // Clear corrupted data
-            await AsyncStorage.removeItem('@auth_token');
-            await AsyncStorage.removeItem('@user');
           }
-        } else {
-          console.log(
-            '=== AUTH STORE: No stored credentials, showing login ===',
-          );
+        } catch (storageError) {
+          console.error('=== AUTH STORE: Storage error ===', storageError);
+          // Continue anyway - storage errors shouldn't block app startup
         }
       })();
 
-      // Set timeout of 5 seconds
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Initialization timeout')), 5000);
+      // Set timeout of 2 seconds - faster timeout
+      let timeoutId: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Initialization timeout')), 2000);
       });
 
-      await Promise.race([initPromise, timeoutPromise]);
+      try {
+        await Promise.race([initPromise, timeoutPromise]);
+      } finally {
+        // Cleanup timeout if promise resolved before timeout
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      }
     } catch (error) {
       console.error('=== AUTH STORE: initializeApp Error ===', error);
       // Ensure we always set loading to false, even on error
@@ -215,19 +268,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.setItem('@auth_token', token);
       await AsyncStorage.setItem('@user', JSON.stringify(user));
 
+      // Set initial user state
+      const fullUser = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        avatar: user.avatar,
+        language: user.language || 'en',
+        currency: user.currency || 'USD',
+        emailVerified: user.emailVerified,
+        bio: user.bio,
+        questionnaireCompleted: user.questionnaireCompleted || false,
+      };
+
       set({
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          language: 'en',
-          currency: 'USD',
-          emailVerified: user.emailVerified,
-        },
+        user: fullUser,
         token,
         isSignedIn: true,
       });
+
+      // Fetch complete user profile from server (includes all fields)
+      try {
+        await get().fetchUserProfile();
+      } catch (error) {
+        console.warn('Failed to fetch full profile after login, using initial data:', error);
+      }
+
+      // Load user applications
+      try {
+        await get().fetchUserApplications();
+      } catch (error) {
+        console.warn('Failed to fetch applications after login:', error);
+      }
+
+      // Load questionnaire data if it exists
+      if (fullUser.bio) {
+        try {
+          const { useOnboardingStore } = require('./onboarding');
+          const onboardingStore = useOnboardingStore.getState();
+          onboardingStore.loadFromUserBio(fullUser.bio);
+        } catch (error) {
+          console.warn('Failed to load questionnaire data:', error);
+        }
+      }
     } catch (error: any) {
       console.error('Login failed:', error.message);
       throw error;
@@ -263,19 +348,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.setItem('@auth_token', token);
       await AsyncStorage.setItem('@user', JSON.stringify(user));
 
+      // Set initial user state
+      const fullUser = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        avatar: user.avatar,
+        language: user.language || 'en',
+        currency: user.currency || 'USD',
+        emailVerified: user.emailVerified,
+        bio: user.bio,
+        questionnaireCompleted: user.questionnaireCompleted || false,
+      };
+
       set({
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          language: 'en',
-          currency: 'USD',
-          emailVerified: user.emailVerified,
-        },
+        user: fullUser,
         token,
         isSignedIn: true,
       });
+
+      // Fetch complete user profile from server
+      try {
+        await get().fetchUserProfile();
+      } catch (error) {
+        console.warn('Failed to fetch full profile after registration, using initial data:', error);
+      }
+
+      // Load user applications
+      try {
+        await get().fetchUserApplications();
+      } catch (error) {
+        console.warn('Failed to fetch applications after registration:', error);
+      }
     } catch (error: any) {
       console.error('Registration failed:', error.message);
       throw error;
@@ -313,20 +419,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.setItem('@auth_token', token);
       await AsyncStorage.setItem('@user', JSON.stringify(user));
 
+      // Set initial user state
+      const fullUser = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        avatar: user.avatar || avatar,
+        language: user.language || 'en',
+        currency: user.currency || 'USD',
+        emailVerified: user.emailVerified,
+        bio: user.bio,
+        questionnaireCompleted: user.questionnaireCompleted || false,
+      };
+
       set({
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          avatar: avatar,
-          language: 'en',
-          currency: 'USD',
-          emailVerified: user.emailVerified,
-        },
+        user: fullUser,
         token,
         isSignedIn: true,
       });
+
+      // Fetch complete user profile from server
+      try {
+        await get().fetchUserProfile();
+      } catch (error) {
+        console.warn('Failed to fetch full profile after Google login, using initial data:', error);
+      }
+
+      // Load user applications
+      try {
+        await get().fetchUserApplications();
+      } catch (error) {
+        console.warn('Failed to fetch applications after Google login:', error);
+      }
+
+      // Load questionnaire data if it exists
+      if (fullUser.bio) {
+        try {
+          const { useOnboardingStore } = require('./onboarding');
+          const onboardingStore = useOnboardingStore.getState();
+          onboardingStore.loadFromUserBio(fullUser.bio);
+        } catch (error) {
+          console.warn('Failed to load questionnaire data:', error);
+        }
+      }
     } catch (error: any) {
       console.error('Google login failed:', error.message);
       throw error;
@@ -408,6 +545,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
 
       set({user: updatedUser});
+
+      // Load questionnaire data if it exists
+      if (updatedUser.bio) {
+        try {
+          const { useOnboardingStore } = require('./onboarding');
+          const onboardingStore = useOnboardingStore.getState();
+          onboardingStore.loadFromUserBio(updatedUser.bio);
+        } catch (error) {
+          console.warn('Failed to load questionnaire data after profile fetch:', error);
+        }
+      }
     } catch (error: any) {
       console.error('Failed to fetch profile:', error.message);
       throw error;
@@ -443,6 +591,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
 
       set({user: updatedUser});
+
+      // Load questionnaire data if bio was updated
+      if (data.bio !== undefined && updatedUser.bio) {
+        try {
+          const { useOnboardingStore } = require('./onboarding');
+          const onboardingStore = useOnboardingStore.getState();
+          onboardingStore.loadFromUserBio(updatedUser.bio);
+        } catch (error) {
+          console.warn('Failed to load questionnaire data after profile update:', error);
+        }
+      }
 
       console.log('=== AUTH STORE: User profile updated ===', {
         questionnaireCompleted: updatedUser.questionnaireCompleted,

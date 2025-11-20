@@ -3,7 +3,7 @@
  * AI-powered visa planning with personalized recommendations
  */
 
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -18,18 +18,20 @@ import {
   Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useTranslation } from 'react-i18next';
-import { useAuthStore } from '../../store/auth';
-import { useOnboardingStore } from '../../store/onboarding';
-import { useVisaStore } from '../../store/visa';
-import { apiClient } from '../../services/api';
-import { questionnaireQuestions } from '../../data/questionnaireQuestions';
-import { QuestionnaireData } from '../../types/questionnaire';
+import {useTranslation} from 'react-i18next';
+import {useAuthStore} from '../../store/auth';
+import {useOnboardingStore} from '../../store/onboarding';
+import {useVisaStore} from '../../store/visa';
+import {apiClient} from '../../services/api';
+import {questionnaireQuestions} from '../../data/questionnaireQuestions';
+import {QuestionnaireData} from '../../types/questionnaire';
+import {getTranslatedCountryName} from '../../data/countryTranslations';
+import {mapExistingQuestionnaireToSummary} from '../../utils/questionnaireMapper';
 
-export default function QuestionnaireScreen({ navigation }: any) {
-  const { t, i18n } = useTranslation();
+export default function QuestionnaireScreen({navigation}: any) {
+  const {t, i18n} = useTranslation();
   const language = i18n.language || 'en';
-  
+
   const {
     currentStep,
     totalSteps,
@@ -44,8 +46,8 @@ export default function QuestionnaireScreen({ navigation }: any) {
     setError: setStoreError,
   } = useOnboardingStore();
 
-  const { user, fetchUserProfile } = useAuthStore();
-  const { countries, fetchCountries, isLoadingCountries } = useVisaStore();
+  const {user, fetchUserProfile, setUser} = useAuthStore();
+  const {countries, fetchCountries, isLoadingCountries} = useVisaStore();
 
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,11 +61,24 @@ export default function QuestionnaireScreen({ navigation }: any) {
 
   // Fade in animation
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    let isMounted = true;
+    let animation: Animated.CompositeAnimation | null = null;
+
+    if (isMounted) {
+      animation = Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      });
+      animation.start();
+    }
+
+    return () => {
+      isMounted = false;
+      if (animation) {
+        animation.stop();
+      }
+    };
   }, [currentStep]);
 
   const currentQuestion = questionnaireQuestions[currentStep];
@@ -94,10 +109,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
 
     // Validate required questions
     if (currentQuestion.required && !currentAnswer) {
-      Alert.alert(
-        t('common.error'),
-        t('auth.fillAllFields')
-      );
+      Alert.alert(t('common.error'), t('auth.fillAllFields'));
       return;
     }
 
@@ -107,6 +119,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
     } else {
       nextStep();
       // Reset fade animation
+      fadeAnim.stopAnimation();
       fadeAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -121,6 +134,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
     if (currentStep > 0) {
       previousStep();
       // Reset fade animation
+      fadeAnim.stopAnimation();
       fadeAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -139,81 +153,251 @@ export default function QuestionnaireScreen({ navigation }: any) {
       setLoading(true);
       setStoreLoading(true);
 
-      // Prepare questionnaire data
+      // Prepare questionnaire data (legacy format for API compatibility)
       const questionnaireData: QuestionnaireData = {
-        purpose: answers.purpose as any || 'tourism',
+        purpose: (answers.purpose as any) || 'tourism',
         country: answers.country as string,
-        duration: answers.duration as any || '1_3_months',
-        traveledBefore: answers.traveledBefore === true || String(answers.traveledBefore) === 'true',
-        currentStatus: answers.currentStatus as any || 'employee',
-        hasInvitation: answers.hasInvitation === true || String(answers.hasInvitation) === 'true',
-        financialSituation: answers.financialSituation as any || 'stable_income',
-        maritalStatus: answers.maritalStatus as any || 'single',
-        hasChildren: answers.hasChildren as any || 'no',
-        englishLevel: answers.englishLevel as any || 'intermediate',
+        duration: (answers.duration as any) || '1_3_months',
+        traveledBefore:
+          answers.traveledBefore === true ||
+          String(answers.traveledBefore) === 'true',
+        currentStatus: (answers.currentStatus as any) || 'employee',
+        hasInvitation:
+          answers.hasInvitation === true ||
+          String(answers.hasInvitation) === 'true',
+        financialSituation:
+          (answers.financialSituation as any) || 'stable_income',
+        maritalStatus: (answers.maritalStatus as any) || 'single',
+        hasChildren: (answers.hasChildren as any) || 'no',
+        englishLevel: (answers.englishLevel as any) || 'intermediate',
       };
 
-      // Save questionnaire to user profile
-      const bio = JSON.stringify(questionnaireData);
-      
-      await apiClient.updateProfile({
+      // Create standardized summary
+      // Pass countries array to help map country ID to code
+      const questionnaireSummary = mapExistingQuestionnaireToSummary(
+        questionnaireData,
+        language as "uz" | "ru" | "en",
+        countries // Pass countries from visa store to help with country code mapping
+      );
+
+      // Save both legacy format (for backwards compatibility) and summary
+      // Store as JSON with both formats
+      const bio = JSON.stringify({
+        // Legacy format for backwards compatibility
+        ...questionnaireData,
+        // New standardized summary
+        summary: questionnaireSummary,
+        // Metadata
+        _version: '1.0',
+        _hasSummary: true,
+      });
+
+      // Use store's updateProfile method which properly updates AsyncStorage
+      const {updateProfile: updateUserProfile} = useAuthStore.getState();
+      await updateUserProfile({
         bio,
         questionnaireCompleted: true,
       });
 
-      // Refresh user profile to get updated data
-      await fetchUserProfile();
+      // Refresh from server to get any other updates (but don't fail if it errors)
+      try {
+        await fetchUserProfile();
+      } catch (error) {
+        console.warn(
+          'Failed to refresh profile, but questionnaire is saved:',
+          error,
+        );
+        // Don't throw - questionnaire is already saved
+      }
 
       // Call AI generation endpoint
       try {
-        const response = await apiClient.generateApplicationWithAI(questionnaireData);
-        
+        const response =
+          await apiClient.generateApplicationWithAI(questionnaireData);
+
         if (response.success && response.data) {
           // Clear questionnaire progress
           await clearProgress();
-          
-          // Show success message
-          Alert.alert(
-            t('questionnaire.success'),
-            t('questionnaire.subtitle'),
-            [
-              {
-                text: t('common.ok'),
-                onPress: () => {
-                  // Navigate to home or application detail
-                  navigation.replace('Home');
-                },
+
+          // Show success message and navigate to Applications
+          Alert.alert('Success!', 'Your visa plan is ready!', [
+            {
+              text: 'OK',
+              onPress: async () => {
+                // Refresh applications list before navigating
+                const { fetchUserApplications } = useAuthStore.getState();
+                try {
+                  await fetchUserApplications();
+                } catch (error) {
+                  console.warn('Failed to refresh applications:', error);
+                }
+                // Navigate back to Applications tab
+                navigation?.navigate('MainTabs', { screen: 'Applications' });
               },
-            ]
-          );
+            },
+          ]);
         } else {
-          throw new Error(response.error?.message || 'Failed to generate application');
+          throw new Error(
+            response.error?.message || 'Failed to generate application',
+          );
         }
       } catch (aiError: any) {
         console.error('AI generation failed:', aiError);
-        
-        // Even if AI fails, questionnaire is complete
-        // User can manually create application
-        Alert.alert(
-          t('questionnaire.success'),
-          'Your questionnaire is complete. You can now create applications manually.',
-          [
-            {
-              text: t('common.ok'),
-              onPress: () => {
-                navigation.replace('Home');
+
+        // Fallback: Create a basic application even if AI fails
+        try {
+          console.log('Starting fallback application creation...');
+          console.log('Questionnaire data:', questionnaireData);
+          
+          // Get default country and visa type
+          let countryId = questionnaireData.country;
+          let visaTypeId: string | undefined;
+
+          // Step 1: Get country ID
+          // Validate country if provided
+          if (countryId && countryId.trim() !== '') {
+            console.log('Using country from questionnaire:', countryId);
+            // Try to validate country exists, but don't fail if validation fails
+            try {
+              const countryCheck = await apiClient.getCountry(countryId);
+              if (!countryCheck.success) {
+                console.warn('Selected country not found, will fetch new one');
+                countryId = undefined; // Reset to fetch a new one
+              }
+            } catch (error) {
+              console.warn('Error validating country, will fetch new one:', error);
+              countryId = undefined; // Reset to fetch a new one
+            }
+          }
+          
+          // Country is required - validate it exists
+          if (!countryId || (typeof countryId === 'string' && countryId.trim() === '')) {
+            throw new Error(t('questionnaire.country.required'));
+          }
+
+          if (!countryId) {
+            throw new Error('Could not determine country');
+          }
+
+          console.log('Selected country ID:', countryId);
+
+          // Step 2: Get visa types for the country
+          console.log('Fetching visa types for country:', countryId);
+          let visaTypesFetched = false;
+          
+          try {
+            const visaTypes = await apiClient.getVisaTypes(countryId);
+            console.log('Visa types API response:', visaTypes);
+            
+            if (visaTypes.success && visaTypes.data && Array.isArray(visaTypes.data) && visaTypes.data.length > 0) {
+              // Find visa type matching purpose, or use first one
+              const purposeMap: Record<string, string> = {
+                study: 'student',
+                work: 'work',
+                tourism: 'tourist',
+                business: 'business',
+                immigration: 'immigration',
+              };
+              const visaTypeName = purposeMap[questionnaireData.purpose] || 'tourist';
+              const matchingVisaType = visaTypes.data.find(
+                (vt: any) => vt.name && vt.name.toLowerCase().includes(visaTypeName)
+              );
+              visaTypeId = matchingVisaType?.id || visaTypes.data[0].id;
+              console.log('Selected visa type ID:', visaTypeId);
+              visaTypesFetched = true;
+            } else {
+              console.warn('No visa types returned for country:', countryId);
+              console.warn('Response:', visaTypes);
+            }
+          } catch (visaTypeError: any) {
+            console.error('Error fetching visa types:', visaTypeError);
+            console.error('Error details:', {
+              message: visaTypeError.message,
+              response: visaTypeError.response?.data,
+              status: visaTypeError.response?.status,
+            });
+          }
+          
+          if (!visaTypeId) {
+            throw new Error(`No visa types available for selected country. The database may need to be seeded. Please run 'npm run db:seed' in the backend directory.`);
+          }
+
+          if (!visaTypeId) {
+            throw new Error('Could not determine visa type');
+          }
+
+          // Step 3: Create basic application
+          console.log('Creating application with country:', countryId, 'visa type:', visaTypeId);
+          const createResponse = await apiClient.createApplication(
+            countryId,
+            visaTypeId,
+            'Application created from questionnaire (AI generation unavailable)'
+          );
+
+          console.log('Application creation response:', createResponse);
+
+          if (createResponse.success && createResponse.data) {
+            console.log('Application created successfully:', createResponse.data.id);
+            Alert.alert(
+              'Success!',
+              'Your application has been created successfully!',
+              [
+                {
+                  text: 'OK',
+                  onPress: async () => {
+                    // Refresh applications list before navigating
+                    const { fetchUserApplications } = useAuthStore.getState();
+                    try {
+                      await fetchUserApplications();
+                    } catch (error) {
+                      console.warn('Failed to refresh applications:', error);
+                    }
+                    // Navigate back to Applications tab
+                    navigation?.navigate('MainTabs', { screen: 'Applications' });
+                  },
+                },
+              ],
+            );
+          } else {
+            throw new Error(createResponse.error?.message || 'Failed to create application');
+          }
+        } catch (fallbackError: any) {
+          console.error('Fallback application creation failed:', fallbackError);
+          console.error('Error details:', {
+            message: fallbackError.message,
+            stack: fallbackError.stack,
+            questionnaireData,
+          });
+          
+          // Even if fallback fails, questionnaire is complete
+          // Show detailed error message to help debug
+          const errorMessage = fallbackError.message || 'Unknown error';
+          Alert.alert(
+            t('questionnaire.complete'),
+            t('questionnaire.saveError', { error: errorMessage }),
+            [
+              {
+                text: t('common.ok'),
+                onPress: async () => {
+                  // Refresh applications list in case something was created
+                  const { fetchUserApplications } = useAuthStore.getState();
+                  try {
+                    await fetchUserApplications();
+                  } catch (error) {
+                    console.warn('Failed to refresh applications:', error);
+                  }
+                  // Navigate back to Applications tab
+                  navigation?.navigate('MainTabs', { screen: 'Applications' });
+                },
               },
-            },
-          ]
-        );
+            ],
+          );
+        }
       }
     } catch (error: any) {
       console.error('Questionnaire submission failed:', error);
       setStoreError(error.message);
-      Alert.alert(
-        t('common.error'),
-        error.message || t('questionnaire.failed')
-      );
+      Alert.alert(t('common.error'), error.message || t('questionnaire.failed'));
     } finally {
       setLoading(false);
       setStoreLoading(false);
@@ -234,7 +418,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
     if (currentQuestion.type === 'boolean') {
       return (
         <View style={styles.optionsContainer}>
-          {currentQuestion.options.map((option) => (
+          {currentQuestion.options.map(option => (
             <TouchableOpacity
               key={option.value}
               style={[
@@ -242,22 +426,19 @@ export default function QuestionnaireScreen({ navigation }: any) {
                 currentAnswer === option.value && styles.optionCardSelected,
               ]}
               onPress={() => handleSelectAnswer(questionId, option.value)}
-              disabled={loading}
-            >
+              disabled={loading}>
               <View
                 style={[
                   styles.optionIcon,
                   currentAnswer === option.value && styles.optionIconSelected,
-                ]}
-              >
+                ]}>
                 <Text style={styles.optionEmoji}>{option.icon}</Text>
               </View>
               <Text
                 style={[
                   styles.optionLabel,
                   currentAnswer === option.value && styles.optionLabelSelected,
-                ]}
-              >
+                ]}>
                 {getOptionText(option)}
               </Text>
               {currentAnswer === option.value && (
@@ -277,7 +458,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
     // For single/multiple choice questions
     return (
       <View style={styles.optionsContainer}>
-        {currentQuestion.options.map((option) => (
+        {currentQuestion.options.map(option => (
           <TouchableOpacity
             key={option.value}
             style={[
@@ -285,22 +466,19 @@ export default function QuestionnaireScreen({ navigation }: any) {
               currentAnswer === option.value && styles.optionCardSelected,
             ]}
             onPress={() => handleSelectAnswer(questionId, option.value)}
-            disabled={loading}
-          >
+            disabled={loading}>
             <View
               style={[
                 styles.optionIcon,
                 currentAnswer === option.value && styles.optionIconSelected,
-              ]}
-            >
+              ]}>
               <Text style={styles.optionEmoji}>{option.icon}</Text>
             </View>
             <Text
               style={[
                 styles.optionLabel,
                 currentAnswer === option.value && styles.optionLabelSelected,
-              ]}
-            >
+              ]}>
               {getOptionText(option)}
             </Text>
             {currentAnswer === option.value && (
@@ -322,38 +500,32 @@ export default function QuestionnaireScreen({ navigation }: any) {
     const currentAnswer = answers.country;
 
     if (!showCountrySearch) {
+      const selectedCountry = countries.find(c => c.id === currentAnswer);
+      const displayName = selectedCountry
+        ? getTranslatedCountryName(selectedCountry.code, language, selectedCountry.name)
+        : null;
+
       return (
         <View style={styles.optionsContainer}>
-          {/* Not sure option */}
+          {/* Search button */}
           <TouchableOpacity
             style={[
-              styles.optionCard,
-              currentAnswer === 'not_sure' && styles.optionCardSelected,
+              styles.searchButton,
+              currentAnswer && styles.searchButtonSelected,
             ]}
-            onPress={() => handleSelectAnswer('country', 'not_sure')}
-            disabled={loading}
-          >
-            <View
-              style={[
-                styles.optionIcon,
-                currentAnswer === 'not_sure' && styles.optionIconSelected,
-              ]}
-            >
-              <Icon
-                name="help-outline"
-                size={24}
-                color={currentAnswer === 'not_sure' ? '#4A9EFF' : '#6B7280'}
-              />
-            </View>
-            <Text
-              style={[
-                styles.optionLabel,
-                currentAnswer === 'not_sure' && styles.optionLabelSelected,
-              ]}
-            >
-              {t('questionnaire.questions.country.notSure')}
+            onPress={() => setShowCountrySearch(true)}>
+            <Icon 
+              name="search-outline" 
+              size={20} 
+              color={currentAnswer ? "#4A9EFF" : "#94A3B8"} 
+            />
+            <Text style={[
+              styles.searchButtonText,
+              currentAnswer && styles.searchButtonTextSelected,
+            ]}>
+              {displayName || t('questionnaire.country.searchPlaceholder')}
             </Text>
-            {currentAnswer === 'not_sure' && (
+            {currentAnswer && (
               <Icon
                 name="checkmark-circle"
                 size={24}
@@ -362,28 +534,16 @@ export default function QuestionnaireScreen({ navigation }: any) {
               />
             )}
           </TouchableOpacity>
-
-          {/* Search button */}
-          <TouchableOpacity
-            style={styles.searchButton}
-            onPress={() => setShowCountrySearch(true)}
-          >
-            <Icon name="search-outline" size={20} color="#94A3B8" />
-            <Text style={styles.searchButtonText}>
-              {currentAnswer && currentAnswer !== 'not_sure'
-                ? countries.find((c) => c.id === currentAnswer)?.name ||
-                  t('questionnaire.questions.country.searchPlaceholder')
-                : t('questionnaire.questions.country.searchPlaceholder')}
-            </Text>
-          </TouchableOpacity>
         </View>
       );
     }
 
-    // Show country search
-    const filteredCountries = countries.filter((country) =>
-      country.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Show country search - filter by translated names
+    const filteredCountries = countries.filter(country => {
+      const translatedName = getTranslatedCountryName(country.code, language, country.name);
+      return translatedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             country.name.toLowerCase().includes(searchQuery.toLowerCase());
+    });
 
     return (
       <View style={styles.countrySearchContainer}>
@@ -393,13 +553,12 @@ export default function QuestionnaireScreen({ navigation }: any) {
             onPress={() => {
               setShowCountrySearch(false);
               setSearchQuery('');
-            }}
-          >
+            }}>
             <Icon name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <TextInput
             style={styles.searchInput}
-            placeholder={t('questionnaire.questions.country.searchPlaceholder')}
+            placeholder={t('questionnaire.country.searchPlaceholder')}
             placeholderTextColor="#6B7280"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -409,11 +568,17 @@ export default function QuestionnaireScreen({ navigation }: any) {
 
         <ScrollView style={styles.countryList}>
           {isLoadingCountries ? (
-            <ActivityIndicator size="large" color="#4A9EFF" style={{ marginTop: 20 }} />
+            <ActivityIndicator
+              size="large"
+              color="#4A9EFF"
+              style={{marginTop: 20}}
+            />
           ) : filteredCountries.length === 0 ? (
-            <Text style={styles.noResultsText}>{t('home.noCountriesFound')}</Text>
+            <Text style={styles.noResultsText}>
+              {t('home.noCountriesFound')}
+            </Text>
           ) : (
-            filteredCountries.map((country) => (
+            filteredCountries.map(country => (
               <TouchableOpacity
                 key={country.id}
                 style={styles.countryItem}
@@ -421,10 +586,11 @@ export default function QuestionnaireScreen({ navigation }: any) {
                   handleSelectAnswer('country', country.id);
                   setShowCountrySearch(false);
                   setSearchQuery('');
-                }}
-              >
+                }}>
                 <Text style={styles.countryFlag}>{country.flagEmoji}</Text>
-                <Text style={styles.countryName}>{country.name}</Text>
+                <Text style={styles.countryName}>
+                  {getTranslatedCountryName(country.code, language, country.name)}
+                </Text>
                 {currentAnswer === country.id && (
                   <Icon
                     name="checkmark-circle"
@@ -459,44 +625,43 @@ export default function QuestionnaireScreen({ navigation }: any) {
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
+          style={styles.keyboardView}>
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
+            keyboardShouldPersistTaps="handled">
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.logoContainer}>
                 <Icon name="clipboard-outline" size={32} color="#4A9EFF" />
               </View>
-              <Text style={styles.headerTitle}>{t('questionnaire.title')}</Text>
-              <Text style={styles.headerSubtitle}>{t('questionnaire.subtitle')}</Text>
+              <Text style={styles.headerTitle}>Visa Plan</Text>
+              <Text style={styles.headerSubtitle}>
+                Help us find the best visa type for you
+              </Text>
             </View>
 
             {/* Progress Indicator */}
             <View style={styles.progressContainer}>
               <View style={styles.progressSteps}>
-                {Array.from({ length: totalSteps }).map((_, index) => (
+                {Array.from({length: totalSteps}).map((_, index) => (
                   <View
-                    key={index}
+                    key={`step-${index}`}
                     style={[
                       styles.progressStep,
                       index <= currentStep && styles.progressStepActive,
                       index < currentStep && styles.progressStepCompleted,
-                    ]}
-                  >
+                    ]}>
                     {index < currentStep ? (
                       <Icon name="checkmark" size={14} color="#FFFFFF" />
                     ) : (
                       <Text
                         style={[
                           styles.progressStepText,
-                          index === currentStep && styles.progressStepTextActive,
-                        ]}
-                      >
+                          index === currentStep &&
+                            styles.progressStepTextActive,
+                        ]}>
                         {index + 1}
                       </Text>
                     )}
@@ -504,10 +669,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
                 ))}
               </View>
               <Text style={styles.progressText}>
-                {t('questionnaire.stepOf', {
-                  current: currentStep + 1,
-                  total: totalSteps,
-                })}
+                {currentStep + 1} of {totalSteps}
               </Text>
             </View>
 
@@ -526,10 +688,11 @@ export default function QuestionnaireScreen({ navigation }: any) {
                     },
                   ],
                 },
-              ]}
-            >
+              ]}>
               <View style={styles.questionContainer}>
-                <Text style={styles.questionTitle}>{getQuestionText('title')}</Text>
+                <Text style={styles.questionTitle}>
+                  {getQuestionText('title')}
+                </Text>
                 {getQuestionText('description') && (
                   <Text style={styles.questionSubtitle}>
                     {getQuestionText('description')}
@@ -546,8 +709,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
               <TouchableOpacity
                 style={styles.backButton}
                 onPress={handleBack}
-                disabled={loading}
-              >
+                disabled={loading}>
                 <Icon name="arrow-back" size={20} color="#FFFFFF" />
                 <Text style={styles.backButtonText}>{t('common.back')}</Text>
               </TouchableOpacity>
@@ -559,16 +721,13 @@ export default function QuestionnaireScreen({ navigation }: any) {
                     styles.continueButtonDisabled,
                 ]}
                 onPress={handleContinue}
-                disabled={!isCurrentQuestionAnswered() || loading}
-              >
+                disabled={!isCurrentQuestionAnswered() || loading}>
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <>
                     <Text style={styles.continueButtonText}>
-                      {currentStep === totalSteps - 1
-                        ? t('questionnaire.complete')
-                        : t('questionnaire.continue')}
+                      {currentStep === totalSteps - 1 ? t('questionnaire.complete') : t('questionnaire.continue')}
                     </Text>
                     <Icon
                       name={
@@ -781,10 +940,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(74, 158, 255, 0.2)',
     gap: 12,
   },
+  searchButtonSelected: {
+    backgroundColor: 'rgba(74, 158, 255, 0.15)',
+    borderColor: '#4A9EFF',
+    borderWidth: 2,
+  },
   searchButtonText: {
     flex: 1,
     fontSize: 15,
     color: '#94A3B8',
+  },
+  searchButtonTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   countrySearchContainer: {
     maxHeight: 400,
@@ -872,7 +1040,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 8,
     shadowColor: '#4A9EFF',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
@@ -886,4 +1054,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-
