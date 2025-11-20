@@ -313,6 +313,14 @@ User's Current Visa Application:
 
       const { message, sources = [], tokens_used = 0, model = 'gpt-4' } = aiResponse.data;
 
+      console.log('[ChatService] AI response received:', {
+        messageLength: message?.length || 0,
+        hasMessage: !!message,
+        sourcesCount: sources?.length || 0,
+        tokensUsed: tokens_used,
+        model,
+      });
+
       // Log RAG usage if sources are present
       if (sources && sources.length > 0) {
         logWarn('RAG sources used in response', {
