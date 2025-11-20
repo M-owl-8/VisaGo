@@ -73,7 +73,7 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
     console.log('[Chat Route] Message processed successfully:', {
       hasMessage: !!response.message,
       messageLength: response.message.length,
-      hasId: !!response.id,
+      hasId: !!(response as any).id,
       model: response.model,
       messagePreview: response.message.substring(0, 100),
     });
@@ -85,14 +85,14 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
     await incrementChatMessageCount(userId);
     const limitInfo = await getChatRateLimitInfo(userId);
 
-    // Ensure response structure is correct
+    // Ensure response structure is correct (handle optional properties)
     const responseData = {
       message: response.message,
       sources: response.sources || [],
       tokens_used: response.tokens_used || 0,
       model: response.model || 'gpt-4',
-      id: response.id || `msg-${Date.now()}`,
-      applicationContext: response.applicationContext || null,
+      id: (response as any).id || `msg-${Date.now()}`,
+      applicationContext: (response as any).applicationContext || null,
     };
 
     console.log('[Chat Route] Sending response to client:', {
