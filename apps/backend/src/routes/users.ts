@@ -183,8 +183,10 @@ router.get("/:userId/applications", authenticateToken, async (req: Request, res:
           },
         },
       },
+      // Order by creation date ascending (oldest first)
+      // This ensures applications appear in chronological order (first created = first in list)
       orderBy: {
-        createdAt: "desc",
+        createdAt: "asc",
       },
     });
 

@@ -184,16 +184,39 @@
     "noMessages": "Нет сообщений",
     "errorSending": "Ошибка при отправке сообщения"
   },
+  "applications": {
+    "title": "Заявки",
+    "startNewApplications": "Начать новую заявку",
+    "myApplications": "Мои заявки",
+    "manageYourApplications": "Управляйте вашими визовыми заявками",
+    "loadingApplications": "Загрузка заявок...",
+    "noApplicationsYet": "Пока нет заявок",
+    "startNewApplicationHint": "Начните новую заявку, нажав на значок плюса выше",
+    "complete": "Завершено",
+    "draft": "Черновик",
+    "submitted": "Отправлено",
+    "underReview": "На рассмотрении",
+    "approved": "Одобрено",
+    "rejected": "Отклонено"
+  },
   "profile": {
     "profile": "Профиль",
     "myProfile": "Мой профиль",
     "personalInfo": "Личная информация",
+    "updateProfileDetails": "Обновить данные профиля",
     "firstName": "Имя",
     "lastName": "Фамилия",
     "email": "Почта",
     "phone": "Телефон",
     "country": "Страна",
     "language": "Язык",
+    "changeAppLanguage": "Изменить язык приложения",
+    "notifications": "Уведомления",
+    "manageNotificationSettings": "Управление настройками уведомлений",
+    "security": "Безопасность",
+    "passwordAndSecurity": "Пароль и настройки безопасности",
+    "helpSupport": "Помощь и поддержка",
+    "getHelpWithApplication": "Получить помощь по вашей заявке",
     "settings": "Настройки",
     "changeLanguage": "Изменить язык",
     "logout": "Выход",
@@ -201,7 +224,19 @@
     "deleteAccount": "Удалить аккаунт",
     "deleteAccountConfirm": "Вы уверены, что хотите удалить ваш аккаунт? Это действие нельзя отменить.",
     "applicationHistory": "История заявок",
-    "noApplications": "Еще нет заявок"
+    "noApplications": "Еще нет заявок",
+    "editProfile": "Редактировать профиль",
+    "saveChanges": "Сохранить изменения",
+    "phoneNumber": "Номер телефона",
+    "enterPhoneNumber": "Введите номер телефона",
+    "phoneHint": "Включите код страны (например, +7 999 123-45-67)",
+    "yourInformation": "Ваша информация",
+    "informationSaved": "Эта информация будет сохранена и использована ИИ для помощи с вашими визовыми заявками. Она будет отображаться на странице Заявки и не может быть изменена после сохранения.",
+    "profileUpdated": "Профиль успешно обновлен",
+    "profileUpdateFailed": "Не удалось сохранить профиль",
+    "validationError": "Ошибка валидации",
+    "firstNameRequired": "Имя обязательно",
+    "invalidPhoneFormat": "Неверный формат номера телефона"
   },
   "language": {
     "english": "Английский",
@@ -227,6 +262,8 @@
     "generating": "AI создает ваш визовый план...",
     "success": "Ваш визовый план готов!",
     "failed": "Ошибка создания визового плана",
+    "saveError": "Ваш опросник сохранен. Однако мы не смогли автоматически создать заявку.\n\nОшибка: {error}\n\nВы можете создать заявки вручную со страницы Заявки.",
+    "saveError": "Ваш опросник сохранен. Однако мы не смогли автоматически создать заявку.\n\nОшибка: {error}\n\nВы можете создать заявки вручную со страницы Заявки.",
     "questions": {
       "purpose": {
         "title": "Какова цель вашей поездки?",
@@ -244,7 +281,8 @@
         "title": "В какую страну вы хотите поехать?",
         "subtitle": "Выберите страну назначения",
         "notSure": "Еще не уверен",
-        "searchPlaceholder": "Поиск страны..."
+        "searchPlaceholder": "Поиск страны...",
+        "required": "Пожалуйста, выберите страну для продолжения"
       },
       "duration": {
         "title": "Как долго вы планируете остаться?",
@@ -315,5 +353,71 @@
         }
       }
     }
+  },
+  "security": {
+    "title": "Безопасность",
+    "securitySettings": "Настройки безопасности",
+    "comingSoon": "Настройки пароля и безопасности будут доступны в ближайшее время."
+  },
+  "helpSupport": {
+    "title": "Помощь и поддержка",
+    "emailSupport": "Поддержка по email",
+    "phoneSupport": "Телефонная поддержка",
+    "needHelp": "Нужна помощь?",
+    "supportAvailable": "Наша команда поддержки доступна 24/7, чтобы помочь вам с любыми вопросами или проблемами.",
+    "supportEmail": "support@visabuddy.com",
+    "supportPhone": "+1 (234) 567-890"
+  },
+  "notifications": {
+    "title": "Настройки уведомлений",
+    "save": "Сохранить настройки",
+    "saving": "Сохранение...",
+    "saved": "Настройки успешно сохранены",
+    "saveFailed": "Не удалось сохранить настройки",
+    "manageDescription": "Управляйте тем, как вы хотите получать уведомления и обновления",
+    "general": "Общие",
+    "contentUpdates": "Контент и обновления",
+    "reminders": "Напоминания",
+    "devicePermissionStatus": "Статус разрешения устройства",
+    "permissionGranted": "Предоставлено",
+    "permissionProvisional": "Временное",
+    "permissionDenied": "Отклонено",
+    "permissionUnknown": "Неизвестно",
+    "openDeviceSettings": "Открыть настройки устройства",
+    "unableToOpenSettings": "Не удалось открыть настройки",
+    "openSettingsManually": "Пожалуйста, откройте настройки устройства вручную, чтобы обновить разрешения на уведомления.",
+    "tip": "Совет",
+    "tipText": "Включите push-уведомления, чтобы получать обновления в реальном времени о ваших визовых заявках.",
+    "changesAutoSaved": "Изменения сохраняются автоматически",
+    "emailNotifications": "Email уведомления",
+    "emailDescription": "Получать обновления по email",
+    "pushNotifications": "Push уведомления",
+    "pushDescription": "Получать уведомления на ваше устройство",
+    "paymentConfirmations": "Подтверждения платежей",
+    "paymentDescription": "Получать уведомления при обработке платежей",
+    "documentUpdates": "Обновления документов",
+    "documentDescription": "Получать уведомления о статусе проверки документов",
+    "visaStatusUpdates": "Обновления статуса визы",
+    "visaStatusDescription": "Получать уведомления об изменениях в ваших визовых заявках",
+    "dailyReminders": "Ежедневные напоминания",
+    "dailyRemindersDescription": "Получать напоминания о недостающих документах",
+    "newsUpdates": "Новости",
+    "newsDescription": "Получать обновления об изменениях визовой политики"
+  },
+  "applicationDetail": {
+    "uploadProgress": "Прогресс загрузки",
+    "documentsUploaded": "{uploaded} из {total} документов загружено",
+    "aiGeneratedList": "Список документов, созданный ИИ",
+    "basedOnAnswers": "На основе ваших ответов",
+    "needHelp": "Нужна помощь?",
+    "helpText": "Загрузите каждый документ, и наш ИИ проверит, соответствует ли он требованиям.",
+    "chatAboutApplication": "Чат об этой заявке",
+    "unknownCountry": "Неизвестная страна",
+    "unknownVisaType": "Неизвестный тип визы"
+  },
+  "countries": {
+    "searchPlaceholder": "Поиск страны...",
+    "noCountriesFound": "Страны не найдены",
+    "loading": "Загрузка стран..."
   }
 }

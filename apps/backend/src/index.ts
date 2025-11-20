@@ -51,6 +51,8 @@ import securityRoutes from './routes/security';
 import healthRoutes from './routes/health';
 import formRoutes from './routes/forms';
 import documentChecklistRoutes from './routes/document-checklist';
+import internalRoutes from './routes/internal';
+import devRoutes from './routes/dev';
 
 // Load environment variables
 dotenv.config();
@@ -271,6 +273,12 @@ app.use('/api/legal', legalRoutes);
 app.use('/api/monitoring', monitoringRoutes);
 // Security routes (admin only)
 app.use('/api/security', securityRoutes);
+// Internal routes (service-to-service)
+app.use('/internal', internalRoutes);
+// Development routes (testing/debugging - development only)
+if (envConfig.NODE_ENV === 'development') {
+  app.use('/dev', devRoutes);
+}
 
 // ============================================================================
 // ERROR HANDLING

@@ -11,11 +11,13 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
   useNotificationStore,
   NotificationPreferences,
 } from '../../store/notifications';
 import {DEFAULT_TOPIC} from '../../services/pushNotifications';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface SettingItem {
   key: keyof NotificationPreferences;
@@ -24,52 +26,54 @@ interface SettingItem {
   category: 'general' | 'content' | 'reminders';
 }
 
-const SETTINGS: SettingItem[] = [
+const getSettings = (t: any): SettingItem[] => [
   {
     key: 'emailNotifications',
-    title: 'Email Notifications',
-    description: 'Receive updates via email',
+    title: t('notifications.emailNotifications'),
+    description: t('notifications.emailDescription'),
     category: 'general',
   },
   {
     key: 'pushNotifications',
-    title: 'Push Notifications',
-    description: 'Receive notifications on your device',
+    title: t('notifications.pushNotifications'),
+    description: t('notifications.pushDescription'),
     category: 'general',
   },
   {
     key: 'paymentConfirmations',
-    title: 'Payment Confirmations',
-    description: 'Get notified when payments are processed',
+    title: t('notifications.paymentConfirmations'),
+    description: t('notifications.paymentDescription'),
     category: 'content',
   },
   {
     key: 'documentUpdates',
-    title: 'Document Updates',
-    description: 'Get notified about document verification status',
+    title: t('notifications.documentUpdates'),
+    description: t('notifications.documentDescription'),
     category: 'content',
   },
   {
     key: 'visaStatusUpdates',
-    title: 'Visa Status Updates',
-    description: 'Get notified about changes to your visa applications',
+    title: t('notifications.visaStatusUpdates'),
+    description: t('notifications.visaStatusDescription'),
     category: 'content',
   },
   {
     key: 'dailyReminders',
-    title: 'Daily Reminders',
-    description: 'Get reminders about missing documents',
+    title: t('notifications.dailyReminders'),
+    description: t('notifications.dailyRemindersDescription'),
     category: 'reminders',
   },
   {
     key: 'newsUpdates',
-    title: 'News Updates',
-    description: 'Get updates about visa policy changes',
+    title: t('notifications.newsUpdates'),
+    description: t('notifications.newsDescription'),
     category: 'reminders',
   },
 ];
 
-export const NotificationSettingsScreen: React.FC = () => {
+export default function NotificationSettingsScreen({ navigation }: any) {
+  const { t } = useTranslation();
+  const SETTINGS = getSettings(t);
   const {
     preferences,
     isLoading,
@@ -126,7 +130,7 @@ export const NotificationSettingsScreen: React.FC = () => {
         ...current,
         [key]: previousValue,
       }));
-      Alert.alert('Error', 'Failed to update preferences. Please try again.');
+      Alert.alert(t('common.error'), t('notifications.saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -135,21 +139,21 @@ export const NotificationSettingsScreen: React.FC = () => {
   const formatPermissionStatus = () => {
     switch (pushPermissionStatus) {
       case 'granted':
-        return 'Granted';
+        return t('notifications.permissionGranted');
       case 'provisional':
-        return 'Provisional';
+        return t('notifications.permissionProvisional');
       case 'denied':
-        return 'Denied';
+        return t('notifications.permissionDenied');
       default:
-        return 'Unknown';
+        return t('notifications.permissionUnknown');
     }
   };
 
   const openDeviceSettings = () => {
     Linking.openSettings().catch(() => {
       Alert.alert(
-        'Unable to open settings',
-        'Please open your device settings manually to update notification permissions.',
+        t('notifications.unableToOpenSettings'),
+        t('notifications.openSettingsManually'),
       );
     });
   };
@@ -198,40 +202,50 @@ export const NotificationSettingsScreen: React.FC = () => {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}>
+        {/* Header */}
+        <View style={styles.customHeader}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation?.goBack()}
+          >
+            <Icon name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
+          <View style={styles.backButton} />
+        </View>
+
         <View style={styles.headerContainer}>
-          <Text style={styles.header}>Notification Settings</Text>
           <Text style={styles.headerDescription}>
-            Manage how you want to receive notifications and updates
+            {t('notifications.manageDescription')}
           </Text>
         </View>
 
-        {renderCategory('general', 'General')}
-        {renderCategory('content', 'Content & Updates')}
-        {renderCategory('reminders', 'Reminders')}
+        {renderCategory('general', t('notifications.general'))}
+        {renderCategory('content', t('notifications.contentUpdates'))}
+        {renderCategory('reminders', t('notifications.reminders'))}
 
         <View style={styles.permissionContainer}>
-          <Text style={styles.permissionTitle}>Device Permission Status</Text>
+          <Text style={styles.permissionTitle}>{t('notifications.devicePermissionStatus')}</Text>
           <Text style={styles.permissionValue}>{formatPermissionStatus()}</Text>
           {(pushPermissionStatus === 'denied' ||
             pushPermissionStatus === 'unknown') && (
             <TouchableOpacity
               style={styles.permissionButton}
               onPress={openDeviceSettings}>
-              <Text style={styles.permissionButtonText}>Open Device Settings</Text>
+              <Text style={styles.permissionButtonText}>{t('notifications.openDeviceSettings')}</Text>
             </TouchableOpacity>
           )}
         </View>
 
         <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>💡 Tip</Text>
+          <Text style={styles.infoTitle}>💡 {t('notifications.tip')}</Text>
           <Text style={styles.infoText}>
-            Enable push notifications to get real-time updates about your visa
-            applications.
+            {t('notifications.tipText')}
           </Text>
         </View>
 
         <View style={styles.buttonContainer}>
-          <Text style={styles.saveButtonText}>Changes are auto-saved</Text>
+          <Text style={styles.saveButtonText}>{t('notifications.changesAutoSaved')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -241,7 +255,27 @@ export const NotificationSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#0A1929',
+  },
+  customHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 24,
+    backgroundColor: '#0A1929',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -255,36 +289,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerContainer: {
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
+    backgroundColor: '#0A1929',
+    paddingHorizontal: 24,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  header: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 8,
   },
   headerDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#94A3B8',
     lineHeight: 20,
   },
   categoryContainer: {
     marginTop: 16,
-    backgroundColor: 'white',
-    marginHorizontal: 8,
-    borderRadius: 12,
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
+    marginHorizontal: 24,
+    borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
   },
   categoryTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
-    backgroundColor: '#f9f9f9',
+    color: '#94A3B8',
+    backgroundColor: 'rgba(15, 30, 45, 0.6)',
     paddingHorizontal: 16,
     paddingVertical: 12,
     textTransform: 'uppercase',
@@ -297,7 +325,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(74, 158, 255, 0.1)',
   },
   settingContent: {
     flex: 1,
@@ -306,12 +334,12 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#000',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   settingDescription: {
     fontSize: 13,
-    color: '#999',
+    color: '#94A3B8',
     lineHeight: 18,
   },
   infoContainer: {

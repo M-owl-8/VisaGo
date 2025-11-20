@@ -11,11 +11,13 @@ import {
   StyleSheet,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useChatStore } from "../../store/chat";
 import { useAuthStore } from "../../store/auth";
 
 export const ChatScreen = ({ route }: any) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const applicationId = route?.params?.applicationId;
   const isSignedIn = useAuthStore((state) => state.isSignedIn);
@@ -37,7 +39,7 @@ export const ChatScreen = ({ route }: any) => {
     if (isSignedIn && user) {
       loadChatHistory(applicationId);
     }
-  }, [applicationId, isSignedIn, user]);
+  }, [applicationId, isSignedIn, user, loadChatHistory]);
 
   useEffect(() => {
     if (currentConversation && currentConversation.messages.length > 0) {
@@ -64,23 +66,38 @@ export const ChatScreen = ({ route }: any) => {
   };
 
   const quickActions = [
-    { id: 'documents', icon: 'document-text-outline', text: 'What documents do I need?', color: '#4A9EFF' },
-    { id: 'timeline', icon: 'time-outline', text: 'Processing timeline?', color: '#10B981' },
-    { id: 'requirements', icon: 'cash-outline', text: 'Financial requirements?', color: '#F59E0B' },
-    { id: 'mistakes', icon: 'warning-outline', text: 'Common mistakes?', color: '#EF4444' },
+    { id: 'documents', icon: 'document-text-outline', text: t('chat.quickActions.documents'), color: '#4A9EFF' },
+    { id: 'timeline', icon: 'time-outline', text: t('chat.quickActions.timeline'), color: '#10B981' },
+    { id: 'requirements', icon: 'cash-outline', text: t('chat.quickActions.requirements'), color: '#F59E0B' },
+    { id: 'mistakes', icon: 'warning-outline', text: t('chat.quickActions.mistakes'), color: '#EF4444' },
   ];
+
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleQuickAction = (action: string) => {
     const quickMessages: { [key: string]: string } = {
-      documents: "What documents do I need to upload for my application?",
-      timeline: "What's the expected processing timeline for my visa?",
-      requirements: "What are the financial requirements for my application?",
-      mistakes: "What are common mistakes applicants make?",
+      documents: t('chat.quickMessages.documents'),
+      timeline: t('chat.quickMessages.timeline'),
+      requirements: t('chat.quickMessages.requirements'),
+      mistakes: t('chat.quickMessages.mistakes'),
     };
 
     if (quickMessages[action]) {
       setMessageInput(quickMessages[action]);
-      setTimeout(() => handleSendMessage(), 100);
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => handleSendMessage(), 100);
       setShowQuickActions(false);
     }
   };
@@ -104,7 +121,7 @@ export const ChatScreen = ({ route }: any) => {
               <View style={styles.sourcesContainer}>
                 <Icon name="book-outline" size={12} color="#94A3B8" />
                 <Text style={styles.sourcesText}>
-                  Sources: {item.sources.join(", ")}
+                  {t('chat.sources', { sources: item.sources.join(", ") })}
                 </Text>
               </View>
             )}
@@ -142,15 +159,15 @@ export const ChatScreen = ({ route }: any) => {
               <View style={styles.emptyIconContainer}>
                 <Icon name="chatbubbles-outline" size={64} color="#4A9EFF" />
               </View>
-              <Text style={styles.emptyTitle}>AI Assistant</Text>
+              <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
               <Text style={styles.emptyText}>
-                Ask me anything about your visa application or the visa process
+                {t('chat.askAnything')}
               </Text>
 
               {/* Quick Actions */}
               {showQuickActions && (
                 <View style={styles.quickActionsContainer}>
-                  <Text style={styles.quickActionsTitle}>Quick Questions</Text>
+                  <Text style={styles.quickActionsTitle}>{t('chat.quickQuestions')}</Text>
                   <View style={styles.quickActionsGrid}>
                     {quickActions.map((action) => (
                       <TouchableOpacity
@@ -183,7 +200,7 @@ export const ChatScreen = ({ route }: any) => {
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
-                placeholder="Type your question..."
+                placeholder={t('chat.messagePlaceholder')}
                 placeholderTextColor="#6B7280"
                 value={messageInput}
                 onChangeText={setMessageInput}

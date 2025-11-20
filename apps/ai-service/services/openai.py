@@ -284,111 +284,188 @@ class OpenAIService:
         start_time: float,
         error: Optional[str] = None,
     ) -> AIResponse:
-        """Generate fallback response when API is unavailable"""
+        """Generate professional fallback response when API is unavailable"""
         import time
         
+        # Professional fallback responses for VisaBuddy
         fallback_responses = {
             "visa": (
-                "To apply for a visa, follow these general steps:\n\n"
-                "1. **Determine Your Visa Type**: Choose the appropriate visa category (tourist, work, student, etc.)\n"
-                "2. **Gather Documents**: Collect required documents (passport, financial proof, accommodation, etc.)\n"
-                "3. **Complete Application**: Fill out official application forms\n"
-                "4. **Schedule Appointment**: Book an appointment at the embassy or visa center\n"
-                "5. **Attend Interview**: If required, attend a visa interview\n"
-                "6. **Wait for Decision**: Processing times vary (2-12 weeks typically)\n\n"
-                "Please specify which country you're interested in for more detailed guidance."
+                "Thank you for your question about visa applications. As VisaBuddy, I specialize in helping Uzbek citizens and residents with Student and Tourist visas.\n\n"
+                "**General Visa Application Steps:**\n\n"
+                "1. **Determine Your Visa Type**: Choose between Student or Tourist visa based on your purpose\n"
+                "2. **Select Your Destination**: Choose from supported countries (US, Canada, New Zealand, Australia, Japan, South Korea, UK, Spain, Germany, UAE)\n"
+                "3. **Gather Required Documents**: Collect all necessary documents (passport, financial proof, accommodation, etc.)\n"
+                "4. **Complete Application Form**: Fill out the official application accurately\n"
+                "5. **Schedule Appointment**: Book an appointment at the embassy or visa center\n"
+                "6. **Attend Interview**: If required, attend the visa interview\n"
+                "7. **Wait for Decision**: Processing times vary by country (typically 2-12 weeks)\n\n"
+                "⚠️ **Important**: For the most accurate and up-to-date information, please contact the embassy of your destination country or check their official website.\n\n"
+                "Which country are you interested in? I can provide more specific guidance once I know your destination."
             ),
             "document": (
-                "Common visa documents typically include:\n\n"
-                "- Valid passport (6+ months validity)\n"
-                "- Completed application form\n"
-                "- Passport-sized photos\n"
-                "- Proof of financial means\n"
-                "- Proof of accommodation\n"
-                "- Travel insurance (if required)\n"
-                "- Employment letter (for work visas)\n"
-                "- University acceptance (for student visas)\n\n"
-                "Requirements vary significantly by country and visa type. Which country are you applying to?"
+                "I can help you understand visa document requirements. As VisaBuddy, I specialize in Student and Tourist visas for Uzbek citizens.\n\n"
+                "**Common Visa Documents Include:**\n\n"
+                "- Valid passport (minimum 6 months validity beyond travel dates)\n"
+                "- Completed visa application form\n"
+                "- Passport-sized photographs (meeting country-specific requirements)\n"
+                "- Proof of financial means (bank statements, sponsorship letters)\n"
+                "- Proof of accommodation (hotel bookings, invitation letters)\n"
+                "- Travel insurance (if required by destination country)\n"
+                "- For Student Visas: University acceptance letter, academic transcripts\n"
+                "- For Tourist Visas: Travel itinerary, return flight tickets\n\n"
+                "⚠️ **Important**: Document requirements vary significantly by country and visa type. "
+                "For accurate, up-to-date requirements, please check the official embassy website of your destination country.\n\n"
+                "Which country and visa type (Student or Tourist) are you applying for? This will help me provide more specific guidance."
             ),
             "cost": (
-                "Visa costs vary significantly by country and type:\n\n"
-                "- **Tourist Visas**: $20-150 USD\n"
-                "- **Work Visas**: $100-500+ USD\n"
-                "- **Student Visas**: $50-300 USD\n"
-                "- **Residence Permits**: $200-1000+ USD\n\n"
-                "Costs may include application fees, visa fees, and processing fees. "
-                "Which country interests you?"
+                "Visa costs vary by destination country and visa type. As VisaBuddy, I can provide general guidance for Student and Tourist visas.\n\n"
+                "**Typical Visa Fee Ranges:**\n\n"
+                "- **Tourist Visas**: $20-200 USD (varies by country)\n"
+                "- **Student Visas**: $50-400 USD (varies by country)\n"
+                "- **Processing Fees**: Additional fees may apply (varies by country)\n\n"
+                "**Supported Countries Fee Estimates:**\n"
+                "- United States: Tourist $185, Student $510\n"
+                "- Canada: Tourist $100 CAD, Student $150 CAD\n"
+                "- Australia: Tourist $145 AUD, Student $630 AUD\n"
+                "- UK: Tourist £100, Student £363\n"
+                "- Germany: Tourist €75, Student €75\n"
+                "- Japan: Tourist ¥3,000, Student varies\n"
+                "- South Korea: Tourist $40, Student $50\n"
+                "- New Zealand: Tourist $211 NZD, Student $330 NZD\n"
+                "- Spain: Tourist €80, Student €60\n"
+                "- UAE: Tourist varies, Student varies\n\n"
+                "⚠️ **Important**: These are approximate fees and may change. Always verify current fees on the official embassy or consulate website of your destination country.\n\n"
+                "Which country are you interested in? I can provide more specific cost information."
             ),
             "time": (
-                "Visa processing times vary by country and type:\n\n"
-                "- **Tourist Visas**: 5-15 business days (fastest)\n"
-                "- **Standard Processing**: 2-4 weeks\n"
-                "- **Work/Student Visas**: 4-8 weeks\n"
-                "- **Complex Cases**: 8-12 weeks+\n\n"
-                "Some countries offer expedited processing for additional fees. "
-                "Which country's visa are you applying for?"
+                "Visa processing times vary significantly by country and visa type. As VisaBuddy, I can provide general guidance.\n\n"
+                "**Typical Processing Times:**\n\n"
+                "- **Tourist Visas**: 5-20 business days (fastest)\n"
+                "- **Student Visas**: 4-12 weeks (longer processing)\n"
+                "- **Peak Seasons**: Processing may take longer during busy periods\n\n"
+                "**Processing Times by Country (Approximate):**\n"
+                "- United States: 2-4 weeks (Tourist), 4-8 weeks (Student)\n"
+                "- Canada: 2-4 weeks (Tourist), 4-8 weeks (Student)\n"
+                "- Australia: 1-3 weeks (Tourist), 4-8 weeks (Student)\n"
+                "- UK: 3-6 weeks (Tourist), 3-8 weeks (Student)\n"
+                "- Germany: 1-2 weeks (Tourist), 4-8 weeks (Student)\n"
+                "- Japan: 5-7 business days (Tourist), 1-3 months (Student)\n"
+                "- South Korea: 5-10 business days (Tourist), 2-4 weeks (Student)\n"
+                "- New Zealand: 1-3 weeks (Tourist), 4-8 weeks (Student)\n"
+                "- Spain: 1-2 weeks (Tourist), 1-2 months (Student)\n"
+                "- UAE: 3-5 business days (Tourist), 2-4 weeks (Student)\n\n"
+                "⚠️ **Important**: Processing times are estimates and can vary based on individual circumstances, application completeness, and embassy workload. "
+                "Some countries offer expedited processing for additional fees.\n\n"
+                "For the most accurate processing time, please check the official embassy website or contact them directly."
             ),
             "requirement": (
-                "Visa requirements vary by your nationality and destination country.\n\n"
-                "**Generally Required**:\n"
-                "- Valid passport\n"
-                "- Proof of funds\n"
-                "- Return ticket\n"
-                "- Accommodation proof\n\n"
-                "**May Be Required**:\n"
-                "- Employment letter\n"
-                "- Invitation letter\n"
-                "- Health insurance\n"
-                "- Criminal background check\n\n"
-                "Please tell me which country you're interested in visiting."
+                "Visa requirements vary by your nationality (Uzbek citizen/resident) and destination country. As VisaBuddy, I specialize in Student and Tourist visas.\n\n"
+                "**Generally Required for All Visas:**\n"
+                "- Valid passport (minimum 6 months validity)\n"
+                "- Completed visa application form\n"
+                "- Passport photographs\n"
+                "- Proof of financial means\n"
+                "- Proof of accommodation\n"
+                "- Return flight ticket or travel itinerary\n\n"
+                "**Additional Requirements May Include:**\n"
+                "- Travel health insurance\n"
+                "- Employment letter or proof of employment\n"
+                "- Invitation letter (if visiting family/friends)\n"
+                "- Criminal background check (for some countries)\n"
+                "- Medical examination (for some countries and visa types)\n\n"
+                "**For Student Visas Specifically:**\n"
+                "- University acceptance letter\n"
+                "- Academic transcripts and certificates\n"
+                "- Proof of tuition payment or scholarship\n"
+                "- Language proficiency test results (if required)\n\n"
+                "⚠️ **Important**: Requirements vary significantly by country and visa type. "
+                "For accurate, up-to-date requirements, please check the official embassy website of your destination country or contact them directly.\n\n"
+                "Which country are you interested in? I can provide more specific requirements once I know your destination."
             ),
             "application": (
-                "The visa application process generally involves:\n\n"
-                "1. Research visa types for your destination\n"
-                "2. Prepare required documents\n"
-                "3. Complete application form accurately\n"
-                "4. Schedule appointment (online or in-person)\n"
-                "5. Submit application and fees\n"
-                "6. Attend interview if required\n"
-                "7. Wait for processing\n"
-                "8. Collect visa or receive decision\n\n"
-                "Each country has unique procedures. What's your destination?"
+                "I can guide you through the visa application process. As VisaBuddy, I help Uzbek citizens and residents with Student and Tourist visa applications.\n\n"
+                "**General Visa Application Process:**\n\n"
+                "1. **Research and Planning**: Determine your visa type (Student or Tourist) and destination country\n"
+                "2. **Gather Documents**: Collect all required documents based on your destination country's requirements\n"
+                "3. **Complete Application Form**: Fill out the official application form accurately and completely\n"
+                "4. **Schedule Appointment**: Book an appointment at the embassy, consulate, or visa application center\n"
+                "5. **Submit Application**: Submit your application along with all required documents and fees\n"
+                "6. **Attend Interview**: If required, attend the visa interview (prepare thoroughly)\n"
+                "7. **Biometric Data**: Provide fingerprints/photos if required by the destination country\n"
+                "8. **Wait for Processing**: Wait for the visa decision (processing times vary)\n"
+                "9. **Collect Visa**: Collect your passport with visa or receive decision notification\n\n"
+                "⚠️ **Important**: Each country has unique procedures and requirements. "
+                "For detailed, country-specific guidance, please visit the official embassy website or contact them directly.\n\n"
+                "Which country are you applying to? I can provide more specific guidance for your destination."
+            ),
+            "probability": (
+                "I understand you're asking about visa approval chances or probability.\n\n"
+                "⚠️ **CRITICAL DISCLAIMER**: Any probability estimates or approval chances mentioned are rough estimates based on general factors and are **NOT a guarantee**. "
+                "Visa decisions are made by immigration authorities based on individual circumstances, and final approval is never guaranteed. "
+                "Always consult with the embassy or an immigration lawyer for accurate assessment of your specific case.\n\n"
+                "**Factors That May Influence Visa Decisions:**\n"
+                "- Completeness and accuracy of application\n"
+                "- Financial stability and proof of funds\n"
+                "- Strong ties to home country (employment, family, property)\n"
+                "- Travel history and previous visa compliance\n"
+                "- Purpose of visit and supporting documentation\n"
+                "- Country-specific requirements and policies\n\n"
+                "For a professional assessment of your specific case, I recommend:\n"
+                "1. Consulting with the embassy or consulate of your destination country\n"
+                "2. Seeking advice from a qualified immigration lawyer\n"
+                "3. Ensuring all documents are complete and accurate\n\n"
+                "I can help you prepare your application to maximize your chances, but I cannot guarantee approval."
             ),
             "default": (
-                "I'm VisaBuddy's AI assistant, here to help with visa application questions!\n\n"
-                "I can help you with:\n"
-                "- Visa types and requirements\n"
-                "- Application procedures\n"
-                "- Required documents\n"
+                "Hello! I'm VisaBuddy, your AI visa consultant specializing in helping Uzbek citizens and residents with visa applications.\n\n"
+                "**I Can Help You With:**\n\n"
+                "- Student and Tourist visa information\n"
+                "- Visa requirements and document lists\n"
+                "- Application procedures and processes\n"
                 "- Processing times and costs\n"
-                "- General immigration guidance\n\n"
-                "What would you like to know about visa applications?"
+                "- Guidance for supported countries (US, Canada, New Zealand, Australia, Japan, South Korea, UK, Spain, Germany, UAE)\n\n"
+                "**Supported Visa Types:**\n"
+                "- Student Visas (academic, educational)\n"
+                "- Tourist Visas (travel, short-term visits)\n\n"
+                "⚠️ **Important**: For the most accurate and up-to-date information, please verify details with the official embassy website of your destination country.\n\n"
+                "What specific visa question can I help you with today? Please let me know:\n"
+                "- Which country you're interested in\n"
+                "- Whether you need a Student or Tourist visa\n"
+                "- What specific information you need"
             )
         }
         
-        # Find matching response
+        # Find matching response (check for multiple keywords, prioritize more specific ones)
         message_lower = user_message.lower()
-        for keyword, response in fallback_responses.items():
-            if keyword in message_lower:
-                logger.info(f"Using fallback response for keyword: {keyword}")
-                return AIResponse(
-                    content=response,
-                    sources=[],
-                    tokens_used=TokenUsage(0, 0, 0),
-                    model=f"{self.model['name']} (fallback)",
-                    generation_time_ms=(time.time() - start_time) * 1000,
-                    finish_reason="fallback",
-                    error=error,
-                )
         
+        # Priority order: more specific keywords first
+        keyword_priority = ["probability", "chance", "approval", "visa", "document", "cost", "time", "requirement", "application"]
+        
+        matched_keyword = None
+        for keyword in keyword_priority:
+            if keyword in message_lower:
+                matched_keyword = keyword
+                break
+        
+        # If no specific match, try all keywords
+        if not matched_keyword:
+            for keyword, response in fallback_responses.items():
+                if keyword != "default" and keyword in message_lower:
+                    matched_keyword = keyword
+                    break
+        
+        # Use matched keyword or default
+        response_content = fallback_responses.get(matched_keyword, fallback_responses["default"])
+        
+        logger.info(f"Using fallback response for keyword: {matched_keyword or 'default'}")
         return AIResponse(
-            content=fallback_responses["default"],
+            content=response_content,
             sources=[],
             tokens_used=TokenUsage(0, 0, 0),
             model=f"{self.model['name']} (fallback)",
             generation_time_ms=(time.time() - start_time) * 1000,
             finish_reason="fallback",
-            error=error,
+            error=error or "AI service temporarily unavailable",
         )
     
     def _log_token_usage(

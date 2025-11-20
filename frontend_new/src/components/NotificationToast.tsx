@@ -26,23 +26,50 @@ const NotificationToastItem: React.FC<NotificationToastProps> = ({
   const [slideAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
-    // Slide in
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: ANIMATION_DURATION,
-      useNativeDriver: true,
-    }).start();
+    let isMounted = true;
+    let timer: NodeJS.Timeout | null = null;
+    let slideInAnimation: Animated.CompositeAnimation | null = null;
+    let slideOutAnimation: Animated.CompositeAnimation | null = null;
 
-    // Auto dismiss after 5 seconds
-    const timer = setTimeout(() => {
-      Animated.timing(slideAnim, {
-        toValue: 0,
+    // Slide in
+    if (isMounted) {
+      slideInAnimation = Animated.timing(slideAnim, {
+        toValue: 1,
         duration: ANIMATION_DURATION,
         useNativeDriver: true,
-      }).start(onDismiss);
+      });
+      slideInAnimation.start();
+    }
+
+    // Auto dismiss after 5 seconds
+    timer = setTimeout(() => {
+      if (isMounted) {
+        slideOutAnimation = Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: ANIMATION_DURATION,
+          useNativeDriver: true,
+        });
+        slideOutAnimation.start(() => {
+          if (isMounted) {
+            onDismiss();
+          }
+        });
+      }
     }, 5000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      isMounted = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      if (slideInAnimation) {
+        slideInAnimation.stop();
+      }
+      if (slideOutAnimation) {
+        slideOutAnimation.stop();
+      }
+      slideAnim.stopAnimation();
+    };
   }, []);
 
   const translateY = slideAnim.interpolate({

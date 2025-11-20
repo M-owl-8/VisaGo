@@ -17,6 +17,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../services/api';
+import { getTranslatedCountryName } from '../../data/countryTranslations';
 
 interface ApplicationDetailProps {
   route: any;
@@ -176,7 +177,7 @@ export default function ApplicationDetailScreen({
       <View style={styles.container}>
         <View style={styles.errorContainer}>
           <Icon name="alert-circle-outline" size={64} color="#EF4444" />
-          <Text style={styles.errorText}>Application not found</Text>
+          <Text style={styles.errorText}>{t('errors.loadFailed')}</Text>
           <TouchableOpacity
             style={styles.errorButton}
             onPress={() => navigation.goBack()}
@@ -220,7 +221,15 @@ export default function ApplicationDetailScreen({
           <View style={styles.applicationHeader}>
             <Text style={styles.countryFlag}>{application.country?.flagEmoji || '🌍'}</Text>
             <View style={styles.applicationInfo}>
-              <Text style={styles.countryName}>{application.country?.name}</Text>
+              <Text style={styles.countryName}>
+                {application.country
+                  ? getTranslatedCountryName(
+                      application.country.code || '',
+                      language,
+                      application.country.name
+                    )
+                  : t('applicationDetail.unknownCountry')}
+              </Text>
               <Text style={styles.visaTypeName}>{application.visaType?.name}</Text>
             </View>
           </View>
@@ -238,107 +247,94 @@ export default function ApplicationDetailScreen({
           </View>
         </View>
 
-        {/* Document Checklist */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t('visa.applicationDetail.documentChecklist')}</Text>
-            {summary && (
-              <Text style={styles.sectionSubtitle}>
-                {t('visa.applicationDetail.documentsProgress', {
-                  uploaded: summary.uploaded,
-                  total: summary.total,
-                })}
-              </Text>
-            )}
-          </View>
-
-          {summary && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${summary.progress}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.progressText}>{summary.progress}%</Text>
-            </View>
-          )}
-
-          {checklistItems.map((item) => {
-            const statusConfig = getStatusConfig(item.status);
-            return (
-              <View key={item.id} style={styles.checklistItem}>
-                <View style={styles.itemHeader}>
-                  <View style={[styles.itemIcon, { backgroundColor: statusConfig.bgColor }]}>
-                    <Icon name={statusConfig.icon} size={20} color={statusConfig.color} />
-                  </View>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{getLocalizedText(item, 'name')}</Text>
-                    <Text style={styles.itemStatus}>{statusConfig.label}</Text>
-                  </View>
-                  {item.required && (
-                    <View style={styles.requiredBadge}>
-                      <Text style={styles.requiredText}>Required</Text>
-                    </View>
-                  )}
-                </View>
-
-                <Text style={styles.itemDescription}>
-                  {getLocalizedText(item, 'description')}
+        {/* Upload Progress Card */}
+        {summary && (
+          <View style={styles.progressCard}>
+            <View style={styles.progressHeader}>
+              <View>
+                <Text style={styles.progressTitle}>{t('applicationDetail.uploadProgress')}</Text>
+                <Text style={styles.progressSubtitle}>
+                  {t('applicationDetail.documentsUploaded', { uploaded: summary.uploaded, total: summary.total })}
                 </Text>
+              </View>
+              <View style={styles.progressCircle}>
+                <Text style={styles.progressPercentage}>{summary.progress}%</Text>
+              </View>
+            </View>
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBar, { width: `${summary.progress}%` }]} />
+            </View>
+          </View>
+        )}
 
-                {item.verificationNotes && item.status === 'rejected' && (
-                  <View style={styles.rejectionNote}>
-                    <Icon name="alert-circle" size={16} color="#EF4444" />
-                    <Text style={styles.rejectionText}>{item.verificationNotes}</Text>
-                  </View>
-                )}
+        {/* AI Generated Document List Header */}
+        <View style={styles.aiGeneratedHeader}>
+          <Icon name="sparkles" size={20} color="#8B5CF6" />
+          <Text style={styles.aiGeneratedText}>
+            {t('applicationDetail.aiGeneratedList')}
+          </Text>
+          <View style={styles.aiGeneratedBadge}>
+            <Text style={styles.aiGeneratedBadgeText}>
+              {t('applicationDetail.basedOnAnswers')}
+            </Text>
+          </View>
+        </View>
 
-                <View style={styles.itemActions}>
-                  {item.status === 'missing' && (
-                    <TouchableOpacity
-                      style={styles.uploadButton}
-                      onPress={() => handleUploadDocument(item.id, item.name)}
-                    >
-                      <Icon name="cloud-upload-outline" size={18} color="#FFFFFF" />
-                      <Text style={styles.uploadButtonText}>{t('visa.actions.upload')}</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {(item.status === 'pending' || item.status === 'verified') && item.userDocumentId && (
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity
-                        style={styles.viewButton}
-                        onPress={() => handleViewDocument(item.userDocumentId!, item.fileUrl!)}
-                      >
-                        <Icon name="eye-outline" size={18} color="#4A9EFF" />
-                        <Text style={styles.viewButtonText}>{t('visa.actions.view')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.replaceButton}
-                        onPress={() => handleUploadDocument(item.id, item.name)}
-                      >
-                        <Icon name="refresh-outline" size={18} color="#6B7280" />
-                        <Text style={styles.replaceButtonText}>{t('visa.actions.replace')}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {item.status === 'rejected' && (
-                    <TouchableOpacity
-                      style={styles.reuploadButton}
-                      onPress={() => handleUploadDocument(item.id, item.name)}
-                    >
-                      <Icon name="cloud-upload-outline" size={18} color="#FFFFFF" />
-                      <Text style={styles.reuploadButtonText}>{t('visa.actions.reupload')}</Text>
-                    </TouchableOpacity>
-                  )}
+        {/* Document List */}
+        <View style={styles.documentListContainer}>
+          {checklistItems.map((item, index) => {
+            const statusConfig = getStatusConfig(item.status);
+            const isUploaded = item.status === 'verified' || item.status === 'pending';
+            
+            return (
+              <View key={item.id} style={styles.documentItem}>
+                {/* Number */}
+                <View style={styles.documentNumber}>
+                  <Text style={styles.documentNumberText}>{index + 1}</Text>
                 </View>
+                
+                {/* Document Info */}
+                <View style={styles.documentInfo}>
+                  <Text style={styles.documentName}>{getLocalizedText(item, 'name')}</Text>
+                  <Text style={styles.documentDescription}>
+                    {getLocalizedText(item, 'description')}
+                  </Text>
+                </View>
+                
+                {/* Upload Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.uploadButton,
+                    isUploaded && styles.uploadButtonSuccess,
+                  ]}
+                  onPress={() => {
+                    if (item.status === 'missing' || item.status === 'rejected') {
+                      handleUploadDocument(item.id, item.name);
+                    } else if (item.userDocumentId && item.fileUrl) {
+                      handleViewDocument(item.userDocumentId, item.fileUrl);
+                    }
+                  }}
+                >
+                  {isUploaded ? (
+                    <Icon name="checkmark-circle" size={24} color="#10B981" />
+                  ) : (
+                    <Icon name="cloud-upload-outline" size={24} color="#4A9EFF" />
+                  )}
+                </TouchableOpacity>
               </View>
             );
           })}
+        </View>
+
+        {/* Help Section */}
+        <View style={styles.helpCard}>
+          <Icon name="information-circle-outline" size={24} color="#4A9EFF" />
+          <View style={styles.helpContent}>
+            <Text style={styles.helpTitle}>{t('applicationDetail.needHelp')}</Text>
+            <Text style={styles.helpText}>
+              {t('applicationDetail.helpText')}
+            </Text>
+          </View>
         </View>
 
         {/* AI Chat Button */}
@@ -347,7 +343,7 @@ export default function ApplicationDetailScreen({
           onPress={handleChatAboutApplication}
         >
           <Icon name="chatbubbles" size={20} color="#FFFFFF" />
-          <Text style={styles.chatButtonText}>{t('visa.applicationDetail.chatAboutThis')}</Text>
+          <Text style={styles.chatButtonText}>{t('applicationDetail.chatAboutApplication')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -498,186 +494,165 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  section: {
-    paddingHorizontal: 24,
+  progressCard: {
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 24,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
   },
-  sectionHeader: {
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
+  progressTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 4,
   },
-  sectionSubtitle: {
+  progressSubtitle: {
     fontSize: 13,
     color: '#94A3B8',
   },
-  progressContainer: {
-    flexDirection: 'row',
+  progressCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(74, 158, 255, 0.15)',
+    borderWidth: 3,
+    borderColor: '#4A9EFF',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
   },
-  progressBar: {
-    flex: 1,
+  progressPercentage: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  progressBarContainer: {
     height: 8,
-    backgroundColor: 'rgba(74, 158, 255, 0.2)',
+    backgroundColor: 'rgba(74, 158, 255, 0.15)',
     borderRadius: 4,
     overflow: 'hidden',
   },
-  progressFill: {
+  progressBar: {
     height: '100%',
     backgroundColor: '#4A9EFF',
     borderRadius: 4,
   },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4A9EFF',
-    width: 45,
-    textAlign: 'right',
+  aiGeneratedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 20,
+    gap: 8,
   },
-  checklistItem: {
-    backgroundColor: 'rgba(15, 30, 45, 0.6)',
-    borderRadius: 12,
+  aiGeneratedText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  aiGeneratedBadge: {
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  aiGeneratedBadgeText: {
+    fontSize: 11,
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  documentListContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(74, 158, 255, 0.2)',
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
     gap: 12,
   },
-  itemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  documentNumber: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(74, 158, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.4)',
   },
-  itemInfo: {
+  documentNumberText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4A9EFF',
+  },
+  documentInfo: {
     flex: 1,
   },
-  itemName: {
+  documentName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  itemStatus: {
+  documentDescription: {
     fontSize: 12,
     color: '#94A3B8',
-  },
-  requiredBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  requiredText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#EF4444',
-  },
-  itemDescription: {
-    fontSize: 13,
-    color: '#94A3B8',
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  rejectionNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    gap: 8,
-  },
-  rejectionText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#EF4444',
     lineHeight: 16,
   },
-  itemActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
   uploadButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4A9EFF',
-    borderRadius: 8,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  uploadButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  actionButtons: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  viewButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     backgroundColor: 'rgba(74, 158, 255, 0.15)',
-    borderRadius: 8,
-    paddingVertical: 10,
-    gap: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(74, 158, 255, 0.3)',
   },
-  viewButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4A9EFF',
+  uploadButtonSuccess: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
-  replaceButton: {
-    flex: 1,
+  helpCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(107, 114, 128, 0.15)',
-    borderRadius: 8,
-    paddingVertical: 10,
-    gap: 6,
+    backgroundColor: 'rgba(74, 158, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 24,
+    marginTop: 24,
     borderWidth: 1,
-    borderColor: 'rgba(107, 114, 128, 0.3)',
+    borderColor: 'rgba(74, 158, 255, 0.2)',
+    gap: 12,
   },
-  replaceButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#9CA3AF',
-  },
-  reuploadButton: {
+  helpContent: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EF4444',
-    borderRadius: 8,
-    paddingVertical: 10,
-    gap: 6,
   },
-  reuploadButtonText: {
-    fontSize: 13,
+  helpTitle: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 18,
   },
   chatButton: {
     flexDirection: 'row',

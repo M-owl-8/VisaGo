@@ -307,6 +307,12 @@ export const useDocumentStore = create<DocumentStore>()(
         documents: state.documents,
         applicationDocuments: state.applicationDocuments,
       }),
+      // Add error handling for storage operations
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[DocumentStore] Failed to rehydrate:', error);
+        }
+      },
     }
   )
 );

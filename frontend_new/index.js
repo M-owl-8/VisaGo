@@ -18,19 +18,17 @@ import './polyfills';
 // 2. Android MainActivity expects component name "main"
 // 3. AppRegistry gives us more control over the component name
 import { AppRegistry } from 'react-native';
-import messaging from '@react-native-firebase/messaging';
 
-import { handleBackgroundNotification } from './src/services/pushNotifications';
+// Setup Firebase messaging background handler
+// This is deferred until Firebase is properly initialized in App.tsx
+// Background message handler will be set up after Firebase initialization
+// See: src/services/firebase.ts and src/App.tsx for initialization logic
 
 // Import the main App component
 import App from './src/App';
 
-messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-  await handleBackgroundNotification(remoteMessage);
-});
-
 // Register the root component with AppRegistry
 // Component name MUST be "main" to match Android MainActivity.getMainComponentName()
-// See: android/app/src/main/java/com/visabuddy/app/MainActivity.kt line 19
+// See: android/app/src/main/java/com/visabuddy/app/MainActivity.java line 16
 // The MainActivity returns "main" from getMainComponentName()
-AppRegistry.registerComponent('frontend_new', () => App);
+AppRegistry.registerComponent('main', () => App);

@@ -1,4 +1,4 @@
-package com.frontend_new;
+package com.visabuddy.app;
 
 import android.app.Application;
 import com.facebook.react.PackageList;
@@ -57,6 +57,5 @@ public class MainApplication extends Application implements ReactApplication {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       DefaultNewArchitectureEntryPoint.load();
     }
-    ReactNativeFlipper.initializeFlipper(this, getReactNativeHost().getReactInstanceManager());
   }
 }

@@ -59,11 +59,24 @@ export default function QuestionnaireScreen({ navigation }: any) {
 
   // Fade in animation
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    let isMounted = true;
+    let animation: Animated.CompositeAnimation | null = null;
+
+    if (isMounted) {
+      animation = Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      });
+      animation.start();
+    }
+
+    return () => {
+      isMounted = false;
+      if (animation) {
+        animation.stop();
+      }
+    };
   }, [currentStep]);
 
   const currentQuestion = questionnaireQuestions[currentStep];
@@ -107,6 +120,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
     } else {
       nextStep();
       // Reset fade animation
+      fadeAnim.stopAnimation();
       fadeAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -121,6 +135,7 @@ export default function QuestionnaireScreen({ navigation }: any) {
     if (currentStep > 0) {
       previousStep();
       // Reset fade animation
+      fadeAnim.stopAnimation();
       fadeAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -179,16 +194,23 @@ export default function QuestionnaireScreen({ navigation }: any) {
           // Clear questionnaire progress
           await clearProgress();
           
-          // Show success message
+          // Show success message and navigate to Applications
           Alert.alert(
             t('questionnaire.success'),
             t('questionnaire.subtitle'),
             [
               {
                 text: t('common.ok'),
-                onPress: () => {
-                  // Navigate to home or application detail
-                  navigation.replace('Home');
+                onPress: async () => {
+                  // Refresh applications list before navigating
+                  const { fetchUserApplications } = useAuthStore.getState();
+                  try {
+                    await fetchUserApplications();
+                  } catch (error) {
+                    console.warn('Failed to refresh applications:', error);
+                  }
+                  // Navigate to Applications tab
+                  navigation?.navigate('MainTabs', { screen: 'Applications' });
                 },
               },
             ]
@@ -198,21 +220,209 @@ export default function QuestionnaireScreen({ navigation }: any) {
         }
       } catch (aiError: any) {
         console.error('AI generation failed:', aiError);
-        
-        // Even if AI fails, questionnaire is complete
-        // User can manually create application
-        Alert.alert(
-          t('questionnaire.success'),
-          'Your questionnaire is complete. You can now create applications manually.',
-          [
-            {
-              text: t('common.ok'),
-              onPress: () => {
-                navigation.replace('Home');
+
+        // Fallback: Create a basic application even if AI fails
+        try {
+          console.log('Starting fallback application creation...');
+          console.log('Questionnaire data:', questionnaireData);
+          
+          const api = getApiClient();
+          
+          // Get default country and visa type
+          let countryId = questionnaireData.country;
+          let visaTypeId: string | undefined;
+
+          // Step 1: Get country ID
+          // Validate country if provided
+          if (countryId && countryId !== 'not_sure' && countryId.trim() !== '') {
+            console.log('Using country from questionnaire:', countryId);
+            // Try to validate country exists, but don't fail if validation fails
+            try {
+              const countryCheck = await api.getCountry(countryId);
+              if (!countryCheck.success) {
+                console.warn('Selected country not found, will fetch new one');
+                countryId = undefined; // Reset to fetch a new one
+              }
+            } catch (error) {
+              console.warn('Error validating country, will fetch new one:', error);
+              countryId = undefined; // Reset to fetch a new one
+            }
+          }
+          
+          // If no valid country, fetch one
+          if (!countryId || countryId === 'not_sure' || (typeof countryId === 'string' && countryId.trim() === '')) {
+            console.log('No country selected, fetching countries...');
+            let countriesFetched = false;
+            
+            // Try to get countries from store first
+            const storeCountries = useVisaStore.getState().countries;
+            if (storeCountries && storeCountries.length > 0) {
+              countryId = storeCountries[0].id;
+              console.log('Using first country from store:', countryId);
+              countriesFetched = true;
+            }
+            
+            // If store is empty, try to fetch
+            if (!countriesFetched) {
+              try {
+                await fetchCountries();
+                const updatedStoreCountries = useVisaStore.getState().countries;
+                if (updatedStoreCountries && updatedStoreCountries.length > 0) {
+                  countryId = updatedStoreCountries[0].id;
+                  console.log('Using first country after fetch:', countryId);
+                  countriesFetched = true;
+                }
+              } catch (fetchError) {
+                console.warn('Error fetching countries from store:', fetchError);
+              }
+            }
+            
+            // Last resort: fetch directly from API
+            if (!countriesFetched) {
+              try {
+                console.log('Fetching countries directly from API...');
+                const countriesResponse = await api.getCountries();
+                console.log('Countries API response:', countriesResponse);
+                if (countriesResponse.success && countriesResponse.data && Array.isArray(countriesResponse.data) && countriesResponse.data.length > 0) {
+                  countryId = countriesResponse.data[0].id;
+                  console.log('Using first country from API:', countryId);
+                  countriesFetched = true;
+                } else {
+                  console.error('Countries API returned empty or invalid data:', countriesResponse);
+                }
+              } catch (apiError: any) {
+                console.error('Error fetching countries from API:', apiError);
+                console.error('API error details:', {
+                  message: apiError.message,
+                  response: apiError.response?.data,
+                  status: apiError.response?.status,
+                });
+              }
+            }
+            
+            if (!countryId) {
+              throw new Error('Unable to load countries. Please ensure the backend database is seeded with countries.');
+            }
+          }
+
+          if (!countryId) {
+            throw new Error('Could not determine country');
+          }
+
+          console.log('Selected country ID:', countryId);
+
+          // Step 2: Get visa types for the country
+          console.log('Fetching visa types for country:', countryId);
+          let visaTypesFetched = false;
+          
+          try {
+            const visaTypes = await api.getVisaTypes(countryId);
+            console.log('Visa types API response:', visaTypes);
+            
+            if (visaTypes.success && visaTypes.data && Array.isArray(visaTypes.data) && visaTypes.data.length > 0) {
+              // Find visa type matching purpose, or use first one
+              const purposeMap: Record<string, string> = {
+                study: 'student',
+                work: 'work',
+                tourism: 'tourist',
+                business: 'business',
+                immigration: 'immigration',
+              };
+              const visaTypeName = purposeMap[questionnaireData.purpose] || 'tourist';
+              const matchingVisaType = visaTypes.data.find(
+                (vt: any) => vt.name && vt.name.toLowerCase().includes(visaTypeName)
+              );
+              visaTypeId = matchingVisaType?.id || visaTypes.data[0].id;
+              console.log('Selected visa type ID:', visaTypeId);
+              visaTypesFetched = true;
+            } else {
+              console.warn('No visa types returned for country:', countryId);
+              console.warn('Response:', visaTypes);
+            }
+          } catch (visaTypeError: any) {
+            console.error('Error fetching visa types:', visaTypeError);
+            console.error('Error details:', {
+              message: visaTypeError.message,
+              response: visaTypeError.response?.data,
+              status: visaTypeError.response?.status,
+            });
+          }
+          
+          if (!visaTypeId) {
+            throw new Error(`No visa types available for selected country. The database may need to be seeded. Please run 'npm run db:seed' in the backend directory.`);
+          }
+
+          if (!visaTypeId) {
+            throw new Error('Could not determine visa type');
+          }
+
+          // Step 3: Create basic application
+          console.log('Creating application with country:', countryId, 'visa type:', visaTypeId);
+          const createResponse = await api.createApplication(
+            countryId,
+            visaTypeId,
+            'Application created from questionnaire (AI generation unavailable)'
+          );
+
+          console.log('Application creation response:', createResponse);
+
+          if (createResponse.success && createResponse.data) {
+            console.log('Application created successfully:', createResponse.data.id);
+            Alert.alert(
+              t('questionnaire.success'),
+              'Your application has been created successfully!',
+              [
+                {
+                  text: t('common.ok'),
+                  onPress: async () => {
+                    // Refresh applications list before navigating
+                    const { fetchUserApplications } = useAuthStore.getState();
+                    try {
+                      await fetchUserApplications();
+                    } catch (error) {
+                      console.warn('Failed to refresh applications:', error);
+                    }
+                    // Navigate to Applications tab
+                    navigation?.navigate('MainTabs', { screen: 'Applications' });
+                  },
+                },
+              ]
+            );
+          } else {
+            throw new Error(createResponse.error?.message || 'Failed to create application');
+          }
+        } catch (fallbackError: any) {
+          console.error('Fallback application creation failed:', fallbackError);
+          console.error('Error details:', {
+            message: fallbackError.message,
+            stack: fallbackError.stack,
+            questionnaireData,
+          });
+          
+          // Even if fallback fails, questionnaire is complete
+          // Show detailed error message to help debug
+          const errorMessage = fallbackError.message || 'Unknown error';
+          Alert.alert(
+            t('questionnaire.success'),
+            `Your questionnaire has been saved. However, we couldn't create an application automatically.\n\nError: ${errorMessage}\n\nYou can create applications manually from the Applications page.`,
+            [
+              {
+                text: t('common.ok'),
+                onPress: async () => {
+                  // Refresh applications list in case something was created
+                  const { fetchUserApplications } = useAuthStore.getState();
+                  try {
+                    await fetchUserApplications();
+                  } catch (error) {
+                    console.warn('Failed to refresh applications:', error);
+                  }
+                  // Navigate to Applications tab
+                  navigation?.navigate('MainTabs', { screen: 'Applications' });
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+        }
       }
     } catch (error: any) {
       console.error('Questionnaire submission failed:', error);

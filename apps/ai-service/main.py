@@ -6,7 +6,7 @@ Handles AI chat with RAG (Retrieval-Augmented Generation)
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import os
 from dotenv import load_dotenv
 import logging
@@ -85,6 +85,35 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+
+
+class ChecklistRequest(BaseModel):
+    """Request model for checklist generation"""
+    user_input: str
+    application_id: str
+    auth_token: Optional[str] = None
+    mock_context: Optional[Dict[str, Any]] = None  # For testing - bypasses backend fetch
+
+
+class ChecklistResponse(BaseModel):
+    """Response model for checklist endpoint"""
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+class ProbabilityRequest(BaseModel):
+    """Request model for visa probability generation"""
+    application_id: str
+    auth_token: Optional[str] = None
+    mock_context: Optional[Dict[str, Any]] = None  # For testing - bypasses backend fetch
+
+
+class ProbabilityResponse(BaseModel):
+    """Response model for probability endpoint"""
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
 
 # ============================================================================
@@ -167,6 +196,7 @@ async def chat(message: ChatMessage):
             logger.debug("RAG service not initialized, proceeding without knowledge base context")
         
         # Build system prompt with all context
+        # The system prompt is loaded from prompts/system_prompt.txt and enhanced with context
         system_prompt = prompt_service.build_system_prompt(
             language=message.language or "en",
             rag_context=rag_context,
@@ -227,21 +257,11 @@ async def chat(message: ChatMessage):
 
 
 def _get_fallback_response(user_message: str) -> str:
-    """Fallback responses when AI is not available"""
-    fallback_responses = {
-        "visa": "To apply for a visa, you typically need to: 1) Determine visa type, 2) Gather required documents, 3) Submit application, 4) Pay fees, 5) Wait for processing. Processing times vary by country and visa type.",
-        "document": "Common visa documents include: passport, birth certificate, financial statements, employment letter, and proof of residence. Requirements vary by country and visa type.",
-        "cost": "Visa costs vary widely by country and type, typically ranging from $50-500 USD. Check the specific country's official website for accurate fees.",
-        "time": "Visa processing times typically range from 2-12 weeks depending on the country and visa type. Some expedited services may be available.",
-        "default": "I'm here to help with visa application questions. Please ask about visa types, documents, costs, processing times, or other visa-related topics."
-    }
+    """Professional fallback responses when AI is not available"""
+    from services.prompt import get_prompt_service
     
-    lower_msg = user_message.lower()
-    for keyword, response in fallback_responses.items():
-        if keyword in lower_msg:
-            return response
-    
-    return fallback_responses["default"]
+    prompt_service = get_prompt_service()
+    return prompt_service.get_fallback_response(user_message)
 
 
 @app.get("/api/rag/status")
@@ -261,6 +281,76 @@ async def rag_status():
     except Exception as e:
         logger.error(f"Status check error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/checklist/generate", response_model=ChecklistResponse)
+async def generate_checklist(request: ChecklistRequest):
+    """
+    Generate personalized document checklist based on AIUserContext, RAG, and questionnaire
+    
+    - **user_input**: User's question or request
+    - **application_id**: Application ID
+    - **auth_token**: Optional JWT token for backend authentication
+    """
+    try:
+        logger.info(f"Received checklist generation request for application {request.application_id}")
+        
+        from services.checklist import generate_document_checklist
+        
+        checklist_data = await generate_document_checklist(
+            user_input=request.user_input,
+            application_id=request.application_id,
+            auth_token=request.auth_token,
+            mock_context=request.mock_context
+        )
+        
+        return {
+            "success": True,
+            "data": checklist_data,
+            "error": None
+        }
+        
+    except Exception as e:
+        logger.error(f"Checklist generation error: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }
+
+
+@app.post("/api/visa-probability", response_model=ProbabilityResponse)
+async def generate_visa_probability_endpoint(request: ProbabilityRequest):
+    """
+    Generate personalized visa probability estimate based on AIUserContext.riskScore, RAG, and AI
+    
+    - **application_id**: Application ID
+    - **auth_token**: Optional JWT token for backend authentication
+    """
+    try:
+        logger.info(f"Received visa probability request for application {request.application_id}")
+        
+        from services.probability import generate_visa_probability
+        
+        probability_data = await generate_visa_probability(
+            application_id=request.application_id,
+            auth_token=request.auth_token,
+            mock_context=request.mock_context
+        )
+        
+        return {
+            "success": True,
+            "data": probability_data,
+            "error": None
+        }
+        
+    except Exception as e:
+        logger.error(f"Probability generation error: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "data": None,
+            "error": str(e)
+        }
 
 
 @app.post("/api/chat/search")

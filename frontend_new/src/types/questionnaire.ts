@@ -21,6 +21,42 @@ export interface QuestionnaireData {
   englishLevel: 'beginner' | 'intermediate' | 'advanced' | 'native';
 }
 
+/**
+ * Standardized Visa Questionnaire Summary
+ * This is the clean, structured format sent to AI and stored in the database
+ */
+export interface VisaQuestionnaireSummary {
+  version: string;            // e.g. "1.0"
+  visaType: "student" | "tourist";
+  targetCountry: string;      // "US" | "CA" | "NZ" | "AU" | "JP" | "KR" | "UK" | "ES" | "DE" | "AE"
+  appLanguage: "uz" | "ru" | "en";
+  age?: number;
+  citizenship?: string;
+  currentCountry?: string;
+  hasUniversityInvitation?: boolean;
+  hasOtherInvitation?: boolean;  // family/company/hotel etc.
+  invitationDetails?: string;
+  monthlyIncomeUSD?: number;
+  bankBalanceUSD?: number;
+  sponsorType?: "self" | "parent" | "relative" | "company" | "other";
+  hasPropertyInUzbekistan?: boolean;
+  hasFamilyInUzbekistan?: boolean;
+  hasInternationalTravel?: boolean;
+  previousVisaRejections?: boolean;
+  previousRejectionDetails?: string;
+  previousOverstay?: boolean;
+  documents: {
+    hasPassport?: boolean;
+    hasBankStatement?: boolean;
+    hasEmploymentOrStudyProof?: boolean;
+    hasTravelInsurance?: boolean;
+    hasFlightBooking?: boolean;
+    hasHotelBookingOrAccommodation?: boolean;
+  };
+  notes?: string;          // anything important user mentioned
+  mainConcerns?: string;   // what user is worried about
+}
+
 export interface QuestionOption {
   value: string;
   labelEn: string;
@@ -51,5 +87,3 @@ export interface AIGeneratedApplication {
   estimatedProcessingTime?: string;
   tips?: string[];
 }
-
-

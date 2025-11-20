@@ -650,6 +650,12 @@ export const useChatStore = create<ChatStore>()(
         conversations: state.conversations,
         currentLanguage: state.currentLanguage,
       }),
+      // Add error handling for storage operations
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[ChatEnhancedStore] Failed to rehydrate:', error);
+        }
+      },
     }
   )
 );

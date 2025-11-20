@@ -261,6 +261,12 @@ export const usePaymentStore = create<PaymentStore>()(
       partialize: (state) => ({
         payments: state.payments,
       }),
+      // Add error handling for storage operations
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[PaymentStore] Failed to rehydrate:', error);
+        }
+      },
     }
   )
 );

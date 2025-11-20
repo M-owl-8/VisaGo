@@ -12,35 +12,26 @@ import {logError, logMessage, addBreadcrumb} from './errorLogger';
 
 // Determine API URL based on environment
 const getApiBaseUrl = (): string => {
-  // TEMPORARILY HARDCODED TO USE LOCAL BACKEND (SECURITY DISABLED)
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3000';
-  }
-  return 'http://localhost:3000';
-
-  // Check if process is available
-  if (typeof process === 'undefined') {
-    // In Android emulator, use 10.0.2.2 instead of localhost
+  // In development (with Metro bundler), use localhost/emulator address
+  if (__DEV__) {
     if (Platform.OS === 'android') {
-      return __DEV__
-        ? 'http://10.0.2.2:3000'
-        : 'https://visabuddy-backend-production.up.railway.app';
+      return 'http://10.0.2.2:3000'; // Android emulator
     }
-    // Fallback to localhost in development, production URL otherwise
-    return __DEV__
-      ? 'http://localhost:3000'
-      : 'https://visabuddy-backend-production.up.railway.app';
+    return 'http://localhost:3000'; // iOS simulator / local
   }
 
-  // If explicitly set via environment variable, use it
-  if (process.env?.EXPO_PUBLIC_API_URL) {
+  // Production: Use Railway backend URL
+  // This will be used when building standalone APK
+  // You can override this by setting EXPO_PUBLIC_API_URL before building
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  if (process.env?.REACT_APP_API_URL) {
+  if (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
 
-  // Production Railway URL
+  // Default production Railway URL
+  // TODO: Replace with your actual Railway backend URL
   return 'https://visabuddy-backend-production.up.railway.app';
 };
 

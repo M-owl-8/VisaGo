@@ -16,11 +16,33 @@ export class ApplicationsService {
         checkpoints: {
           orderBy: { order: "asc" },
         },
+        documents: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
       },
-      orderBy: { createdAt: "desc" },
+      // Order by creation date ascending (oldest first)
+      // This ensures applications appear in chronological order (first created = first in list)
+      orderBy: {
+        createdAt: "asc",
+      },
     });
 
-    return applications;
+    // Calculate progress percentage for each application
+    return applications.map((app: any) => {
+      const allCheckpoints = app.checkpoints || [];
+      const completedCount = allCheckpoints.filter((cp: any) => cp.isCompleted).length;
+      const progressPercentage = allCheckpoints.length > 0
+        ? Math.round((completedCount / allCheckpoints.length) * 100)
+        : 0;
+
+      return {
+        ...app,
+        progressPercentage,
+      };
+    });
   }
 
   /**

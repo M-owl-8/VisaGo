@@ -26,6 +26,7 @@ interface OnboardingState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   getProgress: () => number;
+  loadFromUserBio: (bio: string | null | undefined) => void;
 }
 
 const STORAGE_KEY = '@questionnaire_progress';
@@ -50,6 +51,40 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     }));
     // Auto-save progress
     get().saveProgress();
+  },
+
+  // Load questionnaire data from user bio
+  // Supports both legacy format and new format with summary
+  loadFromUserBio: (bio: string | null | undefined) => {
+    if (!bio) return;
+    try {
+      const parsed = JSON.parse(bio);
+      
+      // Check if it's the new format with summary
+      if (parsed._hasSummary && parsed.summary) {
+        // New format: extract legacy fields for backwards compatibility
+        // Remove metadata fields
+        const {summary, _version, _hasSummary, ...legacyData} = parsed;
+        
+        // Use legacy data for populating answers (for UI compatibility)
+        set((state) => ({
+          answers: {
+            ...state.answers,
+            ...legacyData,
+          },
+        }));
+      } else {
+        // Legacy format: use as-is
+        set((state) => ({
+          answers: {
+            ...state.answers,
+            ...parsed,
+          },
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to parse questionnaire data from bio:', error);
+    }
   },
 
   nextStep: () => {

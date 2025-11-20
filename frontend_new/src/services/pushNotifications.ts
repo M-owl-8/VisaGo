@@ -1,10 +1,11 @@
 import {Platform} from 'react-native';
-import messaging, {
+import {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import {useNotificationStore} from '../store/notifications';
 import {addBreadcrumb, logError, logMessage} from './errorLogger';
 import {APP_VERSION} from '../config/constants';
+import {getMessaging, isFirebaseInitialized, initializeFirebase} from './firebase';
 
 export const DEFAULT_TOPIC = 'visabuddy-general';
 
@@ -16,6 +17,7 @@ let unsubscribeOnNotificationOpened: (() => void) | null = null;
 const mapAuthorizationStatus = (
   status: FirebaseMessagingTypes.AuthorizationStatus,
 ): 'granted' | 'denied' | 'provisional' | 'unknown' => {
+  const messaging = getMessaging();
   switch (status) {
     case messaging.AuthorizationStatus.AUTHORIZED:
       return 'granted';
@@ -95,15 +97,29 @@ export const initializePushNotifications = async (): Promise<void> => {
   }
 
   try {
-    await messaging().registerDeviceForRemoteMessages();
+    // Ensure Firebase is initialized before using messaging
+    const firebaseReady = await initializeFirebase();
+    if (!firebaseReady) {
+      // Don't log as an error - Firebase might not be configured, which is okay
+      if (__DEV__) {
+        logMessage(
+          'Push notifications skipped: Firebase not configured. ' +
+          'This is normal if Firebase setup is not complete.'
+        );
+      }
+      return;
+    }
 
-    let authorizationStatus = await messaging().hasPermission();
+    const messaging = getMessaging();
+    await messaging.registerDeviceForRemoteMessages();
+
+    let authorizationStatus = await messaging.hasPermission();
 
     if (
       authorizationStatus === messaging.AuthorizationStatus.NOT_DETERMINED ||
       authorizationStatus === messaging.AuthorizationStatus.DENIED
     ) {
-      authorizationStatus = await messaging().requestPermission();
+      authorizationStatus = await messaging.requestPermission();
     }
 
     notificationStore.setPushPermissionStatus(
@@ -118,23 +134,23 @@ export const initializePushNotifications = async (): Promise<void> => {
       return;
     }
 
-    const token = await messaging().getToken();
+    const token = await messaging.getToken();
     await syncDeviceToken(token);
 
     if (!unsubscribeOnTokenRefresh) {
-      unsubscribeOnTokenRefresh = messaging().onTokenRefresh(async newToken => {
+      unsubscribeOnTokenRefresh = messaging.onTokenRefresh(async newToken => {
         await syncDeviceToken(newToken);
       });
     }
 
     if (!unsubscribeOnMessage) {
-      unsubscribeOnMessage = messaging().onMessage(async remoteMessage => {
+      unsubscribeOnMessage = messaging.onMessage(async remoteMessage => {
         await handleRemoteMessage(remoteMessage, 'foreground');
       });
     }
 
     if (!unsubscribeOnNotificationOpened) {
-      unsubscribeOnNotificationOpened = messaging().onNotificationOpenedApp(
+      unsubscribeOnNotificationOpened = messaging.onNotificationOpenedApp(
         async remoteMessage => {
           if (remoteMessage) {
             await handleRemoteMessage(remoteMessage, 'opened');
@@ -143,7 +159,7 @@ export const initializePushNotifications = async (): Promise<void> => {
       );
     }
 
-    const initialNotification = await messaging().getInitialNotification();
+    const initialNotification = await messaging.getInitialNotification();
     if (initialNotification) {
       await handleRemoteMessage(initialNotification, 'initial');
     }

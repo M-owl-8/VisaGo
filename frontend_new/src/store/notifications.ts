@@ -1,5 +1,6 @@
 import {create} from 'zustand';
-import {persist} from 'zustand/middleware';
+import {persist, createJSONStorage} from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 let apiClient: any = null;
 const getApiClient = () => {
@@ -302,6 +303,7 @@ export const useNotificationStore = create<NotificationStore>()(
     }),
     {
       name: 'notification-store',
+      storage: createJSONStorage(() => AsyncStorage),
       partialize: state => ({
         notifications: state.notifications,
         preferences: state.preferences,
@@ -311,6 +313,12 @@ export const useNotificationStore = create<NotificationStore>()(
         lastTokenSyncAt: state.lastTokenSyncAt,
         preferencesLoaded: state.preferencesLoaded,
       }),
+      // Add error handling for storage operations
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[NotificationStore] Failed to rehydrate:', error);
+        }
+      },
     },
   ),
 );

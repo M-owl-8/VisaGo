@@ -4,15 +4,88 @@ Manages prompt templates with context injection for RAG
 """
 
 import logging
+import os
 from typing import Dict, List, Any, Optional
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def load_system_prompt() -> str:
+    """
+    Load system prompt from file
+    
+    Returns:
+        System prompt text, or default prompt if file not found
+    """
+    try:
+        # Get the directory where this file is located
+        current_dir = Path(__file__).parent.parent
+        prompt_file = current_dir / "prompts" / "system_prompt.txt"
+        
+        if prompt_file.exists():
+            with open(prompt_file, "r", encoding="utf-8") as f:
+                prompt = f.read()
+            logger.info("✅ Loaded system prompt from file")
+            return prompt
+        else:
+            logger.warning(f"⚠️ System prompt file not found at {prompt_file}, using default")
+            return get_default_system_prompt()
+    except Exception as e:
+        logger.error(f"Error loading system prompt file: {str(e)}, using default")
+        return get_default_system_prompt()
+
+
+def get_default_system_prompt() -> str:
+    """Get default system prompt if file loading fails"""
+    return """You are VisaBuddy, an expert visa application assistant. Your mission is to help users navigate the complex visa application process with accuracy, empathy, and actionable guidance.
+
+## Your Core Responsibilities
+1. **Provide Accurate Information**: Deliver current, country-specific visa requirements and procedures
+2. **Guide Users Through Steps**: Clearly explain the visa application process from start to finish
+3. **Answer Comprehensively**: Address questions about documents, timelines, costs, eligibility, and common pitfalls
+4. **Offer Practical Advice**: Provide tips to increase approval odds and avoid common mistakes
+5. **Direct to Official Sources**: Always reference official sources for legal matters
+6. **Maintain Professional Tone**: Be helpful, empathetic, and non-judgmental
+
+## Communication Guidelines
+- **Format responses clearly**: Use bullet points, numbered lists, and headers for readability
+- **Be concise but complete**: Answer fully without unnecessary verbosity (max 300 words unless detailed explanation needed)
+- **Show empathy**: Understand visa applications can be stressful; be encouraging
+- **Verify context**: Always confirm the country and visa type before providing advice
+- **Use knowledge base first**: Prioritize RAG-retrieved documents over general knowledge
+- **Cite sources**: Reference specific documents or official sources when providing information
+- **Recommend experts**: Suggest immigration lawyers for complex legal situations
+- **Handle uncertainty**: Be honest when unsure; never guess about requirements
+
+## Critical Disclaimers
+⚠️ **NOT LEGAL ADVICE**: This is informational guidance, not legal advice. Complex cases need immigration lawyer consultation.
+⚠️ **VERIFY OFFICIAL**: Always verify current requirements with official government websites and embassies.
+⚠️ **POLICIES CHANGE**: Immigration policies are frequently updated; always check official sources.
+
+## Response Strategies by User Intent
+- **Requirements**: List documents and conditions with country/visa type specifics
+- **Timeline**: Provide typical timelines and factors affecting speed
+- **Cost**: Break down fees and explain what's included
+- **Process**: Step-by-step walkthrough with timelines
+- **Mistakes**: Common pitfalls and how to avoid them
+- **Eligibility**: Factors affecting approval odds
+
+---
+
+Use the knowledge base context below to give accurate, current, country-specific answers. Prioritize RAG information over general knowledge."""
 
 
 class PromptService:
     """Service for managing AI prompts with RAG context"""
     
-    # System prompt template
+    def __init__(self):
+        """Initialize prompt service"""
+        # Load system prompt from file
+        self.system_prompt = load_system_prompt()
+        self.language_prompts = self._build_language_prompts()
+    
+    # System prompt template (fallback - will be loaded from file)
     SYSTEM_PROMPT = """You are VisaBuddy, an expert visa application assistant. Your mission is to help users navigate the complex visa application process with accuracy, empathy, and actionable guidance.
 
 ## Your Core Responsibilities
@@ -94,7 +167,8 @@ Based on your question about {query}, here's relevant information:
 
     def __init__(self):
         """Initialize prompt service"""
-        self.system_prompt = self.SYSTEM_PROMPT
+        # Load system prompt from file (with fallback to default)
+        self.system_prompt = load_system_prompt()
         self.language_prompts = self._build_language_prompts()
     
     def _build_language_prompts(self) -> Dict[str, str]:
@@ -202,23 +276,70 @@ Quyida keltirilgan bilim bazasidagi kontekstdan foydalanib, aniq, hozirgi vaqtda
         Returns:
             Complete system prompt
         """
-        # Get language-specific prompt
-        prompt = self.language_prompts.get(language, self.system_prompt)
+        # Start with base system prompt (loaded from file)
+        prompt = self.system_prompt
         
-        # Add application context if available
+        # Determine language from context if available (prioritize context over parameter)
+        # Check application_context first, then user_profile, then fall back to language parameter
+        final_language = language
         if application_context:
-            app_context_str = self._format_application_context(application_context)
-            prompt += "\n\n" + app_context_str
+            final_language = (
+                application_context.get("userLanguage") or 
+                application_context.get("appLanguage") or 
+                final_language
+            )
+        if user_profile:
+            final_language = (
+                user_profile.get("appLanguage") or 
+                user_profile.get("language") or 
+                final_language
+            )
         
-        # Add RAG context if available
+        # Add language instruction with emphasis on context-based language
+        language_instructions = {
+            "en": "\n\n**LANGUAGE INSTRUCTION**: You must respond in English. All your responses should be in English. Check the userProfile.appLanguage field in the JSON context to confirm the user's language preference.",
+            "ru": "\n\n**LANGUAGE INSTRUCTION**: Вы должны отвечать на русском языке. Все ваши ответы должны быть на русском языке. Проверьте поле userProfile.appLanguage в JSON-контексте, чтобы подтвердить языковые предпочтения пользователя.",
+            "uz": "\n\n**LANGUAGE INSTRUCTION**: Siz o'zbek tilida javob berishingiz kerak. Barcha javoblaringiz o'zbek tilida bo'lishi kerak. Foydalanuvchining til afzalligini tasdiqlash uchun JSON kontekstidagi userProfile.appLanguage maydonini tekshiring."
+        }
+        prompt += language_instructions.get(final_language, language_instructions["en"])
+        
+        # Add reminder about language rules from system prompt
+        prompt += "\n\n**REMINDER**: The LANGUAGE RULES section in the system prompt specifies that you must check userProfile.appLanguage in the JSON context and respond accordingly. Do not mix languages in one answer."
+        
+        # Add RAG context if available (MANDATORY - must use RAG documents)
         if rag_context and rag_context.get("documents"):
             context_str = self._format_rag_context(rag_context)
             prompt += "\n\n" + context_str
+            prompt += "\n\n**IMPORTANT**: Use the RAG documents above as your primary source of information. Prioritize this information over general knowledge."
+        elif rag_context:
+            prompt += "\n\n**NOTE**: No relevant RAG documents found for this query. If you are uncertain about any visa requirements, explicitly state your uncertainty and advise contacting the embassy."
         
-        # Add user context if available
+        # Add structured user context (JSON from backend) if available (MANDATORY - must use)
+        if application_context:
+            app_context_str = self._format_application_context(application_context)
+            prompt += "\n\n" + app_context_str
+            prompt += "\n\n**IMPORTANT**: Use the structured user context above to personalize your response. Reference their specific application details when relevant."
+            # Extract and emphasize language from context
+            context_language = (
+                application_context.get("userLanguage") or 
+                application_context.get("appLanguage") or 
+                None
+            )
+            if context_language:
+                prompt += f"\n\n**LANGUAGE FROM CONTEXT**: The user's app language is {context_language}. You MUST respond in {context_language} language as specified in the context."
+        
+        # Add user profile if available
         if user_profile:
             user_context_str = self._format_user_context(user_profile)
             prompt += "\n\n" + user_context_str
+            # Check for appLanguage in user_profile as well
+            profile_language = (
+                user_profile.get("appLanguage") or 
+                user_profile.get("language") or 
+                None
+            )
+            if profile_language:
+                prompt += f"\n\n**LANGUAGE FROM USER PROFILE**: The user's app language is {profile_language}. You MUST respond in {profile_language} language."
         
         return prompt
     
@@ -272,6 +393,13 @@ Quyida keltirilgan bilim bazasidagi kontekstdan foydalanib, aniq, hozirgi vaqtda
             else:
                 missing_docs_str = str(missing_docs)
             
+            # Extract language from context - check multiple possible locations
+            user_language = (
+                app_context.get("userLanguage") or 
+                app_context.get("appLanguage") or 
+                "en"
+            )
+            
             context_str = f"""
 **USER'S CURRENT VISA APPLICATION:**
 
@@ -294,10 +422,12 @@ Quyida keltirilgan bilim bazasidagi kontekstdan foydalanib, aniq, hozirgi vaqtda
 - Checkpoints Completed: {app_context.get("checkpointsCompleted", 0)} of {app_context.get("checkpointsTotal", 0)}
 - Next Step: {app_context.get("nextCheckpoint", "Complete all documents")}
 
+**USER LANGUAGE**: {user_language} (from application context)
+
 **IMPORTANT**: Use this specific application context to provide personalized advice. 
 If user asks about documents, refer to their specific missing documents.
 If user asks about next steps, refer to their next checkpoint.
-Always respond in {app_context.get("userLanguage", "en")} language.
+Always respond in {user_language} language as specified in the context.
 """
             return context_str
         except Exception as e:
@@ -340,15 +470,16 @@ Always respond in {app_context.get("userLanguage", "en")} language.
         
         return messages
     
-    def get_fallback_response(self, user_message: str) -> str:
+    def get_fallback_response(self, user_message: str, language: str = "en") -> str:
         """
-        Get fallback response for when AI is not available
+        Get professional fallback response for when AI is not available
         
         Args:
             user_message: User's message
+            language: Language code (uz, ru, en)
             
         Returns:
-            Helpful fallback response
+            Professional fallback response aligned with VisaBuddy system prompt
         """
         message_lower = user_message.lower()
         

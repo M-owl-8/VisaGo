@@ -8,19 +8,21 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/auth';
 
 export default function ProfileScreen({ navigation }: any) {
+  const { t } = useTranslation();
   const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('profile.logout'),
+      t('profile.logoutConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Logout',
+          text: t('profile.logout'),
           style: 'destructive',
           onPress: () => logout(),
         },
@@ -32,42 +34,42 @@ export default function ProfileScreen({ navigation }: any) {
     {
       id: 'personal-info',
       icon: 'person-outline',
-      title: 'Personal Information',
-      subtitle: 'Update your profile details',
+      title: t('profile.personalInfo'),
+      subtitle: t('profile.updateProfileDetails'),
       color: '#4A9EFF',
       onPress: () => navigation?.navigate('ProfileEdit'),
     },
     {
       id: 'language',
       icon: 'language-outline',
-      title: 'Language',
-      subtitle: 'Change app language',
+      title: t('profile.language'),
+      subtitle: t('profile.changeAppLanguage'),
       color: '#10B981',
-      onPress: () => {},
+      onPress: () => navigation?.navigate('Language'),
     },
     {
       id: 'notifications',
       icon: 'notifications-outline',
-      title: 'Notifications',
-      subtitle: 'Manage notification settings',
+      title: t('profile.notifications'),
+      subtitle: t('profile.manageNotificationSettings'),
       color: '#F59E0B',
-      onPress: () => {},
+      onPress: () => navigation?.navigate('NotificationSettings'),
     },
     {
       id: 'security',
       icon: 'shield-checkmark-outline',
-      title: 'Security',
-      subtitle: 'Password and security settings',
+      title: t('profile.security'),
+      subtitle: t('profile.passwordAndSecurity'),
       color: '#8B5CF6',
-      onPress: () => {},
+      onPress: () => navigation?.navigate('Security'),
     },
     {
       id: 'help',
       icon: 'help-circle-outline',
-      title: 'Help & Support',
-      subtitle: 'Get help with your application',
+      title: t('profile.helpSupport'),
+      subtitle: t('profile.getHelpWithApplication'),
       color: '#06B6D4',
-      onPress: () => {},
+      onPress: () => navigation?.navigate('HelpSupport'),
     },
   ];
 
@@ -91,7 +93,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Icon name="person" size={48} color="#4A9EFF" />
             </View>
             <Text style={styles.userName}>
-              {user?.firstName} {user?.lastName}
+              {user?.firstName || 'User'}
             </Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
           </View>

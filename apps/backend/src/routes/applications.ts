@@ -1,7 +1,10 @@
 import express, { Request, Response, NextFunction } from "express";
+import axios, { AxiosError } from "axios";
 import { ApplicationsService } from "../services/applications.service";
 import { AIApplicationService } from "../services/ai-application.service";
 import { authenticateToken } from "../middleware/auth";
+import { buildAIUserContext, getQuestionnaireSummary } from "../services/ai-context.service";
+import { logError, logInfo } from "../middleware/logger";
 
 const router = express.Router();
 
@@ -157,6 +160,281 @@ router.post("/ai-generate", async (req: Request, res: Response, next: NextFuncti
       data: result,
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Get AI service URL from environment
+ */
+function getAIServiceURL(): string {
+  return process.env.AI_SERVICE_URL || "http://localhost:8001";
+}
+
+/**
+ * POST /api/applications/:id/generate-checklist
+ * Generate a personalized document checklist for a real user/application
+ * Uses real DB data and AIUserContext (no mock data)
+ */
+router.post("/:id/generate-checklist", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const applicationId = req.params.id;
+    const userId = req.userId!;
+
+    if (!applicationId) {
+      return res.status(400).json({
+        success: false,
+        error: "APPLICATION_ID_REQUIRED",
+        message: "Application ID is required",
+      });
+    }
+
+    logInfo("Generating checklist for application", {
+      userId,
+      applicationId,
+    });
+
+    // Step 1: Check if questionnaire summary exists
+    const questionnaireSummary = await getQuestionnaireSummary(userId);
+    if (!questionnaireSummary) {
+      logInfo("Questionnaire summary missing", {
+        userId,
+        applicationId,
+      });
+      return res.status(400).json({
+        success: false,
+        error: "QUESTIONNAIRE_MISSING",
+        message: "Questionnaire data is required to generate a checklist. Please complete the questionnaire first.",
+      });
+    }
+
+    // Step 2: Build real AIUserContext (not mock)
+    let aiUserContext;
+    try {
+      aiUserContext = await buildAIUserContext(userId, applicationId);
+      logInfo("AIUserContext built successfully", {
+        userId,
+        applicationId,
+        hasSummary: !!aiUserContext.questionnaireSummary,
+      });
+    } catch (contextError) {
+      logError("Failed to build AIUserContext", contextError as Error, {
+        userId,
+        applicationId,
+      });
+      return res.status(500).json({
+        success: false,
+        error: "CONTEXT_BUILD_FAILED",
+        message: "Failed to build application context. Please try again later.",
+      });
+    }
+
+    // Step 3: Call AI service checklist endpoint
+    const aiServiceURL = getAIServiceURL();
+    const checklistEndpoint = `${aiServiceURL}/api/checklist/generate`;
+
+    logInfo("Calling AI service for checklist generation", {
+      url: checklistEndpoint,
+      applicationId,
+      userId,
+    });
+
+    try {
+      const aiResponse = await axios.post(
+        checklistEndpoint,
+        {
+          user_input: "Generate a complete document checklist for my visa application",
+          application_id: applicationId,
+          auth_token: req.headers.authorization?.replace("Bearer ", ""), // Pass JWT token for internal API calls
+          // Do NOT pass mock_context - use real context from backend
+        },
+        {
+          timeout: 60000, // 60 second timeout for AI generation
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (aiResponse.data.success && aiResponse.data.data) {
+        const checklist = aiResponse.data.data;
+
+        logInfo("Checklist generated successfully", {
+          userId,
+          applicationId,
+          checklistType: checklist.type,
+          itemCount: checklist.checklist?.length || 0,
+        });
+
+        return res.json({
+          success: true,
+          checklist: checklist,
+        });
+      } else {
+        throw new Error(
+          aiResponse.data.error || "AI service returned unsuccessful response"
+        );
+      }
+    } catch (axiosError) {
+      const error = axiosError as AxiosError;
+      
+      // Handle timeout
+      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+        logError("AI service timeout", error, {
+          userId,
+          applicationId,
+          url: checklistEndpoint,
+        });
+        return res.status(504).json({
+          success: false,
+          error: "CHECKLIST_FAILED",
+          message: "VisaBuddy could not generate your checklist. The request timed out. Please try again later.",
+        });
+      }
+
+      // Handle other errors
+      logError("AI service call failed", error, {
+        userId,
+        applicationId,
+        url: checklistEndpoint,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "CHECKLIST_FAILED",
+        message: "VisaBuddy could not generate your checklist. Please try again later.",
+      });
+    }
+  } catch (error) {
+    logError("Checklist generation error", error as Error, {
+      userId: req.userId,
+      applicationId: req.params.id,
+    });
+    next(error);
+  }
+});
+
+/**
+ * POST /api/applications/:id/visa-probability
+ * Generate a personalized visa probability estimate for a real user/application
+ * Uses real DB data, AIUserContext.riskScore, RAG, and AI
+ */
+router.post("/:id/visa-probability", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const applicationId = req.params.id;
+    const userId = req.userId!;
+
+    if (!applicationId) {
+      return res.status(400).json({
+        success: false,
+        error: "APPLICATION_ID_REQUIRED",
+        message: "Application ID is required",
+      });
+    }
+
+    logInfo("Generating visa probability for application", {
+      userId,
+      applicationId,
+    });
+
+    // Step 1: Check if questionnaire summary exists
+    const questionnaireSummary = await getQuestionnaireSummary(userId);
+    if (!questionnaireSummary) {
+      logInfo("Questionnaire summary missing", {
+        userId,
+        applicationId,
+      });
+      return res.status(400).json({
+        success: false,
+        error: "QUESTIONNAIRE_MISSING",
+        message: "Questionnaire data is required to generate a probability estimate. Please complete the questionnaire first.",
+      });
+    }
+
+    // Step 2: Call AI service probability endpoint
+    const aiServiceURL = getAIServiceURL();
+    const probabilityEndpoint = `${aiServiceURL}/api/visa-probability`;
+
+    logInfo("Calling AI service for probability generation", {
+      url: probabilityEndpoint,
+      applicationId,
+      userId,
+    });
+
+    try {
+      const aiResponse = await axios.post(
+        probabilityEndpoint,
+        {
+          application_id: applicationId,
+          auth_token: req.headers.authorization?.replace("Bearer ", ""), // Pass JWT token for internal API calls
+        },
+        {
+          timeout: 60000, // 60 second timeout for AI generation
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (aiResponse.data.success && aiResponse.data.data) {
+        const probability = aiResponse.data.data;
+
+        logInfo("Probability generated successfully", {
+          userId,
+          applicationId,
+          probabilityType: probability.type,
+          percent: probability.probability?.percent,
+          level: probability.probability?.level,
+        });
+
+        return res.json({
+          success: true,
+          probability: probability,
+        });
+      } else {
+        throw new Error(
+          aiResponse.data.error || "AI service returned unsuccessful response"
+        );
+      }
+    } catch (axiosError) {
+      const error = axiosError as AxiosError;
+      
+      // Handle timeout
+      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+        logError("AI service timeout", error, {
+          userId,
+          applicationId,
+          url: probabilityEndpoint,
+        });
+        return res.status(504).json({
+          success: false,
+          error: "PROBABILITY_FAILED",
+          message: "VisaBuddy could not generate your probability estimate. The request timed out. Please try again later.",
+        });
+      }
+
+      // Handle other errors
+      logError("AI service call failed", error, {
+        userId,
+        applicationId,
+        url: probabilityEndpoint,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "PROBABILITY_FAILED",
+        message: "VisaBuddy could not generate your probability estimate. Please try again later.",
+      });
+    }
+  } catch (error) {
+    logError("Probability generation error", error as Error, {
+      userId: req.userId,
+      applicationId: req.params.id,
+    });
     next(error);
   }
 });

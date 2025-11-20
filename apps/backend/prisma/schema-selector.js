@@ -1,3 +1,33 @@
+<<<<<<< HEAD
+=======
+// Auto-select Prisma schema based on DATABASE_URL
+// This ensures the correct schema is used for local (SQLite) vs production (PostgreSQL)
+
+const fs = require('fs');
+const path = require('path');
+
+const databaseUrl = process.env.DATABASE_URL || 'file:./dev.db';
+// Check for PostgreSQL - Railway and other providers may use different formats
+const isPostgres = 
+  databaseUrl.startsWith('postgres://') || 
+  databaseUrl.startsWith('postgresql://') ||
+  databaseUrl.includes('postgres') ||
+  databaseUrl.includes('railway') ||
+  databaseUrl.includes('gondola.proxy.rlwy.net') ||
+  (!databaseUrl.startsWith('file:') && !databaseUrl.endsWith('.db'));
+
+const sourceSchema = isPostgres 
+  ? path.join(__dirname, 'schema.postgresql.prisma')
+  : path.join(__dirname, 'schema.prisma'); // schema.prisma is the SQLite version
+
+const targetSchema = path.join(__dirname, 'schema.prisma');
+
+console.log(`\n🔄 Auto-selecting Prisma schema...`);
+console.log(`   DATABASE_URL: ${databaseUrl.substring(0, 30)}...`);
+console.log(`   Database type: ${isPostgres ? 'PostgreSQL' : 'SQLite'}`);
+console.log(`   Using schema: ${isPostgres ? 'schema.postgresql.prisma' : 'schema.prisma'}\n`);
+
+>>>>>>> 42f5192 (chore: sync prisma client schema with selector)
 // Copy the appropriate schema
 try {
   fs.copyFileSync(sourceSchema, targetSchema);
@@ -43,4 +73,10 @@ try {
   console.error(`   Source: ${sourceSchema}`);
   console.error(`   Target: ${targetSchema}`);
   process.exit(1);
+<<<<<<< HEAD
 }
+=======
+}
+
+
+>>>>>>> 42f5192 (chore: sync prisma client schema with selector)

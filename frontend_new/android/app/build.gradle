@@ -73,9 +73,9 @@ android {
 
     compileSdkVersion rootProject.ext.compileSdkVersion
 
-    namespace "com.frontend_new"
+    namespace "com.visabuddy.app"
     defaultConfig {
-        applicationId "com.frontend_new"
+        applicationId "com.visabuddy.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -155,3 +155,6 @@ dependencies {
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
+
+// Apply Google Services plugin at the bottom (required for Firebase)
+apply plugin: 'com.google.gms.google-services'

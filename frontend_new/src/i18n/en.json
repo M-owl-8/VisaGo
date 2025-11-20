@@ -82,6 +82,21 @@
       "action": "Start Application"
     }
   },
+  "applications": {
+    "title": "Applications",
+    "startNewApplications": "Start new applications",
+    "myApplications": "My applications",
+    "manageYourApplications": "Manage your visa applications",
+    "loadingApplications": "Loading applications...",
+    "noApplicationsYet": "No applications yet",
+    "startNewApplicationHint": "Start a new application by clicking the plus icon above",
+    "complete": "Complete",
+    "draft": "Draft",
+    "submitted": "Submitted",
+    "underReview": "Under Review",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
   "visa": {
     "visaSelection": "Visa Selection",
     "selectVisaType": "Select Visa Type",
@@ -171,6 +186,7 @@
     "getHelpWithVisa": "Get help with your visa application",
     "startConversation": "Start a conversation",
     "askAnything": "Ask me anything about your visa application or the visa process",
+    "quickQuestions": "Quick Questions",
     "whatDocuments": "📄 What documents do I need?",
     "processingTime": "⏱️ What's the processing time?",
     "financialRequirements": "💰 What are the financial requirements?",
@@ -182,18 +198,38 @@
     "sending": "Sending...",
     "sources": "📚 Sources: {sources}",
     "noMessages": "No messages yet",
-    "errorSending": "Error sending message"
+    "errorSending": "Error sending message",
+    "quickActions": {
+      "documents": "What documents do I need?",
+      "timeline": "Processing timeline?",
+      "requirements": "Financial requirements?",
+      "mistakes": "Common mistakes?"
+    },
+    "quickMessages": {
+      "documents": "What documents do I need to upload for my application?",
+      "timeline": "What's the expected processing timeline for my visa?",
+      "requirements": "What are the financial requirements for my application?",
+      "mistakes": "What are common mistakes applicants make?"
+    }
   },
   "profile": {
     "profile": "Profile",
     "myProfile": "My Profile",
     "personalInfo": "Personal Information",
+    "updateProfileDetails": "Update your profile details",
     "firstName": "First Name",
     "lastName": "Last Name",
     "email": "Email",
     "phone": "Phone",
     "country": "Country",
     "language": "Language",
+    "changeAppLanguage": "Change app language",
+    "notifications": "Notifications",
+    "manageNotificationSettings": "Manage notification settings",
+    "security": "Security",
+    "passwordAndSecurity": "Password and security settings",
+    "helpSupport": "Help & Support",
+    "getHelpWithApplication": "Get help with your application",
     "settings": "Settings",
     "changeLanguage": "Change Language",
     "logout": "Logout",
@@ -201,7 +237,19 @@
     "deleteAccount": "Delete Account",
     "deleteAccountConfirm": "Are you sure you want to delete your account? This action cannot be undone.",
     "applicationHistory": "Application History",
-    "noApplications": "No applications yet"
+    "noApplications": "No applications yet",
+    "editProfile": "Edit Profile",
+    "saveChanges": "Save Changes",
+    "phoneNumber": "Phone Number",
+    "enterPhoneNumber": "Enter phone number",
+    "phoneHint": "Include country code (e.g., +1 555-123-4567)",
+    "yourInformation": "Your Information",
+    "informationSaved": "This information will be saved and used by AI to assist you with your visa applications. It will be displayed on the Applications page and cannot be changed once saved.",
+    "profileUpdated": "Profile updated successfully",
+    "profileUpdateFailed": "Failed to save profile",
+    "validationError": "Validation Error",
+    "firstNameRequired": "First name is required",
+    "invalidPhoneFormat": "Invalid phone number format"
   },
   "language": {
     "english": "English",
@@ -227,6 +275,7 @@
     "generating": "AI is creating your visa plan...",
     "success": "Your visa plan is ready!",
     "failed": "Failed to create visa plan",
+    "saveError": "Your questionnaire has been saved. However, we couldn't create an application automatically.\n\nError: {error}\n\nYou can create applications manually from the Applications page.",
     "questions": {
       "purpose": {
         "title": "What is your purpose of travel?",
@@ -244,7 +293,8 @@
         "title": "Which country are you interested in?",
         "subtitle": "Select your destination country",
         "notSure": "Not sure yet",
-        "searchPlaceholder": "Search for a country..."
+        "searchPlaceholder": "Search for a country...",
+        "required": "Please select a country to continue"
       },
       "duration": {
         "title": "How long do you plan to stay?",
@@ -315,5 +365,71 @@
         }
       }
     }
+  },
+  "security": {
+    "title": "Security",
+    "securitySettings": "Security Settings",
+    "comingSoon": "Password and security settings will be available soon."
+  },
+  "helpSupport": {
+    "title": "Help & Support",
+    "emailSupport": "Email Support",
+    "phoneSupport": "Phone Support",
+    "needHelp": "Need Help?",
+    "supportAvailable": "Our support team is available 24/7 to assist you with any questions or issues you may have.",
+    "supportEmail": "support@visabuddy.com",
+    "supportPhone": "+1 (234) 567-890"
+  },
+  "notifications": {
+    "title": "Notification Settings",
+    "save": "Save Settings",
+    "saving": "Saving...",
+    "saved": "Settings saved successfully",
+    "saveFailed": "Failed to save settings",
+    "manageDescription": "Manage how you want to receive notifications and updates",
+    "general": "General",
+    "contentUpdates": "Content & Updates",
+    "reminders": "Reminders",
+    "devicePermissionStatus": "Device Permission Status",
+    "permissionGranted": "Granted",
+    "permissionProvisional": "Provisional",
+    "permissionDenied": "Denied",
+    "permissionUnknown": "Unknown",
+    "openDeviceSettings": "Open Device Settings",
+    "unableToOpenSettings": "Unable to open settings",
+    "openSettingsManually": "Please open your device settings manually to update notification permissions.",
+    "tip": "Tip",
+    "tipText": "Enable push notifications to get real-time updates about your visa applications.",
+    "changesAutoSaved": "Changes are auto-saved",
+    "emailNotifications": "Email Notifications",
+    "emailDescription": "Receive updates via email",
+    "pushNotifications": "Push Notifications",
+    "pushDescription": "Receive notifications on your device",
+    "paymentConfirmations": "Payment Confirmations",
+    "paymentDescription": "Get notified when payments are processed",
+    "documentUpdates": "Document Updates",
+    "documentDescription": "Get notified about document verification status",
+    "visaStatusUpdates": "Visa Status Updates",
+    "visaStatusDescription": "Get notified about changes to your visa applications",
+    "dailyReminders": "Daily Reminders",
+    "dailyRemindersDescription": "Get reminders about missing documents",
+    "newsUpdates": "News Updates",
+    "newsDescription": "Get updates about visa policy changes"
+  },
+  "applicationDetail": {
+    "uploadProgress": "Upload Progress",
+    "documentsUploaded": "{uploaded} of {total} documents uploaded",
+    "aiGeneratedList": "AI Generated Document List",
+    "basedOnAnswers": "Based on your answers",
+    "needHelp": "Need Help?",
+    "helpText": "Upload each document and our AI will verify if it meets the requirements.",
+    "chatAboutApplication": "Chat about this application",
+    "unknownCountry": "Unknown Country",
+    "unknownVisaType": "Unknown Visa Type"
+  },
+  "countries": {
+    "searchPlaceholder": "Search for a country...",
+    "noCountriesFound": "No countries found",
+    "loading": "Loading countries..."
   }
 }
