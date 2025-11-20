@@ -14,7 +14,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Navigate to frontend directory
-$frontendDir = Join-Path $PSScriptRoot ".." "frontend_new"
+$frontendDir = Join-Path (Join-Path $PSScriptRoot "..") "frontend_new"
 $androidDir = Join-Path $frontendDir "android"
 
 if (-not (Test-Path $frontendDir)) {
@@ -63,7 +63,7 @@ Write-Host "[SUCCESS] Build completed successfully!" -ForegroundColor Green
 Write-Host ""
 
 # Find the APK file
-$apkPath = Join-Path $androidDir "app" "build" "outputs" "apk" "release" "app-release.apk"
+$apkPath = Join-Path (Join-Path (Join-Path (Join-Path (Join-Path (Join-Path $androidDir "app") "build") "outputs") "apk") "release") "app-release.apk"
 
 if (Test-Path $apkPath) {
     $apkInfo = Get-Item $apkPath
