@@ -169,7 +169,13 @@ export const useChatStore = create<ChatStore>()(
             conversationHistory,
           );
 
-          if (response.success) {
+          console.log('[ChatStore] Send message response:', {
+            success: response.success,
+            hasData: !!response.data,
+            error: response.error,
+          });
+
+          if (response.success && response.data) {
             const key = applicationId || 'general';
             set(state => {
               const conversation = state.conversations[key] || {
@@ -206,20 +212,39 @@ export const useChatStore = create<ChatStore>()(
                 },
               ];
 
+              const updatedConversation = {
+                ...conversation,
+                messages: updatedMessages,
+                total: conversation.total + 2,
+              };
+
               return {
                 conversations: {
                   ...state.conversations,
-                  [key]: {
-                    ...conversation,
-                    messages: updatedMessages,
-                    total: conversation.total + 2,
-                  },
+                  [key]: updatedConversation,
                 },
+                currentConversation: updatedConversation,
                 isSending: false,
               };
             });
+
+            // Reload chat history to ensure we have the latest messages from server
+            setTimeout(() => {
+              get()
+                .loadChatHistory(applicationId)
+                .catch(err => {
+                  console.error(
+                    '[ChatStore] Failed to reload chat history:',
+                    err,
+                  );
+                });
+            }, 500);
           } else {
-            set({error: response.error?.message || 'Failed to send message'});
+            console.error('[ChatStore] Send message failed:', response);
+            set({
+              error: response.error?.message || 'Failed to send message',
+              isSending: false,
+            });
           }
         } catch (error: any) {
           // Handle authentication errors more gracefully
