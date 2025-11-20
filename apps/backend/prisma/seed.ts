@@ -5,9 +5,24 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Starting database seed...");
 
-  // Clear existing data
+  // Clear existing data in correct order (child records first, then parent records)
+  // This prevents foreign key constraint violations
+  console.log("🗑️  Clearing existing data...");
+  
+  // Delete child records that reference VisaApplication
+  await prisma.checkpoint.deleteMany({});
+  await prisma.userDocument.deleteMany({});
+  await prisma.payment.deleteMany({});
+  
+  // Delete applications that reference VisaType and Country
+  await prisma.visaApplication.deleteMany({});
+  await prisma.application.deleteMany({});
+  
+  // Now safe to delete VisaType and Country
   await prisma.visaType.deleteMany({});
   await prisma.country.deleteMany({});
+  
+  console.log("✅ Existing data cleared");
 
   // Create countries
   const countries = [
