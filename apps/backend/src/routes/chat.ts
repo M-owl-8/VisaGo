@@ -59,11 +59,23 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
       conversationHistory
     );
 
+    // Validate response before sending
+    if (!response || !response.message) {
+      console.error('[Chat Route] Invalid response from ChatService:', response);
+      return res.status(500).json({
+        success: false,
+        error: {
+          message: 'AI service returned invalid response. Please try again.',
+        },
+      });
+    }
+
     console.log('[Chat Route] Message processed successfully:', {
       hasMessage: !!response.message,
-      messageLength: response.message?.length || 0,
+      messageLength: response.message.length,
       hasId: !!response.id,
       model: response.model,
+      messagePreview: response.message.substring(0, 100),
     });
 
     // Increment rate limit counter after successful message
@@ -73,9 +85,25 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
     await incrementChatMessageCount(userId);
     const limitInfo = await getChatRateLimitInfo(userId);
 
+    // Ensure response structure is correct
+    const responseData = {
+      message: response.message,
+      sources: response.sources || [],
+      tokens_used: response.tokens_used || 0,
+      model: response.model || 'gpt-4',
+      id: response.id || `msg-${Date.now()}`,
+      applicationContext: response.applicationContext || null,
+    };
+
+    console.log('[Chat Route] Sending response to client:', {
+      hasMessage: !!responseData.message,
+      messageLength: responseData.message.length,
+      hasId: !!responseData.id,
+    });
+
     res.status(201).json({
       success: true,
-      data: response,
+      data: responseData,
       quota: {
         messagesUsed: limitInfo.messagesUsed,
         messagesRemaining: limitInfo.messagesRemaining,

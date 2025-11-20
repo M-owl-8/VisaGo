@@ -380,14 +380,23 @@ User's Current Visa Application:
         .trackMessageUsage(userId, tokens_used, model, responseTime)
         .catch((err) => console.error('Failed to track usage:', err));
 
-      return {
-        message,
-        sources,
-        tokens_used,
-        model,
+      // Ensure we always return a valid response
+      const finalResponse = {
+        message: message || 'I apologize, but I could not generate a response. Please try again.',
+        sources: sources || [],
+        tokens_used: tokens_used || 0,
+        model: model || 'gpt-4',
         id: assistantMessage.id,
-        applicationContext,
+        applicationContext: applicationContext || null,
       };
+
+      console.log('[ChatService] Returning response:', {
+        hasMessage: !!finalResponse.message,
+        messageLength: finalResponse.message.length,
+        hasId: !!finalResponse.id,
+      });
+
+      return finalResponse;
     } catch (error: any) {
       console.error('Chat service error:', error);
 
