@@ -80,9 +80,11 @@ export class AIOpenAIService {
           'OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.'
         );
       }
-      // Try to initialize if not already done
+      // Try to initialize if not already done - import Prisma from db module
       if (!AIOpenAIService.prisma) {
-        throw new Error('OpenAI service not properly initialized. Prisma instance missing.');
+        // Lazy import to avoid circular dependencies
+        const { default: db } = await import('../db');
+        AIOpenAIService.prisma = db;
       }
       AIOpenAIService.initialize(AIOpenAIService.prisma);
     }
@@ -152,9 +154,11 @@ export class AIOpenAIService {
           'OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.'
         );
       }
-      // Try to initialize if not already done
+      // Try to initialize if not already done - import Prisma from db module
       if (!AIOpenAIService.prisma) {
-        throw new Error('OpenAI service not properly initialized. Prisma instance missing.');
+        // Lazy import to avoid circular dependencies
+        const { default: db } = await import('../db');
+        AIOpenAIService.prisma = db;
       }
       AIOpenAIService.initialize(AIOpenAIService.prisma);
     }
