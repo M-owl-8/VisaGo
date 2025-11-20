@@ -1,4 +1,4 @@
-{
+ï»¿{
   "name": "visabuddy-backend",
   "version": "1.0.0",
   "description": "VisaBuddy Node.js/Express REST API",
@@ -9,7 +9,6 @@
     "prebuild": "node prisma/schema-selector.js",
     "build": "prisma generate && tsc && tsc prisma/seed.ts",
 
-    "start": "node prisma/schema-selector.js && prisma generate && prisma db push --accept-data-loss --skip-generate && (node prisma/seed.js 2>/dev/null || (npx ts-node --project prisma/tsconfig.seed.json prisma/seed.ts 2>/dev/null || echo 'òÚàÿ¬Ï  Seed skipped')) && NODE_PATH=/app/node_modules:/app/apps/backend/node_modules node dist/index.js",
 
     "start": "node prisma/schema-selector.js && prisma generate && prisma db push --accept-data-loss --skip-generate && ts-node --project prisma/tsconfig.seed.json prisma/seed.ts && NODE_PATH=/app/node_modules:/app/apps/backend/node_modules node dist/index.js",
 
@@ -93,3 +92,4 @@
     "node": ">=20.0.0"
   }
 }
+
