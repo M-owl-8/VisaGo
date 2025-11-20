@@ -20,14 +20,18 @@ if (process.env.REDIS_URL) {
     });
 
     // Test connection
-    redisClient.ping()
+    redisClient
+      .ping()
       .then(() => {
         redisHealthy = true;
         redisInitialized = true;
         console.log('✅ Redis rate limiting connected successfully');
       })
       .catch((err) => {
-        console.warn('⚠️  Redis rate limiting connection failed, using in-memory store:', err.message);
+        console.warn(
+          '⚠️  Redis rate limiting connection failed, using in-memory store:',
+          err.message
+        );
         redisClient = null;
         redisInitialized = true;
       });
@@ -48,7 +52,9 @@ if (process.env.REDIS_URL) {
     redisInitialized = true;
   }
 } else {
-  console.log('ℹ️  REDIS_URL not set - using in-memory rate limiting (not recommended for production)');
+  console.log(
+    'ℹ️  REDIS_URL not set - using in-memory rate limiting (not recommended for production)'
+  );
   redisInitialized = true;
 }
 
@@ -105,12 +111,13 @@ export const loginLimiter = rateLimit({
 });
 
 /**
- * Rate limiter for registration: 3 attempts per hour per IP
+ * Rate limiter for registration: 10 attempts per hour per IP
+ * Increased from 3 to allow legitimate users to retry with corrections
  */
 export const registerLimiter = rateLimit({
   store: getStore(),
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // Limit each IP to 3 requests per windowMs
+  max: 10, // Limit each IP to 10 requests per windowMs (increased from 3)
   message: 'Too many registration attempts. Please try again after 1 hour.',
   standardHeaders: true,
   legacyHeaders: false,
