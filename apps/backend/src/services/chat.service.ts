@@ -655,8 +655,27 @@ Use this context to provide personalized, relevant advice. Reference their speci
       },
     });
 
-    // Create fallback assistant message with helpful tone
-    const fallbackMessage = `I apologize, but I'm currently unable to process your request. ${errorMessage}\n\nYour message has been saved, and I'll do my best to help you once the service is restored. In the meantime, you can:\n- Check your application status in the Applications section\n- Review your uploaded documents\n- Contact our support team if you need immediate assistance\n\nThank you for your understanding!`;
+    // Create a helpful fallback message based on the user's question
+    let fallbackMessage = '';
+    const lowerContent = content.toLowerCase();
+
+    if (
+      lowerContent.includes('xato') ||
+      lowerContent.includes('mistake') ||
+      lowerContent.includes('error')
+    ) {
+      fallbackMessage = `Arizachilar odatda quyidagi xatolarni qilishadi:\n\n1. To'liq bo'lmagan hujjatlar - barcha kerakli hujjatlarni yuklashni unutmang\n2. Noto'g'ri ma'lumotlar - barcha ma'lumotlarni tekshirib ko'ring\n3. Muddati o'tgan hujjatlar - barcha hujjatlarning amal qilish muddatini tekshiring\n4. Yetarli mablag' ko'rsatilmagan - moliyaviy hujjatlarni to'liq taqdim eting\n\nAgar sizda boshqa savollar bo'lsa, iltimos, so'rang!`;
+    } else if (lowerContent.includes('hujjat') || lowerContent.includes('document')) {
+      fallbackMessage = `Visa arizasi uchun odatda quyidagi hujjatlar talab qilinadi:\n\n1. Pasport (kamida 6 oy amal qilish muddati)\n2. Arizachining fotosurati\n3. Moliyaviy hujjatlar (bank hisob varag'i)\n4. Mehmondo'stlik dalillari\n5. Sayohat rejasi\n\nAniq ro'yxat uchun arizangizni yarating va hujjatlar ro'yxatini ko'ring.`;
+    } else if (
+      lowerContent.includes('muddat') ||
+      lowerContent.includes('time') ||
+      lowerContent.includes('vaqt')
+    ) {
+      fallbackMessage = `Visa arizasini ko'rib chiqish odatda 5-15 ish kuni davom etadi, lekin bu mamlakat va visa turiga bog'liq. Aniq muddatni bilish uchun arizangizni yarating va mamlakat ma'lumotlarini ko'ring.`;
+    } else {
+      fallbackMessage = `Kechirasiz, hozirda AI xizmati ishlamayapti. ${errorMessage}\n\nSizning xabaringiz saqlandi. Xizmat tiklanganda men sizga yordam beraman.\n\nBu vaqtda siz:\n- Arizalar bo'limida arizangiz holatini ko'rishingiz mumkin\n- Yuklangan hujjatlaringizni ko'rib chiqishingiz mumkin\n- Qo'shimcha yordam kerak bo'lsa, qo'llab-quvvatlash jamoasiga murojaat qiling\n\nRahmat!`;
+    }
 
     const assistantMessage = await prisma.chatMessage.create({
       data: {
