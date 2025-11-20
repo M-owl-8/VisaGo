@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/auth';
 import { useFocusEffect } from '@react-navigation/native';
 import { getTranslatedCountryName } from '../../data/countryTranslations';
+import { getTranslatedVisaTypeName } from '../../utils/visaTypeTranslations';
 
 const getOrdinalSuffix = (num: number): string => {
   const j = num % 10;
@@ -149,7 +150,7 @@ export default function VisaApplicationScreen({ navigation }: any) {
                               : t('applicationDetail.unknownCountry')}
                           </Text>
                           <Text style={styles.visaTypeText} numberOfLines={1}>
-                            {application.visaType?.name || t('applicationDetail.unknownVisaType')}
+                            {getTranslatedVisaTypeName(application.visaType?.name, language) || t('applicationDetail.unknownVisaType')}
                           </Text>
                         </View>
                       </View>

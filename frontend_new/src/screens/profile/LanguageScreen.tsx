@@ -22,7 +22,7 @@ const languages = [
 ];
 
 export const LanguageScreen = ({ navigation }: any) => {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language || 'en');
 
   useEffect(() => {
@@ -34,8 +34,17 @@ export const LanguageScreen = ({ navigation }: any) => {
       await i18n.changeLanguage(languageCode);
       await AsyncStorage.setItem('app_language', languageCode);
       setSelectedLanguage(languageCode);
-      // Force a re-render by triggering a state update
-      // The i18n change will automatically trigger re-renders in components using useTranslation
+      
+      // Reload user applications after language change to prevent them from disappearing
+      try {
+        const { useAuthStore } = require('../../store/auth');
+        const authStore = useAuthStore.getState();
+        if (authStore.isSignedIn && authStore.user) {
+          await authStore.fetchUserApplications();
+        }
+      } catch (error) {
+        console.warn('Failed to reload applications after language change:', error);
+      }
     } catch (error) {
       console.error('Failed to change language:', error);
     }
@@ -63,7 +72,7 @@ export const LanguageScreen = ({ navigation }: any) => {
             >
               <Icon name="arrow-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Language</Text>
+            <Text style={styles.headerTitle}>{t('profile.language')}</Text>
             <View style={styles.backButton} />
           </View>
 

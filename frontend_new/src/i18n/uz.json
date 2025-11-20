@@ -293,7 +293,7 @@
         "title": "Qaysi davlatga bormoqchisiz?",
         "subtitle": "Borishni xohlagan davlatingizni tanlang",
         "notSure": "Hali bilmayman",
-        "searchPlaceholder": "Davlatni qidiring...",
+        "searchPlaceholder": "Mamlakat",
         "required": "Davom etish uchun mamlakatni tanlang"
       },
       "duration": {

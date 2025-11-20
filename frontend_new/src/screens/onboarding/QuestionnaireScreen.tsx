@@ -523,7 +523,7 @@ export default function QuestionnaireScreen({navigation}: any) {
               styles.searchButtonText,
               currentAnswer && styles.searchButtonTextSelected,
             ]}>
-              {displayName || t('questionnaire.country.searchPlaceholder')}
+              {displayName || t('questionnaire.questions.country.searchPlaceholder')}
             </Text>
             {currentAnswer && (
               <Icon
@@ -558,7 +558,7 @@ export default function QuestionnaireScreen({navigation}: any) {
           </TouchableOpacity>
           <TextInput
             style={styles.searchInput}
-            placeholder={t('questionnaire.country.searchPlaceholder')}
+            placeholder={t('questionnaire.questions.country.searchPlaceholder')}
             placeholderTextColor="#6B7280"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -636,9 +636,9 @@ export default function QuestionnaireScreen({navigation}: any) {
               <View style={styles.logoContainer}>
                 <Icon name="clipboard-outline" size={32} color="#4A9EFF" />
               </View>
-              <Text style={styles.headerTitle}>Visa Plan</Text>
+              <Text style={styles.headerTitle}>{t('questionnaire.title')}</Text>
               <Text style={styles.headerSubtitle}>
-                Help us find the best visa type for you
+                {t('questionnaire.subtitle')}
               </Text>
             </View>
 

@@ -18,6 +18,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../services/api';
 import { getTranslatedCountryName } from '../../data/countryTranslations';
+import { getTranslatedVisaTypeName } from '../../utils/visaTypeTranslations';
 
 interface ApplicationDetailProps {
   route: any;
@@ -230,7 +231,9 @@ export default function ApplicationDetailScreen({
                     )
                   : t('applicationDetail.unknownCountry')}
               </Text>
-              <Text style={styles.visaTypeName}>{application.visaType?.name}</Text>
+              <Text style={styles.visaTypeName}>
+                {getTranslatedVisaTypeName(application.visaType?.name, language)}
+              </Text>
             </View>
           </View>
           

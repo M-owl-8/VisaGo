@@ -293,7 +293,7 @@
         "title": "Which country are you interested in?",
         "subtitle": "Select your destination country",
         "notSure": "Not sure yet",
-        "searchPlaceholder": "Search for a country...",
+        "searchPlaceholder": "Country",
         "required": "Please select a country to continue"
       },
       "duration": {

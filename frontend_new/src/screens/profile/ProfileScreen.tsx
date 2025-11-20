@@ -125,7 +125,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={handleLogout}
           >
             <Icon name="log-out-outline" size={20} color="#EF4444" />
-            <Text style={styles.logoutText}>Logout</Text>
+            <Text style={styles.logoutText}>{t('profile.logout')}</Text>
           </TouchableOpacity>
 
           {/* App Version */}
