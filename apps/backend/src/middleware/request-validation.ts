@@ -107,7 +107,14 @@ function validateObject(
   // Check required fields
   if (options.required) {
     for (const field of options.required) {
-      if (obj[field] === undefined || obj[field] === null || obj[field] === "") {
+      const value = obj[field];
+      // Allow empty strings for password (will be validated by express-validator)
+      // But require the field to be present
+      if (value === undefined || value === null) {
+        throw errors.badRequest(`Missing required ${source} field: ${field}`);
+      }
+      // For non-password fields, also check for empty strings
+      if (field !== 'password' && value === "") {
         throw errors.badRequest(`Missing required ${source} field: ${field}`);
       }
     }
