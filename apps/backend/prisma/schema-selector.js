@@ -26,30 +26,29 @@ const sourceSchema = isPostgres
 
 const targetSchema = path.join(__dirname, 'schema.prisma');
 
-console.log(\n Auto-selecting Prisma schema...);
-console.log(   DATABASE_URL: ...);
-console.log(   Database type: );
-console.log(   Source schema: );
-console.log(   Target schema: \n);
+console.log(`\n Auto-selecting Prisma schema...`);
+console.log(`   DATABASE_URL: ${databaseUrl.substring(0, 50)}...`);
+console.log(`   Database type: ${isPostgres ? 'PostgreSQL' : 'SQLite'}`);
+console.log(`   Source schema: ${path.basename(sourceSchema)}`);
+console.log(`   Target schema: ${path.basename(targetSchema)}\n`);
 
 // Copy the appropriate schema
 try {
   // Check if source file exists
   if (!fs.existsSync(sourceSchema)) {
-    console.error( Error: Source schema file not found: );
-    console.error(   Current directory: );
-    console.error(   Available files: );
+    console.error(` Error: Source schema file not found: ${sourceSchema}`);
+    console.error(`   Current directory: ${__dirname}`);
+    console.error(`   Available files: ${fs.readdirSync(__dirname).join(', ')}`);
     process.exit(1);
   }
 
   // Copy the schema file
   fs.copyFileSync(sourceSchema, targetSchema);
-  console.log( Schema file updated successfully\n);
+  console.log(` Schema file updated successfully\n`);
 } catch (error) {
-  console.error( Error updating schema: );
-  console.error(   Source: );
-  console.error(   Target: );
-  console.error(   Error stack: );
+  console.error(` Error updating schema: ${error.message}`);
+  console.error(`   Source: ${sourceSchema}`);
+  console.error(`   Target: ${targetSchema}`);
+  console.error(`   Error stack: ${error.stack}`);
   process.exit(1);
 }
-
