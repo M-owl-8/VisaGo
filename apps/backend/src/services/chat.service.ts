@@ -10,8 +10,9 @@ import { getEnvConfig } from '../config/env';
 import { errors } from '../utils/errors';
 import { logError, logWarn } from '../middleware/logger';
 import { AIOpenAIService } from './ai-openai.service';
+import db from '../db';
 
-const prisma = new PrismaClient();
+const prisma = db; // Use shared Prisma instance
 
 /**
  * Get AI service URL from environment
@@ -228,39 +229,47 @@ User's Current Visa Application:
           content: content,
         });
 
-        // Use RAG for better responses (searches knowledge base)
-        // Falls back to regular chat if RAG fails
+        // Use OpenAI chat with enhanced system prompt
+        // Try RAG first if available, fallback to regular chat
         try {
-          const ragResponse = await AIOpenAIService.chatWithRAG(
-            openaiMessages,
-            userId,
-            applicationId,
-            systemPrompt
-          );
+          // Try to use RAG if knowledge base is available
+          let response;
+          try {
+            response = await AIOpenAIService.chatWithRAG(
+              openaiMessages,
+              userId,
+              applicationId,
+              systemPrompt
+            );
+          } catch (ragError) {
+            // Fallback to regular chat if RAG fails
+            console.warn('RAG search failed, using regular chat:', ragError);
+            response = await AIOpenAIService.chat(openaiMessages, systemPrompt);
+          }
 
-          // Format response with RAG sources
+          // Format response
           const formattedResponse = {
-            message: ragResponse.message,
-            sources: ragResponse.sources?.map((s: any) => ({
+            message: response.message,
+            sources: response.sources?.map((s: any) => ({
               title: s.title,
               content: s.content,
               relevanceScore: s.relevanceScore,
             })) || [],
-            tokens_used: ragResponse.tokensUsed,
-            model: ragResponse.model,
+            tokens_used: response.tokensUsed,
+            model: response.model,
           };
 
           aiResponse = { data: formattedResponse };
-        } catch (ragError) {
-          // Fallback to regular chat if RAG fails
-          console.warn('RAG search failed, using regular chat:', ragError);
-          const regularResponse = await AIOpenAIService.chat(openaiMessages, systemPrompt);
+        } catch (chatError) {
+          // Final fallback if both RAG and regular chat fail
+          console.warn('Chat service failed, using fallback:', chatError);
+          const fallbackResponse = await AIOpenAIService.chat(openaiMessages, systemPrompt);
           
           const formattedResponse = {
-            message: regularResponse.message,
+            message: fallbackResponse.message,
             sources: [],
-            tokens_used: regularResponse.tokensUsed,
-            model: regularResponse.model,
+            tokens_used: fallbackResponse.tokensUsed,
+            model: fallbackResponse.model,
           };
 
           aiResponse = { data: formattedResponse };
