@@ -483,8 +483,12 @@ async function startServer() {
     if (envConfig.GOOGLE_CLIENT_ID && envConfig.GOOGLE_CLIENT_SECRET) {
       console.log('✓ Google OAuth configured');
     } else {
-      console.warn('⚠️  Google OAuth not configured - Google Sign-In will not work');
-      console.warn('   See docs/SETUP_GOOGLE_OAUTH.md for setup instructions');
+      // Google OAuth is optional - log as info, not warning
+      console.log('ℹ️  Google OAuth not configured (optional feature)');
+      if (envConfig.NODE_ENV === 'development') {
+        console.log('   Google Sign-In will not work');
+        console.log('   See docs/SETUP_GOOGLE_OAUTH.md for setup instructions');
+      }
     }
 
     if (envConfig.JWT_SECRET && envConfig.JWT_SECRET.length >= 32) {
