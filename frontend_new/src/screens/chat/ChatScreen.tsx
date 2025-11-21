@@ -10,7 +10,8 @@ import {
   FlatList,
   StyleSheet,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
+import {ChatIcons, QuickActionIcons} from '../../components/icons/iconConfig';
 import {useTranslation} from 'react-i18next';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useChatStore} from '../../store/chat';
@@ -71,25 +72,25 @@ export const ChatScreen = ({route}: any) => {
   const quickActions = [
     {
       id: 'documents',
-      icon: 'document-text-outline',
+      icon: QuickActionIcons.documents,
       text: t('chat.quickActions.documents'),
       color: '#4A9EFF',
     },
     {
       id: 'timeline',
-      icon: 'time-outline',
+      icon: QuickActionIcons.timeline,
       text: t('chat.quickActions.timeline'),
       color: '#10B981',
     },
     {
       id: 'requirements',
-      icon: 'cash-outline',
+      icon: QuickActionIcons.requirements,
       text: t('chat.quickActions.requirements'),
       color: '#F59E0B',
     },
     {
       id: 'mistakes',
-      icon: 'warning-outline',
+      icon: QuickActionIcons.mistakes,
       text: t('chat.quickActions.mistakes'),
       color: '#EF4444',
     },
@@ -137,7 +138,12 @@ export const ChatScreen = ({route}: any) => {
           ]}>
           {!isUser && (
             <View style={styles.aiIcon}>
-              <Icon name="sparkles" size={16} color="#8B5CF6" />
+              <AppIcon
+                name={ChatIcons.ai.name}
+                library={ChatIcons.ai.library}
+                size={IconSizes.small}
+                color="#8B5CF6"
+              />
             </View>
           )}
           <View style={styles.messageContent}>
@@ -150,7 +156,12 @@ export const ChatScreen = ({route}: any) => {
             </Text>
             {item.sources && item.sources.length > 0 && (
               <View style={styles.sourcesContainer}>
-                <Icon name="book-outline" size={12} color="#94A3B8" />
+                <AppIcon
+                  name="book-outline"
+                  library="ionicons"
+                  size={IconSizes.small}
+                  color={IconColors.muted}
+                />
                 <Text style={styles.sourcesText}>
                   {t('chat.sources', {sources: item.sources.join(', ')})}
                 </Text>
@@ -187,10 +198,15 @@ export const ChatScreen = ({route}: any) => {
           <View style={styles.contentWrapper}>
             {/* Messages List */}
             {messages.length === 0 ? (
-              <View style={styles.emptyStateContainer}>
-                <View style={styles.emptyIconContainer}>
-                  <Icon name="chatbubbles-outline" size={64} color="#4A9EFF" />
-                </View>
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyIconContainer}>
+                <AppIcon
+                  name={ChatIcons.empty.name}
+                  library={ChatIcons.empty.library}
+                  size={IconSizes.large * 2}
+                  color={IconColors.active}
+                />
+              </View>
                 <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
                 <Text style={styles.emptyText}>{t('chat.askAnything')}</Text>
 
@@ -206,9 +222,10 @@ export const ChatScreen = ({route}: any) => {
                           key={action.id}
                           style={styles.quickActionButton}
                           onPress={() => handleQuickAction(action.id)}>
-                          <Icon
-                            name={action.icon}
-                            size={20}
+                          <AppIcon
+                            name={action.icon.name}
+                            library={action.icon.library}
+                            size={IconSizes.settings}
                             color={action.color}
                           />
                           <Text style={styles.quickActionText}>
@@ -267,7 +284,12 @@ export const ChatScreen = ({route}: any) => {
                 {isSending ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Icon name="send" size={20} color="#FFFFFF" />
+                  <AppIcon
+                    name={ChatIcons.send.name}
+                    library={ChatIcons.send.library}
+                    size={IconSizes.settings}
+                    color={IconColors.bright}
+                  />
                 )}
               </TouchableOpacity>
             </View>

@@ -5,7 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import {AppIcon, IconSizes, IconColors} from './components/icons/AppIcon';
+import {TabIcons} from './components/icons/iconConfig';
 import { useAuthStore } from './store/auth';
 import { initializeGoogleSignIn } from './services/google-oauth';
 import { GOOGLE_WEB_CLIENT_ID } from './config/constants';
@@ -83,27 +84,35 @@ function AppTabs() {
       initialRouteName="Applications"
       screenOptions={({route}) => ({
         headerShown: true,
-        tabBarIcon: ({focused, color, size}) => {
-          let iconName: string = '';
+        tabBarIcon: ({focused, color}) => {
+          let iconConfig;
 
           switch (route.name) {
             case 'Applications':
-              iconName = focused ? 'document-text' : 'document-text-outline';
+              iconConfig = focused ? TabIcons.applications.active : TabIcons.applications.inactive;
               break;
             case 'Chat':
-              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+              iconConfig = focused ? TabIcons.chat.active : TabIcons.chat.inactive;
               break;
             case 'Profile':
-              iconName = focused ? 'person' : 'person-outline';
+              iconConfig = focused ? TabIcons.profile.active : TabIcons.profile.inactive;
               break;
             default:
-              iconName = 'document-text-outline';
+              iconConfig = TabIcons.applications.inactive;
           }
 
-          return <Icon name={iconName} size={size} color={color} />;
+          return (
+            <AppIcon
+              name={iconConfig.name}
+              library={iconConfig.library}
+              size={IconSizes.tab}
+              color={focused ? IconColors.active : IconColors.muted}
+              active={focused}
+            />
+          );
         },
-        tabBarActiveTintColor: '#4A9EFF',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarActiveTintColor: IconColors.active,
+        tabBarInactiveTintColor: IconColors.muted,
         tabBarStyle: {
           backgroundColor: '#0F1E2D',
           borderTopColor: 'rgba(74, 158, 255, 0.2)',
@@ -140,10 +149,11 @@ function AppTabs() {
         },
         headerBackTitleVisible: false,
         headerBackImage: () => (
-          <Icon
-            name="arrow-back"
-            size={24}
-            color="#FFFFFF"
+          <AppIcon
+            name={TabIcons.applications.inactive.name}
+            library="ionicons"
+            size={IconSizes.header}
+            color={IconColors.bright}
             style={{marginLeft: 16}}
           />
         ),

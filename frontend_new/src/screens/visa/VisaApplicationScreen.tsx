@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
+import {DocumentIcons, ApplicationIcons} from '../../components/icons/iconConfig';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/auth';
 import { useFocusEffect } from '@react-navigation/native';
@@ -101,7 +102,12 @@ export default function VisaApplicationScreen({ navigation }: any) {
               style={styles.addButton}
               onPress={() => navigation?.navigate('Questionnaire')}
             >
-              <Icon name="add" size={24} color="#FFFFFF" />
+              <AppIcon
+                name={DocumentIcons.add.name}
+                library={DocumentIcons.add.library}
+                size={IconSizes.settings}
+                color={IconColors.bright}
+              />
             </TouchableOpacity>
           </View>
 
@@ -156,7 +162,12 @@ export default function VisaApplicationScreen({ navigation }: any) {
                       </View>
                       <View style={styles.applicationMeta}>
                         <View style={styles.progressInfo}>
-                          <Icon name="document-text-outline" size={14} color="#94A3B8" />
+                          <AppIcon
+                            name={DocumentIcons.document.name}
+                            library={DocumentIcons.document.library}
+                            size={IconSizes.small}
+                            color={IconColors.muted}
+                          />
                           <Text style={styles.progressText}>
                             {application.progressPercentage || 0}% {t('applications.complete')}
                           </Text>
@@ -166,14 +177,24 @@ export default function VisaApplicationScreen({ navigation }: any) {
                         </View>
                       </View>
                     </View>
-                    <Icon name="chevron-forward" size={20} color="#94A3B8" />
+                    <AppIcon
+                      name={ApplicationIcons.chevron.name}
+                      library={ApplicationIcons.chevron.library}
+                      size={IconSizes.settings}
+                      color={IconColors.muted}
+                    />
                   </View>
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
             <View style={styles.emptyContainer}>
-              <Icon name="document-outline" size={64} color="#94A3B8" />
+              <AppIcon
+                name={DocumentIcons.document.name}
+                library={DocumentIcons.document.library}
+                size={IconSizes.large * 2}
+                color={IconColors.muted}
+              />
               <Text style={styles.emptyTitle}>{t('applications.noApplicationsYet')}</Text>
               <Text style={styles.emptyText}>
                 {t('applications.startNewApplicationHint')}

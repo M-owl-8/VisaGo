@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
+import {ProfileIcons} from '../../components/icons/iconConfig';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/auth';
 
@@ -33,7 +34,7 @@ export default function ProfileScreen({ navigation }: any) {
   const menuItems = [
     {
       id: 'personal-info',
-      icon: 'person-outline',
+      icon: ProfileIcons.personalInfo,
       title: t('profile.personalInfo'),
       subtitle: t('profile.updateProfileDetails'),
       color: '#4A9EFF',
@@ -41,7 +42,7 @@ export default function ProfileScreen({ navigation }: any) {
     },
     {
       id: 'language',
-      icon: 'language-outline',
+      icon: ProfileIcons.language,
       title: t('profile.language'),
       subtitle: t('profile.changeAppLanguage'),
       color: '#10B981',
@@ -49,7 +50,7 @@ export default function ProfileScreen({ navigation }: any) {
     },
     {
       id: 'notifications',
-      icon: 'notifications-outline',
+      icon: ProfileIcons.notifications,
       title: t('profile.notifications'),
       subtitle: t('profile.manageNotificationSettings'),
       color: '#F59E0B',
@@ -57,7 +58,7 @@ export default function ProfileScreen({ navigation }: any) {
     },
     {
       id: 'security',
-      icon: 'shield-checkmark-outline',
+      icon: ProfileIcons.security,
       title: t('profile.security'),
       subtitle: t('profile.passwordAndSecurity'),
       color: '#8B5CF6',
@@ -65,7 +66,7 @@ export default function ProfileScreen({ navigation }: any) {
     },
     {
       id: 'help',
-      icon: 'help-circle-outline',
+      icon: ProfileIcons.help,
       title: t('profile.helpSupport'),
       subtitle: t('profile.getHelpWithApplication'),
       color: '#06B6D4',
@@ -90,7 +91,12 @@ export default function ProfileScreen({ navigation }: any) {
           {/* Profile Header */}
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              <Icon name="person" size={48} color="#4A9EFF" />
+              <AppIcon
+                name={ProfileIcons.avatar.name}
+                library={ProfileIcons.avatar.library}
+                size={IconSizes.large}
+                color={IconColors.active}
+              />
             </View>
             <Text style={styles.userName}>
               {user?.firstName || 'User'}
@@ -108,13 +114,23 @@ export default function ProfileScreen({ navigation }: any) {
                 activeOpacity={0.7}
               >
                 <View style={[styles.menuIcon, { backgroundColor: `${item.color}20` }]}>
-                  <Icon name={item.icon} size={24} color={item.color} />
+                  <AppIcon
+                    name={item.icon.name}
+                    library={item.icon.library}
+                    size={IconSizes.settings}
+                    color={item.color}
+                  />
                 </View>
                 <View style={styles.menuContent}>
                   <Text style={styles.menuTitle}>{item.title}</Text>
                   <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                 </View>
-                <Icon name="chevron-forward" size={20} color="#6B7280" />
+                <AppIcon
+                  name="chevron-forward-outline"
+                  library="ionicons"
+                  size={IconSizes.settings}
+                  color={IconColors.muted}
+                />
               </TouchableOpacity>
             ))}
           </View>
@@ -124,7 +140,12 @@ export default function ProfileScreen({ navigation }: any) {
             style={styles.logoutButton}
             onPress={handleLogout}
           >
-            <Icon name="log-out-outline" size={20} color="#EF4444" />
+            <AppIcon
+              name={ProfileIcons.logout.name}
+              library={ProfileIcons.logout.library}
+              size={IconSizes.settings}
+              color={IconColors.error}
+            />
             <Text style={styles.logoutText}>{t('profile.logout')}</Text>
           </TouchableOpacity>
 
@@ -211,14 +232,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(74, 158, 255, 0.2)',
-    gap: 12,
+    gap: 14,
+    minHeight: 64,
   },
   menuIcon: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
