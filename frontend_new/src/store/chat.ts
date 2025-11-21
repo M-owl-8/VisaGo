@@ -190,29 +190,48 @@ export const useChatStore = create<ChatStore>()(
           };
 
           // Add user message to conversation immediately
-          set(state => {
-            const conversation = state.conversations[key] || {
-              messages: [],
-              total: 0,
-              limit: 50,
-              offset: 0,
-            };
+          try {
+            set(state => {
+              const conversation = state.conversations[key] || {
+                messages: [],
+                total: 0,
+                limit: 50,
+                offset: 0,
+              };
 
-            const updatedMessages = [...conversation.messages, userMessage];
-            const updatedConversation = {
-              ...conversation,
-              messages: updatedMessages,
-              total: conversation.total + 1,
-            };
+              // Prevent duplicate messages
+              const hasDuplicate = conversation.messages.some(
+                msg => msg.id === userMessageId,
+              );
+              if (hasDuplicate) {
+                console.warn(
+                  '[AI CHAT] [ChatStore] Duplicate message detected, skipping',
+                );
+                return state;
+              }
 
-            return {
-              conversations: {
-                ...state.conversations,
-                [key]: updatedConversation,
-              },
-              currentConversation: updatedConversation,
-            };
-          });
+              const updatedMessages = [...conversation.messages, userMessage];
+              const updatedConversation = {
+                ...conversation,
+                messages: updatedMessages,
+                total: updatedMessages.length,
+              };
+
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [key]: updatedConversation,
+                },
+                currentConversation: updatedConversation,
+              };
+            });
+          } catch (error) {
+            console.error(
+              '[AI CHAT] [ChatStore] Error adding user message to state:',
+              error,
+            );
+            // Continue with API call even if state update fails
+          }
 
           console.log(
             '[AI CHAT] [ChatStore] User message added to UI immediately',
@@ -238,63 +257,77 @@ export const useChatStore = create<ChatStore>()(
 
           // STEP 3: Update conversation with AI response or handle error
           if (response.success && response.data) {
-            set(state => {
-              const conversation = state.conversations[key] || {
-                messages: [],
-                total: 0,
-                limit: 50,
-                offset: 0,
-              };
+            try {
+              set(state => {
+                // Get current conversation - use existing one to preserve optimistic updates
+                const conversation = state.conversations[key] || {
+                  messages: [],
+                  total: 0,
+                  limit: 50,
+                  offset: 0,
+                };
 
-              // Update user message status to 'sent'
-              const updatedMessages = conversation.messages.map(msg =>
-                msg.id === userMessageId
-                  ? {...msg, status: 'sent' as const}
-                  : msg,
+                // Find and update user message status to 'sent'
+                const updatedMessages = conversation.messages.map(msg =>
+                  msg.id === userMessageId
+                    ? {...msg, status: 'sent' as const}
+                    : msg,
+                );
+
+                // Check if AI response already exists (prevent duplicates)
+                const existingAssistantId =
+                  response.data.id || `assistant-${Date.now()}`;
+                const hasExistingResponse = updatedMessages.some(
+                  msg => msg.id === existingAssistantId,
+                );
+
+                if (!hasExistingResponse) {
+                  // Add AI response
+                  const assistantMessage: ChatMessage = {
+                    id: existingAssistantId,
+                    userId: '',
+                    applicationId: applicationId,
+                    role: 'assistant',
+                    content: response.data.message,
+                    sources: response.data.sources || [],
+                    model: response.data.model || 'gpt-4',
+                    tokensUsed: response.data.tokens_used || 0,
+                    createdAt: new Date().toISOString(),
+                    status: 'sent',
+                  };
+
+                  updatedMessages.push(assistantMessage);
+                }
+
+                const updatedConversation = {
+                  ...conversation,
+                  messages: updatedMessages,
+                  total: updatedMessages.length,
+                };
+
+                return {
+                  conversations: {
+                    ...state.conversations,
+                    [key]: updatedConversation,
+                  },
+                  currentConversation: updatedConversation,
+                  isSending: false,
+                };
+              });
+            } catch (error) {
+              console.error(
+                '[AI CHAT] [ChatStore] Error updating conversation state:',
+                error,
               );
+              // Still set isSending to false even if state update fails
+              set({isSending: false});
+            }
 
-              // Add AI response
-              const assistantMessage: ChatMessage = {
-                id: response.data.id || `assistant-${Date.now()}`,
-                userId: '',
-                applicationId: applicationId,
-                role: 'assistant',
-                content: response.data.message,
-                sources: response.data.sources || [],
-                model: response.data.model || 'gpt-4',
-                tokensUsed: response.data.tokens_used || 0,
-                createdAt: new Date().toISOString(),
-                status: 'sent',
-              };
-
-              const finalMessages = [...updatedMessages, assistantMessage];
-              const updatedConversation = {
-                ...conversation,
-                messages: finalMessages,
-                total: finalMessages.length,
-              };
-
-              return {
-                conversations: {
-                  ...state.conversations,
-                  [key]: updatedConversation,
-                },
-                currentConversation: updatedConversation,
-                isSending: false,
-              };
-            });
-
-            // Reload chat history to ensure we have the latest messages from server
-            setTimeout(() => {
-              get()
-                .loadChatHistory(applicationId)
-                .catch(err => {
-                  console.error(
-                    '[ChatStore] Failed to reload chat history:',
-                    err,
-                  );
-                });
-            }, 500);
+            // Don't reload chat history immediately - it can overwrite optimistic updates
+            // The server already has the messages, so we'll load them on next screen visit
+            console.log(
+              '[AI CHAT] [ChatStore] Message sent successfully, skipping history reload to preserve UI state',
+            );
           } else {
             // API failed - mark user message as error but keep it visible
             console.error('[AI CHAT] [ChatStore] Send message failed:', {

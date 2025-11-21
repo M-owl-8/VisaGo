@@ -40,8 +40,16 @@ export const ChatScreen = ({route}: any) => {
   useEffect(() => {
     if (isSignedIn && user) {
       // Load both sessions list and chat history
-      loadSessions().catch(console.error);
-      loadChatHistory(applicationId);
+      // Use a small delay to prevent race conditions with state updates
+      const timer = setTimeout(() => {
+        loadSessions().catch(err => {
+          console.error('[ChatScreen] Failed to load sessions:', err);
+        });
+        loadChatHistory(applicationId).catch(err => {
+          console.error('[ChatScreen] Failed to load chat history:', err);
+        });
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [applicationId, isSignedIn, user, loadChatHistory, loadSessions]);
 
