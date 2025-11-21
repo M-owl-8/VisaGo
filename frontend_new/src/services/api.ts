@@ -36,6 +36,12 @@ const getApiBaseUrl = (): string => {
 
 const API_BASE_URL = getApiBaseUrl();
 console.log('🌐 API Base URL:', API_BASE_URL);
+console.log('[AI CHAT] [ApiClient] API_BASE_URL determined:', API_BASE_URL);
+console.log('[AI CHAT] [ApiClient] __DEV__:', __DEV__);
+console.log('[AI CHAT] [ApiClient] Platform.OS:', Platform.OS);
+console.log('[AI CHAT] [ApiClient] EXPO_PUBLIC_API_URL:', typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_API_URL : 'N/A');
+console.log('[AI CHAT] [ApiClient] REACT_APP_API_URL:', typeof process !== 'undefined' ? process.env?.REACT_APP_API_URL : 'N/A');
+console.log('[AI CHAT] [ApiClient] Final chat endpoint will be:', `${API_BASE_URL}/api/chat/send`);
 
 const CSRF_TOKEN_STORAGE_KEY = '@csrf_token';
 const SESSION_ID_STORAGE_KEY = '@session_id';
