@@ -32,7 +32,7 @@ const getApiBaseUrl = (): string => {
   // Priority 2: Always use Railway URL by default
   // This ensures physical devices NEVER try to connect to localhost/10.0.2.2
   // For emulator development, set EXPO_PUBLIC_API_URL=http://10.0.2.2:3000 explicitly
-  return 'https://zippy-perfection-production.up.railway.app';
+  return 'https://visago-production.up.railway.app';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -40,9 +40,18 @@ console.log('🌐 API Base URL:', API_BASE_URL);
 console.log('[AI CHAT] [ApiClient] API_BASE_URL determined:', API_BASE_URL);
 console.log('[AI CHAT] [ApiClient] __DEV__:', __DEV__);
 console.log('[AI CHAT] [ApiClient] Platform.OS:', Platform.OS);
-console.log('[AI CHAT] [ApiClient] EXPO_PUBLIC_API_URL:', typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_API_URL : 'N/A');
-console.log('[AI CHAT] [ApiClient] REACT_APP_API_URL:', typeof process !== 'undefined' ? process.env?.REACT_APP_API_URL : 'N/A');
-console.log('[AI CHAT] [ApiClient] Final chat endpoint will be:', `${API_BASE_URL}/api/chat/send`);
+console.log(
+  '[AI CHAT] [ApiClient] EXPO_PUBLIC_API_URL:',
+  typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_API_URL : 'N/A',
+);
+console.log(
+  '[AI CHAT] [ApiClient] REACT_APP_API_URL:',
+  typeof process !== 'undefined' ? process.env?.REACT_APP_API_URL : 'N/A',
+);
+console.log(
+  '[AI CHAT] [ApiClient] Final chat endpoint will be:',
+  `${API_BASE_URL}/api/chat/send`,
+);
 
 const CSRF_TOKEN_STORAGE_KEY = '@csrf_token';
 const SESSION_ID_STORAGE_KEY = '@session_id';
@@ -1224,8 +1233,15 @@ class ApiClient {
     console.log('[AI CHAT] [ApiClient] sendMessage called');
     console.log('[AI CHAT] [ApiClient] URL:', fullUrl);
     console.log('[AI CHAT] [ApiClient] Base URL:', API_BASE_URL);
-    console.log('[AI CHAT] [ApiClient] PAYLOAD:', JSON.stringify(payload, null, 2));
-    console.log('[AI CHAT] [ApiClient] Payload size:', JSON.stringify(payload).length, 'bytes');
+    console.log(
+      '[AI CHAT] [ApiClient] PAYLOAD:',
+      JSON.stringify(payload, null, 2),
+    );
+    console.log(
+      '[AI CHAT] [ApiClient] Payload size:',
+      JSON.stringify(payload).length,
+      'bytes',
+    );
 
     try {
       const response = await this.api.post('/chat/send', payload);
@@ -1237,7 +1253,9 @@ class ApiClient {
         dataKeys: response.data ? Object.keys(response.data) : [],
         success: response.data?.success,
         hasResponseData: !!response.data?.data,
-        responseDataKeys: response.data?.data ? Object.keys(response.data.data) : [],
+        responseDataKeys: response.data?.data
+          ? Object.keys(response.data.data)
+          : [],
         error: response.data?.error,
         headers: response.headers,
       });
@@ -1245,7 +1263,10 @@ class ApiClient {
       // Log response body (truncated if too long)
       const responseBodyStr = JSON.stringify(response.data, null, 2);
       if (responseBodyStr.length > 500) {
-        console.log('[AI CHAT] [ApiClient] Response body (truncated):', responseBodyStr.substring(0, 500) + '...');
+        console.log(
+          '[AI CHAT] [ApiClient] Response body (truncated):',
+          responseBodyStr.substring(0, 500) + '...',
+        );
       } else {
         console.log('[AI CHAT] [ApiClient] Response body:', responseBodyStr);
       }
@@ -1263,9 +1284,10 @@ class ApiClient {
         requestUrl: error?.config?.url,
         requestMethod: error?.config?.method,
         requestBaseURL: error?.config?.baseURL,
-        requestFullURL: error?.config?.baseURL && error?.config?.url 
-          ? `${error.config.baseURL}${error.config.url}` 
-          : fullUrl,
+        requestFullURL:
+          error?.config?.baseURL && error?.config?.url
+            ? `${error.config.baseURL}${error.config.url}`
+            : fullUrl,
         requestData: error?.config?.data,
         requestHeaders: error?.config?.headers,
         code: error?.code,
@@ -1280,9 +1302,15 @@ class ApiClient {
       if (error?.response?.data) {
         const errorBodyStr = JSON.stringify(error.response.data, null, 2);
         if (errorBodyStr.length > 500) {
-          console.log('[AI CHAT] [ApiClient] Error response body (truncated):', errorBodyStr.substring(0, 500) + '...');
+          console.log(
+            '[AI CHAT] [ApiClient] Error response body (truncated):',
+            errorBodyStr.substring(0, 500) + '...',
+          );
         } else {
-          console.log('[AI CHAT] [ApiClient] Error response body:', errorBodyStr);
+          console.log(
+            '[AI CHAT] [ApiClient] Error response body:',
+            errorBodyStr,
+          );
         }
       }
 

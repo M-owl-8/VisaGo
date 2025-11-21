@@ -47,7 +47,7 @@ export const GOOGLE_WEB_CLIENT_ID = getGoogleClientId();
  * Backend API Configuration
  * IMPORTANT: Physical devices ALWAYS use Railway URL (or env var)
  * Only emulators/simulators can use localhost/10.0.2.2 (via explicit env var)
- * 
+ *
  * Priority:
  * 1. EXPO_PUBLIC_API_URL (if set, use it - even if localhost for emulator dev)
  * 2. REACT_APP_API_URL (if set, use it - even if localhost for emulator dev)
@@ -72,7 +72,7 @@ const getApiBaseUrl = (): string => {
   // Priority 2: Always use Railway URL by default
   // This ensures physical devices NEVER try to connect to localhost/10.0.2.2
   // For emulator development, set EXPO_PUBLIC_API_URL=http://10.0.2.2:3000 explicitly
-  return 'https://zippy-perfection-production.up.railway.app';
+  return 'https://visago-production.up.railway.app';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
