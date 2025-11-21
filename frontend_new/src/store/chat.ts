@@ -114,15 +114,63 @@ export const useChatStore = create<ChatStore>()(
 
           if (response.success) {
             const key = applicationId || 'general';
-            set(state => ({
-              conversations: {
-                ...state.conversations,
-                [key]: response.data,
-              },
-              currentConversation: response.data,
-              currentApplicationId: applicationId || null,
-              isLoading: false,
-            }));
+            set(state => {
+              const existingConversation = state.conversations[key];
+              const serverMessages = response.data.messages || [];
+
+              // If we have optimistic updates (messages with status 'sending'), preserve them
+              if (
+                existingConversation &&
+                existingConversation.messages.length > 0
+              ) {
+                const optimisticMessages = existingConversation.messages.filter(
+                  msg => msg.status === 'sending' || msg.status === 'error',
+                );
+
+                // Merge: server messages + optimistic messages that aren't on server yet
+                const serverMessageIds = new Set(serverMessages.map(m => m.id));
+                const mergedMessages = [
+                  ...serverMessages,
+                  ...optimisticMessages.filter(
+                    msg => !serverMessageIds.has(msg.id),
+                  ),
+                ];
+
+                // Sort by createdAt to maintain order
+                mergedMessages.sort(
+                  (a, b) =>
+                    new Date(a.createdAt).getTime() -
+                    new Date(b.createdAt).getTime(),
+                );
+
+                const mergedConversation = {
+                  ...response.data,
+                  messages: mergedMessages,
+                  total: mergedMessages.length,
+                };
+
+                return {
+                  conversations: {
+                    ...state.conversations,
+                    [key]: mergedConversation,
+                  },
+                  currentConversation: mergedConversation,
+                  currentApplicationId: applicationId || null,
+                  isLoading: false,
+                };
+              }
+
+              // No existing conversation, use server data as-is
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [key]: response.data,
+                },
+                currentConversation: response.data,
+                currentApplicationId: applicationId || null,
+                isLoading: false,
+              };
+            });
           } else {
             set({
               error: response.error?.message || 'Failed to load chat history',
@@ -217,13 +265,26 @@ export const useChatStore = create<ChatStore>()(
                 total: updatedMessages.length,
               };
 
-              return {
+              const newState = {
                 conversations: {
                   ...state.conversations,
                   [key]: updatedConversation,
                 },
                 currentConversation: updatedConversation,
               };
+
+              console.log(
+                '[AI CHAT] [ChatStore] User message added to UI immediately:',
+                {
+                  messageId: userMessageId,
+                  conversationKey: key,
+                  totalMessages: updatedMessages.length,
+                  currentConversationMessages:
+                    newState.currentConversation.messages.length,
+                },
+              );
+
+              return newState;
             });
           } catch (error) {
             console.error(
@@ -232,10 +293,6 @@ export const useChatStore = create<ChatStore>()(
             );
             // Continue with API call even if state update fails
           }
-
-          console.log(
-            '[AI CHAT] [ChatStore] User message added to UI immediately',
-          );
 
           // STEP 2: Call API to get AI response
           console.log('[AI CHAT] [ChatStore] Calling apiClient.sendMessage...');
