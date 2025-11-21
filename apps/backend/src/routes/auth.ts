@@ -30,7 +30,7 @@ const router = express.Router();
  */
 router.post(
   '/register',
-  (req, res, next) => {
+  (req: Request, res: Response, next: NextFunction) => {
     console.log('[AUTH] Register route hit:', req.method, req.path, req.body?.email);
     next();
   },
@@ -77,7 +77,7 @@ router.post(
  */
 router.post(
   '/login',
-  (req, res, next) => {
+  (req: Request, res: Response, next: NextFunction) => {
     console.log('[AUTH] Login route hit:', req.method, req.path, req.body?.email);
     next();
   },
