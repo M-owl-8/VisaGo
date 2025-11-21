@@ -1206,12 +1206,81 @@ class ApiClient {
     applicationId?: string,
     conversationHistory?: any[],
   ): Promise<ApiResponse> {
-    const response = await this.api.post('/chat/send', {
+    // Build the full URL for logging
+    const fullUrl = `${API_BASE_URL}/api/chat/send`;
+    const payload = {
       content,
       applicationId,
       conversationHistory,
-    });
-    return response.data;
+    };
+
+    console.log('[AI CHAT] [ApiClient] sendMessage called');
+    console.log('[AI CHAT] [ApiClient] URL:', fullUrl);
+    console.log('[AI CHAT] [ApiClient] Base URL:', API_BASE_URL);
+    console.log('[AI CHAT] [ApiClient] PAYLOAD:', JSON.stringify(payload, null, 2));
+    console.log('[AI CHAT] [ApiClient] Payload size:', JSON.stringify(payload).length, 'bytes');
+
+    try {
+      const response = await this.api.post('/chat/send', payload);
+
+      console.log('[AI CHAT] [ApiClient] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        success: response.data?.success,
+        hasResponseData: !!response.data?.data,
+        responseDataKeys: response.data?.data ? Object.keys(response.data.data) : [],
+        error: response.data?.error,
+        headers: response.headers,
+      });
+
+      // Log response body (truncated if too long)
+      const responseBodyStr = JSON.stringify(response.data, null, 2);
+      if (responseBodyStr.length > 500) {
+        console.log('[AI CHAT] [ApiClient] Response body (truncated):', responseBodyStr.substring(0, 500) + '...');
+      } else {
+        console.log('[AI CHAT] [ApiClient] Response body:', responseBodyStr);
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.log('[AI CHAT] [ApiClient] Request failed:', {
+        error: error?.message || error,
+        errorType: error?.constructor?.name,
+        isAxiosError: error?.isAxiosError,
+        responseStatus: error?.response?.status,
+        responseStatusText: error?.response?.statusText,
+        responseData: error?.response?.data,
+        responseHeaders: error?.response?.headers,
+        requestUrl: error?.config?.url,
+        requestMethod: error?.config?.method,
+        requestBaseURL: error?.config?.baseURL,
+        requestFullURL: error?.config?.baseURL && error?.config?.url 
+          ? `${error.config.baseURL}${error.config.url}` 
+          : fullUrl,
+        requestData: error?.config?.data,
+        requestHeaders: error?.config?.headers,
+        code: error?.code,
+        errno: error?.errno,
+        syscall: error?.syscall,
+        address: error?.address,
+        port: error?.port,
+        stack: error?.stack,
+      });
+
+      // Log response body if available
+      if (error?.response?.data) {
+        const errorBodyStr = JSON.stringify(error.response.data, null, 2);
+        if (errorBodyStr.length > 500) {
+          console.log('[AI CHAT] [ApiClient] Error response body (truncated):', errorBodyStr.substring(0, 500) + '...');
+        } else {
+          console.log('[AI CHAT] [ApiClient] Error response body:', errorBodyStr);
+        }
+      }
+
+      throw error;
+    }
   }
 
   async getChatHistory(

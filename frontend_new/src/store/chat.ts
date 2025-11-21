@@ -153,9 +153,18 @@ export const useChatStore = create<ChatStore>()(
         try {
           set({isSending: true, error: null});
 
+          console.log('[AI CHAT] [ChatStore] sendMessage called:', {
+            contentLength: content.length,
+            contentPreview: content.substring(0, 50),
+            hasApplicationId: !!applicationId,
+            applicationId,
+            historyLength: conversationHistory?.length || 0,
+          });
+
           // Verify user is signed in before sending
           const authState = useAuthStore.getState();
           if (!authState.isSignedIn || !authState.token) {
+            console.log('[AI CHAT] [ChatStore] User not authenticated');
             set({
               error: 'Please log in to use the AI assistant',
               isSending: false,
@@ -163,16 +172,21 @@ export const useChatStore = create<ChatStore>()(
             return;
           }
 
+          console.log('[AI CHAT] [ChatStore] Calling apiClient.sendMessage...');
           const response = await apiClient.sendMessage(
             content,
             applicationId,
             conversationHistory,
           );
 
-          console.log('[ChatStore] Send message response:', {
+          console.log('[AI CHAT] [ChatStore] Send message response received:', {
             success: response.success,
             hasData: !!response.data,
+            dataKeys: response.data ? Object.keys(response.data) : [],
             error: response.error,
+            errorMessage: response.error?.message,
+            errorCode: response.error?.code,
+            responseStatus: (response as any).status,
           });
 
           if (response.success && response.data) {
@@ -240,20 +254,40 @@ export const useChatStore = create<ChatStore>()(
                 });
             }, 500);
           } else {
-            console.error('[ChatStore] Send message failed:', response);
+            console.error('[AI CHAT] [ChatStore] Send message failed:', {
+              response,
+              errorDetails: response.error,
+              fullResponse: JSON.stringify(response, null, 2),
+            });
             set({
               error: response.error?.message || 'Failed to send message',
               isSending: false,
             });
           }
         } catch (error: any) {
+          console.log('[AI CHAT] [ChatStore] Send message exception:', {
+            error: error?.message || error,
+            errorType: error?.constructor?.name,
+            isAxiosError: error?.isAxiosError,
+            responseStatus: error?.response?.status,
+            responseData: error?.response?.data,
+            responseHeaders: error?.response?.headers,
+            requestUrl: error?.config?.url,
+            requestMethod: error?.config?.method,
+            requestData: error?.config?.data,
+            requestHeaders: error?.config?.headers,
+            stack: error?.stack,
+          });
+
           // Handle authentication errors more gracefully
           if (error.response?.status === 401) {
+            console.log('[AI CHAT] [ChatStore] 401 Unauthorized - session expired');
             set({
               error: 'Your session has expired. Please log in again.',
               isSending: false,
             });
           } else {
+            console.log('[AI CHAT] [ChatStore] Other error, setting error state');
             set({
               error:
                 error.message || 'Failed to send message. Please try again.',

@@ -56,17 +56,36 @@ export const ChatScreen = ({route}: any) => {
     if (!messageInput.trim()) return;
 
     if (!isSignedIn || !user) {
+      console.log('[AI CHAT] Cannot send: User not signed in');
       return;
     }
 
     const message = messageInput;
     setMessageInput('');
 
-    await sendMessage(
-      message,
+    console.log('[AI CHAT] Starting send message:', {
+      messageLength: message.length,
+      messagePreview: message.substring(0, 50),
+      hasApplicationId: !!applicationId,
       applicationId,
-      currentConversation?.messages || [],
-    );
+      historyLength: currentConversation?.messages?.length || 0,
+      userId: user?.id,
+    });
+
+    try {
+      await sendMessage(
+        message,
+        applicationId,
+        currentConversation?.messages || [],
+      );
+      console.log('[AI CHAT] Send message completed successfully');
+    } catch (error: any) {
+      console.log('[AI CHAT] Send message error in handleSendMessage:', {
+        error: error?.message || error,
+        errorType: error?.constructor?.name,
+        stack: error?.stack,
+      });
+    }
   };
 
   const quickActions = [
