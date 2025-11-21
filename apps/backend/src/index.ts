@@ -245,28 +245,11 @@ app.get('/api/status', (req: Request, res: Response) => {
   });
 });
 
-// Test auth endpoint to verify routing
-app.get('/api/auth/test', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: 'Auth routes are working',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Register routes
 // Health check routes (public, no auth required)
 app.use('/api/health', healthRoutes);
 // Auth routes (rate limiters are applied within the auth router)
-// Add logging middleware to trace auth route requests
-app.use(
-  '/api/auth',
-  (req, res, next) => {
-    console.log('[ROUTE DEBUG] Auth route hit:', req.method, req.path, req.originalUrl);
-    next();
-  },
-  authRoutes
-);
+app.use('/api/auth', authRoutes);
 app.use('/api/countries', countriesRoutes);
 app.use('/api/visa-types', visaTypesRoutes);
 app.use('/api/applications', applicationsRoutes);
