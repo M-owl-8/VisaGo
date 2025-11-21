@@ -62,9 +62,9 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
 
   const panGesture = Gesture.Pan()
     .enabled(enabled)
-    .activeOffsetX([-20, 20]) // Activate if horizontal movement > 20px
-    .failOffsetY([-30, 30]) // Only fail if vertical movement > 30px (allows scrolling)
-    .minDistance(15) // Minimum distance before gesture activates
+    .activeOffsetX([-30, 30]) // Activate if horizontal movement > 30px (more lenient)
+    .failOffsetY([-50, 50]) // Only fail if vertical movement > 50px (allows more scrolling)
+    .minDistance(10) // Minimum distance before gesture activates (reduced)
     .onStart((event) => {
       startX.value = event.x;
       translateX.value = 0;
@@ -75,8 +75,8 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
       const deltaY = Math.abs(event.translationY);
       
       // Only apply horizontal translation if horizontal movement is dominant
-      // Ratio check: horizontal must be at least 1.5x vertical movement
-      if (Math.abs(deltaX) > deltaY * 1.5) {
+      // Ratio check: horizontal must be at least 1.2x vertical movement (more lenient)
+      if (Math.abs(deltaX) > deltaY * 1.2) {
         // Limit the visual feedback to prevent over-swiping
         translateX.value = Math.max(-100, Math.min(100, deltaX));
       }
@@ -89,8 +89,8 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
       const absVelocityX = Math.abs(velocityX);
 
       // Only trigger if horizontal movement is dominant over vertical
-      // Use ratio check: horizontal must be at least 1.5x vertical
-      const isHorizontalSwipe = absDeltaX > deltaY * 1.5;
+      // Use ratio check: horizontal must be at least 1.2x vertical (more lenient)
+      const isHorizontalSwipe = absDeltaX > deltaY * 1.2;
 
       // Check if swipe meets threshold (distance or velocity)
       const meetsThreshold =
