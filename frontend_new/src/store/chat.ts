@@ -310,7 +310,64 @@ export const useChatStore = create<ChatStore>()(
             errorMessage: response.error?.message,
             errorCode: response.error?.code,
             responseStatus: (response as any).status,
+            fullResponse: JSON.stringify(response, null, 2).substring(0, 1000),
           });
+
+          // Validate response structure
+          if (!response) {
+            console.error('[AI CHAT] [ChatStore] No response received');
+            set({
+              error: 'No response received from server',
+              isSending: false,
+            });
+            return;
+          }
+
+          if (!response.success) {
+            console.error(
+              '[AI CHAT] [ChatStore] Response indicates failure:',
+              response,
+            );
+            set({
+              error: response.error?.message || 'Failed to send message',
+              isSending: false,
+            });
+            return;
+          }
+
+          if (!response.data) {
+            console.error(
+              '[AI CHAT] [ChatStore] Response has no data field:',
+              response,
+            );
+            set({
+              error: 'Invalid response from server',
+              isSending: false,
+            });
+            return;
+          }
+
+          if (!response.data.message) {
+            console.error(
+              '[AI CHAT] [ChatStore] Response data has no message:',
+              response.data,
+            );
+            set({
+              error: 'AI response missing message content',
+              isSending: false,
+            });
+            return;
+          }
+
+          console.log(
+            '[AI CHAT] [ChatStore] Response validated, updating state with AI message:',
+            {
+              messageLength: response.data.message.length,
+              messagePreview: response.data.message.substring(0, 100),
+              hasId: !!response.data.id,
+              messageId: response.data.id,
+            },
+          );
 
           // STEP 3: Update conversation with AI response or handle error
           if (response.success && response.data) {

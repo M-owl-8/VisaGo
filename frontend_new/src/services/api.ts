@@ -1276,7 +1276,10 @@ class ApiClient {
     );
 
     try {
-      const response = await this.api.post('/chat/send', payload);
+      // Use longer timeout for chat requests (30 seconds)
+      const response = await this.api.post('/chat/send', payload, {
+        timeout: 30000, // 30 seconds for AI responses
+      });
 
       console.log('[AI CHAT] [ApiClient] Response received:', {
         status: response.status,
@@ -1303,9 +1306,45 @@ class ApiClient {
         console.log('[AI CHAT] [ApiClient] Response body:', responseBodyStr);
       }
 
+      // Validate response structure
+      if (!response.data) {
+        console.error('[AI CHAT] [ApiClient] Response has no data:', response);
+        throw new Error('Invalid response: no data');
+      }
+
+      if (!response.data.success) {
+        console.error(
+          '[AI CHAT] [ApiClient] Response indicates failure:',
+          response.data,
+        );
+        throw new Error(response.data.error?.message || 'Request failed');
+      }
+
+      if (!response.data.data) {
+        console.error(
+          '[AI CHAT] [ApiClient] Response has no data field:',
+          response.data,
+        );
+        throw new Error('Invalid response: missing data field');
+      }
+
+      if (!response.data.data.message) {
+        console.error(
+          '[AI CHAT] [ApiClient] Response data has no message:',
+          response.data.data,
+        );
+        throw new Error('Invalid response: missing message field');
+      }
+
+      console.log('[AI CHAT] [ApiClient] Response validated successfully:', {
+        hasMessage: !!response.data.data.message,
+        messageLength: response.data.data.message.length,
+        messagePreview: response.data.data.message.substring(0, 100),
+      });
+
       return response.data;
     } catch (error: any) {
-      console.log('[AI CHAT] [ApiClient] Request failed:', {
+      console.error('[AI CHAT] [ApiClient] Request failed:', {
         error: error?.message || error,
         errorType: error?.constructor?.name,
         isAxiosError: error?.isAxiosError,
