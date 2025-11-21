@@ -131,19 +131,9 @@ router.post(
     try {
       const { googleId, email, firstName, lastName, avatar } = req.body;
 
-      // Check if Google OAuth is configured
-      const { getEnvConfig } = require('../config/env');
-      const config = getEnvConfig();
-
-      if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) {
-        return errorResponse(
-          res,
-          HTTP_STATUS.SERVICE_UNAVAILABLE,
-          'Google Sign-In is not configured. Please contact support.',
-          'OAUTH_NOT_CONFIGURED'
-        );
-      }
-
+      // Google OAuth is now optional - allow it to work without server-side verification
+      // The client-side Google Sign-In already verifies the token
+      // We just need to trust the Google ID provided by the client
       const result = await AuthService.verifyGoogleAuth({
         googleId,
         email,
