@@ -30,6 +30,10 @@ const router = express.Router();
  */
 router.post(
   '/register',
+  (req, res, next) => {
+    console.log('[AUTH] Register route hit:', req.method, req.path, req.body?.email);
+    next();
+  },
   registerLimiter, // Apply rate limiter directly to the route
   validateRequest({
     body: {
@@ -73,6 +77,10 @@ router.post(
  */
 router.post(
   '/login',
+  (req, res, next) => {
+    console.log('[AUTH] Login route hit:', req.method, req.path, req.body?.email);
+    next();
+  },
   loginLimiter, // Apply rate limiter directly to the route
   validateRequest({
     body: {
