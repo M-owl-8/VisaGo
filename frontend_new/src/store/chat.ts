@@ -324,6 +324,14 @@ export const useChatStore = create<ChatStore>()(
                   offset: 0,
                 };
 
+                console.log('[AI CHAT] [ChatStore] Adding AI response:', {
+                  conversationKey: key,
+                  existingMessagesCount: conversation.messages.length,
+                  userMessageId,
+                  aiResponseId: response.data.id,
+                  aiMessagePreview: response.data.message?.substring(0, 50),
+                });
+
                 // Find and update user message status to 'sent'
                 const updatedMessages = conversation.messages.map(msg =>
                   msg.id === userMessageId
@@ -345,7 +353,7 @@ export const useChatStore = create<ChatStore>()(
                     userId: '',
                     applicationId: applicationId,
                     role: 'assistant',
-                    content: response.data.message,
+                    content: response.data.message || 'No response received',
                     sources: response.data.sources || [],
                     model: response.data.model || 'gpt-4',
                     tokensUsed: response.data.tokens_used || 0,
@@ -354,6 +362,18 @@ export const useChatStore = create<ChatStore>()(
                   };
 
                   updatedMessages.push(assistantMessage);
+                  console.log(
+                    '[AI CHAT] [ChatStore] AI message added to state:',
+                    {
+                      messageId: assistantMessage.id,
+                      contentLength: assistantMessage.content.length,
+                      totalMessagesNow: updatedMessages.length,
+                    },
+                  );
+                } else {
+                  console.warn(
+                    '[AI CHAT] [ChatStore] AI response already exists, skipping',
+                  );
                 }
 
                 const updatedConversation = {
@@ -361,6 +381,15 @@ export const useChatStore = create<ChatStore>()(
                   messages: updatedMessages,
                   total: updatedMessages.length,
                 };
+
+                console.log('[AI CHAT] [ChatStore] Final conversation state:', {
+                  totalMessages: updatedConversation.messages.length,
+                  messageIds: updatedConversation.messages.map(m => ({
+                    id: m.id,
+                    role: m.role,
+                    status: m.status,
+                  })),
+                });
 
                 return {
                   conversations: {
