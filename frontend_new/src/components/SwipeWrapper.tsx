@@ -47,8 +47,8 @@ export const SwipeWrapper: React.FC<SwipeWrapperProps> = ({
   children,
   onSwipeLeft,
   onSwipeRight,
-  swipeThreshold = 50,
-  velocityThreshold = 500,
+  swipeThreshold = 40, // Reduced for easier triggering
+  velocityThreshold = 400, // Reduced for easier triggering
   enabled = true,
 }) => {
   const translateX = useSharedValue(0);
