@@ -7,9 +7,9 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  FlatList,
   StyleSheet,
 } from 'react-native';
+import {FlatList} from 'react-native-gesture-handler';
 import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
 import {ChatIcons, QuickActionIcons} from '../../components/icons/iconConfig';
 import {useTranslation} from 'react-i18next';

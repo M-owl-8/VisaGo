@@ -3,10 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import {ScrollView} from 'react-native-gesture-handler';
 import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
 import {ProfileIcons} from '../../components/icons/iconConfig';
 import { useTranslation } from 'react-i18next';
