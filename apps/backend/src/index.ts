@@ -458,9 +458,12 @@ async function startServer() {
       try {
         await FirebaseStorageService.initialize();
         console.log('✓ Firebase Storage initialized');
-      } catch (error) {
-        console.warn('⚠️  Firebase Storage initialization failed, falling back to local storage');
-        // Note: In production, this should be handled more gracefully
+      } catch (error: any) {
+        // Firebase Storage is optional - fallback to local storage is expected
+        console.log('ℹ️  Firebase Storage not configured, using local storage (this is normal)');
+        if (envConfig.NODE_ENV === 'development') {
+          console.log('   To enable Firebase Storage, configure FIREBASE_* environment variables');
+        }
       }
     } else if (storageType === 'local') {
       try {

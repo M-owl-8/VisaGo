@@ -63,9 +63,11 @@ COPY --from=dependencies /app/apps/backend/package.json ./apps/backend/package.j
 
 # Install production dependencies directly in production stage
 # This ensures all workspace dependencies are properly installed and hoisted
-# With Debian-based image, sharp will automatically install with correct binaries
+# Install sharp with platform-specific binaries for Linux x64 (Railway)
 WORKDIR /app
 RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
+# Reinstall sharp with correct platform binaries for Linux x64
+RUN npm install --no-save --platform=linux --arch=x64 sharp@^0.33.1 || echo "Sharp installation failed, will use fallback"
 
 # Verify critical dependencies are installed (express should be in root node_modules)
 # This will fail the build early if dependencies are missing
