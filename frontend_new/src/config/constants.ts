@@ -77,6 +77,43 @@ const getApiBaseUrl = (): string => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
+/**
+ * AI Service Configuration
+ * The AI service is deployed separately on Railway
+ *
+ * Priority:
+ * 1. EXPO_PUBLIC_AI_SERVICE_URL (if set, use it)
+ * 2. EXPO_PUBLIC_API_URL (if it points to AI service)
+ * 3. Production AI Service Railway URL (default)
+ */
+const getAiServiceBaseUrl = (): string => {
+  // Priority 1: Environment variable for AI service (if set)
+  if (
+    typeof process !== 'undefined' &&
+    process.env?.EXPO_PUBLIC_AI_SERVICE_URL
+  ) {
+    const envUrl = process.env.EXPO_PUBLIC_AI_SERVICE_URL.trim();
+    if (envUrl) {
+      return envUrl;
+    }
+  }
+
+  // Priority 2: Use the same env var as backend, but default to AI service URL
+  // This allows using EXPO_PUBLIC_API_URL for AI service if needed
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
+    const envUrl = process.env.EXPO_PUBLIC_API_URL.trim();
+    // If it's explicitly set to the AI service URL, use it
+    if (envUrl && envUrl.includes('zippy-perfection')) {
+      return envUrl;
+    }
+  }
+
+  // Priority 3: Default to AI service Railway URL
+  return 'https://zippy-perfection-production.up.railway.app';
+};
+
+export const AI_SERVICE_BASE_URL = getAiServiceBaseUrl();
+
 const getSentryDsn = (): string | undefined => {
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SENTRY_DSN) {
     return process.env.EXPO_PUBLIC_SENTRY_DSN;

@@ -35,9 +35,43 @@ const getApiBaseUrl = (): string => {
   return 'https://visago-production.up.railway.app';
 };
 
+// Determine AI Service URL (separate from backend API)
+// The AI service is deployed separately on Railway
+const getAiServiceBaseUrl = (): string => {
+  // Priority 1: Environment variable for AI service (if set)
+  if (
+    typeof process !== 'undefined' &&
+    process.env?.EXPO_PUBLIC_AI_SERVICE_URL
+  ) {
+    const envUrl = process.env.EXPO_PUBLIC_AI_SERVICE_URL.trim();
+    if (envUrl) {
+      return envUrl;
+    }
+  }
+
+  // Priority 2: Use the same env var as backend, but default to AI service URL
+  // This allows using EXPO_PUBLIC_API_URL for AI service if needed
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
+    const envUrl = process.env.EXPO_PUBLIC_API_URL.trim();
+    // If it's explicitly set to the AI service URL, use it
+    if (envUrl && envUrl.includes('zippy-perfection')) {
+      return envUrl;
+    }
+  }
+
+  // Priority 3: Default to AI service Railway URL
+  return 'https://zippy-perfection-production.up.railway.app';
+};
+
 const API_BASE_URL = getApiBaseUrl();
+const AI_SERVICE_BASE_URL = getAiServiceBaseUrl();
 console.log('🌐 API Base URL:', API_BASE_URL);
+console.log('🤖 AI Service Base URL:', AI_SERVICE_BASE_URL);
 console.log('[AI CHAT] [ApiClient] API_BASE_URL determined:', API_BASE_URL);
+console.log(
+  '[AI CHAT] [ApiClient] AI_SERVICE_BASE_URL determined:',
+  AI_SERVICE_BASE_URL,
+);
 console.log('[AI CHAT] [ApiClient] __DEV__:', __DEV__);
 console.log('[AI CHAT] [ApiClient] Platform.OS:', Platform.OS);
 console.log(
@@ -45,12 +79,18 @@ console.log(
   typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_API_URL : 'N/A',
 );
 console.log(
+  '[AI CHAT] [ApiClient] EXPO_PUBLIC_AI_SERVICE_URL:',
+  typeof process !== 'undefined'
+    ? process.env?.EXPO_PUBLIC_AI_SERVICE_URL
+    : 'N/A',
+);
+console.log(
   '[AI CHAT] [ApiClient] REACT_APP_API_URL:',
   typeof process !== 'undefined' ? process.env?.REACT_APP_API_URL : 'N/A',
 );
 console.log(
   '[AI CHAT] [ApiClient] Final chat endpoint will be:',
-  `${API_BASE_URL}/api/chat/send`,
+  `${AI_SERVICE_BASE_URL}/api/chat`,
 );
 
 const CSRF_TOKEN_STORAGE_KEY = '@csrf_token';
@@ -1249,22 +1289,133 @@ class ApiClient {
    * ============================================================================
    */
 
+  /**
+   * Helper function to call the AI service directly
+   * This bypasses the backend and calls the AI service at /api/chat
+   */
+  private async callAiService(
+    endpoint: string,
+    payload: any,
+    options?: {timeout?: number},
+  ): Promise<any> {
+    // Get auth token for the request
+    const authToken = await AsyncStorage.getItem('@auth_token');
+    if (!authToken) {
+      throw new Error('No authentication token found');
+    }
+
+    const fullUrl = `${AI_SERVICE_BASE_URL}${endpoint}`;
+    const timeout = options?.timeout || 30000;
+
+    console.log('[AI CHAT] [ApiClient] Calling AI service:', {
+      url: fullUrl,
+      method: 'POST',
+      hasToken: !!authToken,
+      timeout,
+    });
+
+    // Create AbortController for timeout (React Native compatible)
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, timeout);
+
+    try {
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(payload),
+        signal: abortController.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = {
+            detail:
+              errorText || `HTTP ${response.status}: ${response.statusText}`,
+          };
+        }
+
+        console.error('[AI CHAT] [ApiClient] AI service error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+
+        const error = new Error(
+          errorData.detail ||
+            errorData.message ||
+            `HTTP ${response.status}: ${response.statusText}`,
+        ) as any;
+        error.status = response.status;
+        throw error;
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+        const timeoutError = new Error(
+          `Request timeout after ${timeout}ms`,
+        ) as any;
+        timeoutError.status = 408;
+        timeoutError.code = 'TIMEOUT';
+        throw timeoutError;
+      }
+      throw error;
+    }
+  }
+
   async sendMessage(
     content: string,
     applicationId?: string,
     conversationHistory?: any[],
   ): Promise<ApiResponse> {
+    // Get user ID from auth store
+    const {useAuthStore} = await import('../store/auth');
+    const authState = useAuthStore.getState();
+    const userId = authState.user?.id;
+
+    if (!userId) {
+      console.error('[AI CHAT] [ApiClient] No user ID found');
+      throw new Error('User not authenticated');
+    }
+
     // Build the full URL for logging
-    const fullUrl = `${API_BASE_URL}/api/chat/send`;
+    const fullUrl = `${AI_SERVICE_BASE_URL}/api/chat`;
+
+    // Transform conversation history to match AI service format
+    // AI service expects: [{ role: 'user', content: '...' }, { role: 'assistant', content: '...' }]
+    // Frontend provides: ChatMessage[] with { id, userId, role, content, ... }
+    const transformedHistory = (conversationHistory || []).map(msg => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    // Transform payload to match AI service format
     const payload = {
       content,
-      applicationId,
-      conversationHistory,
+      user_id: userId,
+      application_id: applicationId,
+      conversation_history: transformedHistory,
+      language: 'en', // Default to English, can be made configurable
     };
 
     console.log('[AI CHAT] [ApiClient] sendMessage called');
     console.log('[AI CHAT] [ApiClient] URL:', fullUrl);
-    console.log('[AI CHAT] [ApiClient] Base URL:', API_BASE_URL);
+    console.log(
+      '[AI CHAT] [ApiClient] AI Service Base URL:',
+      AI_SERVICE_BASE_URL,
+    );
     console.log(
       '[AI CHAT] [ApiClient] PAYLOAD:',
       JSON.stringify(payload, null, 2),
@@ -1276,27 +1427,21 @@ class ApiClient {
     );
 
     try {
-      // Use longer timeout for chat requests (30 seconds)
-      const response = await this.api.post('/chat/send', payload, {
+      // Call AI service directly
+      const aiResponse = await this.callAiService('/api/chat', payload, {
         timeout: 30000, // 30 seconds for AI responses
       });
 
-      console.log('[AI CHAT] [ApiClient] Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        hasData: !!response.data,
-        dataKeys: response.data ? Object.keys(response.data) : [],
-        success: response.data?.success,
-        hasResponseData: !!response.data?.data,
-        responseDataKeys: response.data?.data
-          ? Object.keys(response.data.data)
-          : [],
-        error: response.data?.error,
-        headers: response.headers,
+      console.log('[AI CHAT] [ApiClient] AI service response received:', {
+        hasMessage: !!aiResponse.message,
+        hasSources: !!aiResponse.sources,
+        tokensUsed: aiResponse.tokens_used,
+        model: aiResponse.model,
+        responseKeys: Object.keys(aiResponse),
       });
 
       // Log response body (truncated if too long)
-      const responseBodyStr = JSON.stringify(response.data, null, 2);
+      const responseBodyStr = JSON.stringify(aiResponse, null, 2);
       if (responseBodyStr.length > 500) {
         console.log(
           '[AI CHAT] [ApiClient] Response body (truncated):',
@@ -1306,86 +1451,75 @@ class ApiClient {
         console.log('[AI CHAT] [ApiClient] Response body:', responseBodyStr);
       }
 
-      // Validate response structure
-      if (!response.data) {
-        console.error('[AI CHAT] [ApiClient] Response has no data:', response);
+      // Validate response structure (AI service returns { message, sources, tokens_used, model, ... })
+      if (!aiResponse) {
+        console.error(
+          '[AI CHAT] [ApiClient] Response is null or undefined:',
+          aiResponse,
+        );
         throw new Error('Invalid response: no data');
       }
 
-      if (!response.data.success) {
+      if (aiResponse.error) {
         console.error(
-          '[AI CHAT] [ApiClient] Response indicates failure:',
-          response.data,
+          '[AI CHAT] [ApiClient] AI service returned error:',
+          aiResponse.error,
         );
-        throw new Error(response.data.error?.message || 'Request failed');
+        throw new Error(aiResponse.error || 'AI service error');
       }
 
-      if (!response.data.data) {
+      if (!aiResponse.message) {
         console.error(
-          '[AI CHAT] [ApiClient] Response has no data field:',
-          response.data,
-        );
-        throw new Error('Invalid response: missing data field');
-      }
-
-      if (!response.data.data.message) {
-        console.error(
-          '[AI CHAT] [ApiClient] Response data has no message:',
-          response.data.data,
+          '[AI CHAT] [ApiClient] Response has no message field:',
+          aiResponse,
         );
         throw new Error('Invalid response: missing message field');
       }
 
       console.log('[AI CHAT] [ApiClient] Response validated successfully:', {
-        hasMessage: !!response.data.data.message,
-        messageLength: response.data.data.message.length,
-        messagePreview: response.data.data.message.substring(0, 100),
+        hasMessage: !!aiResponse.message,
+        messageLength: aiResponse.message.length,
+        messagePreview: aiResponse.message.substring(0, 100),
+        sourcesCount: aiResponse.sources?.length || 0,
+        tokensUsed: aiResponse.tokens_used,
+        model: aiResponse.model,
       });
 
-      return response.data;
+      // Transform AI service response to match expected format
+      // AI service returns: { message, sources, tokens_used, model, ... }
+      // Chat store expects: { success: true, data: { message, sources, tokens_used, model, id } }
+      const transformedResponse: ApiResponse = {
+        success: true,
+        data: {
+          message: aiResponse.message,
+          sources: aiResponse.sources || [],
+          tokens_used: aiResponse.tokens_used || 0,
+          model: aiResponse.model || 'gpt-4',
+          id: `assistant-${Date.now()}`, // Generate ID if not provided
+          generation_time_ms: aiResponse.generation_time_ms,
+          finish_reason: aiResponse.finish_reason,
+        },
+      };
+
+      return transformedResponse;
     } catch (error: any) {
       console.error('[AI CHAT] [ApiClient] Request failed:', {
         error: error?.message || error,
         errorType: error?.constructor?.name,
-        isAxiosError: error?.isAxiosError,
-        responseStatus: error?.response?.status,
-        responseStatusText: error?.response?.statusText,
-        responseData: error?.response?.data,
-        responseHeaders: error?.response?.headers,
-        requestUrl: error?.config?.url,
-        requestMethod: error?.config?.method,
-        requestBaseURL: error?.config?.baseURL,
-        requestFullURL:
-          error?.config?.baseURL && error?.config?.url
-            ? `${error.config.baseURL}${error.config.url}`
-            : fullUrl,
-        requestData: error?.config?.data,
-        requestHeaders: error?.config?.headers,
-        code: error?.code,
-        errno: error?.errno,
-        syscall: error?.syscall,
-        address: error?.address,
-        port: error?.port,
+        requestUrl: fullUrl,
+        requestMethod: 'POST',
         stack: error?.stack,
       });
 
-      // Log response body if available
-      if (error?.response?.data) {
-        const errorBodyStr = JSON.stringify(error.response.data, null, 2);
-        if (errorBodyStr.length > 500) {
-          console.log(
-            '[AI CHAT] [ApiClient] Error response body (truncated):',
-            errorBodyStr.substring(0, 500) + '...',
-          );
-        } else {
-          console.log(
-            '[AI CHAT] [ApiClient] Error response body:',
-            errorBodyStr,
-          );
-        }
-      }
-
-      throw error;
+      // Return error in expected format
+      return {
+        success: false,
+        error: {
+          status: error?.status || 500,
+          message: error?.message || 'Failed to send message to AI service',
+          code: error?.code,
+        },
+      };
     }
   }
 
