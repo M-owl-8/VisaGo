@@ -12,9 +12,12 @@ try {
   sharpAvailable = true;
   console.log('✅ Sharp image processing library loaded successfully');
 } catch (error: any) {
-  console.warn('⚠️  Sharp image processing library not available:', error.message);
-  console.warn('⚠️  Image compression and thumbnail generation will be disabled');
-  console.warn('⚠️  Files will be uploaded without processing');
+  // Sharp is optional - image processing will be disabled but app continues normally
+  console.log('ℹ️  Sharp image processing library not available (optional feature)');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('   Image compression and thumbnails will be disabled');
+    console.log('   To enable: npm install --platform=linux --arch=x64 sharp');
+  }
   sharpAvailable = false;
 }
 

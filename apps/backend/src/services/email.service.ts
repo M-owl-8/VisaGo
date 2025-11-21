@@ -47,7 +47,12 @@ export class EmailService {
     }
 
     if (!this.sendgridConfigured && !this.nodemailerTransporter) {
-      console.warn('⚠️ No email service configured. Emails will be logged only.');
+      // Email service is optional - app continues normally
+      console.log('ℹ️  Email service not configured (optional feature)');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('   Emails will be logged to console only');
+        console.log('   To enable: Configure SENDGRID_API_KEY or SMTP settings');
+      }
     }
   }
 
