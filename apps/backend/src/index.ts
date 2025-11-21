@@ -245,6 +245,15 @@ app.get('/api/status', (req: Request, res: Response) => {
   });
 });
 
+// Test auth endpoint to verify routing
+app.get('/api/auth/test', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    message: 'Auth routes are working',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Register routes
 // Health check routes (public, no auth required)
 app.use('/api/health', healthRoutes);
