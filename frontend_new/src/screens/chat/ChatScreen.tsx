@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,19 @@ import {
   Platform,
   FlatList,
   StyleSheet,
-} from "react-native";
-import Icon from "react-native-vector-icons/Ionicons";
-import { useTranslation } from "react-i18next";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useChatStore } from "../../store/chat";
-import { useAuthStore } from "../../store/auth";
+} from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import {useTranslation} from 'react-i18next';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useChatStore} from '../../store/chat';
+import {useAuthStore} from '../../store/auth';
 
-export const ChatScreen = ({ route }: any) => {
-  const { t } = useTranslation();
+export const ChatScreen = ({route}: any) => {
+  const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const applicationId = route?.params?.applicationId;
-  const isSignedIn = useAuthStore((state) => state.isSignedIn);
-  const user = useAuthStore((state) => state.user);
+  const isSignedIn = useAuthStore(state => state.isSignedIn);
+  const user = useAuthStore(state => state.user);
 
   const {
     currentConversation,
@@ -32,7 +32,7 @@ export const ChatScreen = ({ route }: any) => {
     sendMessage,
   } = useChatStore();
 
-  const [messageInput, setMessageInput] = useState("");
+  const [messageInput, setMessageInput] = useState('');
   const [showQuickActions, setShowQuickActions] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
@@ -46,33 +46,53 @@ export const ChatScreen = ({ route }: any) => {
 
   useEffect(() => {
     if (currentConversation && currentConversation.messages.length > 0) {
-      flatListRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({animated: true});
       setShowQuickActions(false);
     }
   }, [currentConversation?.messages]);
 
   const handleSendMessage = async () => {
     if (!messageInput.trim()) return;
-    
+
     if (!isSignedIn || !user) {
       return;
     }
 
     const message = messageInput;
-    setMessageInput("");
+    setMessageInput('');
 
     await sendMessage(
       message,
       applicationId,
-      currentConversation?.messages || []
+      currentConversation?.messages || [],
     );
   };
 
   const quickActions = [
-    { id: 'documents', icon: 'document-text-outline', text: t('chat.quickActions.documents'), color: '#4A9EFF' },
-    { id: 'timeline', icon: 'time-outline', text: t('chat.quickActions.timeline'), color: '#10B981' },
-    { id: 'requirements', icon: 'cash-outline', text: t('chat.quickActions.requirements'), color: '#F59E0B' },
-    { id: 'mistakes', icon: 'warning-outline', text: t('chat.quickActions.mistakes'), color: '#EF4444' },
+    {
+      id: 'documents',
+      icon: 'document-text-outline',
+      text: t('chat.quickActions.documents'),
+      color: '#4A9EFF',
+    },
+    {
+      id: 'timeline',
+      icon: 'time-outline',
+      text: t('chat.quickActions.timeline'),
+      color: '#10B981',
+    },
+    {
+      id: 'requirements',
+      icon: 'cash-outline',
+      text: t('chat.quickActions.requirements'),
+      color: '#F59E0B',
+    },
+    {
+      id: 'mistakes',
+      icon: 'warning-outline',
+      text: t('chat.quickActions.mistakes'),
+      color: '#EF4444',
+    },
   ];
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -87,7 +107,7 @@ export const ChatScreen = ({ route }: any) => {
   }, []);
 
   const handleQuickAction = (action: string) => {
-    const quickMessages: { [key: string]: string } = {
+    const quickMessages: {[key: string]: string} = {
       documents: t('chat.quickMessages.documents'),
       timeline: t('chat.quickMessages.timeline'),
       requirements: t('chat.quickMessages.requirements'),
@@ -105,33 +125,41 @@ export const ChatScreen = ({ route }: any) => {
     }
   };
 
-  const renderMessage = ({ item }: { item: any }) => {
-    const isUser = item.role === "user";
+  const renderMessage = ({item}: {item: any}) => {
+    const isUser = item.role === 'user';
 
     return (
       <View style={styles.messageContainer}>
-        <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
+        <View
+          style={[
+            styles.messageBubble,
+            isUser ? styles.userBubble : styles.aiBubble,
+          ]}>
           {!isUser && (
             <View style={styles.aiIcon}>
               <Icon name="sparkles" size={16} color="#8B5CF6" />
             </View>
           )}
           <View style={styles.messageContent}>
-            <Text style={[styles.messageText, isUser ? styles.userText : styles.aiText]}>
+            <Text
+              style={[
+                styles.messageText,
+                isUser ? styles.userText : styles.aiText,
+              ]}>
               {item.content}
             </Text>
             {item.sources && item.sources.length > 0 && (
               <View style={styles.sourcesContainer}>
                 <Icon name="book-outline" size={12} color="#94A3B8" />
                 <Text style={styles.sourcesText}>
-                  {t('chat.sources', { sources: item.sources.join(", ") })}
+                  {t('chat.sources', {sources: item.sources.join(', ')})}
                 </Text>
               </View>
             )}
             <Text style={styles.timestamp}>
               {new Date(item.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
+                hour: '2-digit',
+                minute: '2-digit',
               })}
             </Text>
           </View>
@@ -152,10 +180,9 @@ export const ChatScreen = ({ route }: any) => {
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-        >
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
           {/* Messages List */}
           {messages.length === 0 ? (
             <View style={styles.emptyStateContainer}>
@@ -163,23 +190,28 @@ export const ChatScreen = ({ route }: any) => {
                 <Icon name="chatbubbles-outline" size={64} color="#4A9EFF" />
               </View>
               <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
-              <Text style={styles.emptyText}>
-                {t('chat.askAnything')}
-              </Text>
+              <Text style={styles.emptyText}>{t('chat.askAnything')}</Text>
 
               {/* Quick Actions */}
               {showQuickActions && (
                 <View style={styles.quickActionsContainer}>
-                  <Text style={styles.quickActionsTitle}>{t('chat.quickQuestions')}</Text>
+                  <Text style={styles.quickActionsTitle}>
+                    {t('chat.quickQuestions')}
+                  </Text>
                   <View style={styles.quickActionsGrid}>
-                    {quickActions.map((action) => (
+                    {quickActions.map(action => (
                       <TouchableOpacity
                         key={action.id}
                         style={styles.quickActionButton}
-                        onPress={() => handleQuickAction(action.id)}
-                      >
-                        <Icon name={action.icon} size={20} color={action.color} />
-                        <Text style={styles.quickActionText}>{action.text}</Text>
+                        onPress={() => handleQuickAction(action.id)}>
+                        <Icon
+                          name={action.icon}
+                          size={20}
+                          color={action.color}
+                        />
+                        <Text style={styles.quickActionText}>
+                          {action.text}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -191,10 +223,14 @@ export const ChatScreen = ({ route }: any) => {
               ref={flatListRef}
               data={messages}
               renderItem={renderMessage}
-              keyExtractor={(item: any) => item.id?.toString() || Math.random().toString()}
+              keyExtractor={(item: any) =>
+                item.id?.toString() || Math.random().toString()
+              }
               contentContainerStyle={styles.messagesList}
               showsVerticalScrollIndicator={false}
-              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              onContentSizeChange={() =>
+                flatListRef.current?.scrollToEnd({animated: true})
+              }
             />
           )}
 
@@ -212,10 +248,13 @@ export const ChatScreen = ({ route }: any) => {
                 editable={!isSending}
               />
               <TouchableOpacity
-                style={[styles.sendButton, (!messageInput.trim() || isSending) && styles.sendButtonDisabled]}
+                style={[
+                  styles.sendButton,
+                  (!messageInput.trim() || isSending) &&
+                    styles.sendButtonDisabled,
+                ]}
                 onPress={handleSendMessage}
-                disabled={!messageInput.trim() || isSending}
-              >
+                disabled={!messageInput.trim() || isSending}>
                 {isSending ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
@@ -420,7 +459,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#4A9EFF',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
