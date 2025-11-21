@@ -249,7 +249,15 @@ app.get('/api/status', (req: Request, res: Response) => {
 // Health check routes (public, no auth required)
 app.use('/api/health', healthRoutes);
 // Auth routes (rate limiters are applied within the auth router)
-app.use('/api/auth', authRoutes);
+// Add logging middleware to trace auth route requests
+app.use(
+  '/api/auth',
+  (req, res, next) => {
+    console.log('[ROUTE DEBUG] Auth route hit:', req.method, req.path, req.originalUrl);
+    next();
+  },
+  authRoutes
+);
 app.use('/api/countries', countriesRoutes);
 app.use('/api/visa-types', visaTypesRoutes);
 app.use('/api/applications', applicationsRoutes);
@@ -286,6 +294,17 @@ if (envConfig.NODE_ENV === 'development') {
 
 // 404 handler
 app.use((req: Request, res: Response) => {
+  console.log('[404 HANDLER] Request not found:', {
+    method: req.method,
+    path: req.path,
+    originalUrl: req.originalUrl,
+    url: req.url,
+    baseUrl: req.baseUrl,
+    headers: {
+      'user-agent': req.headers['user-agent'],
+      'content-type': req.headers['content-type'],
+    },
+  });
   res.status(HTTP_STATUS.NOT_FOUND).json({
     success: false,
     error: {
@@ -293,6 +312,7 @@ app.use((req: Request, res: Response) => {
       message: API_MESSAGES.NOT_FOUND,
       code: 'NOT_FOUND',
       path: req.path,
+      originalUrl: req.originalUrl,
     },
   });
 });
