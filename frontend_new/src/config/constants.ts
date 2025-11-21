@@ -45,45 +45,33 @@ export const GOOGLE_WEB_CLIENT_ID = getGoogleClientId();
 
 /**
  * Backend API Configuration
+ * IMPORTANT: Physical devices ALWAYS use Railway URL (or env var)
+ * Only emulators/simulators can use localhost/10.0.2.2 (via explicit env var)
+ * 
  * Priority:
- * 1. EXPO_PUBLIC_API_URL (for Expo) - must not contain localhost/10.0.2.2
- * 2. REACT_APP_API_URL (fallback) - must not contain localhost/10.0.2.2
- * 3. Production Railway URL (default) - always used on physical devices
- * 4. Localhost/emulator addresses - ONLY when actually in emulator/simulator
+ * 1. EXPO_PUBLIC_API_URL (if set, use it - even if localhost for emulator dev)
+ * 2. REACT_APP_API_URL (if set, use it - even if localhost for emulator dev)
+ * 3. Production Railway URL (default - always safe for physical devices)
  */
 const getApiBaseUrl = (): string => {
   // Priority 1: Environment variable (set at build time)
+  // If explicitly set, use it (even if localhost/10.0.2.2 for emulator development)
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
     const envUrl = process.env.EXPO_PUBLIC_API_URL.trim();
-    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('10.0.2.2')) {
+    if (envUrl) {
       return envUrl;
     }
   }
   if (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) {
     const envUrl = process.env.REACT_APP_API_URL.trim();
-    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('10.0.2.2')) {
+    if (envUrl) {
       return envUrl;
     }
   }
 
-  // Priority 2: Only use localhost/emulator addresses in development AND when actually in emulator/simulator
-  // For physical devices, always use production URL
-  // Note: __DEV__ can be true on physical devices too, so we check for emulator/simulator specifically
-  const isEmulator = __DEV__ && (
-    Platform.OS === 'android' && Platform.isTV === false // Android emulator (not TV)
-  ) || (
-    Platform.OS === 'ios' && Platform.isPad === false && Platform.isTV === false // iOS simulator
-  );
-
-  if (isEmulator) {
-    // Only use localhost/emulator addresses when actually running in emulator/simulator
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:3000'; // Android emulator only
-    }
-    return 'http://localhost:3000'; // iOS simulator only
-  }
-
-  // Priority 3: Production Railway URL (always used on physical devices and production builds)
+  // Priority 2: Always use Railway URL by default
+  // This ensures physical devices NEVER try to connect to localhost/10.0.2.2
+  // For emulator development, set EXPO_PUBLIC_API_URL=http://10.0.2.2:3000 explicitly
   return 'https://zippy-perfection-production.up.railway.app';
 };
 
