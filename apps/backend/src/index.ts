@@ -91,9 +91,10 @@ try {
   }
 
   if (warnings.length > 0 && envConfig.NODE_ENV === 'production') {
-    console.warn('\n⚠️  Production Warnings:');
-    warnings.forEach((w) => console.warn(`   - ${w}`));
-    console.warn('');
+    // These are optional features - log as info, not warnings
+    console.log('\nℹ️  Optional Features (not configured):');
+    warnings.forEach((w) => console.log(`   - ${w}`));
+    console.log('');
   }
 } catch (error) {
   console.error(
