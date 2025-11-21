@@ -260,8 +260,8 @@ app.use('/api/forms', formRoutes);
 // Document checklist routes (AI-generated checklists)
 app.use('/api/document-checklist', documentChecklistRoutes);
 // Chat routes with user-level rate limiting and cost tracking
-app.use('/api/chat', chatRateLimitMiddleware); // 50 messages per day per user
-app.use('/api/chat', attachChatLimitHeaders); // Attach quota info to response headers
+// NOTE: chatRateLimitMiddleware must run AFTER authentication (which is in chatRoutes)
+// So we apply it inside the chatRoutes router, not here
 app.use('/api/chat', chatRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/notifications', notificationsRoutes);

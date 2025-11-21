@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import { chatService as ChatService } from '../services/chat.service';
 import { authenticateToken } from '../middleware/auth';
 import { validateRAGRequest } from '../middleware/input-validation';
+import { chatRateLimitMiddleware, attachChatLimitHeaders } from '../middleware/chat-rate-limit';
 
 const router = Router();
 
@@ -11,6 +12,10 @@ const router = Router();
 
 // Require authentication for all chat routes
 router.use(authenticateToken);
+
+// Apply rate limiting AFTER authentication (so we have userId)
+router.use(chatRateLimitMiddleware);
+router.use(attachChatLimitHeaders);
 
 // ============================================================================
 // ROUTES

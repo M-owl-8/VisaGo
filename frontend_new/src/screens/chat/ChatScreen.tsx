@@ -147,6 +147,8 @@ export const ChatScreen = ({route}: any) => {
 
   const renderMessage = ({item}: {item: any}) => {
     const isUser = item.role === 'user';
+    const isSending = item.status === 'sending';
+    const hasError = item.status === 'error';
 
     return (
       <View style={styles.messageContainer}>
@@ -154,15 +156,20 @@ export const ChatScreen = ({route}: any) => {
           style={[
             styles.messageBubble,
             isUser ? styles.userBubble : styles.aiBubble,
+            hasError && styles.errorBubble,
           ]}>
           {!isUser && (
             <View style={styles.aiIcon}>
-              <AppIcon
-                name={ChatIcons.ai.name}
-                library={ChatIcons.ai.library}
-                size={IconSizes.small}
-                color="#8B5CF6"
-              />
+              {isSending ? (
+                <ActivityIndicator size="small" color="#8B5CF6" />
+              ) : (
+                <AppIcon
+                  name={ChatIcons.ai.name}
+                  library={ChatIcons.ai.library}
+                  size={IconSizes.small}
+                  color="#8B5CF6"
+                />
+              )}
             </View>
           )}
           <View style={styles.messageContent}>
@@ -170,9 +177,15 @@ export const ChatScreen = ({route}: any) => {
               style={[
                 styles.messageText,
                 isUser ? styles.userText : styles.aiText,
+                hasError && styles.errorText,
               ]}>
               {item.content}
             </Text>
+            {hasError && (
+              <Text style={styles.errorMessage}>
+                {t('chat.messageFailed', 'Failed to send. Tap to retry.')}
+              </Text>
+            )}
             {item.sources && item.sources.length > 0 && (
               <View style={styles.sourcesContainer}>
                 <AppIcon
@@ -186,12 +199,21 @@ export const ChatScreen = ({route}: any) => {
                 </Text>
               </View>
             )}
-            <Text style={styles.timestamp}>
-              {new Date(item.createdAt).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
+            <View style={styles.timestampContainer}>
+              {isSending && (
+                <ActivityIndicator
+                  size="small"
+                  color={isUser ? '#FFFFFF' : '#8B5CF6'}
+                  style={styles.sendingIndicator}
+                />
+              )}
+              <Text style={styles.timestamp}>
+                {new Date(item.createdAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -212,20 +234,19 @@ export const ChatScreen = ({route}: any) => {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 65} // Account for bottom tab bar
-        >
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 65}>
           <View style={styles.contentWrapper}>
             {/* Messages List */}
             {messages.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <View style={styles.emptyIconContainer}>
-                <AppIcon
-                  name={ChatIcons.empty.name}
-                  library={ChatIcons.empty.library}
-                  size={IconSizes.large * 2}
-                  color={IconColors.active}
-                />
-              </View>
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.emptyIconContainer}>
+                  <AppIcon
+                    name={ChatIcons.empty.name}
+                    library={ChatIcons.empty.library}
+                    size={IconSizes.large * 2}
+                    color={IconColors.active}
+                  />
+                </View>
                 <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
                 <Text style={styles.emptyText}>{t('chat.askAnything')}</Text>
 
@@ -269,15 +290,18 @@ export const ChatScreen = ({route}: any) => {
                 onContentSizeChange={() =>
                   flatListRef.current?.scrollToEnd({animated: true})
                 }
+                keyboardShouldPersistTaps="handled"
               />
             )}
           </View>
 
-          {/* Input Area - Always visible, positioned above tab bar */}
+          {/* Input Area - Positioned directly above tab bar, moves above keyboard when open */}
           <View
             style={[
               styles.inputContainer,
-              {paddingBottom: Math.max(12, insets.bottom)},
+              {
+                paddingBottom: Math.max(12, insets.bottom),
+              },
             ]}>
             <View style={styles.inputWrapper}>
               <TextInput
@@ -356,6 +380,7 @@ const styles = StyleSheet.create({
   },
   contentWrapper: {
     flex: 1,
+    paddingBottom: 0, // No padding - input is in normal flow
   },
   messagesList: {
     paddingTop: 20,
@@ -415,10 +440,31 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontStyle: 'italic',
   },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
   timestamp: {
     fontSize: 11,
     color: '#6B7280',
+  },
+  sendingIndicator: {
+    marginRight: 4,
+  },
+  errorBubble: {
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderWidth: 1,
+  },
+  errorText: {
+    opacity: 0.7,
+  },
+  errorMessage: {
+    fontSize: 12,
+    color: '#EF4444',
     marginTop: 6,
+    fontStyle: 'italic',
   },
   emptyStateContainer: {
     flex: 1,
@@ -483,12 +529,11 @@ const styles = StyleSheet.create({
   inputContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 12,
     backgroundColor: 'rgba(15, 30, 45, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(74, 158, 255, 0.2)',
-    // Ensure input is above bottom tab bar
-    marginBottom: 0,
+    // Positioned in normal flow - KeyboardAvoidingView handles keyboard
+    // Tab bar (65px) is handled by React Navigation and stays at bottom
   },
   inputWrapper: {
     flexDirection: 'row',

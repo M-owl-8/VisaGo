@@ -14,6 +14,7 @@ export interface ChatMessage {
   model: string;
   tokensUsed: number;
   createdAt: string;
+  status?: 'sending' | 'sent' | 'error'; // Track message status for optimistic UI
 }
 
 export interface ChatStats {
@@ -172,6 +173,52 @@ export const useChatStore = create<ChatStore>()(
             return;
           }
 
+          // STEP 1: Add user message immediately (optimistic UI update)
+          const key = applicationId || 'general';
+          const userMessageId = `user-${Date.now()}`;
+          const userMessage: ChatMessage = {
+            id: userMessageId,
+            userId: authState.user?.id || '',
+            applicationId: applicationId,
+            role: 'user',
+            content,
+            sources: [],
+            model: 'user',
+            tokensUsed: 0,
+            createdAt: new Date().toISOString(),
+            status: 'sending', // Mark as sending
+          };
+
+          // Add user message to conversation immediately
+          set(state => {
+            const conversation = state.conversations[key] || {
+              messages: [],
+              total: 0,
+              limit: 50,
+              offset: 0,
+            };
+
+            const updatedMessages = [...conversation.messages, userMessage];
+            const updatedConversation = {
+              ...conversation,
+              messages: updatedMessages,
+              total: conversation.total + 1,
+            };
+
+            return {
+              conversations: {
+                ...state.conversations,
+                [key]: updatedConversation,
+              },
+              currentConversation: updatedConversation,
+            };
+          });
+
+          console.log(
+            '[AI CHAT] [ChatStore] User message added to UI immediately',
+          );
+
+          // STEP 2: Call API to get AI response
           console.log('[AI CHAT] [ChatStore] Calling apiClient.sendMessage...');
           const response = await apiClient.sendMessage(
             content,
@@ -189,8 +236,8 @@ export const useChatStore = create<ChatStore>()(
             responseStatus: (response as any).status,
           });
 
+          // STEP 3: Update conversation with AI response or handle error
           if (response.success && response.data) {
-            const key = applicationId || 'general';
             set(state => {
               const conversation = state.conversations[key] || {
                 messages: [],
@@ -199,37 +246,32 @@ export const useChatStore = create<ChatStore>()(
                 offset: 0,
               };
 
-              // Add user message and assistant response
-              const updatedMessages = [
-                ...conversation.messages,
-                {
-                  id: `user-${Date.now()}`,
-                  userId: '',
-                  applicationId: applicationId,
-                  role: 'user' as const,
-                  content,
-                  sources: [],
-                  model: 'user',
-                  tokensUsed: 0,
-                  createdAt: new Date().toISOString(),
-                },
-                {
-                  id: response.data.id,
-                  userId: '',
-                  applicationId: applicationId,
-                  role: 'assistant' as const,
-                  content: response.data.message,
-                  sources: response.data.sources || [],
-                  model: response.data.model || 'gpt-4',
-                  tokensUsed: response.data.tokens_used || 0,
-                  createdAt: new Date().toISOString(),
-                },
-              ];
+              // Update user message status to 'sent'
+              const updatedMessages = conversation.messages.map(msg =>
+                msg.id === userMessageId
+                  ? {...msg, status: 'sent' as const}
+                  : msg,
+              );
 
+              // Add AI response
+              const assistantMessage: ChatMessage = {
+                id: response.data.id || `assistant-${Date.now()}`,
+                userId: '',
+                applicationId: applicationId,
+                role: 'assistant',
+                content: response.data.message,
+                sources: response.data.sources || [],
+                model: response.data.model || 'gpt-4',
+                tokensUsed: response.data.tokens_used || 0,
+                createdAt: new Date().toISOString(),
+                status: 'sent',
+              };
+
+              const finalMessages = [...updatedMessages, assistantMessage];
               const updatedConversation = {
                 ...conversation,
-                messages: updatedMessages,
-                total: conversation.total + 2,
+                messages: finalMessages,
+                total: finalMessages.length,
               };
 
               return {
@@ -254,14 +296,42 @@ export const useChatStore = create<ChatStore>()(
                 });
             }, 500);
           } else {
+            // API failed - mark user message as error but keep it visible
             console.error('[AI CHAT] [ChatStore] Send message failed:', {
               response,
               errorDetails: response.error,
               fullResponse: JSON.stringify(response, null, 2),
             });
-            set({
-              error: response.error?.message || 'Failed to send message',
-              isSending: false,
+
+            set(state => {
+              const conversation = state.conversations[key] || {
+                messages: [],
+                total: 0,
+                limit: 50,
+                offset: 0,
+              };
+
+              // Update user message status to 'error'
+              const updatedMessages = conversation.messages.map(msg =>
+                msg.id === userMessageId
+                  ? {...msg, status: 'error' as const}
+                  : msg,
+              );
+
+              const updatedConversation = {
+                ...conversation,
+                messages: updatedMessages,
+              };
+
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [key]: updatedConversation,
+                },
+                currentConversation: updatedConversation,
+                error: response.error?.message || 'Failed to send message',
+                isSending: false,
+              };
             });
           }
         } catch (error: any) {
@@ -281,13 +351,17 @@ export const useChatStore = create<ChatStore>()(
 
           // Handle authentication errors more gracefully
           if (error.response?.status === 401) {
-            console.log('[AI CHAT] [ChatStore] 401 Unauthorized - session expired');
+            console.log(
+              '[AI CHAT] [ChatStore] 401 Unauthorized - session expired',
+            );
             set({
               error: 'Your session has expired. Please log in again.',
               isSending: false,
             });
           } else {
-            console.log('[AI CHAT] [ChatStore] Other error, setting error state');
+            console.log(
+              '[AI CHAT] [ChatStore] Other error, setting error state',
+            );
             set({
               error:
                 error.message || 'Failed to send message. Please try again.',

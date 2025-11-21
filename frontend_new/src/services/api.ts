@@ -521,8 +521,30 @@ class ApiClient {
           const authToken = await AsyncStorage.getItem('@auth_token');
           if (authToken) {
             setHeaderValue(headers, 'Authorization', `Bearer ${authToken}`);
+            // Log auth token for chat requests
+            if (config.url?.includes('/chat')) {
+              console.log(
+                '[ApiClient] Setting Authorization header for chat request:',
+                {
+                  url: config.url,
+                  hasToken: !!authToken,
+                  tokenLength: authToken.length,
+                  tokenPreview: authToken.substring(0, 20) + '...',
+                },
+              );
+            }
           } else {
             removeHeaderValue(headers, 'Authorization');
+            // Log missing token for chat requests
+            if (config.url?.includes('/chat')) {
+              console.warn(
+                '[ApiClient] No auth token found for chat request:',
+                {
+                  url: config.url,
+                  method: config.method,
+                },
+              );
+            }
           }
 
           if (cachedSessionId) {
@@ -596,9 +618,19 @@ class ApiClient {
           const isAIGenerateEndpoint =
             error.config?.url?.includes('/ai-generate');
 
-          // For chat and AI endpoints, don't log warnings or logout - let them handle it
+          // For chat and AI endpoints, log detailed info but don't logout
           if (isChatEndpoint || isAIGenerateEndpoint) {
-            // Silently handle 401 for chat/AI endpoints - they'll show appropriate messages
+            console.error(
+              '[ApiClient] 401 Unauthorized for chat/AI endpoint:',
+              {
+                url: error.config?.url,
+                method: error.config?.method,
+                status: error.response?.status,
+                errorData: error.response?.data,
+                hasToken: !!authState.token,
+                isSignedIn: authState.isSignedIn,
+              },
+            );
             return Promise.reject(error);
           }
 
