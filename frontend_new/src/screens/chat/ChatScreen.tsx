@@ -182,6 +182,7 @@ export const ChatScreen = ({route}: any) => {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
+<<<<<<< Updated upstream
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
           {/* Messages List */}
           {messages.length === 0 ? (
@@ -233,9 +234,69 @@ export const ChatScreen = ({route}: any) => {
               }
             />
           )}
+=======
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 65} // Account for bottom tab bar
+        >
+          <View style={styles.contentWrapper}>
+            {/* Messages List */}
+            {messages.length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.emptyIconContainer}>
+                  <Icon name="chatbubbles-outline" size={64} color="#4A9EFF" />
+                </View>
+                <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
+                <Text style={styles.emptyText}>{t('chat.askAnything')}</Text>
+>>>>>>> Stashed changes
 
-          {/* Input Area */}
-          <View style={styles.inputContainer}>
+                {/* Quick Actions */}
+                {showQuickActions && (
+                  <View style={styles.quickActionsContainer}>
+                    <Text style={styles.quickActionsTitle}>
+                      {t('chat.quickQuestions')}
+                    </Text>
+                    <View style={styles.quickActionsGrid}>
+                      {quickActions.map(action => (
+                        <TouchableOpacity
+                          key={action.id}
+                          style={styles.quickActionButton}
+                          onPress={() => handleQuickAction(action.id)}>
+                          <Icon
+                            name={action.icon}
+                            size={20}
+                            color={action.color}
+                          />
+                          <Text style={styles.quickActionText}>
+                            {action.text}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderMessage}
+                keyExtractor={(item: any) =>
+                  item.id?.toString() || Math.random().toString()
+                }
+                contentContainerStyle={styles.messagesList}
+                showsVerticalScrollIndicator={false}
+                onContentSizeChange={() =>
+                  flatListRef.current?.scrollToEnd({animated: true})
+                }
+              />
+            )}
+          </View>
+
+          {/* Input Area - Always visible, positioned above tab bar */}
+          <View
+            style={[
+              styles.inputContainer,
+              {paddingBottom: Math.max(12, insets.bottom)},
+            ]}>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
@@ -246,6 +307,8 @@ export const ChatScreen = ({route}: any) => {
                 multiline
                 maxLength={500}
                 editable={!isSending}
+                returnKeyType="send"
+                onSubmitEditing={handleSendMessage}
               />
               <TouchableOpacity
                 style={[
@@ -302,6 +365,9 @@ const styles = StyleSheet.create({
     left: -50,
   },
   keyboardView: {
+    flex: 1,
+  },
+  contentWrapper: {
     flex: 1,
   },
   messagesList: {
@@ -429,10 +495,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
     backgroundColor: 'rgba(15, 30, 45, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(74, 158, 255, 0.2)',
+    // Ensure input is above bottom tab bar
+    marginBottom: 0,
   },
   inputWrapper: {
     flexDirection: 'row',
