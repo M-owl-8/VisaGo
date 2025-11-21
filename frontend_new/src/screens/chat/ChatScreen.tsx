@@ -182,59 +182,6 @@ export const ChatScreen = ({route}: any) => {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
-<<<<<<< Updated upstream
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-          {/* Messages List */}
-          {messages.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <View style={styles.emptyIconContainer}>
-                <Icon name="chatbubbles-outline" size={64} color="#4A9EFF" />
-              </View>
-              <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
-              <Text style={styles.emptyText}>{t('chat.askAnything')}</Text>
-
-              {/* Quick Actions */}
-              {showQuickActions && (
-                <View style={styles.quickActionsContainer}>
-                  <Text style={styles.quickActionsTitle}>
-                    {t('chat.quickQuestions')}
-                  </Text>
-                  <View style={styles.quickActionsGrid}>
-                    {quickActions.map(action => (
-                      <TouchableOpacity
-                        key={action.id}
-                        style={styles.quickActionButton}
-                        onPress={() => handleQuickAction(action.id)}>
-                        <Icon
-                          name={action.icon}
-                          size={20}
-                          color={action.color}
-                        />
-                        <Text style={styles.quickActionText}>
-                          {action.text}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </View>
-          ) : (
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={(item: any) =>
-                item.id?.toString() || Math.random().toString()
-              }
-              contentContainerStyle={styles.messagesList}
-              showsVerticalScrollIndicator={false}
-              onContentSizeChange={() =>
-                flatListRef.current?.scrollToEnd({animated: true})
-              }
-            />
-          )}
-=======
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 65} // Account for bottom tab bar
         >
           <View style={styles.contentWrapper}>
@@ -246,7 +193,6 @@ export const ChatScreen = ({route}: any) => {
                 </View>
                 <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
                 <Text style={styles.emptyText}>{t('chat.askAnything')}</Text>
->>>>>>> Stashed changes
 
                 {/* Quick Actions */}
                 {showQuickActions && (
