@@ -12,26 +12,39 @@ import {logError, logMessage, addBreadcrumb} from './errorLogger';
 
 // Determine API URL based on environment
 const getApiBaseUrl = (): string => {
-  // In development (with Metro bundler), use localhost/emulator address
-  if (__DEV__) {
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:3000'; // Android emulator
-    }
-    return 'http://localhost:3000'; // iOS simulator / local
-  }
-
-  // Production: Use Railway backend URL
-  // This will be used when building standalone APK
-  // You can override this by setting EXPO_PUBLIC_API_URL before building
+  // Priority 1: Environment variable (set at build time)
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+    const envUrl = process.env.EXPO_PUBLIC_API_URL.trim();
+    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('10.0.2.2')) {
+      return envUrl;
+    }
   }
   if (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
+    const envUrl = process.env.REACT_APP_API_URL.trim();
+    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('10.0.2.2')) {
+      return envUrl;
+    }
   }
 
-  // Default production Railway URL
-  return 'https://visago-production.up.railway.app';
+  // Priority 2: Only use localhost/emulator addresses in development AND when actually in emulator/simulator
+  // For physical devices, always use production URL
+  // Note: __DEV__ can be true on physical devices too, so we check for emulator/simulator specifically
+  const isEmulator = __DEV__ && (
+    Platform.OS === 'android' && Platform.isTV === false // Android emulator (not TV)
+  ) || (
+    Platform.OS === 'ios' && Platform.isPad === false && Platform.isTV === false // iOS simulator
+  );
+
+  if (isEmulator) {
+    // Only use localhost/emulator addresses when actually running in emulator/simulator
+    if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:3000'; // Android emulator only
+    }
+    return 'http://localhost:3000'; // iOS simulator only
+  }
+
+  // Priority 3: Production Railway URL (always used on physical devices and production builds)
+  return 'https://zippy-perfection-production.up.railway.app';
 };
 
 const API_BASE_URL = getApiBaseUrl();

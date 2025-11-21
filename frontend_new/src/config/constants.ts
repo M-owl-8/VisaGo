@@ -46,48 +46,45 @@ export const GOOGLE_WEB_CLIENT_ID = getGoogleClientId();
 /**
  * Backend API Configuration
  * Priority:
- * 1. EXPO_PUBLIC_API_URL (for Expo)
- * 2. REACT_APP_API_URL (fallback)
- * 3. API_BASE_URL (fallback)
- * 4. Production Railway URL (default)
- * 5. Localhost (development fallback)
+ * 1. EXPO_PUBLIC_API_URL (for Expo) - must not contain localhost/10.0.2.2
+ * 2. REACT_APP_API_URL (fallback) - must not contain localhost/10.0.2.2
+ * 3. Production Railway URL (default) - always used on physical devices
+ * 4. Localhost/emulator addresses - ONLY when actually in emulator/simulator
  */
 const getApiBaseUrl = (): string => {
-  // Check if process is available (not available in some Expo contexts)
-  if (typeof process === 'undefined') {
-    // In emulator, use 10.0.2.2 instead of localhost
-    // Check if we're on Android (emulator uses 10.0.2.2 for localhost)
-    if (typeof Platform !== 'undefined' && Platform.OS === 'android') {
-      return __DEV__
-        ? 'http://10.0.2.2:3000'
-        : 'https://visago-production.up.railway.app';
+  // Priority 1: Environment variable (set at build time)
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
+    const envUrl = process.env.EXPO_PUBLIC_API_URL.trim();
+    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('10.0.2.2')) {
+      return envUrl;
     }
-    // Fallback to localhost in development
-    return __DEV__
-      ? 'http://localhost:3000'
-      : 'https://visago-production.up.railway.app';
+  }
+  if (typeof process !== 'undefined' && process.env?.REACT_APP_API_URL) {
+    const envUrl = process.env.REACT_APP_API_URL.trim();
+    if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('10.0.2.2')) {
+      return envUrl;
+    }
   }
 
-  // Expo environment variables (available at build time)
-  if (process.env?.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  // Priority 2: Only use localhost/emulator addresses in development AND when actually in emulator/simulator
+  // For physical devices, always use production URL
+  // Note: __DEV__ can be true on physical devices too, so we check for emulator/simulator specifically
+  const isEmulator = __DEV__ && (
+    Platform.OS === 'android' && Platform.isTV === false // Android emulator (not TV)
+  ) || (
+    Platform.OS === 'ios' && Platform.isPad === false && Platform.isTV === false // iOS simulator
+  );
+
+  if (isEmulator) {
+    // Only use localhost/emulator addresses when actually running in emulator/simulator
+    if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:3000'; // Android emulator only
+    }
+    return 'http://localhost:3000'; // iOS simulator only
   }
-  if (process.env?.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
-  }
-  if (
-    process.env?.API_BASE_URL &&
-    process.env.API_BASE_URL !== 'http://localhost:3000'
-  ) {
-    return process.env.API_BASE_URL;
-  }
-  // Production default (Railway)
-  if (process.env?.NODE_ENV === 'production') {
-    return 'https://visago-production.up.railway.app';
-  }
-  // Development fallback - use 10.0.2.2 for Android emulator
-  // Note: For emulator, set EXPO_PUBLIC_API_URL=http://10.0.2.2:3000
-  return 'http://localhost:3000';
+
+  // Priority 3: Production Railway URL (always used on physical devices and production builds)
+  return 'https://zippy-perfection-production.up.railway.app';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
