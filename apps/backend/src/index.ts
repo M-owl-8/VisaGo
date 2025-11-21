@@ -248,9 +248,7 @@ app.get('/api/status', (req: Request, res: Response) => {
 // Register routes
 // Health check routes (public, no auth required)
 app.use('/api/health', healthRoutes);
-// Rate limiters for auth endpoints
-app.use('/api/auth/login', loginLimiter); // 5 attempts per 15 minutes
-app.use('/api/auth/register', registerLimiter); // 3 attempts per hour
+// Auth routes (rate limiters are applied within the auth router)
 app.use('/api/auth', authRoutes);
 app.use('/api/countries', countriesRoutes);
 app.use('/api/visa-types', visaTypesRoutes);

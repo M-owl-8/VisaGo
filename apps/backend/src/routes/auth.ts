@@ -3,26 +3,23 @@
  * Handles user registration, login, and authentication
  */
 
-import express, { Request, Response, NextFunction } from "express";
-import { AuthService } from "../services/auth.service";
-import { authenticateToken } from "../middleware/auth";
-import { ApiError } from "../utils/errors";
-import {
-  validateRegister,
-  validateLogin,
-  handleValidationErrors,
-} from "../middleware/validation";
-import { validateRequest } from "../middleware/request-validation";
-import { isValidEmail } from "../utils/validation";
-import { successResponse, createdResponse, errorResponse } from "../utils/response";
-import { HTTP_STATUS, ERROR_CODES } from "../config/constants";
+import express, { Request, Response, NextFunction } from 'express';
+import { AuthService } from '../services/auth.service';
+import { authenticateToken } from '../middleware/auth';
+import { ApiError } from '../utils/errors';
+import { validateRegister, validateLogin, handleValidationErrors } from '../middleware/validation';
+import { validateRequest } from '../middleware/request-validation';
+import { isValidEmail } from '../utils/validation';
+import { successResponse, createdResponse, errorResponse } from '../utils/response';
+import { HTTP_STATUS, ERROR_CODES } from '../config/constants';
+import { loginLimiter, registerLimiter } from '../middleware/rate-limit';
 
 const router = express.Router();
 
 /**
  * POST /api/auth/register
  * Register a new user with email and password
- * 
+ *
  * @route POST /api/auth/register
  * @access Public
  * @body {string} email - User email address
@@ -32,12 +29,13 @@ const router = express.Router();
  * @returns {object} Authentication response with token and user data
  */
 router.post(
-  "/register",
+  '/register',
+  registerLimiter, // Apply rate limiter directly to the route
   validateRequest({
     body: {
-      required: ["email", "password"],
-      optional: ["firstName", "lastName"],
-      sanitize: ["email", "firstName", "lastName"],
+      required: ['email', 'password'],
+      optional: ['firstName', 'lastName'],
+      sanitize: ['email', 'firstName', 'lastName'],
       validate: {
         email: (val) => isValidEmail(val),
       },
@@ -66,7 +64,7 @@ router.post(
 /**
  * POST /api/auth/login
  * Login with email and password
- * 
+ *
  * @route POST /api/auth/login
  * @access Public
  * @body {string} email - User email address
@@ -74,11 +72,12 @@ router.post(
  * @returns {object} Authentication response with token and user data
  */
 router.post(
-  "/login",
+  '/login',
+  loginLimiter, // Apply rate limiter directly to the route
   validateRequest({
     body: {
-      required: ["email", "password"],
-      sanitize: ["email"],
+      required: ['email', 'password'],
+      sanitize: ['email'],
       validate: {
         email: (val) => isValidEmail(val),
       },
@@ -106,7 +105,7 @@ router.post(
  * POST /api/auth/google
  * Login/Register with Google OAuth
  * Enhanced with better error messages and validation
- * 
+ *
  * @route POST /api/auth/google
  * @access Public
  * @body {string} googleId - Google user ID
@@ -117,12 +116,12 @@ router.post(
  * @returns {object} Authentication response with token and user data
  */
 router.post(
-  "/google",
+  '/google',
   validateRequest({
     body: {
-      required: ["googleId", "email"],
-      optional: ["firstName", "lastName", "avatar"],
-      sanitize: ["email", "firstName", "lastName"],
+      required: ['googleId', 'email'],
+      optional: ['firstName', 'lastName', 'avatar'],
+      sanitize: ['email', 'firstName', 'lastName'],
       validate: {
         email: (val) => isValidEmail(val),
       },
@@ -133,15 +132,15 @@ router.post(
       const { googleId, email, firstName, lastName, avatar } = req.body;
 
       // Check if Google OAuth is configured
-      const { getEnvConfig } = require("../config/env");
+      const { getEnvConfig } = require('../config/env');
       const config = getEnvConfig();
-      
+
       if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) {
         return errorResponse(
           res,
           HTTP_STATUS.SERVICE_UNAVAILABLE,
-          "Google Sign-In is not configured. Please contact support.",
-          "OAUTH_NOT_CONFIGURED"
+          'Google Sign-In is not configured. Please contact support.',
+          'OAUTH_NOT_CONFIGURED'
         );
       }
 
@@ -163,8 +162,8 @@ router.post(
         next(
           new ApiError(
             HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            "Google Sign-In failed. Please try again or use email/password.",
-            "OAUTH_ERROR"
+            'Google Sign-In failed. Please try again or use email/password.',
+            'OAUTH_ERROR'
           )
         );
       }
@@ -175,39 +174,35 @@ router.post(
 /**
  * GET /api/auth/me
  * Get current user profile (requires authentication)
- * 
+ *
  * @route GET /api/auth/me
  * @access Private
  * @returns {object} User profile data
  */
-router.get(
-  "/me",
-  authenticateToken,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      if (!req.userId) {
-        return errorResponse(
-          res,
-          HTTP_STATUS.UNAUTHORIZED,
-          "User ID not found in request",
-          ERROR_CODES.UNAUTHORIZED
-        );
-      }
-
-      const profile = await AuthService.getProfile(req.userId);
-
-      successResponse(res, profile);
-    } catch (error) {
-      next(error);
+router.get('/me', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.userId) {
+      return errorResponse(
+        res,
+        HTTP_STATUS.UNAUTHORIZED,
+        'User ID not found in request',
+        ERROR_CODES.UNAUTHORIZED
+      );
     }
+
+    const profile = await AuthService.getProfile(req.userId);
+
+    successResponse(res, profile);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 /**
  * PUT /api/auth/me
  * Update user profile (requires authentication)
  */
-router.put("/me", authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/me', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const updated = await AuthService.updateProfile(req.userId!, req.body);
 
@@ -225,57 +220,65 @@ router.put("/me", authenticateToken, async (req: Request, res: Response, next: N
  * Refresh JWT token (requires valid token)
  * Enhanced with better error handling
  */
-router.post("/refresh", authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.userId) {
-      return errorResponse(
-        res,
-        HTTP_STATUS.UNAUTHORIZED,
-        "User ID not found. Please log in again.",
-        ERROR_CODES.UNAUTHORIZED
-      );
+router.post(
+  '/refresh',
+  authenticateToken,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.userId) {
+        return errorResponse(
+          res,
+          HTTP_STATUS.UNAUTHORIZED,
+          'User ID not found. Please log in again.',
+          ERROR_CODES.UNAUTHORIZED
+        );
+      }
+
+      const newToken = await AuthService.refreshToken(req.userId);
+
+      successResponse(res, {
+        token: newToken,
+        message: 'Token refreshed successfully',
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const newToken = await AuthService.refreshToken(req.userId);
-
-    successResponse(res, {
-      token: newToken,
-      message: "Token refreshed successfully",
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * POST /api/auth/logout
  * Logout user (optional - just clears client-side)
  * Enhanced with better response
  */
-router.post("/logout", authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // In a real app, you might invalidate the token on server side (e.g., add to blacklist)
-    // For now, logout is handled client-side by removing the token from AsyncStorage
-    successResponse(res, {
-      message: "Logged out successfully",
-    });
-  } catch (error) {
-    next(error);
+router.post(
+  '/logout',
+  authenticateToken,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // In a real app, you might invalidate the token on server side (e.g., add to blacklist)
+      // For now, logout is handled client-side by removing the token from AsyncStorage
+      successResponse(res, {
+        message: 'Logged out successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 /**
  * GET /api/auth/status
  * Get authentication service status
  * Checks if OAuth and other auth services are configured
- * 
+ *
  * @route GET /api/auth/status
  * @access Public
  * @returns {object} Authentication service status
  */
-router.get("/status", async (req: Request, res: Response) => {
+router.get('/status', async (req: Request, res: Response) => {
   try {
-    const { getEnvConfig } = require("../config/env");
+    const { getEnvConfig } = require('../config/env');
     const config = getEnvConfig();
 
     const status = {
@@ -299,26 +302,26 @@ router.get("/status", async (req: Request, res: Response) => {
     errorResponse(
       res,
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      "Failed to check authentication status",
-      "STATUS_CHECK_ERROR"
+      'Failed to check authentication status',
+      'STATUS_CHECK_ERROR'
     );
   }
 });
 /**
  * POST /api/auth/forgot-password
  * Request password reset
- * 
+ *
  * @route POST /api/auth/forgot-password
  * @access Public
  * @body {string} email - User email address
  * @returns {object} Success message
  */
 router.post(
-  "/forgot-password",
+  '/forgot-password',
   validateRequest({
     body: {
-      required: ["email"],
-      sanitize: ["email"],
+      required: ['email'],
+      sanitize: ['email'],
       validate: {
         email: (val) => isValidEmail(val),
       },
@@ -330,7 +333,7 @@ router.post(
       await AuthService.requestPasswordReset(email);
       // Always return success to prevent user enumeration
       successResponse(res, {
-        message: "If an account exists with this email, a password reset link has been sent.",
+        message: 'If an account exists with this email, a password reset link has been sent.',
       });
     } catch (error) {
       next(error);
@@ -341,7 +344,7 @@ router.post(
 /**
  * POST /api/auth/reset-password
  * Reset password with token
- * 
+ *
  * @route POST /api/auth/reset-password
  * @access Public
  * @body {string} token - Password reset token
@@ -349,10 +352,10 @@ router.post(
  * @returns {object} Success message
  */
 router.post(
-  "/reset-password",
+  '/reset-password',
   validateRequest({
     body: {
-      required: ["token", "password"],
+      required: ['token', 'password'],
       sanitize: [],
       validate: {},
     },
@@ -362,7 +365,7 @@ router.post(
       const { token, password } = req.body;
       await AuthService.resetPassword(token, password);
       successResponse(res, {
-        message: "Password has been reset successfully.",
+        message: 'Password has been reset successfully.',
       });
     } catch (error) {
       next(error);
