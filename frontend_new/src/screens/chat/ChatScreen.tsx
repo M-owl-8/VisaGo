@@ -1,588 +1,405 @@
+/**
+ * ChatScreen - Simple ChatGPT-style chat interface
+ * Uses local state for messages instead of Zustand store
+ */
+
 import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
+  StyleSheet,
+  FlatList,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import {FlatList} from 'react-native-gesture-handler';
-import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
-import {ChatIcons, QuickActionIcons} from '../../components/icons/iconConfig';
-import {useTranslation} from 'react-i18next';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useChatStore} from '../../store/chat';
+import Icon from 'react-native-vector-icons/Ionicons';
 import {useAuthStore} from '../../store/auth';
+import {apiClient} from '../../services/api';
 
-export const ChatScreen = ({route}: any) => {
-  const {t} = useTranslation();
-  const insets = useSafeAreaInsets();
-  const applicationId = route?.params?.applicationId;
+// Local message types
+type LocalRole = 'user' | 'assistant';
+
+interface LocalMessage {
+  id: string;
+  role: LocalRole;
+  content: string;
+  createdAt: string;
+  status?: 'sending' | 'sent' | 'error';
+  sources?: string[];
+  model?: string;
+  tokensUsed?: number;
+}
+
+interface ChatScreenProps {
+  navigation?: any;
+  route?: any;
+}
+
+export function ChatScreen({navigation, route}: ChatScreenProps) {
+  // Auth state (still using store for auth)
   const isSignedIn = useAuthStore(state => state.isSignedIn);
   const user = useAuthStore(state => state.user);
+  const applicationId = route?.params?.applicationId || undefined;
 
-  const {
-    currentConversation,
-    isSending,
-    error,
-    loadChatHistory,
-    loadSessions,
-    sendMessage,
-  } = useChatStore();
-
+  // Local state for messages
+  const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
-  const [showQuickActions, setShowQuickActions] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+
+  // Refs for auto-scroll
   const flatListRef = useRef<FlatList>(null);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (isSignedIn && user) {
-      // Load sessions list
-      loadSessions().catch(err => {
-        console.error('[ChatScreen] Failed to load sessions:', err);
-      });
-
-      // Only load chat history if we don't already have a conversation
-      // This prevents overwriting optimistic updates
-      const key = applicationId || 'general';
-      const hasExistingConversation =
-        currentConversation && currentConversation.messages.length > 0;
-
-      if (!hasExistingConversation) {
-        // Use a small delay to prevent race conditions
-        const timer = setTimeout(() => {
-          loadChatHistory(applicationId).catch(err => {
-            console.error('[ChatScreen] Failed to load chat history:', err);
-          });
-        }, 100);
-        return () => clearTimeout(timer);
-      }
+    if (messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({animated: true});
+      }, 100);
     }
-  }, [applicationId, isSignedIn, user, loadChatHistory, loadSessions]);
+  }, [messages.length]);
 
+  // Logging (temporary)
   useEffect(() => {
-    if (currentConversation && currentConversation.messages.length > 0) {
-      flatListRef.current?.scrollToEnd({animated: true});
-      setShowQuickActions(false);
-    }
-  }, [currentConversation?.messages]);
+    console.log('[ChatScreen] messages:', messages.length);
+  }, [messages.length]);
 
+  // Handle sending a message
   const handleSendMessage = async () => {
-    if (!messageInput.trim()) return;
-
-    if (!isSignedIn || !user) {
-      console.log('[AI CHAT] Cannot send: User not signed in');
+    // Validation
+    if (!messageInput.trim()) {
       return;
     }
 
-    const message = messageInput;
-    setMessageInput('');
+    if (!isSignedIn || !user) {
+      Alert.alert('Authentication Required', 'Please sign in to use the chat.');
+      return;
+    }
 
-    console.log('[AI CHAT] Starting send message:', {
-      messageLength: message.length,
-      messagePreview: message.substring(0, 50),
-      hasApplicationId: !!applicationId,
-      applicationId,
-      historyLength: currentConversation?.messages?.length || 0,
-      userId: user?.id,
-    });
+    // Create local user message
+    const content = messageInput.trim();
+    const userMessage: LocalMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content,
+      createdAt: new Date().toISOString(),
+      status: 'sending',
+    };
+
+    // Clear input and add user message
+    setMessageInput('');
+    setMessages(prev => [...prev, userMessage]);
+    setIsSending(true);
+
+    // Build conversation history from current messages (before adding AI reply)
+    const conversationHistory = [...messages, userMessage].map(msg => ({
+      role: msg.role,
+      content: msg.content,
+    }));
 
     try {
-      await sendMessage(
-        message,
+      // Call the existing AI API
+      const response = await apiClient.sendMessage(
+        content,
         applicationId,
-        currentConversation?.messages || [],
+        conversationHistory,
       );
-      console.log('[AI CHAT] Send message completed successfully');
-    } catch (error: any) {
-      console.log('[AI CHAT] Send message error in handleSendMessage:', {
-        error: error?.message || error,
-        errorType: error?.constructor?.name,
-        stack: error?.stack,
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'AI error');
+      }
+
+      const aiData = response.data; // { message, sources, tokens_used, model, id }
+
+      const assistantMessage: LocalMessage = {
+        id: aiData.id || `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: aiData.message,
+        createdAt: new Date().toISOString(),
+        status: 'sent',
+        sources: aiData.sources || [],
+        model: aiData.model,
+        tokensUsed: aiData.tokens_used,
+      };
+
+      // Mark last user message as 'sent' and add assistant message
+      setMessages(prev => {
+        const updated = prev.map(msg =>
+          msg.id === userMessage.id ? {...msg, status: 'sent'} : msg,
+        );
+        return [...updated, assistantMessage];
       });
+    } catch (err: any) {
+      console.error('[ChatScreen] AI send error:', err);
+
+      // Mark last user message as error
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === userMessage.id ? {...msg, status: 'error'} : msg,
+        ),
+      );
+
+      Alert.alert(
+        'Error',
+        err?.message || 'Failed to send message. Please try again.',
+      );
+    } finally {
+      setIsSending(false);
     }
   };
 
-  const quickActions = [
-    {
-      id: 'documents',
-      icon: QuickActionIcons.documents,
-      text: t('chat.quickActions.documents'),
-      color: '#4A9EFF',
-    },
-    {
-      id: 'timeline',
-      icon: QuickActionIcons.timeline,
-      text: t('chat.quickActions.timeline'),
-      color: '#10B981',
-    },
-    {
-      id: 'requirements',
-      icon: QuickActionIcons.requirements,
-      text: t('chat.quickActions.requirements'),
-      color: '#F59E0B',
-    },
-    {
-      id: 'mistakes',
-      icon: QuickActionIcons.mistakes,
-      text: t('chat.quickActions.mistakes'),
-      color: '#EF4444',
-    },
-  ];
-
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    // Cleanup timeout on unmount
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleQuickAction = (action: string) => {
-    const quickMessages: {[key: string]: string} = {
-      documents: t('chat.quickMessages.documents'),
-      timeline: t('chat.quickMessages.timeline'),
-      requirements: t('chat.quickMessages.requirements'),
-      mistakes: t('chat.quickMessages.mistakes'),
-    };
-
-    if (quickMessages[action]) {
-      setMessageInput(quickMessages[action]);
-      // Clear any existing timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => handleSendMessage(), 100);
-      setShowQuickActions(false);
-    }
-  };
-
-  const renderMessage = ({item}: {item: any}) => {
+  // Render a single message
+  const renderMessage = ({item}: {item: LocalMessage}) => {
     const isUser = item.role === 'user';
+    const isError = item.status === 'error';
     const isSending = item.status === 'sending';
-    const hasError = item.status === 'error';
 
     return (
-      <View style={styles.messageContainer}>
+      <View
+        style={[
+          styles.messageContainer,
+          isUser
+            ? styles.userMessageContainer
+            : styles.assistantMessageContainer,
+        ]}>
         <View
           style={[
             styles.messageBubble,
-            isUser ? styles.userBubble : styles.aiBubble,
-            hasError && styles.errorBubble,
+            isUser ? styles.userBubble : styles.assistantBubble,
+            isError && styles.errorBubble,
           ]}>
-          {!isUser && (
-            <View style={styles.aiIcon}>
-              {isSending ? (
-                <ActivityIndicator size="small" color="#8B5CF6" />
-              ) : (
-                <AppIcon
-                  name={ChatIcons.ai.name}
-                  library={ChatIcons.ai.library}
-                  size={IconSizes.small}
-                  color="#8B5CF6"
-                />
-              )}
+          {isSending && (
+            <ActivityIndicator
+              size="small"
+              color={isUser ? '#FFFFFF' : '#4A9EFF'}
+              style={styles.sendingIndicator}
+            />
+          )}
+          {isError && (
+            <Icon
+              name="alert-circle"
+              size={16}
+              color="#EF4444"
+              style={styles.errorIcon}
+            />
+          )}
+          <Text
+            style={[
+              styles.messageText,
+              isUser ? styles.userMessageText : styles.assistantMessageText,
+            ]}>
+            {item.content}
+          </Text>
+          {item.sources && item.sources.length > 0 && (
+            <View style={styles.sourcesContainer}>
+              <Text style={styles.sourcesLabel}>Sources:</Text>
+              {item.sources.map((source, idx) => (
+                <Text key={idx} style={styles.sourceText}>
+                  •{' '}
+                  {typeof source === 'string'
+                    ? source
+                    : source.title || 'Source'}
+                </Text>
+              ))}
             </View>
           )}
-          <View style={styles.messageContent}>
-            <Text
-              style={[
-                styles.messageText,
-                isUser ? styles.userText : styles.aiText,
-                hasError && styles.errorText,
-              ]}>
-              {item.content}
-            </Text>
-            {hasError && (
-              <Text style={styles.errorMessage}>
-                {t('chat.messageFailed', 'Failed to send. Tap to retry.')}
-              </Text>
-            )}
-            {item.sources && item.sources.length > 0 && (
-              <View style={styles.sourcesContainer}>
-                <AppIcon
-                  name="book-outline"
-                  library="ionicons"
-                  size={IconSizes.small}
-                  color={IconColors.muted}
-                />
-                <Text style={styles.sourcesText}>
-                  {t('chat.sources', {sources: item.sources.join(', ')})}
-                </Text>
-              </View>
-            )}
-            <View style={styles.timestampContainer}>
-              {isSending && (
-                <ActivityIndicator
-                  size="small"
-                  color={isUser ? '#FFFFFF' : '#8B5CF6'}
-                  style={styles.sendingIndicator}
-                />
-              )}
-              <Text style={styles.timestamp}>
-                {new Date(item.createdAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
-            </View>
-          </View>
         </View>
       </View>
     );
   };
 
-  const messages = currentConversation?.messages || [];
-
   return (
-    <View style={styles.container}>
-      <View style={styles.gradientBackground}>
-        {/* Background Pattern */}
-        <View style={styles.backgroundPattern}>
-          <View style={[styles.circle, styles.circle1]} />
-          <View style={[styles.circle, styles.circle2]} />
-        </View>
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 65}>
-          <View style={styles.contentWrapper}>
-            {/* Messages List */}
-            {messages.length === 0 ? (
-              <View style={styles.emptyStateContainer}>
-                <View style={styles.emptyIconContainer}>
-                  <AppIcon
-                    name={ChatIcons.empty.name}
-                    library={ChatIcons.empty.library}
-                    size={IconSizes.large * 2}
-                    color={IconColors.active}
-                  />
-                </View>
-                <Text style={styles.emptyTitle}>{t('chat.aiAssistant')}</Text>
-                <Text style={styles.emptyText}>{t('chat.askAnything')}</Text>
-
-                {/* Quick Actions */}
-                {showQuickActions && (
-                  <View style={styles.quickActionsContainer}>
-                    <Text style={styles.quickActionsTitle}>
-                      {t('chat.quickQuestions')}
-                    </Text>
-                    <View style={styles.quickActionsGrid}>
-                      {quickActions.map(action => (
-                        <TouchableOpacity
-                          key={action.id}
-                          style={styles.quickActionButton}
-                          onPress={() => handleQuickAction(action.id)}>
-                          <AppIcon
-                            name={action.icon.name}
-                            library={action.icon.library}
-                            size={IconSizes.settings}
-                            color={action.color}
-                          />
-                          <Text style={styles.quickActionText}>
-                            {action.text}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </View>
-            ) : (
-              <FlatList
-                ref={flatListRef}
-                data={messages}
-                renderItem={renderMessage}
-                keyExtractor={(item: any) =>
-                  item.id?.toString() || Math.random().toString()
-                }
-                contentContainerStyle={styles.messagesList}
-                showsVerticalScrollIndicator={false}
-                onContentSizeChange={() =>
-                  flatListRef.current?.scrollToEnd({animated: true})
-                }
-                keyboardShouldPersistTaps="handled"
-              />
-            )}
-          </View>
-
-          {/* Input Area - Positioned directly above tab bar, moves above keyboard when open */}
-          <View
-            style={[
-              styles.inputContainer,
-              {
-                paddingBottom: Math.max(12, insets.bottom),
-              },
-            ]}>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder={t('chat.messagePlaceholder')}
-                placeholderTextColor="#6B7280"
-                value={messageInput}
-                onChangeText={setMessageInput}
-                multiline
-                maxLength={500}
-                editable={!isSending}
-                returnKeyType="send"
-                onSubmitEditing={handleSendMessage}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  (!messageInput.trim() || isSending) &&
-                    styles.sendButtonDisabled,
-                ]}
-                onPress={handleSendMessage}
-                disabled={!messageInput.trim() || isSending}>
-                {isSending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <AppIcon
-                    name={ChatIcons.send.name}
-                    library={ChatIcons.send.library}
-                    size={IconSizes.settings}
-                    color={IconColors.bright}
-                  />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>AI Assistant</Text>
+        {applicationId && (
+          <Text style={styles.headerSubtitle}>Application Chat</Text>
+        )}
       </View>
-    </View>
+
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={item => item.id}
+        renderItem={renderMessage}
+        contentContainerStyle={styles.messagesList}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Icon name="chatbubbles-outline" size={64} color="#9CA3AF" />
+            <Text style={styles.emptyText}>
+              Start a conversation with your AI assistant
+            </Text>
+          </View>
+        }
+      />
+
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Type your message..."
+          placeholderTextColor="#9CA3AF"
+          value={messageInput}
+          onChangeText={setMessageInput}
+          multiline
+          maxLength={2000}
+          editable={!isSending}
+        />
+        <TouchableOpacity
+          style={[
+            styles.sendButton,
+            (!messageInput.trim() || isSending) && styles.sendButtonDisabled,
+          ]}
+          onPress={handleSendMessage}
+          disabled={!messageInput.trim() || isSending}>
+          {isSending ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Icon name="send" size={20} color="#FFFFFF" />
+          )}
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F9FAFB',
   },
-  gradientBackground: {
-    flex: 1,
-    backgroundColor: '#0A1929',
-  },
-  backgroundPattern: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-  },
-  circle: {
-    position: 'absolute',
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 158, 255, 0.1)',
-  },
-  circle1: {
-    width: 300,
-    height: 300,
-    top: -100,
-    right: -100,
-  },
-  circle2: {
-    width: 200,
-    height: 200,
-    bottom: 100,
-    left: -50,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  contentWrapper: {
-    flex: 1,
-    paddingBottom: 0, // No padding - input is in normal flow
-  },
-  messagesList: {
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  messageContainer: {
-    marginBottom: 16,
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: 16,
     paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  messageBubble: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
   },
-  userBubble: {
-    justifyContent: 'flex-end',
-    marginLeft: 'auto',
-  },
-  aiBubble: {
-    justifyContent: 'flex-start',
-  },
-  aiIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
     marginTop: 4,
   },
-  messageContent: {
-    maxWidth: '75%',
-    backgroundColor: 'rgba(15, 30, 45, 0.8)',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 158, 255, 0.2)',
+  messagesList: {
+    padding: 16,
+    flexGrow: 1,
   },
-  userText: {
-    color: '#FFFFFF',
-  },
-  aiText: {
-    color: '#E2E8F0',
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  sourcesContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 6,
-  },
-  sourcesText: {
-    fontSize: 11,
-    color: '#94A3B8',
-    fontStyle: 'italic',
-  },
-  timestampContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    gap: 6,
-  },
-  timestamp: {
-    fontSize: 11,
-    color: '#6B7280',
-  },
-  sendingIndicator: {
-    marginRight: 4,
-  },
-  errorBubble: {
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    borderWidth: 1,
-  },
-  errorText: {
-    opacity: 0.7,
-  },
-  errorMessage: {
-    fontSize: 12,
-    color: '#EF4444',
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  emptyStateContainer: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 30,
-    backgroundColor: 'rgba(74, 158, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 158, 255, 0.3)',
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 12,
+    paddingVertical: 64,
   },
   emptyText: {
-    fontSize: 15,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-  quickActionsContainer: {
-    width: '100%',
-    marginTop: 8,
-  },
-  quickActionsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginBottom: 16,
+    fontSize: 16,
+    color: '#9CA3AF',
+    marginTop: 16,
     textAlign: 'center',
   },
-  quickActionsGrid: {
-    gap: 12,
-  },
-  quickActionButton: {
+  messageContainer: {
+    marginBottom: 12,
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(15, 30, 45, 0.8)',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 158, 255, 0.2)',
-    gap: 12,
+    width: '100%',
   },
-  quickActionText: {
-    fontSize: 14,
-    color: '#E2E8F0',
-    fontWeight: '500',
-    flex: 1,
+  userMessageContainer: {
+    justifyContent: 'flex-end',
+  },
+  assistantMessageContainer: {
+    justifyContent: 'flex-start',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+  },
+  userBubble: {
+    backgroundColor: '#4A9EFF',
+    borderBottomRightRadius: 4,
+  },
+  assistantBubble: {
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  errorBubble: {
+    borderColor: '#EF4444',
+    borderWidth: 2,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  userMessageText: {
+    color: '#FFFFFF',
+  },
+  assistantMessageText: {
+    color: '#111827',
+  },
+  sendingIndicator: {
+    marginBottom: 4,
+  },
+  errorIcon: {
+    marginBottom: 4,
+  },
+  sourcesContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  sourcesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  sourceText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 2,
   },
   inputContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    backgroundColor: 'rgba(15, 30, 45, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(74, 158, 255, 0.2)',
-    // Positioned in normal flow - KeyboardAvoidingView handles keyboard
-    // Tab bar (65px) is handled by React Navigation and stays at bottom
-  },
-  inputWrapper: {
     flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
     alignItems: 'flex-end',
-    gap: 12,
   },
   input: {
     flex: 1,
-    backgroundColor: 'rgba(30, 41, 59, 0.8)',
-    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 15,
-    color: '#FFFFFF',
+    fontSize: 16,
+    color: '#111827',
     maxHeight: 100,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 158, 255, 0.2)',
+    marginRight: 8,
   },
   sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#4A9EFF',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#4A9EFF',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
   sendButtonDisabled: {
-    opacity: 0.4,
+    backgroundColor: '#D1D5DB',
   },
 });
+
+export default ChatScreen;
