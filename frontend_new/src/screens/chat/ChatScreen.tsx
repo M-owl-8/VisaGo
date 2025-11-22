@@ -193,19 +193,6 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
             ]}>
             {item.content}
           </Text>
-          {item.sources && item.sources.length > 0 && (
-            <View style={styles.sourcesContainer}>
-              <Text style={styles.sourcesLabel}>Sources:</Text>
-              {item.sources.map((source, idx) => (
-                <Text key={idx} style={styles.sourceText}>
-                  •{' '}
-                  {typeof source === 'string'
-                    ? source
-                    : source.title || 'Source'}
-                </Text>
-              ))}
-            </View>
-          )}
         </View>
       </View>
     );
@@ -216,22 +203,16 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>AI Assistant</Text>
-        {applicationId && (
-          <Text style={styles.headerSubtitle}>Application Chat</Text>
-        )}
-      </View>
-
       <FlatList
         ref={flatListRef}
         data={messages}
         keyExtractor={item => item.id}
         renderItem={renderMessage}
+        style={styles.flatList}
         contentContainerStyle={styles.messagesList}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Icon name="chatbubbles-outline" size={64} color="#9CA3AF" />
+            <Icon name="chatbubbles-outline" size={64} color="#94A3B8" />
             <Text style={styles.emptyText}>
               Start a conversation with your AI assistant
             </Text>
@@ -271,28 +252,15 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#0A1929',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
+  flatList: {
+    flex: 1,
+    backgroundColor: '#0A1929',
   },
   messagesList: {
     padding: 16,
+    paddingTop: 16,
     flexGrow: 1,
   },
   emptyContainer: {
@@ -303,7 +271,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#9CA3AF',
+    color: '#94A3B8',
     marginTop: 16,
     textAlign: 'center',
   },
@@ -328,10 +296,10 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(74, 158, 255, 0.2)',
   },
   errorBubble: {
     borderColor: '#EF4444',
@@ -345,7 +313,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   assistantMessageText: {
-    color: '#111827',
+    color: '#FFFFFF',
   },
   sendingIndicator: {
     marginBottom: 4,
@@ -353,41 +321,26 @@ const styles = StyleSheet.create({
   errorIcon: {
     marginBottom: 4,
   },
-  sourcesContainer: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  sourcesLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  sourceText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
   inputContainer: {
     flexDirection: 'row',
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0A1929',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: 'rgba(74, 158, 255, 0.2)',
     alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111827',
+    color: '#FFFFFF',
     maxHeight: 100,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
   },
   sendButton: {
     width: 44,
@@ -398,7 +351,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: 'rgba(74, 158, 255, 0.3)',
   },
 });
 

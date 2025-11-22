@@ -161,12 +161,13 @@ async def chat(message: ChatMessage):
         from services.rag import get_rag_service
         from services.prompt import get_prompt_service
         from services.openai import get_openai_service
+        from services.deepseek import generate_chat_response
         
         rag_service = get_rag_service()
         prompt_service = get_prompt_service()
         openai_service = get_openai_service()
         
-        # Check rate limit
+        # Check rate limit (still using OpenAI service for rate limiting)
         is_allowed, rate_info = openai_service.check_rate_limit(message.user_id)
         if not is_allowed:
             logger.warning(f"Rate limit exceeded for user {message.user_id}")
@@ -203,7 +204,7 @@ async def chat(message: ChatMessage):
             application_context=message.application_context,
         )
         
-        # Build messages with context
+        # Build messages with context (for DeepSeek)
         messages = prompt_service.build_messages(
             user_message=message.content,
             conversation_history=message.conversation_history,
@@ -211,13 +212,12 @@ async def chat(message: ChatMessage):
             language=message.language or "en"
         )
         
-        # Generate response using OpenAI service
-        logger.info(f"Generating response with OpenAI service")
-        ai_response = await openai_service.generate_response(
+        # Generate response using DeepSeek service (replaces OpenAI for chat completion)
+        logger.info(f"Generating response with DeepSeek service")
+        ai_response = await generate_chat_response(
             user_message=message.content,
             conversation_history=message.conversation_history,
             system_prompt=system_prompt,
-            user_id=message.user_id,
             temperature=message.temperature or 0.7,
             max_tokens=message.max_tokens,
         )
