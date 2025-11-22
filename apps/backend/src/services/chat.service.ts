@@ -191,10 +191,10 @@ User's Current Visa Application:
         `.trim();
       }
 
-      // Check if AI service is configured
+      // Check if DeepSeek API key is configured for chat
       const envConfig = getEnvConfig();
-      if (!envConfig.OPENAI_API_KEY) {
-        logWarn('OpenAI API key not configured, using fallback response', {
+      if (!process.env.DEEPSEEK_API_KEY) {
+        logWarn('DeepSeek API key not configured, using fallback response', {
           userId,
           applicationId,
         });
@@ -205,100 +205,81 @@ User's Current Visa Application:
           sessionId,
           content,
           startTime,
-          'AI service not configured. Please configure OPENAI_API_KEY in environment variables.'
+          'AI service not configured. Please configure DEEPSEEK_API_KEY in environment variables.'
         );
       }
 
-      // Use OpenAI service with RAG for better, context-aware responses
+      // Use DeepSeek Reasoner for AI assistant chat
+      // Build full user message with conversation history and context
       let aiResponse;
       try {
         // Build system prompt with context
         const systemPrompt = this.buildSystemPrompt(applicationContext, ragContext);
 
-        // Convert history to OpenAI format
-        const openaiMessages: Array<{ role: 'user' | 'assistant'; content: string }> = history.map(
-          (msg: any) => ({
-            role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-            content: msg.content || '',
-          })
-        );
-
-        // Add current user message
-        openaiMessages.push({
-          role: 'user' as const,
-          content: content,
-        });
-
-        // Use OpenAI chat with enhanced system prompt
-        // Try RAG first if available, fallback to regular chat
+        // Use DeepSeek Reasoner for AI assistant chat
+        // Build full user message with conversation history and context
         try {
-          // Try to use RAG if knowledge base is available
-          let response;
-          try {
-            response = await AIOpenAIService.chatWithRAG(
-              openaiMessages,
-              userId,
-              applicationId,
-              systemPrompt
-            );
-          } catch (ragError) {
-            // Fallback to regular chat if RAG fails
-            console.warn('RAG search failed, using regular chat:', ragError);
-            response = await AIOpenAIService.chat(openaiMessages, systemPrompt);
+          // Import DeepSeek service
+          const { deepseekVisaChat } = await import('./deepseek');
+
+          // Build the full user message with conversation history
+          let fullUserMessage = content;
+          if (history.length > 0) {
+            // Include recent conversation history in the message
+            const historyText = history
+              .slice(-5) // Last 5 messages for context
+              .map((msg: any) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+              .join('\n\n');
+            fullUserMessage = `Previous conversation:\n${historyText}\n\nCurrent question: ${content}`;
           }
 
-          // Format response
+          // Add application context to the message if available
+          if (applicationContext) {
+            fullUserMessage = `${fullUserMessage}\n\nContext: ${ragContext || 'No additional context available.'}`;
+          }
+
+          // Call DeepSeek with the system prompt and full user message
+          const deepseekResponse = await deepseekVisaChat(fullUserMessage, systemPrompt);
+
+          // Format response to match expected structure
           const formattedResponse = {
-            message: response.message,
-            sources:
-              response.sources?.map((s: any) => ({
-                title: s.title,
-                content: s.content,
-                relevanceScore: s.relevanceScore,
-              })) || [],
-            tokens_used: response.tokensUsed,
-            model: response.model,
+            message: deepseekResponse.message,
+            sources: [], // DeepSeek doesn't provide RAG sources, but we keep the structure
+            tokens_used: deepseekResponse.tokensUsed,
+            model: deepseekResponse.model,
           };
 
           aiResponse = { data: formattedResponse };
         } catch (chatError: any) {
-          // Final fallback if both RAG and regular chat fail
-          console.error('Chat service failed:', chatError);
+          // Handle DeepSeek errors
+          console.error('DeepSeek chat service failed:', chatError);
 
           // Check if it's a configuration error
           if (
             chatError.message?.includes('not configured') ||
-            chatError.message?.includes('not initialized')
+            chatError.message === 'DEEPSEEK_AUTH_ERROR'
           ) {
             throw chatError; // Re-throw configuration errors to be handled by outer catch
           }
 
-          // Try regular chat as last resort
-          try {
-            const fallbackResponse = await AIOpenAIService.chat(openaiMessages, systemPrompt);
-
-            const formattedResponse = {
-              message: fallbackResponse.message,
-              sources: [],
-              tokens_used: fallbackResponse.tokensUsed,
-              model: fallbackResponse.model,
-            };
-
-            aiResponse = { data: formattedResponse };
-          } catch (finalError: any) {
-            // If even regular chat fails, throw the error
-            throw finalError;
+          // For other errors, provide user-friendly message
+          if (chatError.message === 'DEEPSEEK_CHAT_ERROR') {
+            throw new Error(
+              'Ketdik AI assistant is temporarily unavailable. Please try again later.'
+            );
           }
+
+          throw chatError;
         }
-      } catch (openaiError: any) {
-        logError('OpenAI service error', openaiError, {
+      } catch (deepseekError: any) {
+        logError('DeepSeek service error', deepseekError, {
           userId,
           applicationId,
         });
 
         // Provide user-friendly error message
         const errorMessage =
-          openaiError.message ||
+          deepseekError.message ||
           'AI service temporarily unavailable. Please try again in a moment.';
 
         return this.createFallbackResponse(

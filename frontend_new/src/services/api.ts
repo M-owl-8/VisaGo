@@ -1380,124 +1380,73 @@ class ApiClient {
     applicationId?: string,
     conversationHistory?: any[],
   ): Promise<ApiResponse> {
-    // Get user ID from auth store
-    const {useAuthStore} = await import('../store/auth');
-    const authState = useAuthStore.getState();
-    const userId = authState.user?.id;
-
-    if (!userId) {
-      console.error('[AI CHAT] [ApiClient] No user ID found');
-      throw new Error('User not authenticated');
-    }
-
-    // Build the full URL for logging
-    const fullUrl = `${AI_SERVICE_BASE_URL}/api/chat`;
-
-    // Transform conversation history to match AI service format
-    // AI service expects: [{ role: 'user', content: '...' }, { role: 'assistant', content: '...' }]
+    // Transform conversation history to match backend format
+    // Backend expects: [{ role: 'user', content: '...' }, { role: 'assistant', content: '...' }]
     // Frontend provides: ChatMessage[] with { id, userId, role, content, ... }
     const transformedHistory = (conversationHistory || []).map(msg => ({
       role: msg.role,
       content: msg.content,
     }));
 
-    // Transform payload to match AI service format
-    const payload = {
-      content,
-      user_id: userId,
-      application_id: applicationId,
-      conversation_history: transformedHistory,
-      language: 'en', // Default to English, can be made configurable
-    };
-
-    console.log('[AI CHAT] [ApiClient] sendMessage called');
-    console.log('[AI CHAT] [ApiClient] URL:', fullUrl);
     console.log(
-      '[AI CHAT] [ApiClient] AI Service Base URL:',
-      AI_SERVICE_BASE_URL,
+      '[AI CHAT] [ApiClient] sendMessage called - calling backend /api/chat',
     );
-    console.log(
-      '[AI CHAT] [ApiClient] PAYLOAD:',
-      JSON.stringify(payload, null, 2),
-    );
-    console.log(
-      '[AI CHAT] [ApiClient] Payload size:',
-      JSON.stringify(payload).length,
-      'bytes',
-    );
+    console.log('[AI CHAT] [ApiClient] Payload:', {
+      contentLength: content.length,
+      hasApplicationId: !!applicationId,
+      historyLength: transformedHistory.length,
+    });
 
     try {
-      // Call AI service directly
-      const aiResponse = await this.callAiService('/api/chat', payload, {
-        timeout: 30000, // 30 seconds for AI responses
+      // Call backend /api/chat endpoint using authenticated API client
+      // Backend expects: { query, content, applicationId, conversationHistory }
+      // Backend returns: { success: true, data: { message, sources, tokens_used, model, id }, quota: {...} }
+      const response = await this.api.post(
+        '/chat',
+        {
+          query: content,
+          content: content, // Backward compatibility
+          applicationId: applicationId,
+          conversationHistory: transformedHistory,
+        },
+        {
+          timeout: 30000, // 30 seconds for AI responses
+        },
+      );
+
+      // Backend returns { success: true, data: { message, sources, tokens_used, model, id }, quota: {...} }
+      if (!response.data || !response.data.success || !response.data.data) {
+        console.error(
+          '[AI CHAT] [ApiClient] Invalid backend response:',
+          response.data,
+        );
+        throw new Error(
+          response.data?.error?.message || 'Invalid response from backend',
+        );
+      }
+
+      const aiData = response.data.data;
+
+      console.log('[AI CHAT] [ApiClient] Backend response received:', {
+        hasMessage: !!aiData.message,
+        messageLength: aiData.message?.length || 0,
+        model: aiData.model,
+        tokensUsed: aiData.tokens_used,
+        hasId: !!aiData.id,
       });
 
-      console.log('[AI CHAT] [ApiClient] AI service response received:', {
-        hasMessage: !!aiResponse.message,
-        hasSources: !!aiResponse.sources,
-        tokensUsed: aiResponse.tokens_used,
-        model: aiResponse.model,
-        responseKeys: Object.keys(aiResponse),
-      });
-
-      // Log response body (truncated if too long)
-      const responseBodyStr = JSON.stringify(aiResponse, null, 2);
-      if (responseBodyStr.length > 500) {
-        console.log(
-          '[AI CHAT] [ApiClient] Response body (truncated):',
-          responseBodyStr.substring(0, 500) + '...',
-        );
-      } else {
-        console.log('[AI CHAT] [ApiClient] Response body:', responseBodyStr);
-      }
-
-      // Validate response structure (AI service returns { message, sources, tokens_used, model, ... })
-      if (!aiResponse) {
-        console.error(
-          '[AI CHAT] [ApiClient] Response is null or undefined:',
-          aiResponse,
-        );
-        throw new Error('Invalid response: no data');
-      }
-
-      if (aiResponse.error) {
-        console.error(
-          '[AI CHAT] [ApiClient] AI service returned error:',
-          aiResponse.error,
-        );
-        throw new Error(aiResponse.error || 'AI service error');
-      }
-
-      if (!aiResponse.message) {
-        console.error(
-          '[AI CHAT] [ApiClient] Response has no message field:',
-          aiResponse,
-        );
-        throw new Error('Invalid response: missing message field');
-      }
-
-      console.log('[AI CHAT] [ApiClient] Response validated successfully:', {
-        hasMessage: !!aiResponse.message,
-        messageLength: aiResponse.message.length,
-        messagePreview: aiResponse.message.substring(0, 100),
-        sourcesCount: aiResponse.sources?.length || 0,
-        tokensUsed: aiResponse.tokens_used,
-        model: aiResponse.model,
-      });
-
-      // Transform AI service response to match expected format
-      // AI service returns: { message, sources, tokens_used, model, ... }
+      // Transform backend response to match expected format
+      // Backend returns: { message, sources, tokens_used, model, id, applicationContext }
       // Chat store expects: { success: true, data: { message, sources, tokens_used, model, id } }
       const transformedResponse: ApiResponse = {
         success: true,
         data: {
-          message: aiResponse.message,
-          sources: aiResponse.sources || [],
-          tokens_used: aiResponse.tokens_used || 0,
-          model: aiResponse.model || 'gpt-4',
-          id: `assistant-${Date.now()}`, // Generate ID if not provided
-          generation_time_ms: aiResponse.generation_time_ms,
-          finish_reason: aiResponse.finish_reason,
+          message: aiData.message,
+          sources: aiData.sources || [],
+          tokens_used: aiData.tokens_used || 0,
+          model: aiData.model || 'deepseek-reasoner',
+          id: aiData.id || `assistant-${Date.now()}`,
+          applicationContext: aiData.applicationContext,
         },
       };
 
@@ -1506,19 +1455,18 @@ class ApiClient {
       console.error('[AI CHAT] [ApiClient] Request failed:', {
         error: error?.message || error,
         errorType: error?.constructor?.name,
-        requestUrl: fullUrl,
+        requestUrl: '/api/chat',
         requestMethod: 'POST',
         stack: error?.stack,
       });
 
+      // Normalize error using the shared helper
+      const normalized = normalizeApiError(error);
+
       // Return error in expected format
       return {
         success: false,
-        error: {
-          status: error?.status || 500,
-          message: error?.message || 'Failed to send message to AI service',
-          code: error?.code,
-        },
+        error: normalized,
       };
     }
   }
