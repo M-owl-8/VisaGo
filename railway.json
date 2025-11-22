@@ -17,8 +17,8 @@
     "ai-service": {
       "name": "VisaBuddy AI Service",
       "image": "railway:latest",
-      "context": "./apps/ai-service",
-      "dockerfile": "./Dockerfile",
+      "context": ".",
+      "dockerfile": "./apps/ai-service/Dockerfile",
       "port": 8001,
       "replicas": 1,
       "variables": {
