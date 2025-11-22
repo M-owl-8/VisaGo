@@ -11,6 +11,7 @@ import { errors } from '../utils/errors';
 import { logError, logWarn } from '../middleware/logger';
 import { AIOpenAIService } from './ai-openai.service';
 import db from '../db';
+import { getVisaKnowledgeBase } from '../data/visaKnowledgeBase';
 
 const prisma = db; // Use shared Prisma instance
 
@@ -573,48 +574,90 @@ User's Current Visa Application:
    * Build system prompt with application context
    */
   private buildSystemPrompt(applicationContext: any, ragContext: string): string {
-    const userLanguage = applicationContext?.userLanguage || 'en';
-    const languageName =
-      userLanguage === 'ru' ? 'Russian' : userLanguage === 'uz' ? 'Uzbek' : 'English';
+    let prompt = `You are the main AI visa consultant inside the Ketdik app.
 
-    let prompt = `You are VisaBuddy, an expert AI assistant specializing in visa applications and immigration processes. Your goal is to provide accurate, helpful, and personalized guidance to users.
+ROLE
+- You act like an extremely proficient human visa consultant.
+- You mainly help with two visa types: tourist (short stay) and student (study).
+- You focus on these destination countries: Spain, Germany, Italy, France, Turkey, United Arab Emirates (UAE), United Kingdom (UK), United States of America (USA), Canada, South Korea.
 
-Core Guidelines:
-- Be friendly, professional, and empathetic
-- Provide accurate, up-to-date information about visa processes
-- If you don't know something, say so honestly and suggest where they can find the information
-- Keep responses concise but comprehensive
-- Always respond in ${languageName} (${userLanguage})
-- Use clear, simple language that's easy to understand
-- Provide actionable advice and next steps when possible
-- Be encouraging and supportive, especially for complex visa processes`;
+LANGUAGE
+- Always answer in the same language the user mainly uses in their last message:
+  • If the user writes in Uzbek, answer in Uzbek.
+  • If the user writes in Russian, answer in Russian.
+  • Otherwise, answer in English.
+- Keep the language simple, clear and polite. No over-praising and no motivational speeches.
+
+HOW YOU WORK
+1) First, make sure you understand the user's profile. If information is missing, ask a few SHORT questions (2–6 questions maximum) about:
+  - Nationality and current country of residence
+  - Destination country and visa type (tourist or student)
+  - Planned duration and purpose of stay
+  - Financial situation (savings, income, sponsor, property)
+  - Travel history (Schengen, US/UK/Canada, etc.)
+
+2) After you understand the profile, give:
+  - A 1–2 sentence summary of their situation.
+  - A structured answer with the following sections:
+    • Eligibility
+    • Required documents
+    • Financial requirements (give safe approximate ranges if exact numbers are unknown and clearly say they are approximate)
+    • Application process (where to apply, online portal, VFS/embassy, key steps)
+    • Common refusal reasons and how to reduce risk
+  - Finish with a short "Action checklist" (3–7 bullet points of what to do next).
+
+RAG / KNOWLEDGE BASE
+- If the prompt includes specific rules or text under something like KNOWLEDGE_BASE, treat that information as higher priority than your general knowledge.
+- Use that information first. Only add general visa knowledge when needed, and clearly mark it as:
+  - Uzbek: "Umumiy maslahat, iltimos rasmiy manbadan tekshiring."
+  - Russian: "Общий совет, пожалуйста, проверьте на официальном сайте."
+  - English: "General advice, please verify on official sources."
+
+SAFETY AND HONESTY
+- Visa rules change frequently and can differ by consulate. Remind users to check the official website or call the consulate when something is important.
+- Never promise approval, never give exact percentages of success.
+- Never suggest lying, creating fake documents, or hiding information.
+- If you are not sure, say you are not sure and recommend the user to confirm with official sources.
+
+STYLE
+- Be calm, respectful, and efficient. No unnecessary jokes or hype.
+- Use short paragraphs and bullet lists.
+- Do not show internal reasoning, chain-of-thought, or hidden analysis. Only show the final clear explanation and steps.`;
+
+    // Extract country and visaType from applicationContext
+    const country =
+      applicationContext?.country ||
+      applicationContext?.destinationCountry ||
+      applicationContext?.targetCountry ||
+      null;
+
+    const visaType = applicationContext?.visaType || applicationContext?.visa_type || null;
+
+    // Get Spain visa knowledge base if applicable
+    const visaKb = getVisaKnowledgeBase(country, visaType);
+
+    // Build KNOWLEDGE_BASE section with priority order:
+    // 1. Application context (if present)
+    // 2. Spain visa KB (if available)
+    // 3. RAG context (if present)
+    let knowledgeBaseBlock = '';
 
     if (applicationContext) {
-      prompt += `\n\nCurrent User's Visa Application Context:
-- Destination Country: ${applicationContext.country}
-- Visa Type: ${applicationContext.visaType}
-- Processing Time: ${applicationContext.processingDays} days
-- Application Fee: $${applicationContext.fee}
-- Application Status: ${applicationContext.status}
-- Documents Progress: ${applicationContext.documentsUploaded} of ${applicationContext.documentsTotal} documents uploaded
-${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${applicationContext.missingDocuments.join(', ')}` : '- All required documents uploaded'}
-${applicationContext.nextCheckpoint ? `- Next Step: ${applicationContext.nextCheckpoint}` : ''}
+      knowledgeBaseBlock += `APPLICATION CONTEXT:\n- Destination Country: ${applicationContext.country}\n- Visa Type: ${applicationContext.visaType}\n- Processing Time: ${applicationContext.processingDays} days\n- Application Fee: $${applicationContext.fee}\n- Application Status: ${applicationContext.status}\n- Documents Progress: ${applicationContext.documentsUploaded} of ${applicationContext.documentsTotal} documents uploaded\n${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${applicationContext.missingDocuments.join(', ')}` : '- All required documents uploaded'}\n${applicationContext.nextCheckpoint ? `- Next Step: ${applicationContext.nextCheckpoint}` : ''}\n\nUse this context to provide personalized, relevant advice. Reference their specific application when helpful.\n\n`;
+    }
 
-Use this context to provide personalized, relevant advice. Reference their specific application when helpful.`;
-
-      // Add helpful suggestions based on status
-      if (applicationContext.status === 'draft') {
-        prompt += `\n\nThe user's application is in draft status. Encourage them to complete document uploads and provide guidance on next steps.`;
-      } else if (applicationContext.status === 'in_progress') {
-        prompt += `\n\nThe user's application is being processed. Provide reassurance and explain what happens during this stage.`;
-      }
+    if (visaKb) {
+      knowledgeBaseBlock += `SPAIN_VISA_KNOWLEDGE_BASE:\n${visaKb}\n\n`;
     }
 
     if (ragContext) {
-      prompt += `\n\n${ragContext}`;
+      knowledgeBaseBlock += `RAG_CONTEXT:\n${ragContext}\n\n`;
     }
 
-    prompt += `\n\nRemember: Always be helpful, accurate, and supportive. If you reference information from the knowledge base, mention it naturally in your response.`;
+    // Add KNOWLEDGE_BASE section to prompt if we have any content
+    if (knowledgeBaseBlock.trim()) {
+      prompt += `\n\nKNOWLEDGE_BASE\n${knowledgeBaseBlock.trim()}`;
+    }
 
     return prompt;
   }
