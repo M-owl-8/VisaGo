@@ -21,12 +21,15 @@ COPY . .
 # Create data directory
 RUN mkdir -p /app/data
 
-# Expose port
+# Make startup script executable
+RUN chmod +x start.sh
+
+# Expose port (Railway will map this dynamically via PORT env var)
 EXPOSE 8001
 
-# Health check
+# Health check (uses PORT env var or defaults to 8001)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8001/health').raise_for_status()"
+  CMD python -c "import os, requests; port = os.getenv('PORT', '8001'); requests.get(f'http://localhost:{port}/health').raise_for_status()"
 
-# Start application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Start application using startup script (reads PORT from Railway env)
+CMD ["./start.sh"]
