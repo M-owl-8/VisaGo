@@ -1,24 +1,38 @@
-import React, { useEffect, ErrorInfo, useState } from 'react';
-import { StatusBar, View, Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import React, {useEffect, ErrorInfo, useState} from 'react';
+import {StatusBar, View, Text} from 'react-native';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AppIcon, IconSizes, IconColors} from './components/icons/AppIcon';
 import {TabIcons} from './components/icons/iconConfig';
-import { useAuthStore } from './store/auth';
-import { initializeGoogleSignIn } from './services/google-oauth';
-import { GOOGLE_WEB_CLIENT_ID } from './config/constants';
-import { initializeErrorLogger, logError, setUserContext } from './services/errorLogger';
-import { startNetworkMonitoring, stopNetworkMonitoring } from './services/network';
-import { OfflineBanner } from './components/OfflineBanner';
-import { useNotificationStore } from './store/notifications';
-import { initializePushNotifications, cleanupPushNotifications, handleBackgroundNotification } from './services/pushNotifications';
-import { initializeFirebase, setupBackgroundMessageHandler } from './services/firebase';
+import {useAuthStore} from './store/auth';
+import {initializeGoogleSignIn} from './services/google-oauth';
+import {GOOGLE_WEB_CLIENT_ID} from './config/constants';
+import {
+  initializeErrorLogger,
+  logError,
+  setUserContext,
+} from './services/errorLogger';
+import {
+  startNetworkMonitoring,
+  stopNetworkMonitoring,
+} from './services/network';
+import {OfflineBanner} from './components/OfflineBanner';
+import {useNotificationStore} from './store/notifications';
+import {
+  initializePushNotifications,
+  cleanupPushNotifications,
+  handleBackgroundNotification,
+} from './services/pushNotifications';
+import {
+  initializeFirebase,
+  setupBackgroundMessageHandler,
+} from './services/firebase';
 import './i18n'; // Initialize i18next
-import { useTranslation } from 'react-i18next';
-import { isHomePageFrozen } from './config/features';
+import {useTranslation} from 'react-i18next';
+import {isHomePageFrozen} from './config/features';
 
 initializeErrorLogger();
 
@@ -77,25 +91,32 @@ function AuthStack() {
 // APP TABS (Main Screen)
 // ============================================================================
 function AppTabs() {
-  const { t } = useTranslation();
-  
+  const {t} = useTranslation();
+
   return (
     <Tab.Navigator
       initialRouteName="Applications"
       screenOptions={({route}) => ({
         headerShown: true,
+        tabBarHideOnKeyboard: true,
         tabBarIcon: ({focused, color}) => {
           let iconConfig;
 
           switch (route.name) {
             case 'Applications':
-              iconConfig = focused ? TabIcons.applications.active : TabIcons.applications.inactive;
+              iconConfig = focused
+                ? TabIcons.applications.active
+                : TabIcons.applications.inactive;
               break;
             case 'Chat':
-              iconConfig = focused ? TabIcons.chat.active : TabIcons.chat.inactive;
+              iconConfig = focused
+                ? TabIcons.chat.active
+                : TabIcons.chat.inactive;
               break;
             case 'Profile':
-              iconConfig = focused ? TabIcons.profile.active : TabIcons.profile.inactive;
+              iconConfig = focused
+                ? TabIcons.profile.active
+                : TabIcons.profile.inactive;
               break;
             default:
               iconConfig = TabIcons.applications.inactive;
@@ -341,16 +362,20 @@ class ErrorBoundary extends React.Component<
 // MAIN APP COMPONENT
 // ============================================================================
 function AppContent() {
-  const isLoading = useAuthStore((state) => state.isLoading);
-  const isSignedIn = useAuthStore((state) => state.isSignedIn);
-  const user = useAuthStore((state) => state.user);
-  const initializeApp = useAuthStore((state) => state.initializeApp);
+  const isLoading = useAuthStore(state => state.isLoading);
+  const isSignedIn = useAuthStore(state => state.isSignedIn);
+  const user = useAuthStore(state => state.user);
+  const initializeApp = useAuthStore(state => state.initializeApp);
   const [forceShow, setForceShow] = useState(false);
   // Use separate selectors to avoid getSnapshot warning
-  const preferences = useNotificationStore((state) => state.preferences);
-  const preferencesLoaded = useNotificationStore((state) => state.preferencesLoaded);
-  const loadPreferences = useNotificationStore((state) => state.loadPreferences);
-  const clearDeviceToken = useNotificationStore((state) => state.clearDeviceToken);
+  const preferences = useNotificationStore(state => state.preferences);
+  const preferencesLoaded = useNotificationStore(
+    state => state.preferencesLoaded,
+  );
+  const loadPreferences = useNotificationStore(state => state.loadPreferences);
+  const clearDeviceToken = useNotificationStore(
+    state => state.clearDeviceToken,
+  );
 
   // Debug logging - watch for user changes
   useEffect(() => {
@@ -377,8 +402,10 @@ function AppContent() {
         if (mounted) {
           const authState = useAuthStore.getState();
           if (authState.isLoading) {
-            useAuthStore.setState({ isLoading: false });
-            console.log('=== APP.TSX: Force set isLoading to false after error ===');
+            useAuthStore.setState({isLoading: false});
+            console.log(
+              '=== APP.TSX: Force set isLoading to false after error ===',
+            );
           }
         }
       }
@@ -389,8 +416,10 @@ function AppContent() {
       if (mounted) {
         const authState = useAuthStore.getState();
         if (authState.isLoading) {
-          console.warn('=== APP.TSX: Safety timeout - forcing isLoading to false ===');
-          useAuthStore.setState({ isLoading: false });
+          console.warn(
+            '=== APP.TSX: Safety timeout - forcing isLoading to false ===',
+          );
+          useAuthStore.setState({isLoading: false});
         }
       }
     }, 3000);
@@ -408,19 +437,19 @@ function AppContent() {
     // React Native Firebase auto-initializes from google-services.json
     // We just need to verify it's ready and set up handlers
     initializeFirebase()
-      .then((initialized) => {
+      .then(initialized => {
         if (initialized) {
           // Set up background message handler after Firebase is initialized
           setupBackgroundMessageHandler(handleBackgroundNotification).catch(
-            (error) => {
+            error => {
               // Silently fail - background handler is optional
               if (__DEV__) {
                 console.warn(
                   '[Firebase] Background message handler setup failed:',
-                  error?.message || error
+                  error?.message || error,
                 );
               }
-            }
+            },
           );
         } else {
           // Firebase not configured - this is okay, app can work without it
@@ -428,22 +457,24 @@ function AppContent() {
           if (__DEV__) {
             console.info(
               '[Firebase] Firebase not configured. Push notifications will not be available. ' +
-              'This is normal if Firebase setup is incomplete.'
+                'This is normal if Firebase setup is incomplete.',
             );
           }
         }
       })
-      .catch((error) => {
+      .catch(error => {
         // Silently handle errors - Firebase is optional
         // Only log unexpected errors in development
         if (__DEV__) {
           const errorMessage = error?.message || '';
           // Don't log the expected "no app" error
-          if (!errorMessage.includes('No Firebase App') && 
-              !errorMessage.includes('has been created')) {
+          if (
+            !errorMessage.includes('No Firebase App') &&
+            !errorMessage.includes('has been created')
+          ) {
             console.warn(
               '[Firebase] Unexpected error during initialization:',
-              errorMessage
+              errorMessage,
             );
           }
         }
@@ -500,11 +531,11 @@ function AppContent() {
 
   useEffect(() => {
     if (isSignedIn && !preferencesLoaded) {
-      loadPreferences().catch((error) =>
+      loadPreferences().catch(error =>
         logError(error, {
           scope: 'NotificationPreferences',
           message: 'Failed to load notification preferences',
-        })
+        }),
       );
     }
   }, [isSignedIn, preferencesLoaded, loadPreferences]);
@@ -545,7 +576,12 @@ function AppContent() {
       cancelled = true;
       cleanupPushNotifications();
     };
-  }, [isSignedIn, preferencesLoaded, preferences.pushNotifications, clearDeviceToken]);
+  }, [
+    isSignedIn,
+    preferencesLoaded,
+    preferences.pushNotifications,
+    clearDeviceToken,
+  ]);
 
   useEffect(() => {
     // Force show app after 2 seconds max - prevents infinite loading
@@ -554,8 +590,10 @@ function AppContent() {
       // Also ensure isLoading is false
       const authState = useAuthStore.getState();
       if (authState.isLoading) {
-        console.log('=== APP.TSX: Force timeout - setting isLoading to false ===');
-        useAuthStore.setState({ isLoading: false });
+        console.log(
+          '=== APP.TSX: Force timeout - setting isLoading to false ===',
+        );
+        useAuthStore.setState({isLoading: false});
       }
     }, 2000);
     return () => clearTimeout(timeout);
@@ -578,11 +616,7 @@ function AppContent() {
               backgroundColor={colors.primary}
               translucent={false}
             />
-            {isSignedIn ? (
-              <MainAppStack />
-            ) : (
-              <AuthStack />
-            )}
+            {isSignedIn ? <MainAppStack /> : <AuthStack />}
           </NavigationContainer>
         </View>
       </SafeAreaProvider>
