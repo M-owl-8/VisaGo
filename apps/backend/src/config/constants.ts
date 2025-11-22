@@ -6,8 +6,8 @@
 // Server Configuration
 export const SERVER_CONFIG = {
   DEFAULT_PORT: 3000,
-  DEFAULT_NODE_ENV: "development",
-  MAX_REQUEST_SIZE: "50mb",
+  DEFAULT_NODE_ENV: 'development',
+  MAX_REQUEST_SIZE: '50mb',
   REQUEST_TIMEOUT_MS: 30000,
 } as const;
 
@@ -26,11 +26,11 @@ export const RATE_LIMIT_CONFIG = {
 
 // Security Configuration
 export const SECURITY_CONFIG = {
-  JWT_EXPIRES_IN: "7d",
+  JWT_EXPIRES_IN: '7d',
   PASSWORD_MIN_LENGTH: 12,
   PASSWORD_HASH_ROUNDS: 12,
-  CORS_ALLOWED_METHODS: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  CORS_ALLOWED_HEADERS: ["Content-Type", "Authorization", "X-CSRF-Token"],
+  CORS_ALLOWED_METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  CORS_ALLOWED_HEADERS: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 } as const;
 
 // Database Configuration
@@ -56,14 +56,14 @@ export const UPLOAD_CONFIG = {
   MAX_FILE_SIZE_MB: 10,
   MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024, // 10MB
   ALLOWED_FILE_TYPES: [
-    "image/jpeg",
-    "image/png",
-    "image/jpg",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    'image/jpeg',
+    'image/png',
+    'image/jpg',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ],
-  DEFAULT_STORAGE_PATH: "uploads",
+  DEFAULT_STORAGE_PATH: 'uploads',
 } as const;
 
 // Payment Configuration
@@ -77,28 +77,33 @@ export const PAYMENT_CONFIG = {
 
 // API Response Messages
 export const API_MESSAGES = {
-  SUCCESS: "Operation completed successfully",
-  UNAUTHORIZED: "Unauthorized access",
-  FORBIDDEN: "Access forbidden",
-  NOT_FOUND: "Resource not found",
-  VALIDATION_ERROR: "Validation failed",
-  INTERNAL_ERROR: "Internal server error",
-  RATE_LIMIT_EXCEEDED: "Too many requests, please try again later",
-  INVALID_TOKEN: "Invalid or expired token",
-  TOKEN_REQUIRED: "Authentication token required",
+  SUCCESS: 'Operation completed successfully',
+  UNAUTHORIZED: 'Unauthorized access',
+  FORBIDDEN: 'Access forbidden',
+  NOT_FOUND: 'Resource not found',
+  VALIDATION_ERROR: 'Validation failed',
+  INTERNAL_ERROR: 'Internal server error',
+  RATE_LIMIT_EXCEEDED: 'Too many requests, please try again later',
+  INVALID_TOKEN: 'Invalid or expired token',
+  TOKEN_REQUIRED: 'Authentication token required',
 } as const;
 
 // Error Codes
 export const ERROR_CODES = {
-  UNAUTHORIZED: "UNAUTHORIZED",
-  FORBIDDEN: "FORBIDDEN",
-  NOT_FOUND: "NOT_FOUND",
-  VALIDATION_ERROR: "VALIDATION_ERROR",
-  INTERNAL_ERROR: "INTERNAL_ERROR",
-  RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
-  INVALID_TOKEN: "INVALID_TOKEN",
-  DATABASE_ERROR: "DATABASE_ERROR",
-  EXTERNAL_SERVICE_ERROR: "EXTERNAL_SERVICE_ERROR",
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  INVALID_TOKEN: 'INVALID_TOKEN',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+  // User-friendly error codes
+  ACCOUNT_ALREADY_EXISTS: 'ACCOUNT_ALREADY_EXISTS',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  TIMEOUT: 'TIMEOUT',
 } as const;
 
 // HTTP Status Codes
@@ -116,12 +121,3 @@ export const HTTP_STATUS = {
   INTERNAL_SERVER_ERROR: 500,
   SERVICE_UNAVAILABLE: 503,
 } as const;
-
-
-
-
-
-
-
-
-
