@@ -3,7 +3,7 @@
  * Shows complete application information with document checklist
  */
 
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,10 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useTranslation } from 'react-i18next';
-import { apiClient } from '../../services/api';
-import { getTranslatedCountryName } from '../../data/countryTranslations';
-import { getTranslatedVisaTypeName } from '../../utils/visaTypeTranslations';
+import {useTranslation} from 'react-i18next';
+import {apiClient} from '../../services/api';
+import {getTranslatedCountryName} from '../../data/countryTranslations';
+import {getTranslatedVisaTypeName} from '../../utils/visaTypeTranslations';
 
 interface ApplicationDetailProps {
   route: any;
@@ -40,6 +40,8 @@ interface DocumentChecklistItem {
   fileName?: string;
   uploadedAt?: string;
   verificationNotes?: string;
+  aiVerified?: boolean;
+  aiConfidence?: number;
 }
 
 interface ChecklistSummary {
@@ -55,12 +57,14 @@ export default function ApplicationDetailScreen({
   route,
   navigation,
 }: ApplicationDetailProps) {
-  const { t, i18n } = useTranslation();
+  const {t, i18n} = useTranslation();
   const language = i18n.language || 'en';
   const applicationId = route.params?.applicationId;
 
   const [application, setApplication] = useState<any>(null);
-  const [checklistItems, setChecklistItems] = useState<DocumentChecklistItem[]>([]);
+  const [checklistItems, setChecklistItems] = useState<DocumentChecklistItem[]>(
+    [],
+  );
   const [summary, setSummary] = useState<ChecklistSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,10 +94,52 @@ export default function ApplicationDetailScreen({
       if (checklistResponse.success && checklistResponse.data) {
         setChecklistItems(checklistResponse.data.items || []);
         setSummary(checklistResponse.data.summary);
+      } else if (checklistResponse.error) {
+        // Check if it's an AI-related error
+        const errorMessage = checklistResponse.error.message || '';
+        const errorCode = checklistResponse.error.code || '';
+        const isAIError =
+          errorMessage.toLowerCase().includes('openai') ||
+          errorCode.includes('OPENAI') ||
+          errorMessage.toLowerCase().includes('ai service');
+
+        if (isAIError) {
+          // Show user-friendly AI error message
+          const aiErrorMessage =
+            language === 'uz'
+              ? "Hozircha AI asosida hujjatlar ro'yxatini yaratishda xatolik yuz berdi. Server tomoni bu muammoni hal qiladi. Siz mavjud hujjatlarni yuklashda davom etishingiz mumkin."
+              : language === 'ru'
+                ? 'При создании списка документов с помощью ИИ произошла ошибка. Команда уже работает над этим. Вы можете продолжать загружать документы.'
+                : 'There was an error generating the document list with AI. Our team is working on it. You can still upload your documents.';
+
+          Alert.alert(t('common.error'), aiErrorMessage);
+        } else {
+          Alert.alert(
+            t('common.error'),
+            errorMessage || t('errors.loadFailed'),
+          );
+        }
       }
     } catch (error: any) {
       console.error('Error loading application:', error);
-      Alert.alert(t('common.error'), t('errors.loadFailed'));
+      const errorMessage =
+        error?.message || error?.response?.data?.message || '';
+      const isAIError =
+        errorMessage.toLowerCase().includes('openai') ||
+        errorMessage.toLowerCase().includes('ai service');
+
+      if (isAIError) {
+        const aiErrorMessage =
+          language === 'uz'
+            ? "Hozircha AI asosida hujjatlar ro'yxatini yaratishda xatolik yuz berdi. Server tomoni bu muammoni hal qiladi. Siz mavjud hujjatlarni yuklashda davom etishingiz mumkin."
+            : language === 'ru'
+              ? 'При создании списка документов с помощью ИИ произошла ошибка. Команда уже работает над этим. Вы можете продолжать загружать документы.'
+              : 'There was an error generating the document list with AI. Our team is working on it. You can still upload your documents.';
+
+        Alert.alert(t('common.error'), aiErrorMessage);
+      } else {
+        Alert.alert(t('common.error'), errorMessage || t('errors.loadFailed'));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +172,10 @@ export default function ApplicationDetailScreen({
     });
   };
 
-  const getLocalizedText = (item: DocumentChecklistItem, field: 'name' | 'description'): string => {
+  const getLocalizedText = (
+    item: DocumentChecklistItem,
+    field: 'name' | 'description',
+  ): string => {
     if (language === 'uz' && item[`${field}Uz`]) return item[`${field}Uz`]!;
     if (language === 'ru' && item[`${field}Ru`]) return item[`${field}Ru`]!;
     return item[field];
@@ -181,8 +230,7 @@ export default function ApplicationDetailScreen({
           <Text style={styles.errorText}>{t('errors.loadFailed')}</Text>
           <TouchableOpacity
             style={styles.errorButton}
-            onPress={() => navigation.goBack()}
-          >
+            onPress={() => navigation.goBack()}>
             <Text style={styles.errorButtonText}>{t('common.back')}</Text>
           </TouchableOpacity>
         </View>
@@ -203,49 +251,61 @@ export default function ApplicationDetailScreen({
             tintColor="#4A9EFF"
             colors={['#4A9EFF']}
           />
-        }
-      >
+        }>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
+            onPress={() => navigation.goBack()}>
             <Icon name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('visa.applicationDetail.title')}</Text>
-          <View style={{ width: 40 }} />
+          <Text style={styles.headerTitle}>
+            {t('visa.applicationDetail.title')}
+          </Text>
+          <View style={{width: 40}} />
         </View>
 
         {/* Application Header Card */}
         <View style={styles.applicationCard}>
           <View style={styles.applicationHeader}>
-            <Text style={styles.countryFlag}>{application.country?.flagEmoji || '🌍'}</Text>
+            <Text style={styles.countryFlag}>
+              {application.country?.flagEmoji || '🌍'}
+            </Text>
             <View style={styles.applicationInfo}>
               <Text style={styles.countryName}>
                 {application.country
                   ? getTranslatedCountryName(
                       application.country.code || '',
                       language,
-                      application.country.name
+                      application.country.name,
                     )
                   : t('applicationDetail.unknownCountry')}
               </Text>
               <Text style={styles.visaTypeName}>
-                {getTranslatedVisaTypeName(application.visaType?.name, language)}
+                {getTranslatedVisaTypeName(
+                  application.visaType?.name,
+                  language,
+                )}
               </Text>
             </View>
           </View>
-          
+
           <View style={styles.applicationMeta}>
             <View style={styles.metaItem}>
               <Icon name="calendar-outline" size={16} color="#94A3B8" />
               <Text style={styles.metaText}>
-                {t('visa.applicationDetail.createdOn')}: {new Date(application.createdAt).toLocaleDateString()}
+                {t('visa.applicationDetail.createdOn')}:{' '}
+                {new Date(application.createdAt).toLocaleDateString()}
               </Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusBgColor(application.status) }]}>
-              <Text style={styles.statusText}>{getStatusLabel(application.status)}</Text>
+            <View
+              style={[
+                styles.statusBadge,
+                {backgroundColor: getStatusBgColor(application.status)},
+              ]}>
+              <Text style={styles.statusText}>
+                {getStatusLabel(application.status)}
+              </Text>
             </View>
           </View>
         </View>
@@ -255,17 +315,26 @@ export default function ApplicationDetailScreen({
           <View style={styles.progressCard}>
             <View style={styles.progressHeader}>
               <View>
-                <Text style={styles.progressTitle}>{t('applicationDetail.uploadProgress')}</Text>
+                <Text style={styles.progressTitle}>
+                  {t('applicationDetail.uploadProgress')}
+                </Text>
                 <Text style={styles.progressSubtitle}>
-                  {t('applicationDetail.documentsUploaded', { uploaded: summary.uploaded, total: summary.total })}
+                  {t('applicationDetail.documentsUploaded', {
+                    uploaded: summary.uploaded,
+                    total: summary.total,
+                  })}
                 </Text>
               </View>
               <View style={styles.progressCircle}>
-                <Text style={styles.progressPercentage}>{summary.progress}%</Text>
+                <Text style={styles.progressPercentage}>
+                  {summary.progress}%
+                </Text>
               </View>
             </View>
             <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${summary.progress}%` }]} />
+              <View
+                style={[styles.progressBar, {width: `${summary.progress}%`}]}
+              />
             </View>
           </View>
         )}
@@ -287,23 +356,53 @@ export default function ApplicationDetailScreen({
         <View style={styles.documentListContainer}>
           {checklistItems.map((item, index) => {
             const statusConfig = getStatusConfig(item.status);
-            const isUploaded = item.status === 'verified' || item.status === 'pending';
-            
+            const isUploaded =
+              item.status === 'verified' || item.status === 'pending';
+
             return (
               <View key={item.id} style={styles.documentItem}>
                 {/* Number */}
                 <View style={styles.documentNumber}>
                   <Text style={styles.documentNumberText}>{index + 1}</Text>
                 </View>
-                
+
                 {/* Document Info */}
                 <View style={styles.documentInfo}>
-                  <Text style={styles.documentName}>{getLocalizedText(item, 'name')}</Text>
+                  <View style={styles.documentHeader}>
+                    <Text style={styles.documentName}>
+                      {getLocalizedText(item, 'name')}
+                    </Text>
+                    {/* AI Verification Badge */}
+                    {item.aiVerified && item.status === 'verified' && (
+                      <View style={styles.aiVerifiedBadge}>
+                        <Icon name="sparkles" size={12} color="#10B981" />
+                        <Text style={styles.aiVerifiedText}>
+                          {language === 'uz'
+                            ? 'AI tasdiqladi'
+                            : language === 'ru'
+                              ? 'Проверено ИИ'
+                              : 'Verified by AI'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.documentDescription}>
                     {getLocalizedText(item, 'description')}
                   </Text>
+                  {/* AI Verification Notes */}
+                  {item.verificationNotes && (
+                    <Text style={styles.verificationNotesText}>
+                      {item.verificationNotes}
+                    </Text>
+                  )}
+                  {/* Rejected Status with Notes */}
+                  {item.status === 'rejected' && item.verificationNotes && (
+                    <Text style={styles.rejectedNotesText}>
+                      {item.verificationNotes}
+                    </Text>
+                  )}
                 </View>
-                
+
                 {/* Upload Button */}
                 <TouchableOpacity
                   style={[
@@ -311,17 +410,23 @@ export default function ApplicationDetailScreen({
                     isUploaded && styles.uploadButtonSuccess,
                   ]}
                   onPress={() => {
-                    if (item.status === 'missing' || item.status === 'rejected') {
+                    if (
+                      item.status === 'missing' ||
+                      item.status === 'rejected'
+                    ) {
                       handleUploadDocument(item.id, item.name);
                     } else if (item.userDocumentId && item.fileUrl) {
                       handleViewDocument(item.userDocumentId, item.fileUrl);
                     }
-                  }}
-                >
+                  }}>
                   {isUploaded ? (
                     <Icon name="checkmark-circle" size={24} color="#10B981" />
                   ) : (
-                    <Icon name="cloud-upload-outline" size={24} color="#4A9EFF" />
+                    <Icon
+                      name="cloud-upload-outline"
+                      size={24}
+                      color="#4A9EFF"
+                    />
                   )}
                 </TouchableOpacity>
               </View>
@@ -333,7 +438,9 @@ export default function ApplicationDetailScreen({
         <View style={styles.helpCard}>
           <Icon name="information-circle-outline" size={24} color="#4A9EFF" />
           <View style={styles.helpContent}>
-            <Text style={styles.helpTitle}>{t('applicationDetail.needHelp')}</Text>
+            <Text style={styles.helpTitle}>
+              {t('applicationDetail.needHelp')}
+            </Text>
             <Text style={styles.helpText}>
               {t('applicationDetail.helpText')}
             </Text>
@@ -343,10 +450,11 @@ export default function ApplicationDetailScreen({
         {/* AI Chat Button */}
         <TouchableOpacity
           style={styles.chatButton}
-          onPress={handleChatAboutApplication}
-        >
+          onPress={handleChatAboutApplication}>
           <Icon name="chatbubbles" size={20} color="#FFFFFF" />
-          <Text style={styles.chatButtonText}>{t('applicationDetail.chatAboutApplication')}</Text>
+          <Text style={styles.chatButtonText}>
+            {t('applicationDetail.chatAboutApplication')}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -607,15 +715,52 @@ const styles = StyleSheet.create({
   documentInfo: {
     flex: 1,
   },
+  documentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    gap: 8,
+  },
   documentName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 4,
+    flex: 1,
+  },
+  aiVerifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  aiVerifiedText: {
+    fontSize: 10,
+    color: '#10B981',
+    fontWeight: '600',
   },
   documentDescription: {
     fontSize: 12,
     color: '#94A3B8',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  verificationNotesText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+    lineHeight: 16,
+    fontStyle: 'italic',
+  },
+  rejectedNotesText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
     lineHeight: 16,
   },
   uploadButton: {
@@ -668,7 +813,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 8,
     shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
@@ -679,4 +824,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

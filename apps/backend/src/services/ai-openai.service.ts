@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { PrismaClient } from '@prisma/client';
+import { logInfo, logError, logWarn } from '../middleware/logger';
 
 /**
  * OpenAI + RAG Service
@@ -37,8 +38,19 @@ export interface AIResponse {
 export class AIOpenAIService {
   private static openai: OpenAI;
   private static prisma: PrismaClient;
-  private static readonly MODEL = process.env.OPENAI_MODEL || 'gpt-4';
+  // Use gpt-4o-mini for checklist generation and document validation
+  public static readonly MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   private static readonly MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS || '2000');
+
+  /**
+   * Get OpenAI client (for internal use)
+   */
+  static getOpenAIClient(): OpenAI {
+    if (!AIOpenAIService.openai) {
+      throw new Error('OpenAI service not initialized. Call initialize() first.');
+    }
+    return AIOpenAIService.openai;
+  }
 
   // Pricing per 1K tokens (as of 2024)
   private static readonly PRICING = {
@@ -54,10 +66,25 @@ export class AIOpenAIService {
     if (!AIOpenAIService.openai) {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
+        logError(
+          '[OPENAI_CONFIG_ERROR] OPENAI_API_KEY not configured',
+          new Error('Missing OPENAI_API_KEY'),
+          {
+            model: AIOpenAIService.MODEL,
+          }
+        );
         throw new Error('OPENAI_API_KEY not configured');
       }
-      AIOpenAIService.openai = new OpenAI({ apiKey });
+      AIOpenAIService.openai = new OpenAI({
+        apiKey,
+        timeout: 60000, // 60 second timeout
+      });
       AIOpenAIService.prisma = prisma;
+      logInfo('[OpenAI] Service initialized', {
+        model: AIOpenAIService.MODEL,
+        maxTokens: AIOpenAIService.MAX_TOKENS,
+        hasApiKey: !!apiKey,
+      });
     }
   }
 
@@ -127,19 +154,49 @@ export class AIOpenAIService {
         model: this.MODEL,
         responseTime,
       };
-    } catch (error) {
-      console.error('OpenAI API error:', error);
+    } catch (error: any) {
+      const errorType = error?.type || 'unknown';
+      const statusCode = error?.status || error?.response?.status;
+      const errorMessage = error?.message || String(error);
+
+      logError(
+        '[OpenAI_API_ERROR] Chat completion failed',
+        error instanceof Error ? error : new Error(errorMessage),
+        {
+          model: this.MODEL,
+          errorType,
+          statusCode,
+          errorMessage,
+        }
+      );
 
       // Provide user-friendly error message
       if (error instanceof Error) {
-        if (error.message.includes('rate limit') || error.message.includes('429')) {
+        if (
+          error.message.includes('rate limit') ||
+          error.message.includes('429') ||
+          statusCode === 429
+        ) {
           throw new Error('AI service is busy. Please try again in a moment.');
         }
         if (error.message.includes('timeout') || error.message.includes('ECONNABORTED')) {
           throw new Error('AI service request timed out. Please try again.');
         }
-        if (error.message.includes('API key') || error.message.includes('401')) {
+        if (
+          error.message.includes('API key') ||
+          error.message.includes('401') ||
+          statusCode === 401
+        ) {
+          logError('[OPENAI_CONFIG_ERROR] Invalid API key', error, { model: this.MODEL });
           throw new Error('AI service configuration error. Please contact support.');
+        }
+        if (
+          error.message.includes('quota') ||
+          error.message.includes('insufficient_quota') ||
+          statusCode === 429
+        ) {
+          logError('[OPENAI_QUOTA_ERROR] Quota exceeded', error, { model: this.MODEL });
+          throw new Error('AI service quota exceeded. Please try again later.');
         }
       }
 
@@ -368,48 +425,133 @@ If you don't know something, say so clearly and suggest how to find the informat
 
   /**
    * Generate document checklist for visa application
+   * Enhanced with visa knowledge base and document guides
    */
   static async generateChecklist(
     userContext: any,
     country: string,
     visaType: string
   ): Promise<{
-    checklist: Array<{ document: string; required: boolean; description?: string }>;
+    checklist: Array<{
+      document: string;
+      name?: string;
+      nameUz?: string;
+      nameRu?: string;
+      required: boolean;
+      description?: string;
+      descriptionUz?: string;
+      descriptionRu?: string;
+      priority?: 'high' | 'medium' | 'low';
+      whereToObtain?: string;
+      whereToObtainUz?: string;
+      whereToObtainRu?: string;
+    }>;
     type: string;
   }> {
     try {
-      const systemPrompt = `You are a visa application assistant. Generate a comprehensive document checklist for a ${visaType} visa application to ${country}.
+      // Import visa knowledge base and document guides
+      const { getVisaKnowledgeBase } = await import('../data/visaKnowledgeBase');
+      const { getRelevantDocumentGuides } = await import('../data/documentGuides');
 
-Based on the user's context, create a detailed checklist of all required and optional documents. Format your response as a JSON object with this structure:
+      // Get visa knowledge base for the country and visa type
+      const visaKb = getVisaKnowledgeBase(country, visaType as 'tourist' | 'student');
+
+      // Get relevant document guides based on user context
+      const userQuery = JSON.stringify(userContext);
+      const documentGuides = getRelevantDocumentGuides(userQuery, 5);
+
+      // Build document guides text
+      const documentGuidesText =
+        documentGuides.length > 0
+          ? documentGuides.map((guide) => `\n- ${guide.title}:\n${guide.content}`).join('\n\n')
+          : '';
+
+      const systemPrompt = `You are a visa application assistant for Ketdik. Generate a comprehensive, multilingual document checklist for a ${visaType} visa application to ${country}.
+
+CRITICAL REQUIREMENTS:
+1. You MUST return a JSON object with this EXACT structure:
 {
   "type": "${visaType}",
   "checklist": [
     {
-      "document": "Document name",
+      "document": "English document name (internal key)",
+      "name": "English display name",
+      "nameUz": "Uzbek display name",
+      "nameRu": "Russian display name",
       "required": true/false,
-      "description": "Brief description of what this document is and why it's needed"
+      "description": "English description",
+      "descriptionUz": "Uzbek description",
+      "descriptionRu": "Russian description",
+      "priority": "high" | "medium" | "low",
+      "whereToObtain": "English instructions on where to get this document in Uzbekistan",
+      "whereToObtainUz": "Uzbek instructions on where to get this document in Uzbekistan",
+      "whereToObtainRu": "Russian instructions on where to get this document in Uzbekistan"
     }
   ]
 }
 
-Include all standard documents for this visa type, plus any specific documents based on the user's profile.`;
+2. ALL fields (name, nameUz, nameRu, description, descriptionUz, descriptionRu, whereToObtain, whereToObtainUz, whereToObtainRu) MUST be provided for each checklist item.
 
-      const userPrompt = `Generate a document checklist for:
+3. Use the visa knowledge base and document guides provided below to ensure accuracy.
+
+4. Priority levels:
+   - "high": Essential documents that are always required (passport, application form, etc.)
+   - "medium": Important documents that are usually required (bank statements, accommodation proof, etc.)
+   - "low": Optional but recommended documents (travel insurance, flight bookings, etc.)
+
+5. For "whereToObtain" fields, provide specific, practical instructions for obtaining each document in Uzbekistan, using the document guides provided.
+
+VISA KNOWLEDGE BASE FOR ${country} ${visaType.toUpperCase()} VISA:
+${visaKb || 'No specific knowledge base available for this country/visa type.'}
+
+DOCUMENT GUIDES (How to obtain documents in Uzbekistan):
+${documentGuidesText || 'No specific document guides available.'}
+
+USER CONTEXT:
+${JSON.stringify(userContext, null, 2)}
+
+Based on the user's context, visa knowledge base, and document guides, create a complete, accurate checklist with all required and optional documents. Ensure all multilingual fields are properly filled.`;
+
+      const userPrompt = `Generate a complete document checklist for:
 - Country: ${country}
 - Visa Type: ${visaType}
 - User Context: ${JSON.stringify(userContext, null, 2)}
 
-Provide a complete checklist with all required documents.`;
+Provide a comprehensive checklist with all required documents, including multilingual names, descriptions, and instructions on where to obtain each document in Uzbekistan.`;
 
+      logInfo('[OpenAI][Checklist] Generating checklist', {
+        model: this.MODEL,
+        country,
+        visaType,
+        hasVisaKb: !!visaKb,
+        documentGuidesCount: documentGuides.length,
+      });
+
+      const startTime = Date.now();
       const response = await AIOpenAIService.openai.chat.completions.create({
         model: this.MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        max_tokens: 2000,
-        temperature: 0.3, // Lower temperature for more consistent checklist generation
+        max_tokens: 3000,
+        temperature: 0.2, // Very low temperature for deterministic, consistent checklist generation
         response_format: { type: 'json_object' },
+      });
+
+      const responseTime = Date.now() - startTime;
+      const inputTokens = response.usage?.prompt_tokens || 0;
+      const outputTokens = response.usage?.completion_tokens || 0;
+      const totalTokens = inputTokens + outputTokens;
+
+      logInfo('[OpenAI][Checklist] Checklist generated', {
+        model: this.MODEL,
+        country,
+        visaType,
+        tokensUsed: totalTokens,
+        inputTokens,
+        outputTokens,
+        responseTimeMs: responseTime,
       });
 
       const content = response.choices[0]?.message?.content || '{}';
@@ -420,45 +562,85 @@ Provide a complete checklist with all required documents.`;
         throw new Error('Invalid checklist format from AI');
       }
 
+      // Validate and enrich checklist items
+      const enrichedChecklist = parsed.checklist.map((item: any) => ({
+        document: item.document || item.name || 'Unknown',
+        name: item.name || item.document || 'Unknown',
+        nameUz: item.nameUz || item.name || item.document || "Noma'lum",
+        nameRu: item.nameRu || item.name || item.document || 'Неизвестно',
+        required: item.required !== undefined ? item.required : true,
+        description: item.description || '',
+        descriptionUz: item.descriptionUz || item.description || '',
+        descriptionRu: item.descriptionRu || item.description || '',
+        priority: item.priority || (item.required ? 'high' : 'medium'),
+        whereToObtain: item.whereToObtain || '',
+        whereToObtainUz: item.whereToObtainUz || item.whereToObtain || '',
+        whereToObtainRu: item.whereToObtainRu || item.whereToObtain || '',
+      }));
+
       return {
         type: parsed.type || visaType,
-        checklist: parsed.checklist,
+        checklist: enrichedChecklist,
       };
-    } catch (error) {
-      console.error('Checklist generation error:', error);
-      // Return a basic fallback checklist
+    } catch (error: any) {
+      logError(
+        '[OpenAI][Checklist] Checklist generation failed',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          model: this.MODEL,
+          country,
+          visaType,
+          errorType: error?.type || 'unknown',
+          statusCode: error?.status || error?.response?.status,
+          errorMessage: error?.message || String(error),
+        }
+      );
+
+      // Return a basic fallback checklist with multilingual support
       return {
         type: visaType,
         checklist: [
           {
-            document: 'Passport',
+            document: 'passport',
+            name: 'Passport',
+            nameUz: 'Pasport',
+            nameRu: 'Паспорт',
             required: true,
             description: 'Valid passport with at least 6 months validity',
+            descriptionUz: 'Kamida 6 oy muddati qolgan yaroqli pasport',
+            descriptionRu: 'Действительный паспорт со сроком действия не менее 6 месяцев',
+            priority: 'high',
+            whereToObtain: 'Apply at migration service or internal affairs office',
+            whereToObtainUz: 'Migratsiya xizmatiga yoki Ichki ishlar organlariga murojaat qiling',
+            whereToObtainRu: 'Обратитесь в службу миграции или органы внутренних дел',
           },
           {
-            document: 'Visa Application Form',
+            document: 'visa_application_form',
+            name: 'Visa Application Form',
+            nameUz: 'Viza ariza formasi',
+            nameRu: 'Форма заявления на визу',
             required: true,
             description: 'Completed and signed visa application form',
+            descriptionUz: "To'ldirilgan va imzolangan viza ariza formasi",
+            descriptionRu: 'Заполненная и подписанная форма заявления на визу',
+            priority: 'high',
+            whereToObtain: 'Download from embassy/consulate website or VFS center',
+            whereToObtainUz: 'Elchixona/konsullik veb-saytidan yoki VFS markazidan yuklab oling',
+            whereToObtainRu: 'Скачайте с веб-сайта посольства/консульства или центра VFS',
           },
           {
-            document: 'Passport Photos',
-            required: true,
-            description: 'Recent passport-sized photographs',
-          },
-          {
-            document: 'Travel Itinerary',
-            required: false,
-            description: 'Flight bookings and travel plans',
-          },
-          {
-            document: 'Accommodation Proof',
-            required: false,
-            description: 'Hotel reservations or accommodation details',
-          },
-          {
-            document: 'Financial Proof',
+            document: 'financial_proof',
+            name: 'Financial Proof',
+            nameUz: 'Moliyaviy isbot',
+            nameRu: 'Финансовое подтверждение',
             required: true,
             description: 'Bank statements or proof of sufficient funds',
+            descriptionUz: "Bank hisob varag'lari yoki yetarli mablag' isboti",
+            descriptionRu: 'Банковские выписки или подтверждение достаточных средств',
+            priority: 'high',
+            whereToObtain: 'Obtain from your bank',
+            whereToObtainUz: 'Bankingizdan oling',
+            whereToObtainRu: 'Получите в вашем банке',
           },
         ],
       };

@@ -10,6 +10,9 @@ import { logError, logInfo } from '../middleware/logger';
 import { AIUserContext, VisaQuestionnaireSummary } from '../types/ai-context';
 import { getEnvConfig } from '../config/env';
 import { calculateVisaProbability } from '../services/ai-context.service';
+import { AIOpenAIService } from '../services/ai-openai.service';
+import { validateDocumentWithAI } from '../services/document-validation.service';
+import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 
@@ -417,6 +420,199 @@ router.post('/test-probability', async (req: Request, res: Response, next: NextF
   } catch (error) {
     logError('Test probability generation error', error as Error);
     next(error);
+  }
+});
+
+/**
+ * GET /dev/ai-self-check
+ * Test GPT-4o-mini checklist generation and document validation end-to-end
+ * Development only - no authentication required for testing
+ */
+router.get('/ai-self-check', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Only allow in development
+    const envConfig = getEnvConfig();
+    if (envConfig.NODE_ENV === 'production') {
+      throw new ApiError(403, 'This endpoint is only available in development');
+    }
+
+    logInfo('[Dev][AI Self-Check] Starting AI self-check', {
+      model: AIOpenAIService.MODEL,
+    });
+
+    const results: any = {
+      checklistOk: false,
+      docValidationOk: false,
+      usedModel: AIOpenAIService.MODEL,
+      checklistItemCount: 0,
+      validationStatus: null,
+      validationNotesUz: null,
+      errors: [] as string[],
+    };
+
+    // Initialize OpenAI service if needed
+    try {
+      if (!AIOpenAIService.isInitialized()) {
+        const prisma = new PrismaClient();
+        AIOpenAIService.initialize(prisma);
+      }
+    } catch (initError: any) {
+      results.errors.push(`OpenAI initialization failed: ${initError.message}`);
+      return res.status(500).json({
+        success: false,
+        message: 'AI self-check failed: OpenAI service not initialized',
+        error: initError.message,
+        results,
+      });
+    }
+
+    // Test 1: Checklist Generation
+    try {
+      logInfo('[Dev][AI Self-Check] Testing checklist generation', {
+        model: AIOpenAIService.MODEL,
+        country: 'Germany',
+        visaType: 'tourist',
+      });
+
+      const mockUserContext = {
+        personalInfo: {
+          fullName: 'Test User',
+          dateOfBirth: '1995-01-01',
+          nationality: 'UZ',
+        },
+        travelInfo: {
+          purpose: 'tourism',
+          funding: 'self',
+        },
+        financialInfo: {
+          selfFundsUSD: 5000,
+        },
+      };
+
+      const checklistResult = await AIOpenAIService.generateChecklist(
+        mockUserContext,
+        'Germany',
+        'tourist'
+      );
+
+      if (
+        checklistResult &&
+        checklistResult.checklist &&
+        Array.isArray(checklistResult.checklist)
+      ) {
+        results.checklistOk = true;
+        results.checklistItemCount = checklistResult.checklist.length;
+        logInfo('[Dev][AI Self-Check] Checklist generation successful', {
+          itemCount: results.checklistItemCount,
+          model: AIOpenAIService.MODEL,
+        });
+      } else {
+        results.errors.push('Checklist generation returned invalid format');
+      }
+    } catch (checklistError: any) {
+      results.errors.push(`Checklist generation failed: ${checklistError.message}`);
+      logError(
+        '[Dev][AI Self-Check] Checklist generation failed',
+        checklistError instanceof Error ? checklistError : new Error(checklistError.message),
+        {
+          model: AIOpenAIService.MODEL,
+        }
+      );
+    }
+
+    // Test 2: Document Validation
+    try {
+      logInfo('[Dev][AI Self-Check] Testing document validation', {
+        model: AIOpenAIService.MODEL,
+        documentType: 'passport',
+        country: 'Germany',
+        visaType: 'tourist',
+      });
+
+      const mockDocument = {
+        id: 'test-doc-id',
+        documentType: 'passport',
+        documentName: 'Test Passport',
+        fileName: 'passport_test.jpg',
+        fileUrl: 'https://example.com/passport_test.jpg',
+        uploadedAt: new Date(),
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+      };
+
+      const mockApplication = {
+        id: 'test-app-id',
+        country: { name: 'Germany', code: 'DE' },
+        visaType: { name: 'tourist' },
+      };
+
+      const validationResult = await validateDocumentWithAI({
+        document: mockDocument,
+        checklistItem: {
+          name: 'Passport',
+          nameUz: 'Pasport',
+          description: 'Valid passport required',
+          descriptionUz: 'Yaroqli pasport talab qilinadi',
+          required: true,
+        },
+        application: mockApplication,
+        countryName: 'Germany',
+        visaTypeName: 'tourist',
+      });
+
+      if (validationResult && validationResult.status) {
+        results.docValidationOk = true;
+        results.validationStatus = validationResult.status;
+        results.validationNotesUz = validationResult.notesUz;
+        results.validationConfidence = validationResult.confidence;
+        results.verifiedByAI = validationResult.verifiedByAI;
+        logInfo('[Dev][AI Self-Check] Document validation successful', {
+          status: validationResult.status,
+          verifiedByAI: validationResult.verifiedByAI,
+          confidence: validationResult.confidence,
+          model: AIOpenAIService.MODEL,
+        });
+      } else {
+        results.errors.push('Document validation returned invalid format');
+      }
+    } catch (validationError: any) {
+      results.errors.push(`Document validation failed: ${validationError.message}`);
+      logError(
+        '[Dev][AI Self-Check] Document validation failed',
+        validationError instanceof Error ? validationError : new Error(validationError.message),
+        {
+          model: AIOpenAIService.MODEL,
+        }
+      );
+    }
+
+    // Return results
+    const allOk = results.checklistOk && results.docValidationOk;
+    const statusCode = allOk ? 200 : 500;
+
+    logInfo('[Dev][AI Self-Check] AI self-check completed', {
+      checklistOk: results.checklistOk,
+      docValidationOk: results.docValidationOk,
+      model: results.usedModel,
+      errors: results.errors.length,
+    });
+
+    return res.status(statusCode).json({
+      success: allOk,
+      message: allOk
+        ? 'AI self-check passed: Both checklist generation and document validation are working'
+        : 'AI self-check failed: Some tests did not pass',
+      results,
+    });
+  } catch (error: any) {
+    logError(
+      '[Dev][AI Self-Check] AI self-check failed',
+      error instanceof Error ? error : new Error(error.message)
+    );
+    return res.status(500).json({
+      success: false,
+      message: 'AI self-check failed',
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 });
 

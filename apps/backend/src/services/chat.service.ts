@@ -12,6 +12,7 @@ import { logError, logWarn } from '../middleware/logger';
 import { AIOpenAIService } from './ai-openai.service';
 import db from '../db';
 import { getVisaKnowledgeBase } from '../data/visaKnowledgeBase';
+import { getRelevantDocumentGuides } from '../data/documentGuides';
 
 const prisma = db; // Use shared Prisma instance
 
@@ -215,7 +216,7 @@ User's Current Visa Application:
       let aiResponse;
       try {
         // Build system prompt with context
-        const systemPrompt = this.buildSystemPrompt(applicationContext, ragContext);
+        const systemPrompt = this.buildSystemPrompt(applicationContext, ragContext, content);
 
         // Use DeepSeek Reasoner for AI assistant chat
         // Build full user message with conversation history and context
@@ -573,7 +574,11 @@ User's Current Visa Application:
   /**
    * Build system prompt with application context
    */
-  private buildSystemPrompt(applicationContext: any, ragContext: string): string {
+  private buildSystemPrompt(
+    applicationContext: any,
+    ragContext: string,
+    latestUserMessage: string
+  ): string {
     let prompt = `You are the main AI visa consultant inside the Ketdik app.
 
 ROLE
@@ -608,6 +613,12 @@ HOW YOU WORK
 
 RAG / KNOWLEDGE BASE
 - If the prompt includes specific rules or text under something like KNOWLEDGE_BASE, treat that information as higher priority than your general knowledge.
+- Within KNOWLEDGE_BASE there may be:
+  • APPLICATION CONTEXT: details about this user's visa application.
+  • VISA_KNOWLEDGE_BASE: country and visa-type specific rules (documents, finance, process, refusal reasons).
+  • DOCUMENT_GUIDES: practical instructions (for Uzbekistan) on how the user can obtain specific documents such as bank statements, police clearance, property certificates, etc.
+  • RAG_CONTEXT: additional retrieved information.
+- When the user asks about a specific document (for example, where to get a bank statement or police clearance), prefer to use the DOCUMENT_GUIDES section and adapt it to the user's language.
 - Use that information first. Only add general visa knowledge when needed, and clearly mark it as:
   - Uzbek: "Umumiy maslahat, iltimos rasmiy manbadan tekshiring."
   - Russian: "Общий совет, пожалуйста, проверьте на официальном сайте."
@@ -621,8 +632,15 @@ SAFETY AND HONESTY
 
 STYLE
 - Be calm, respectful, and efficient. No unnecessary jokes or hype.
-- Use short paragraphs and bullet lists.
-- Do not show internal reasoning, chain-of-thought, or hidden analysis. Only show the final clear explanation and steps.`;
+- Use short paragraphs and SHORT lists.
+- Prefer simple numbered or bulleted lists like "1., 2., 3." instead of Markdown headings.
+- Avoid using Markdown headings such as "##", "###" and avoid too many "**bold**" markers.
+- Use punctuation that is natural for the language:
+  • Uzbek: commas and periods correctly, no extra exclamation marks.
+  • Russian: proper commas and periods, no unnecessary quotes or brackets.
+  • English: clear sentences, no overuse of parentheses or exclamation marks.
+- Do not output chain-of-thought, hidden reasoning, or internal analysis.
+- Never output "<think>" or any similar tags. If you need to reason, do it internally and output only the final answer.`;
 
     // Extract country and visaType from applicationContext
     const country =
@@ -636,10 +654,14 @@ STYLE
     // Get Spain visa knowledge base if applicable
     const visaKb = getVisaKnowledgeBase(country, visaType);
 
+    // Get relevant document guides based on user's latest message
+    const documentGuides = getRelevantDocumentGuides(latestUserMessage || '');
+
     // Build KNOWLEDGE_BASE section with priority order:
     // 1. Application context (if present)
     // 2. Spain visa KB (if available)
-    // 3. RAG context (if present)
+    // 3. Document guides (if user asks about specific documents)
+    // 4. RAG context (if present)
     let knowledgeBaseBlock = '';
 
     if (applicationContext) {
@@ -647,7 +669,11 @@ STYLE
     }
 
     if (visaKb) {
-      knowledgeBaseBlock += `SPAIN_VISA_KNOWLEDGE_BASE:\n${visaKb}\n\n`;
+      knowledgeBaseBlock += `VISA_KNOWLEDGE_BASE:\n${visaKb}\n\n`;
+    }
+
+    if (documentGuides) {
+      knowledgeBaseBlock += `DOCUMENT_GUIDES:\n${documentGuides}\n\n`;
     }
 
     if (ragContext) {
@@ -658,6 +684,13 @@ STYLE
     if (knowledgeBaseBlock.trim()) {
       prompt += `\n\nKNOWLEDGE_BASE\n${knowledgeBaseBlock.trim()}`;
     }
+
+    // Add explicit chain-of-thought blocking rules at the end
+    prompt += `\n\nCRITICAL OUTPUT RULES (MUST FOLLOW):
+- Do NOT output chain-of-thought, hidden reasoning, or internal analysis.
+- Never output <think> or anything similar.
+- Only provide the final, concise answer.
+- If you need to reason, do it internally, but output only conclusions.`;
 
     return prompt;
   }

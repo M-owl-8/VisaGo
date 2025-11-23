@@ -154,30 +154,107 @@ export default function QuestionnaireScreen({navigation}: any) {
       setStoreLoading(true);
 
       // Prepare questionnaire data (legacy format for API compatibility)
+      // Map new questionnaire structure to old format for backend compatibility
+
+      // Get purpose directly from answers (Q4: purpose question)
+      // Fallback to hasUniversityAcceptance for backward compatibility
+      const purposeFromAnswer = answers.purpose as string;
+      const hasUniversityAcceptance =
+        answers.hasUniversityAcceptance === true ||
+        String(answers.hasUniversityAcceptance) === 'true';
+      const purpose =
+        purposeFromAnswer === 'study' || purposeFromAnswer === 'tourism'
+          ? purposeFromAnswer
+          : hasUniversityAcceptance
+            ? 'study'
+            : 'tourism';
+
+      // Get country ID from answers (Q3: destination country)
+      // CRITICAL: Must be a valid country ID from /api/countries
+      const countryId = answers.country as string;
+
+      // Validate country ID is present and not 'not_sure'
+      if (!countryId || countryId === 'not_sure' || countryId.trim() === '') {
+        throw new Error(
+          t('questionnaire.country.required') ||
+            'Please select a destination country',
+        );
+      }
+
+      // Map employment status
+      const isEmployed =
+        answers.isEmployed === true || String(answers.isEmployed) === 'true';
+      const isStudent =
+        answers.isCurrentlyStudying === true ||
+        String(answers.isCurrentlyStudying) === 'true';
+      let currentStatus = 'employee';
+      if (isStudent) {
+        currentStatus = 'student';
+      } else if (isEmployed) {
+        currentStatus = 'employee';
+      } else {
+        currentStatus = 'unemployed';
+      }
+
+      // Map financial situation from tripFunding
+      const tripFunding = answers.tripFunding as string;
+      let financialSituation = 'stable_income';
+      if (tripFunding === 'sponsor') {
+        financialSituation = 'sponsor';
+      } else if (tripFunding === 'savings') {
+        financialSituation = 'savings';
+      } else if (tripFunding === 'self') {
+        financialSituation = 'stable_income';
+      }
+
+      // Map travel history
+      const visitedCountries = answers.visitedCountries as string;
+      const traveledBefore = visitedCountries && visitedCountries.trim() !== '';
+
+      // Map family status
+      const hasFamilyTies =
+        answers.hasFamilyTiesUzbekistan === true ||
+        String(answers.hasFamilyTiesUzbekistan) === 'true';
+      const maritalStatus = hasFamilyTies ? 'married' : 'single';
+      const hasChildren = hasFamilyTies ? 'one' : 'no';
+
+      // Map duration from plannedTravelDates or use default
+      // TODO: Extract duration from plannedTravelDates if available
+      const duration = '1_3_months'; // Default, can be enhanced later
+
+      // Map invitation based on visa type
+      let hasInvitation = false;
+      if (purpose === 'study') {
+        hasInvitation = hasUniversityAcceptance;
+      } else if (purpose === 'tourism') {
+        // For tourist, check if they have hotel booking or invitation
+        hasInvitation =
+          answers.accommodationStatus === 'reserved' ||
+          answers.hasOtherInvitation === true;
+      }
+
+      // Map English level if available
+      const englishLevel = (answers.englishLevel as string) || 'intermediate';
+
       const questionnaireData: QuestionnaireData = {
-        purpose: (answers.purpose as any) || 'tourism',
-        country: answers.country as string,
-        duration: (answers.duration as any) || '1_3_months',
-        traveledBefore:
-          answers.traveledBefore === true ||
-          String(answers.traveledBefore) === 'true',
-        currentStatus: (answers.currentStatus as any) || 'employee',
-        hasInvitation:
-          answers.hasInvitation === true ||
-          String(answers.hasInvitation) === 'true',
-        financialSituation:
-          (answers.financialSituation as any) || 'stable_income',
-        maritalStatus: (answers.maritalStatus as any) || 'single',
-        hasChildren: (answers.hasChildren as any) || 'no',
-        englishLevel: (answers.englishLevel as any) || 'intermediate',
+        purpose: purpose as 'tourism' | 'study',
+        country: countryId, // Must be valid country ID
+        duration: duration as any,
+        traveledBefore: traveledBefore,
+        currentStatus: currentStatus as any,
+        hasInvitation: hasInvitation,
+        financialSituation: financialSituation as any,
+        maritalStatus: maritalStatus as any,
+        hasChildren: hasChildren as any,
+        englishLevel: englishLevel as any,
       };
 
       // Create standardized summary
       // Pass countries array to help map country ID to code
       const questionnaireSummary = mapExistingQuestionnaireToSummary(
         questionnaireData,
-        language as "uz" | "ru" | "en",
-        countries // Pass countries from visa store to help with country code mapping
+        language as 'uz' | 'ru' | 'en',
+        countries, // Pass countries from visa store to help with country code mapping
       );
 
       // Save both legacy format (for backwards compatibility) and summary
@@ -211,9 +288,16 @@ export default function QuestionnaireScreen({navigation}: any) {
       }
 
       // Call AI generation endpoint
+      // Include summary in questionnaireData for backend fallback lookup
+      const questionnaireDataWithSummary = {
+        ...questionnaireData,
+        summary: questionnaireSummary, // Include summary for country fallback
+      };
+
       try {
-        const response =
-          await apiClient.generateApplicationWithAI(questionnaireData);
+        const response = await apiClient.generateApplicationWithAI(
+          questionnaireDataWithSummary,
+        );
 
         if (response.success && response.data) {
           // Clear questionnaire progress
@@ -225,30 +309,41 @@ export default function QuestionnaireScreen({navigation}: any) {
               text: 'OK',
               onPress: async () => {
                 // Refresh applications list before navigating
-                const { fetchUserApplications } = useAuthStore.getState();
+                const {fetchUserApplications} = useAuthStore.getState();
                 try {
                   await fetchUserApplications();
                 } catch (error) {
                   console.warn('Failed to refresh applications:', error);
                 }
                 // Navigate back to Applications tab
-                navigation?.navigate('MainTabs', { screen: 'Applications' });
+                navigation?.navigate('MainTabs', {screen: 'Applications'});
               },
             },
           ]);
         } else {
-          throw new Error(
-            response.error?.message || 'Failed to generate application',
-          );
+          // Extract error message properly
+          const errorMessage =
+            response.error?.message ||
+            response.error?.error?.message ||
+            'Failed to generate application';
+          throw new Error(errorMessage);
         }
       } catch (aiError: any) {
         console.error('AI generation failed:', aiError);
+
+        // Extract error message from API response - check all possible locations
+        const aiErrorMessage =
+          aiError?.response?.data?.error?.message ||
+          aiError?.response?.data?.message ||
+          aiError?.response?.data?.error ||
+          aiError?.message ||
+          'Failed to generate application with AI';
 
         // Fallback: Create a basic application even if AI fails
         try {
           console.log('Starting fallback application creation...');
           console.log('Questionnaire data:', questionnaireData);
-          
+
           // Get default country and visa type
           let countryId = questionnaireData.country;
           let visaTypeId: string | undefined;
@@ -265,13 +360,19 @@ export default function QuestionnaireScreen({navigation}: any) {
                 countryId = undefined; // Reset to fetch a new one
               }
             } catch (error) {
-              console.warn('Error validating country, will fetch new one:', error);
+              console.warn(
+                'Error validating country, will fetch new one:',
+                error,
+              );
               countryId = undefined; // Reset to fetch a new one
             }
           }
-          
+
           // Country is required - validate it exists
-          if (!countryId || (typeof countryId === 'string' && countryId.trim() === '')) {
+          if (
+            !countryId ||
+            (typeof countryId === 'string' && countryId.trim() === '')
+          ) {
             throw new Error(t('questionnaire.country.required'));
           }
 
@@ -284,12 +385,17 @@ export default function QuestionnaireScreen({navigation}: any) {
           // Step 2: Get visa types for the country
           console.log('Fetching visa types for country:', countryId);
           let visaTypesFetched = false;
-          
+
           try {
             const visaTypes = await apiClient.getVisaTypes(countryId);
             console.log('Visa types API response:', visaTypes);
-            
-            if (visaTypes.success && visaTypes.data && Array.isArray(visaTypes.data) && visaTypes.data.length > 0) {
+
+            if (
+              visaTypes.success &&
+              visaTypes.data &&
+              Array.isArray(visaTypes.data) &&
+              visaTypes.data.length > 0
+            ) {
               // Find visa type matching purpose, or use first one
               const purposeMap: Record<string, string> = {
                 study: 'student',
@@ -298,9 +404,11 @@ export default function QuestionnaireScreen({navigation}: any) {
                 business: 'business',
                 immigration: 'immigration',
               };
-              const visaTypeName = purposeMap[questionnaireData.purpose] || 'tourist';
+              const visaTypeName =
+                purposeMap[questionnaireData.purpose] || 'tourist';
               const matchingVisaType = visaTypes.data.find(
-                (vt: any) => vt.name && vt.name.toLowerCase().includes(visaTypeName)
+                (vt: any) =>
+                  vt.name && vt.name.toLowerCase().includes(visaTypeName),
               );
               visaTypeId = matchingVisaType?.id || visaTypes.data[0].id;
               console.log('Selected visa type ID:', visaTypeId);
@@ -317,9 +425,11 @@ export default function QuestionnaireScreen({navigation}: any) {
               status: visaTypeError.response?.status,
             });
           }
-          
+
           if (!visaTypeId) {
-            throw new Error(`No visa types available for selected country. The database may need to be seeded. Please run 'npm run db:seed' in the backend directory.`);
+            throw new Error(
+              `No visa types available for selected country. The database may need to be seeded. Please run 'npm run db:seed' in the backend directory.`,
+            );
           }
 
           if (!visaTypeId) {
@@ -327,17 +437,25 @@ export default function QuestionnaireScreen({navigation}: any) {
           }
 
           // Step 3: Create basic application
-          console.log('Creating application with country:', countryId, 'visa type:', visaTypeId);
+          console.log(
+            'Creating application with country:',
+            countryId,
+            'visa type:',
+            visaTypeId,
+          );
           const createResponse = await apiClient.createApplication(
             countryId,
             visaTypeId,
-            'Application created from questionnaire (AI generation unavailable)'
+            'Application created from questionnaire (AI generation unavailable)',
           );
 
           console.log('Application creation response:', createResponse);
 
           if (createResponse.success && createResponse.data) {
-            console.log('Application created successfully:', createResponse.data.id);
+            console.log(
+              'Application created successfully:',
+              createResponse.data.id,
+            );
             Alert.alert(
               'Success!',
               'Your application has been created successfully!',
@@ -346,48 +464,60 @@ export default function QuestionnaireScreen({navigation}: any) {
                   text: 'OK',
                   onPress: async () => {
                     // Refresh applications list before navigating
-                    const { fetchUserApplications } = useAuthStore.getState();
+                    const {fetchUserApplications} = useAuthStore.getState();
                     try {
                       await fetchUserApplications();
                     } catch (error) {
                       console.warn('Failed to refresh applications:', error);
                     }
                     // Navigate back to Applications tab
-                    navigation?.navigate('MainTabs', { screen: 'Applications' });
+                    navigation?.navigate('MainTabs', {screen: 'Applications'});
                   },
                 },
               ],
             );
           } else {
-            throw new Error(createResponse.error?.message || 'Failed to create application');
+            throw new Error(
+              createResponse.error?.message || 'Failed to create application',
+            );
           }
         } catch (fallbackError: any) {
           console.error('Fallback application creation failed:', fallbackError);
           console.error('Error details:', {
             message: fallbackError.message,
+            response: fallbackError.response?.data,
             stack: fallbackError.stack,
             questionnaireData,
           });
-          
+
           // Even if fallback fails, questionnaire is complete
-          // Show detailed error message to help debug
-          const errorMessage = fallbackError.message || 'Unknown error';
+          // Extract error message from API response or use fallback
+          const errorMessage =
+            fallbackError?.response?.data?.error?.message ||
+            fallbackError?.response?.data?.message ||
+            fallbackError?.response?.data?.error ||
+            fallbackError?.message ||
+            'Unknown error occurred while creating application';
+
+          // Show detailed error message (no {error} placeholder)
+          const errorText = errorMessage.replace(/{error}/g, errorMessage);
           Alert.alert(
             t('questionnaire.complete'),
-            t('questionnaire.saveError', { error: errorMessage }),
+            t('questionnaire.saveError', {error: errorText}) ||
+              `Your questionnaire has been saved. However, we couldn't create an application automatically.\n\nError: ${errorText}\n\nYou can create applications manually from the Applications page.`,
             [
               {
                 text: t('common.ok'),
                 onPress: async () => {
                   // Refresh applications list in case something was created
-                  const { fetchUserApplications } = useAuthStore.getState();
+                  const {fetchUserApplications} = useAuthStore.getState();
                   try {
                     await fetchUserApplications();
                   } catch (error) {
                     console.warn('Failed to refresh applications:', error);
                   }
                   // Navigate back to Applications tab
-                  navigation?.navigate('MainTabs', { screen: 'Applications' });
+                  navigation?.navigate('MainTabs', {screen: 'Applications'});
                 },
               },
             ],
@@ -397,7 +527,10 @@ export default function QuestionnaireScreen({navigation}: any) {
     } catch (error: any) {
       console.error('Questionnaire submission failed:', error);
       setStoreError(error.message);
-      Alert.alert(t('common.error'), error.message || t('questionnaire.failed'));
+      Alert.alert(
+        t('common.error'),
+        error.message || t('questionnaire.failed'),
+      );
     } finally {
       setLoading(false);
       setStoreLoading(false);
@@ -412,6 +545,26 @@ export default function QuestionnaireScreen({navigation}: any) {
     // For country question, handle special case
     if (questionId === 'country') {
       return renderCountryQuestion();
+    }
+
+    // For text input questions
+    if (currentQuestion.type === 'text') {
+      return (
+        <View style={styles.textInputContainer}>
+          <TextInput
+            style={styles.textInput}
+            value={(currentAnswer as string) || ''}
+            onChangeText={text => handleSelectAnswer(questionId, text)}
+            placeholder={getQuestionText('description') || ''}
+            placeholderTextColor="#94A3B8"
+            editable={!loading}
+            multiline={
+              questionId === 'plannedTravelDates' ||
+              questionId === 'visitedCountries'
+            }
+          />
+        </View>
+      );
     }
 
     // For boolean questions
@@ -502,7 +655,11 @@ export default function QuestionnaireScreen({navigation}: any) {
     if (!showCountrySearch) {
       const selectedCountry = countries.find(c => c.id === currentAnswer);
       const displayName = selectedCountry
-        ? getTranslatedCountryName(selectedCountry.code, language, selectedCountry.name)
+        ? getTranslatedCountryName(
+            selectedCountry.code,
+            language,
+            selectedCountry.name,
+          )
         : null;
 
       return (
@@ -514,16 +671,18 @@ export default function QuestionnaireScreen({navigation}: any) {
               currentAnswer && styles.searchButtonSelected,
             ]}
             onPress={() => setShowCountrySearch(true)}>
-            <Icon 
-              name="search-outline" 
-              size={20} 
-              color={currentAnswer ? "#4A9EFF" : "#94A3B8"} 
+            <Icon
+              name="search-outline"
+              size={20}
+              color={currentAnswer ? '#4A9EFF' : '#94A3B8'}
             />
-            <Text style={[
-              styles.searchButtonText,
-              currentAnswer && styles.searchButtonTextSelected,
-            ]}>
-              {displayName || t('questionnaire.questions.country.searchPlaceholder')}
+            <Text
+              style={[
+                styles.searchButtonText,
+                currentAnswer && styles.searchButtonTextSelected,
+              ]}>
+              {displayName ||
+                t('questionnaire.questions.country.searchPlaceholder')}
             </Text>
             {currentAnswer && (
               <Icon
@@ -540,9 +699,15 @@ export default function QuestionnaireScreen({navigation}: any) {
 
     // Show country search - filter by translated names
     const filteredCountries = countries.filter(country => {
-      const translatedName = getTranslatedCountryName(country.code, language, country.name);
-      return translatedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             country.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const translatedName = getTranslatedCountryName(
+        country.code,
+        language,
+        country.name,
+      );
+      return (
+        translatedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        country.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     });
 
     return (
@@ -589,7 +754,11 @@ export default function QuestionnaireScreen({navigation}: any) {
                 }}>
                 <Text style={styles.countryFlag}>{country.flagEmoji}</Text>
                 <Text style={styles.countryName}>
-                  {getTranslatedCountryName(country.code, language, country.name)}
+                  {getTranslatedCountryName(
+                    country.code,
+                    language,
+                    country.name,
+                  )}
                 </Text>
                 {currentAnswer === country.id && (
                   <Icon
@@ -727,7 +896,9 @@ export default function QuestionnaireScreen({navigation}: any) {
                 ) : (
                   <>
                     <Text style={styles.continueButtonText}>
-                      {currentStep === totalSteps - 1 ? t('questionnaire.complete') : t('questionnaire.continue')}
+                      {currentStep === totalSteps - 1
+                        ? t('questionnaire.complete')
+                        : t('questionnaire.continue')}
                     </Text>
                     <Icon
                       name={
@@ -929,6 +1100,20 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     marginLeft: 'auto',
+  },
+  textInputContainer: {
+    marginTop: 16,
+  },
+  textInput: {
+    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
+    minHeight: 50,
+    textAlignVertical: 'top',
   },
   searchButton: {
     flexDirection: 'row',

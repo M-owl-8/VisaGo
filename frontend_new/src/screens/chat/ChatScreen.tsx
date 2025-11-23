@@ -15,11 +15,25 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuthStore} from '../../store/auth';
 import {apiClient} from '../../services/api';
+
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// Storage key for chat history persistence
+const CHAT_HISTORY_STORAGE_KEY = '@ketdik_chat_history_global_v1';
 
 // Local message types
 type LocalRole = 'user' | 'assistant';
@@ -52,35 +66,147 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Refs for auto-scroll
   const flatListRef = useRef<FlatList>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && isNearBottom) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({animated: true});
       }, 100);
     }
-  }, [messages.length]);
+  }, [messages.length, isNearBottom]);
+
+  // Handle scroll events to show/hide scroll-to-bottom button
+  const handleScroll = (event: any) => {
+    const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
+    const distanceFromBottom =
+      contentSize.height - layoutMeasurement.height - contentOffset.y;
+    const nearBottom = distanceFromBottom < 200; // Show button if more than 200px from bottom
+    setIsNearBottom(nearBottom);
+    setShowScrollToBottom(!nearBottom && messages.length > 3);
+  };
+
+  const scrollToBottom = () => {
+    flatListRef.current?.scrollToEnd({animated: true});
+    setShowScrollToBottom(false);
+    setIsNearBottom(true);
+  };
+
+  // Load chat history from AsyncStorage on mount
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadChatHistory = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          // Basic validation: ensure it's an array
+          if (Array.isArray(parsed)) {
+            if (!isCancelled) {
+              setMessages(parsed);
+              console.log(
+                '[ChatScreen] Loaded chat history:',
+                parsed.length,
+                'messages',
+              );
+            }
+          }
+        } else {
+          console.log('[ChatScreen] No stored chat history found');
+        }
+      } catch (error) {
+        console.warn(
+          '[ChatScreen] Failed to load chat history from storage',
+          error,
+        );
+        // If parsing/loading fails, just start with empty messages
+      } finally {
+        if (!isCancelled) {
+          setIsHydrated(true);
+        }
+      }
+    };
+
+    loadChatHistory();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  // Save chat history to AsyncStorage whenever messages change
+  useEffect(() => {
+    if (!isHydrated) {
+      // Avoid saving initial empty state before hydration finishes
+      return;
+    }
+
+    const saveChatHistory = async () => {
+      try {
+        // Limit the number of messages to avoid unbounded growth
+        const maxMessagesToPersist = 200;
+        const toPersist =
+          messages.length > maxMessagesToPersist
+            ? messages.slice(messages.length - maxMessagesToPersist)
+            : messages;
+
+        await AsyncStorage.setItem(
+          CHAT_HISTORY_STORAGE_KEY,
+          JSON.stringify(toPersist),
+        );
+        console.log(
+          '[ChatScreen] Saved chat history:',
+          toPersist.length,
+          'messages',
+        );
+      } catch (error) {
+        console.warn(
+          '[ChatScreen] Failed to save chat history to storage',
+          error,
+        );
+      }
+    };
+
+    saveChatHistory();
+  }, [messages, isHydrated]);
 
   // Logging (temporary)
   useEffect(() => {
     console.log('[ChatScreen] messages:', messages.length);
   }, [messages.length]);
 
-  // Helper function to strip DeepSeek thinking blocks
-  function stripThinkBlock(raw: string): string {
+  // Helper function to sanitize AI messages: remove markdown and thinking blocks
+  const sanitizeAiMessage = (raw: string): string => {
     if (!raw) return '';
-    // Remove <think>...</think> including the tags and any leading/trailing whitespace/newlines
-    const thinkRegex = /<think>[\s\S]*?<\/redacted_reasoning>/gi;
-    let cleaned = raw.replace(thinkRegex, '');
-    // Clean up any extra newlines or whitespace left behind
-    cleaned = cleaned.replace(/\n\s*\n+/g, '\n').trim();
-    // If after stripping we have nothing, return the original (shouldn't happen, but safety)
-    return cleaned.length > 0 ? cleaned : raw.trim();
-  }
+
+    let text = raw;
+
+    // Remove <think>...</think> blocks (multi-line)
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // Remove <think>...</think> blocks (alternative format)
+    text = text.replace(/<think>[\s\S]*?<\/redacted_reasoning>/gi, '').trim();
+
+    // Remove Markdown heading markers at line starts (###, ####, etc.)
+    text = text.replace(/^\s*#{1,6}\s*/gm, '');
+
+    // Remove bold markers **text**
+    text = text.replace(/\*\*/g, '');
+
+    // Normalize list markers "- " (ensure space after dash)
+    text = text.replace(/^\s*-\s*/gm, '- ');
+
+    // Collapse multiple blank lines into max 2
+    text = text.replace(/\n{3,}/g, '\n\n');
+
+    return text.trim();
+  };
 
   // Handle sending a message
   const handleSendMessage = async () => {
@@ -113,7 +239,7 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     const thinkingMessage: LocalMessage = {
       id: thinkingMessageId,
       role: 'assistant',
-      content: 'Ketdik is thinking...',
+      content: 'Ketdik AI is thinking...',
       createdAt: new Date().toISOString(),
       status: 'thinking',
       pending: true,
@@ -121,6 +247,10 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
 
     // Clear input and add both messages immediately (ChatGPT-style)
     setMessageInput('');
+
+    // Animate message appearance
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
     setMessages(prev => [...prev, userMessage, thinkingMessage]);
     setIsSending(true);
 
@@ -144,8 +274,8 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
 
       const aiData = response.data; // { message, sources, tokens_used, model, id }
 
-      // Strip thinking blocks from the response
-      const cleanedContent = stripThinkBlock(aiData.message);
+      // Sanitize AI message: remove markdown and thinking blocks
+      const cleanedContent = sanitizeAiMessage(aiData.message);
 
       const assistantMessage: LocalMessage = {
         id: aiData.id || `assistant-${Date.now()}`,
@@ -160,6 +290,8 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
       };
 
       // Replace the thinking placeholder with the real AI response
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
       setMessages(prev => {
         return prev
           .filter(msg => msg.id !== thinkingMessageId) // Remove thinking placeholder
@@ -244,12 +376,19 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     );
   };
 
+  // Platform-specific keyboard behavior
+  const keyboardBehavior = Platform.select({
+    ios: 'padding',
+    android: 'height',
+    default: undefined,
+  }) as 'padding' | 'height' | 'position' | undefined;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+        behavior={keyboardBehavior}
+        keyboardVerticalOffset={0}>
         <View style={styles.contentContainer}>
           <FlatList
             ref={flatListRef}
@@ -259,6 +398,8 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
             style={styles.flatList}
             contentContainerStyle={styles.messagesList}
             keyboardShouldPersistTaps="handled"
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Icon name="chatbubbles-outline" size={64} color="#94A3B8" />
@@ -268,6 +409,16 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
               </View>
             }
           />
+
+          {/* Scroll to bottom button */}
+          {showScrollToBottom && (
+            <TouchableOpacity
+              style={styles.scrollToBottomButton}
+              onPress={scrollToBottom}
+              activeOpacity={0.7}>
+              <Icon name="chevron-down" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
 
           {errorMessage && (
             <View style={styles.errorBanner}>
@@ -290,16 +441,16 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
               onChangeText={setMessageInput}
               multiline
               maxLength={2000}
-              editable={!isSending}
+              editable={isHydrated && !isSending}
             />
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!messageInput.trim() || isSending) &&
+                (!isHydrated || !messageInput.trim() || isSending) &&
                   styles.sendButtonDisabled,
               ]}
               onPress={handleSendMessage}
-              disabled={!messageInput.trim() || isSending}>
+              disabled={!isHydrated || !messageInput.trim() || isSending}>
               {isSending ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
@@ -361,7 +512,7 @@ const styles = StyleSheet.create({
   messageBubble: {
     maxWidth: '80%',
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   userBubble: {
     backgroundColor: '#4A9EFF',
@@ -457,6 +608,22 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: 'rgba(74, 158, 255, 0.3)',
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    bottom: 80,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4A9EFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
 

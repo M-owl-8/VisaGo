@@ -11,9 +11,19 @@ export interface QuestionnaireAnswer {
 export interface QuestionnaireData {
   purpose: 'study' | 'work' | 'tourism' | 'business' | 'immigration' | 'other';
   country?: string;
-  duration: 'less_than_1' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year';
+  duration:
+    | 'less_than_1'
+    | '1_3_months'
+    | '3_6_months'
+    | '6_12_months'
+    | 'more_than_1_year';
   traveledBefore: boolean;
-  currentStatus: 'student' | 'employee' | 'entrepreneur' | 'unemployed' | 'other';
+  currentStatus:
+    | 'student'
+    | 'employee'
+    | 'entrepreneur'
+    | 'unemployed'
+    | 'other';
   hasInvitation: boolean;
   financialSituation: 'stable_income' | 'sponsor' | 'savings' | 'preparing';
   maritalStatus: 'single' | 'married' | 'divorced';
@@ -26,19 +36,21 @@ export interface QuestionnaireData {
  * This is the clean, structured format sent to AI and stored in the database
  */
 export interface VisaQuestionnaireSummary {
-  version: string;            // e.g. "1.0"
-  visaType: "student" | "tourist";
-  targetCountry: string;      // "US" | "CA" | "NZ" | "AU" | "JP" | "KR" | "UK" | "ES" | "DE" | "AE"
-  appLanguage: "uz" | "ru" | "en";
+  version: string; // e.g. "2.0" (updated for new structure)
+  visaType: 'student' | 'tourist';
+  targetCountry: string; // "US" | "CA" | "NZ" | "AU" | "JP" | "KR" | "UK" | "ES" | "DE" | "PL"
+  appLanguage: 'uz' | 'ru' | 'en';
+
+  // Legacy fields (for backward compatibility)
   age?: number;
   citizenship?: string;
   currentCountry?: string;
   hasUniversityInvitation?: boolean;
-  hasOtherInvitation?: boolean;  // family/company/hotel etc.
+  hasOtherInvitation?: boolean;
   invitationDetails?: string;
   monthlyIncomeUSD?: number;
   bankBalanceUSD?: number;
-  sponsorType?: "self" | "parent" | "relative" | "company" | "other";
+  sponsorType?: 'self' | 'parent' | 'relative' | 'company' | 'other';
   hasPropertyInUzbekistan?: boolean;
   hasFamilyInUzbekistan?: boolean;
   hasInternationalTravel?: boolean;
@@ -53,8 +65,54 @@ export interface VisaQuestionnaireSummary {
     hasFlightBooking?: boolean;
     hasHotelBookingOrAccommodation?: boolean;
   };
-  notes?: string;          // anything important user mentioned
-  mainConcerns?: string;   // what user is worried about
+  notes?: string;
+  mainConcerns?: string;
+
+  // NEW: Extended structure for better AI generation
+  personalInfo?: {
+    fullName?: string;
+    dateOfBirth?: string;
+    nationality?: string;
+    passportStatus?: 'valid' | 'expired' | 'no_passport';
+  };
+  travelInfo?: {
+    purpose?: string;
+    plannedDates?: string;
+    funding?: 'self' | 'sponsor' | 'company';
+    monthlyCapacity?: number;
+    accommodation?: 'reserved' | 'university_housing' | 'not_reserved';
+    tuitionStatus?: 'fully_paid' | 'scholarship' | 'partial_scholarship';
+  };
+  employment?: {
+    isEmployed?: boolean;
+    employerName?: string;
+    monthlySalaryUSD?: number;
+  };
+  education?: {
+    isStudent?: boolean;
+    university?: string;
+    programType?: 'bachelor' | 'master' | 'phd' | 'exchange' | 'language';
+    diplomaAvailable?: boolean;
+    transcriptAvailable?: boolean;
+    hasGraduated?: boolean;
+  };
+  financialInfo?: {
+    selfFundsUSD?: number;
+    sponsorDetails?: {
+      relationship?: 'parent' | 'sibling' | 'relative' | 'friend' | 'other';
+      employment?: 'employed' | 'business_owner' | 'retired' | 'other';
+      annualIncomeUSD?: number;
+    };
+  };
+  travelHistory?: {
+    visitedCountries?: string[];
+    hasRefusals?: boolean;
+    refusalDetails?: string;
+  };
+  ties?: {
+    propertyDocs?: boolean;
+    familyTies?: boolean;
+  };
 }
 
 export interface QuestionOption {
@@ -73,7 +131,7 @@ export interface Question {
   descriptionEn?: string;
   descriptionUz?: string;
   descriptionRu?: string;
-  type: 'single' | 'multiple' | 'boolean' | 'dropdown';
+  type: 'single' | 'multiple' | 'boolean' | 'dropdown' | 'text';
   required: boolean;
   options: QuestionOption[];
 }

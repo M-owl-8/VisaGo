@@ -1,5 +1,5 @@
-import { PrismaClient, Prisma } from "@prisma/client";
-import { errors } from "../utils/errors";
+import { PrismaClient, Prisma } from '@prisma/client';
+import { errors } from '../utils/errors';
 
 const prisma = new PrismaClient();
 
@@ -10,10 +10,7 @@ export class CountriesService {
   static async getAllCountries(search?: string) {
     const where: any = search
       ? {
-          OR: [
-            { name: { contains: search } },
-            { code: { contains: search } },
-          ],
+          OR: [{ name: { contains: search } }, { code: { contains: search } }],
         }
       : {};
 
@@ -22,7 +19,7 @@ export class CountriesService {
       include: {
         visaTypes: true,
       },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
 
     return countries;
@@ -40,7 +37,7 @@ export class CountriesService {
     });
 
     if (!country) {
-      throw errors.notFound("Country");
+      throw errors.notFound('Country');
     }
 
     return country;
@@ -54,14 +51,41 @@ export class CountriesService {
       where: { code: code.toUpperCase() },
       include: {
         visaTypes: {
-          orderBy: { name: "asc" },
+          orderBy: { name: 'asc' },
         },
       },
     });
 
     if (!country) {
-      throw errors.notFound("Country");
+      throw errors.notFound('Country');
     }
+
+    return country;
+  }
+
+  /**
+   * Get country by code or name (fallback helper for questionnaire)
+   * Used when country ID might be stale but we have code/name from summary
+   */
+  static async getCountryByCodeOrName(codeOrName: string) {
+    const value = codeOrName.trim();
+    if (!value) {
+      return null;
+    }
+
+    const country = await prisma.country.findFirst({
+      where: {
+        OR: [
+          { code: value.toUpperCase() }, // e.g. "US"
+          { name: { contains: value, mode: Prisma.QueryMode.insensitive } }, // e.g. "United States"
+        ],
+      },
+      include: {
+        visaTypes: {
+          orderBy: { name: 'asc' },
+        },
+      },
+    });
 
     return country;
   }
@@ -77,7 +101,7 @@ export class CountriesService {
           take: 3,
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
 
     return countries;
@@ -95,7 +119,7 @@ export class CountriesService {
     });
 
     if (!visaType) {
-      throw errors.notFound("Visa Type");
+      throw errors.notFound('Visa Type');
     }
 
     return visaType;
@@ -107,7 +131,7 @@ export class CountriesService {
   static async getVisaTypesByCountry(countryId: string) {
     const visaTypes = await prisma.visaType.findMany({
       where: { countryId },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
 
     return visaTypes;
@@ -131,7 +155,7 @@ export class CountriesService {
     });
 
     if (existing) {
-      throw errors.conflict("Country");
+      throw errors.conflict('Country');
     }
 
     const country = await prisma.country.create({
@@ -150,14 +174,25 @@ export class CountriesService {
   /**
    * Create visa type for a country (admin only)
    */
-  static async createVisaType(countryId: string, data: { name: string; description: string; processingDays?: number; validity?: string; fee?: number; requirements?: string; documentTypes?: string[] }) {
+  static async createVisaType(
+    countryId: string,
+    data: {
+      name: string;
+      description: string;
+      processingDays?: number;
+      validity?: string;
+      fee?: number;
+      requirements?: string;
+      documentTypes?: string[];
+    }
+  ) {
     // Verify country exists
     const country = await prisma.country.findUnique({
       where: { id: countryId },
     });
 
     if (!country) {
-      throw errors.notFound("Country");
+      throw errors.notFound('Country');
     }
 
     // Check if visa type already exists
@@ -169,7 +204,7 @@ export class CountriesService {
     });
 
     if (existing) {
-      throw errors.conflict("Visa Type");
+      throw errors.conflict('Visa Type');
     }
 
     const visaType = await prisma.visaType.create({
@@ -178,9 +213,9 @@ export class CountriesService {
         name: data.name,
         description: data.description,
         processingDays: data.processingDays || 30,
-        validity: data.validity || "1 year",
+        validity: data.validity || '1 year',
         fee: data.fee || 0,
-        requirements: data.requirements || "{}",
+        requirements: data.requirements || '{}',
         documentTypes: JSON.stringify(data.documentTypes || []),
       },
     });

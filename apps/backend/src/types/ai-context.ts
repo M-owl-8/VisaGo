@@ -9,7 +9,7 @@
  */
 export interface VisaProbabilityResult {
   score: number; // 10–90
-  level: "low" | "medium" | "high";
+  level: 'low' | 'medium' | 'high';
   riskFactors: string[];
   positiveFactors: string[];
 }
@@ -18,19 +18,21 @@ export interface VisaProbabilityResult {
  * Visa Questionnaire Summary (matches frontend type)
  */
 export interface VisaQuestionnaireSummary {
-  version: string;            // e.g. "1.0"
-  visaType: "student" | "tourist";
-  targetCountry: string;      // "US" | "CA" | "NZ" | "AU" | "JP" | "KR" | "UK" | "ES" | "DE" | "AE"
-  appLanguage: "uz" | "ru" | "en";
+  version: string; // e.g. "2.0" (updated for new structure)
+  visaType: 'student' | 'tourist';
+  targetCountry: string; // "US" | "CA" | "NZ" | "AU" | "JP" | "KR" | "UK" | "ES" | "DE" | "PL"
+  appLanguage: 'uz' | 'ru' | 'en';
+
+  // Legacy fields (for backward compatibility)
   age?: number;
   citizenship?: string;
   currentCountry?: string;
   hasUniversityInvitation?: boolean;
-  hasOtherInvitation?: boolean;  // family/company/hotel etc.
+  hasOtherInvitation?: boolean;
   invitationDetails?: string;
   monthlyIncomeUSD?: number;
   bankBalanceUSD?: number;
-  sponsorType?: "self" | "parent" | "relative" | "company" | "other";
+  sponsorType?: 'self' | 'parent' | 'relative' | 'company' | 'other';
   hasPropertyInUzbekistan?: boolean;
   hasFamilyInUzbekistan?: boolean;
   hasInternationalTravel?: boolean;
@@ -45,8 +47,54 @@ export interface VisaQuestionnaireSummary {
     hasFlightBooking?: boolean;
     hasHotelBookingOrAccommodation?: boolean;
   };
-  notes?: string;          // anything important user mentioned
-  mainConcerns?: string;   // what user is worried about
+  notes?: string;
+  mainConcerns?: string;
+
+  // NEW: Extended structure for better AI generation
+  personalInfo?: {
+    fullName?: string;
+    dateOfBirth?: string;
+    nationality?: string;
+    passportStatus?: 'valid' | 'expired' | 'no_passport';
+  };
+  travelInfo?: {
+    purpose?: string;
+    plannedDates?: string;
+    funding?: 'self' | 'sponsor' | 'company';
+    monthlyCapacity?: number;
+    accommodation?: 'reserved' | 'university_housing' | 'not_reserved';
+    tuitionStatus?: 'fully_paid' | 'scholarship' | 'partial_scholarship';
+  };
+  employment?: {
+    isEmployed?: boolean;
+    employerName?: string;
+    monthlySalaryUSD?: number;
+  };
+  education?: {
+    isStudent?: boolean;
+    university?: string;
+    programType?: 'bachelor' | 'master' | 'phd' | 'exchange' | 'language';
+    diplomaAvailable?: boolean;
+    transcriptAvailable?: boolean;
+    hasGraduated?: boolean;
+  };
+  financialInfo?: {
+    selfFundsUSD?: number;
+    sponsorDetails?: {
+      relationship?: 'parent' | 'sibling' | 'relative' | 'friend' | 'other';
+      employment?: 'employed' | 'business_owner' | 'retired' | 'other';
+      annualIncomeUSD?: number;
+    };
+  };
+  travelHistory?: {
+    visitedCountries?: string[];
+    hasRefusals?: boolean;
+    refusalDetails?: string;
+  };
+  ties?: {
+    propertyDocs?: boolean;
+    familyTies?: boolean;
+  };
 }
 
 /**
@@ -56,22 +104,22 @@ export interface VisaQuestionnaireSummary {
 export interface AIUserContext {
   userProfile: {
     userId: string;
-    appLanguage: "uz" | "ru" | "en";
+    appLanguage: 'uz' | 'ru' | 'en';
     citizenship?: string;
     age?: number;
   };
   application: {
     applicationId: string;
-    visaType: "student" | "tourist";
+    visaType: 'student' | 'tourist';
     country: string;
-    status: "draft" | "in_progress" | "submitted" | "approved" | "rejected";
+    status: 'draft' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
   };
   questionnaireSummary?: VisaQuestionnaireSummary;
   uploadedDocuments: {
     type: string;
     fileName: string;
     url?: string;
-    status: "uploaded" | "approved" | "rejected";
+    status: 'uploaded' | 'approved' | 'rejected';
   }[];
   appActions: {
     timestamp: string;
@@ -82,7 +130,6 @@ export interface AIUserContext {
     probabilityPercent: number;
     riskFactors: string[];
     positiveFactors: string[];
-    level: "low" | "medium" | "high";
+    level: 'low' | 'medium' | 'high';
   };
 }
-

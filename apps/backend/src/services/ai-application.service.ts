@@ -1,23 +1,23 @@
-import { PrismaClient } from "@prisma/client";
-import { errors } from "../utils/errors";
-import { AIOpenAIService } from "./ai-openai.service";
-import { ApplicationsService } from "./applications.service";
-import { VisaTypesService } from "./visa-types.service";
-import { CountriesService } from "./countries.service";
+import { PrismaClient } from '@prisma/client';
+import { errors } from '../utils/errors';
+import { AIOpenAIService } from './ai-openai.service';
+import { ApplicationsService } from './applications.service';
+import { VisaTypesService } from './visa-types.service';
+import { CountriesService } from './countries.service';
 
 const prisma = new PrismaClient();
 
 interface QuestionnaireData {
   purpose: string; // study, work, tourism, business, immigration, other
   country?: string; // country ID or "not_sure"
-  duration: string; // less_than_1, 1_3_months, 3_6_months, 6_12_months, more_than_1_year
-  traveledBefore: boolean;
-  currentStatus: string; // student, employee, entrepreneur, unemployed, other
-  hasInvitation: boolean;
-  financialSituation: string; // stable_income, sponsor, savings, preparing
-  maritalStatus: string; // single, married, divorced
-  hasChildren: string; // no, one, two_plus
-  englishLevel: string; // beginner, intermediate, advanced, native
+  duration?: string; // less_than_1, 1_3_months, 3_6_months, 6_12_months, more_than_1_year
+  traveledBefore?: boolean;
+  currentStatus?: string; // student, employee, entrepreneur, unemployed, other
+  hasInvitation?: boolean;
+  financialSituation?: string; // stable_income, sponsor, savings, preparing
+  maritalStatus?: string; // single, married, divorced
+  hasChildren?: string; // no, one, two_plus
+  englishLevel?: string; // beginner, intermediate, advanced, native
 }
 
 interface AIApplicationResult {
@@ -36,29 +36,48 @@ export class AIApplicationService {
     questionnaireData: QuestionnaireData
   ): Promise<AIApplicationResult> {
     try {
+      // Validate required fields
+      if (!questionnaireData.purpose) {
+        throw new Error(
+          "Questionnaire data must include 'purpose' field (study, tourism, work, etc.)"
+        );
+      }
+
+      console.log('[AIApplication] Generating application from questionnaire', {
+        userId,
+        purpose: questionnaireData.purpose,
+        countryId: questionnaireData.country,
+        hasSummary: !!(questionnaireData as any).summary,
+      });
+
       // Step 1: Determine country and visa type
       let countryId: string;
       let visaTypeId: string;
       let suggestedCountry: string | undefined;
       let requiredDocuments: string[] = [];
-      let aiRecommendations = "";
+      let aiRecommendations = '';
 
       // If country is "not-sure" or not provided, use AI to suggest best country
-      if (!questionnaireData.country || questionnaireData.country === "not_sure") {
+      if (
+        !questionnaireData.country ||
+        questionnaireData.country === 'not_sure' ||
+        questionnaireData.country.trim() === ''
+      ) {
         const suggestion = await this.suggestCountryWithAI(
           questionnaireData.purpose,
-          questionnaireData.currentStatus,
-          questionnaireData.duration,
-          questionnaireData.traveledBefore
+          questionnaireData.currentStatus || 'employee',
+          questionnaireData.duration || '1_3_months',
+          questionnaireData.traveledBefore || false
         );
-        
+
         // Try to find the suggested country in database
         const countries = await CountriesService.getAllCountries();
         const matchedCountry = countries.find(
-          (c) => c.name.toLowerCase() === suggestion.countryName.toLowerCase() ||
-                 c.name.toLowerCase().includes(suggestion.countryName.toLowerCase())
+          (c) =>
+            c.name.toLowerCase() === suggestion.countryName.toLowerCase() ||
+            c.name.toLowerCase().includes(suggestion.countryName.toLowerCase())
         );
-        
+
         if (matchedCountry) {
           countryId = matchedCountry.id;
           suggestedCountry = matchedCountry.name;
@@ -70,13 +89,43 @@ export class AIApplicationService {
         }
         aiRecommendations = suggestion.reasoning;
       } else {
-        // Country is specified, find it by ID
-        const country = await prisma.country.findUnique({
-          where: { id: questionnaireData.country },
-        });
-        
+        // Country is specified, try to find it by ID first
+        let country = await prisma.country
+          .findUnique({
+            where: { id: questionnaireData.country },
+          })
+          .catch(() => null);
+
+        // If not found by ID, try fallback to code/name from summary
         if (!country) {
-          throw errors.notFound("Country not found");
+          const summary = (questionnaireData as any).summary;
+          const targetCountry = summary?.targetCountry;
+
+          if (targetCountry) {
+            console.warn('[AIApplication] Country ID not found, falling back to code or name', {
+              countryId: questionnaireData.country,
+              targetCountry: targetCountry,
+            });
+
+            country = await CountriesService.getCountryByCodeOrName(targetCountry).catch(
+              () => null
+            );
+
+            if (country) {
+              console.log('[AIApplication] Country found via fallback', {
+                originalId: questionnaireData.country,
+                foundId: country.id,
+                foundName: country.name,
+                foundCode: country.code,
+              });
+            }
+          }
+        }
+
+        if (!country) {
+          throw new Error(
+            'Country not found for questionnaire. Please reselect the country and try again.'
+          );
         }
         countryId = country.id;
       }
@@ -87,17 +136,28 @@ export class AIApplicationService {
         include: { country: true },
       });
 
+      if (visaTypes.length === 0) {
+        const countryName =
+          (await prisma.country.findUnique({ where: { id: countryId } }))?.name ||
+          'selected country';
+        throw new Error(
+          `No visa types found for ${countryName}. The database may need to be seeded with visa types.`
+        );
+      }
+
       // Match visa type by purpose
       const purposeToVisaTypeMapping: Record<string, string[]> = {
-        study: ["student", "f-1", "study", "academic", "tier 4"],
-        work: ["work", "h-1b", "employment", "worker", "skilled"],
-        tourism: ["tourist", "visitor", "b1/b2", "travel", "tourism"],
-        business: ["business", "b1", "commercial"],
-        immigration: ["immigrant", "permanent", "green card", "residence"],
-        other: ["general", "other"],
+        study: ['student', 'f-1', 'study', 'academic', 'tier 4'],
+        work: ['work', 'h-1b', 'employment', 'worker', 'skilled'],
+        tourism: ['tourist', 'visitor', 'b1/b2', 'travel', 'tourism'],
+        business: ['business', 'b1', 'commercial'],
+        immigration: ['immigrant', 'permanent', 'green card', 'residence'],
+        other: ['general', 'other'],
       };
 
-      const searchTerms = purposeToVisaTypeMapping[questionnaireData.purpose] || [questionnaireData.purpose];
+      const searchTerms = purposeToVisaTypeMapping[questionnaireData.purpose] || [
+        questionnaireData.purpose,
+      ];
       let visaType = visaTypes.find((vt) =>
         searchTerms.some((term) => vt.name.toLowerCase().includes(term))
       );
@@ -109,14 +169,19 @@ export class AIApplicationService {
       }
 
       if (!visaType) {
-        throw errors.notFound("No visa types found for this country");
+        const countryName =
+          (await prisma.country.findUnique({ where: { id: countryId } }))?.name ||
+          'selected country';
+        throw new Error(
+          `No matching visa type found for ${questionnaireData.purpose} purpose in ${countryName}.`
+        );
       }
 
       visaTypeId = visaType.id;
 
       // Step 3: Get required documents from visa type
       try {
-        const docTypes = JSON.parse(visaType.documentTypes || "[]");
+        const docTypes = JSON.parse(visaType.documentTypes || '[]');
         requiredDocuments = Array.isArray(docTypes) ? docTypes : [];
       } catch {
         // If parsing fails, use default documents based on purpose
@@ -136,7 +201,7 @@ export class AIApplicationService {
       );
       requiredDocuments = enhancedDocs.documents;
       if (enhancedDocs.recommendations) {
-        aiRecommendations += " " + enhancedDocs.recommendations;
+        aiRecommendations += ' ' + enhancedDocs.recommendations;
       }
 
       // Step 5: Create the application
@@ -153,7 +218,7 @@ export class AIApplicationService {
         suggestedCountry,
       };
     } catch (error: any) {
-      console.error("Error generating AI application:", error);
+      console.error('Error generating AI application:', error);
       throw error;
     }
   }
@@ -196,7 +261,7 @@ Respond in JSON format:
 
       const response = await AIOpenAIService.chat([
         {
-          role: "user",
+          role: 'user',
           content: prompt,
         },
       ]);
@@ -207,8 +272,8 @@ Respond in JSON format:
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
           return {
-            countryName: parsed.countryName || "United States",
-            reasoning: parsed.reasoning || "Recommended based on your profile",
+            countryName: parsed.countryName || 'United States',
+            reasoning: parsed.reasoning || 'Recommended based on your profile',
           };
         }
       } catch {
@@ -217,15 +282,15 @@ Respond in JSON format:
 
       // Default fallback
       return {
-        countryName: "United States",
-        reasoning: "United States is a popular destination for this visa type",
+        countryName: 'United States',
+        reasoning: 'United States is a popular destination for this visa type',
       };
     } catch (error) {
-      console.error("AI suggestion error:", error);
+      console.error('AI suggestion error:', error);
       // Fallback to default
       return {
-        countryName: "United States",
-        reasoning: "Default recommendation",
+        countryName: 'United States',
+        reasoning: 'Default recommendation',
       };
     }
   }
@@ -259,7 +324,7 @@ User Profile:
 - English Level: ${questionnaireData.englishLevel}
 
 Base Documents Required:
-${baseDocuments.map((doc, i) => `${i + 1}. ${doc}`).join("\n")}
+${baseDocuments.map((doc, i) => `${i + 1}. ${doc}`).join('\n')}
 
 Please:
 1. Review and enhance the document list if needed
@@ -274,7 +339,7 @@ Respond in JSON format:
 
       const response = await AIOpenAIService.chat([
         {
-          role: "user",
+          role: 'user',
           content: prompt,
         },
       ]);
@@ -295,7 +360,7 @@ Respond in JSON format:
 
       return { documents: baseDocuments };
     } catch (error) {
-      console.error("AI document enhancement error:", error);
+      console.error('AI document enhancement error:', error);
       return { documents: baseDocuments };
     }
   }
@@ -305,25 +370,25 @@ Respond in JSON format:
    */
   private static getConditionalDocuments(questionnaireData: QuestionnaireData): string[] {
     const conditionalDocs: string[] = [];
-    
+
     // Marital status
     if (questionnaireData.maritalStatus === 'married') {
       conditionalDocs.push('Marriage Certificate');
     }
-    
+
     // Children
     if (questionnaireData.hasChildren === 'one' || questionnaireData.hasChildren === 'two_plus') {
       conditionalDocs.push('Birth Certificates of Children');
-      conditionalDocs.push('Children\'s Passports');
+      conditionalDocs.push("Children's Passports");
     }
-    
+
     // Financial situation
     if (questionnaireData.financialSituation === 'sponsor') {
       conditionalDocs.push('Sponsor Letter');
-      conditionalDocs.push('Sponsor\'s Financial Documents');
-      conditionalDocs.push('Sponsor\'s ID/Passport');
+      conditionalDocs.push("Sponsor's Financial Documents");
+      conditionalDocs.push("Sponsor's ID/Passport");
     }
-    
+
     // Invitation/Acceptance
     if (questionnaireData.hasInvitation) {
       if (questionnaireData.purpose === 'study') {
@@ -337,7 +402,7 @@ Respond in JSON format:
         conditionalDocs.push('Business Invitation Letter');
       }
     }
-    
+
     // Current status
     if (questionnaireData.currentStatus === 'student') {
       conditionalDocs.push('Student ID');
@@ -349,19 +414,22 @@ Respond in JSON format:
       conditionalDocs.push('Business Registration Certificate');
       conditionalDocs.push('Tax Returns');
     }
-    
+
     // Duration (for long stays)
-    if (questionnaireData.duration === '6_12_months' || questionnaireData.duration === 'more_than_1_year') {
+    if (
+      questionnaireData.duration === '6_12_months' ||
+      questionnaireData.duration === 'more_than_1_year'
+    ) {
       conditionalDocs.push('Medical Certificate');
       conditionalDocs.push('Police Clearance Certificate');
     }
-    
+
     // Travel history (for first-time travelers)
     if (!questionnaireData.traveledBefore) {
       conditionalDocs.push('Travel Itinerary');
       conditionalDocs.push('Hotel Reservations');
     }
-    
+
     return conditionalDocs;
   }
 
@@ -371,55 +439,50 @@ Respond in JSON format:
   private static getDefaultDocuments(purpose: string): string[] {
     const defaults: Record<string, string[]> = {
       study: [
-        "Passport",
-        "Academic Records",
-        "Bank Statement",
-        "Letter of Acceptance",
-        "Visa Application Form",
-        "Passport Photo",
+        'Passport',
+        'Academic Records',
+        'Bank Statement',
+        'Letter of Acceptance',
+        'Visa Application Form',
+        'Passport Photo',
       ],
       tourism: [
-        "Passport",
-        "Passport Photo",
-        "Travel Itinerary",
-        "Bank Statement",
-        "Hotel Reservations",
-        "Visa Application Form",
+        'Passport',
+        'Passport Photo',
+        'Travel Itinerary',
+        'Bank Statement',
+        'Hotel Reservations',
+        'Visa Application Form',
       ],
       business: [
-        "Passport",
-        "Business Invitation Letter",
-        "Company Registration",
-        "Bank Statement",
-        "Visa Application Form",
-        "Passport Photo",
+        'Passport',
+        'Business Invitation Letter',
+        'Company Registration',
+        'Bank Statement',
+        'Visa Application Form',
+        'Passport Photo',
       ],
       work: [
-        "Passport",
-        "Job Offer Letter",
-        "Degree Certificate",
-        "Employment Verification",
-        "Bank Statement",
-        "Visa Application Form",
-        "Passport Photo",
+        'Passport',
+        'Job Offer Letter',
+        'Degree Certificate',
+        'Employment Verification',
+        'Bank Statement',
+        'Visa Application Form',
+        'Passport Photo',
       ],
       immigration: [
-        "Passport",
-        "Birth Certificate",
-        "Marriage Certificate",
-        "Police Clearance Certificate",
-        "Medical Certificate",
-        "Bank Statement",
-        "Proof of Residence",
-        "Visa Application Form",
-        "Passport Photo",
+        'Passport',
+        'Birth Certificate',
+        'Marriage Certificate',
+        'Police Clearance Certificate',
+        'Medical Certificate',
+        'Bank Statement',
+        'Proof of Residence',
+        'Visa Application Form',
+        'Passport Photo',
       ],
-      other: [
-        "Passport",
-        "Supporting Documents",
-        "Visa Application Form",
-        "Passport Photo",
-      ],
+      other: ['Passport', 'Supporting Documents', 'Visa Application Form', 'Passport Photo'],
     };
 
     return defaults[purpose.toLowerCase()] || defaults.other;
@@ -430,33 +493,33 @@ Respond in JSON format:
    */
   private static async getFallbackCountry(purpose: string): Promise<any> {
     const countries = await prisma.country.findMany({
-      include: { visaTypes: true }
+      include: { visaTypes: true },
     });
-    
+
     // Purpose-based country preferences
     const purposeCountryMap: Record<string, string[]> = {
-      study: ["United States", "United Kingdom", "Canada", "Germany", "Australia"],
-      work: ["Germany", "Canada", "Australia", "Netherlands", "United States"],
-      tourism: ["Turkey", "United Arab Emirates", "Thailand", "Georgia", "Malaysia"],
-      business: ["United States", "United Kingdom", "Singapore", "Germany"],
-      immigration: ["Canada", "Australia", "United States", "Germany"],
-      other: ["United States", "United Kingdom", "Canada"]
+      study: ['United States', 'United Kingdom', 'Canada', 'Germany', 'Australia'],
+      work: ['Germany', 'Canada', 'Australia', 'Netherlands', 'United States'],
+      tourism: ['Turkey', 'United Arab Emirates', 'Thailand', 'Georgia', 'Malaysia'],
+      business: ['United States', 'United Kingdom', 'Singapore', 'Germany'],
+      immigration: ['Canada', 'Australia', 'United States', 'Germany'],
+      other: ['United States', 'United Kingdom', 'Canada'],
     };
-    
+
     const preferredCountries = purposeCountryMap[purpose] || purposeCountryMap.other;
-    
+
     for (const countryName of preferredCountries) {
-      const country = countries.find(c => c.name === countryName);
+      const country = countries.find((c) => c.name === countryName);
       if (country && country.visaTypes.length > 0) {
         return country;
       }
     }
-    
+
     // Ultimate fallback: first country with visa types
-    const fallback = countries.find(c => c.visaTypes.length > 0);
+    const fallback = countries.find((c) => c.visaTypes.length > 0);
     if (fallback) return fallback;
-    
-    throw errors.notFound("No countries with visa types found");
+
+    throw errors.notFound('No countries with visa types found');
   }
 
   /**
@@ -472,14 +535,13 @@ Respond in JSON format:
         reasoning: `Recommended based on ${purpose} purpose`,
       };
     } catch (error) {
-      console.error("Error suggesting country from database:", error);
+      console.error('Error suggesting country from database:', error);
     }
 
     // Ultimate fallback
     return {
-      countryName: "United States",
-      reasoning: "Default recommendation",
+      countryName: 'United States',
+      reasoning: 'Default recommendation',
     };
   }
 }
-
