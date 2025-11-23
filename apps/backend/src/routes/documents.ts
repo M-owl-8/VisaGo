@@ -183,12 +183,14 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         fileSize: uploadResult.fileSize,
         status: initialStatus,
         verificationNotes: aiResult?.notesUz || null, // Backward compatibility
-        verifiedByAI: aiResult?.verifiedByAI || false,
-        aiConfidence: aiResult?.confidence || null,
-        aiNotesUz: aiResult?.notesUz || null,
-        aiNotesRu: aiResult?.notesRu || null,
-        aiNotesEn: aiResult?.notesEn || null,
-      },
+        ...(aiResult && {
+          verifiedByAI: aiResult.verifiedByAI || false,
+          aiConfidence: aiResult.confidence || null,
+          aiNotesUz: aiResult.notesUz || null,
+          aiNotesRu: aiResult.notesRu || null,
+          aiNotesEn: aiResult.notesEn || null,
+        }),
+      } as any, // Type assertion for AI fields that may not be in Prisma types during build
     });
 
     res.status(201).json({

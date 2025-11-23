@@ -73,12 +73,10 @@ export class CountriesService {
       return null;
     }
 
-    const country = await prisma.country.findFirst({
+    // First try exact code match (case-insensitive)
+    let country = await prisma.country.findFirst({
       where: {
-        OR: [
-          { code: value.toUpperCase() }, // e.g. "US"
-          { name: { contains: value, mode: 'insensitive' } }, // e.g. "United States"
-        ],
+        code: value.toUpperCase(), // e.g. "US"
       },
       include: {
         visaTypes: {
@@ -86,6 +84,25 @@ export class CountriesService {
         },
       },
     });
+
+    // If not found by code, search by name (case-insensitive filtering in JavaScript)
+    if (!country) {
+      const valueLower = value.toLowerCase();
+      const countries = await prisma.country.findMany({
+        where: {
+          name: { contains: value }, // Basic contains, will filter case-insensitively below
+        },
+        include: {
+          visaTypes: {
+            orderBy: { name: 'asc' },
+          },
+        },
+        take: 10, // Get more to filter case-insensitively
+      });
+
+      // Filter case-insensitively (SQLite compatibility)
+      country = countries.find((c) => c.name.toLowerCase().includes(valueLower)) || null;
+    }
 
     return country;
   }

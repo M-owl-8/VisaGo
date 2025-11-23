@@ -518,7 +518,7 @@ Provide a comprehensive checklist with all required documents, including multili
         country,
         visaType,
         hasVisaKb: !!visaKb,
-        documentGuidesCount: documentGuides.length,
+        hasDocumentGuides: !!documentGuidesText && documentGuidesText.length > 0,
       });
 
       const startTime = Date.now();
