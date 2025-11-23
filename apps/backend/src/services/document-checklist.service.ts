@@ -91,7 +91,7 @@ export class DocumentChecklistService {
 
       // Get existing documents with full data for AI verification
       const existingDocumentsMap = new Map(
-        application.documents.map((doc) => [
+        application.documents.map((doc: any) => [
           doc.documentType,
           {
             type: doc.documentType,
@@ -102,11 +102,11 @@ export class DocumentChecklistService {
             fileSize: doc.fileSize,
             uploadedAt: doc.uploadedAt,
             verificationNotes: doc.verificationNotes,
-            verifiedByAI: doc.verifiedByAI,
-            aiConfidence: doc.aiConfidence,
-            aiNotesUz: doc.aiNotesUz,
-            aiNotesRu: doc.aiNotesRu,
-            aiNotesEn: doc.aiNotesEn,
+            verifiedByAI: doc.verifiedByAI ?? false,
+            aiConfidence: doc.aiConfidence ?? null,
+            aiNotesUz: doc.aiNotesUz ?? null,
+            aiNotesRu: doc.aiNotesRu ?? null,
+            aiNotesEn: doc.aiNotesEn ?? null,
           },
         ])
       );

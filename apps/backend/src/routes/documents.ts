@@ -62,20 +62,6 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       });
     }
 
-    // Verify user owns the application (for security)
-    const application = await prisma.visaApplication.findFirst({
-      where: { id: applicationId, userId },
-    });
-
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Application not found or access denied',
-        },
-      });
-    }
-
     // Upload file using storage adapter (local or Firebase)
     const uploadResult = await StorageAdapter.uploadFile(
       req.file.buffer,
@@ -88,7 +74,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       }
     );
 
-    // Get application details for AI validation context
+    // Get application details for AI validation context (with relations)
     const application = await prisma.visaApplication.findFirst({
       where: { id: applicationId, userId },
       include: {

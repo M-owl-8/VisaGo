@@ -458,13 +458,7 @@ If you don't know something, say so clearly and suggest how to find the informat
 
       // Get relevant document guides based on user context
       const userQuery = JSON.stringify(userContext);
-      const documentGuides = getRelevantDocumentGuides(userQuery, 5);
-
-      // Build document guides text
-      const documentGuidesText =
-        documentGuides.length > 0
-          ? documentGuides.map((guide) => `\n- ${guide.title}:\n${guide.content}`).join('\n\n')
-          : '';
+      const documentGuidesText = getRelevantDocumentGuides(userQuery, 5);
 
       const systemPrompt = `You are a visa application assistant for Ketdik. Generate a comprehensive, multilingual document checklist for a ${visaType} visa application to ${country}.
 

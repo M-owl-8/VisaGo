@@ -178,6 +178,11 @@ model UserDocument {
   status            String    @default("pending") // pending, verified, rejected
   verificationNotes String?
   expiryDate        DateTime?
+  verifiedByAI      Boolean?  @default(false)
+  aiConfidence      Float?    // 0-1
+  aiNotesUz         String?
+  aiNotesRu         String?
+  aiNotesEn         String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

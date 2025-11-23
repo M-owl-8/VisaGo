@@ -166,11 +166,7 @@ VISA KNOWLEDGE BASE FOR ${countryName} ${normalizedVisaType.toUpperCase()} VISA:
 ${visaKb || 'No specific knowledge base available for this country/visa type.'}
 
 DOCUMENT GUIDES (How documents should be obtained in Uzbekistan):
-${
-  documentGuides.length > 0
-    ? documentGuides.map((g) => `\n- ${g.title}:\n${g.content}`).join('\n\n')
-    : 'No specific guides available.'
-}
+${documentGuides || 'No specific guides available.'}
 
 DOCUMENT-SPECIFIC VALIDATION INSTRUCTIONS:
 ${documentSpecificInstructions}

@@ -77,7 +77,7 @@ export class CountriesService {
       where: {
         OR: [
           { code: value.toUpperCase() }, // e.g. "US"
-          { name: { contains: value, mode: Prisma.QueryMode.insensitive } }, // e.g. "United States"
+          { name: { contains: value, mode: 'insensitive' } }, // e.g. "United States"
         ],
       },
       include: {
