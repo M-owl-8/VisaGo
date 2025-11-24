@@ -193,6 +193,18 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       } as any, // Type assertion for AI fields that may not be in Prisma types during build
     });
 
+    // Update application progress based on documents (non-blocking)
+    try {
+      const { ApplicationsService } = await import('../services/applications.service');
+      await ApplicationsService.updateProgressFromDocuments(applicationId);
+    } catch (progressError: any) {
+      // Log but do NOT fail the upload
+      console.error(
+        '[DocumentProgress] Failed to update progress from documents (non-blocking):',
+        progressError
+      );
+    }
+
     res.status(201).json({
       success: true,
       data: document, // Includes all new AI fields

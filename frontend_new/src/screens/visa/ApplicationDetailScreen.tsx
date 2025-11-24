@@ -3,7 +3,7 @@
  * Shows complete application information with document checklist
  */
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useTranslation} from 'react-i18next';
+import {useFocusEffect} from '@react-navigation/native';
 import {apiClient} from '../../services/api';
 import {getTranslatedCountryName} from '../../data/countryTranslations';
 import {getTranslatedVisaTypeName} from '../../utils/visaTypeTranslations';
@@ -27,9 +28,10 @@ interface ApplicationDetailProps {
 
 interface DocumentChecklistItem {
   id: string;
-  name: string;
-  nameUz?: string;
-  nameRu?: string;
+  documentType?: string; // Internal key for upload mapping (e.g., 'passport', 'bank_statement') - optional for backward compatibility
+  name: string; // English display name
+  nameUz?: string; // Uzbek display name
+  nameRu?: string; // Russian display name
   description: string;
   descriptionUz?: string;
   descriptionRu?: string;
@@ -76,6 +78,15 @@ export default function ApplicationDetailScreen({
       navigation.goBack();
     }
   }, [applicationId]);
+
+  // Refresh checklist when screen comes into focus (e.g., after returning from upload)
+  useFocusEffect(
+    useCallback(() => {
+      if (applicationId) {
+        loadApplicationData();
+      }
+    }, [applicationId]),
+  );
 
   const loadApplicationData = async () => {
     try {
@@ -156,6 +167,10 @@ export default function ApplicationDetailScreen({
       applicationId,
       documentType,
       documentName,
+      onUploadSuccess: () => {
+        // Re-fetch checklist after successful upload to show updated status and progress
+        loadApplicationData();
+      },
     });
   };
 
@@ -414,7 +429,11 @@ export default function ApplicationDetailScreen({
                       item.status === 'missing' ||
                       item.status === 'rejected'
                     ) {
-                      handleUploadDocument(item.id, item.name);
+                      // Use documentType for internal logic, localized name for display
+                      handleUploadDocument(
+                        item.documentType || item.id,
+                        getLocalizedText(item, 'name'),
+                      );
                     } else if (item.userDocumentId && item.fileUrl) {
                       handleViewDocument(item.userDocumentId, item.fileUrl);
                     }

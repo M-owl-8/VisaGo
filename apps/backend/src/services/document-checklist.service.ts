@@ -9,6 +9,7 @@ import { errors } from '../utils/errors';
 import { logError, logInfo } from '../middleware/logger';
 import AIOpenAIService from './ai-openai.service';
 import { getDocumentTranslation } from '../data/document-translations';
+import { buildAIUserContext } from './ai-context.service';
 
 const prisma = new PrismaClient();
 
@@ -111,38 +112,96 @@ export class DocumentChecklistService {
         ])
       );
 
-      // Generate checklist items
-      const items = await this.generateChecklistItems(
-        application.country,
-        application.visaType,
-        application.user,
-        Array.from(existingDocumentsMap.values())
-      );
+      // Generate checklist items - AI-first approach
+      let items: ChecklistItem[] = [];
+      let aiGenerated = false;
 
-      // Merge full document data including AI verification
-      const enrichedItems = items.map((item) => {
-        const doc = existingDocumentsMap.get(item.documentType);
-        if (doc) {
-          return {
-            ...item,
-            status: doc.status as any,
-            userDocumentId: doc.id,
-            fileUrl: doc.fileUrl,
-            fileName: doc.fileName,
-            fileSize: doc.fileSize,
-            uploadedAt: doc.uploadedAt?.toISOString(),
-            verificationNotes: doc.aiNotesUz || doc.verificationNotes, // Prefer AI notes
-            aiVerified: doc.verifiedByAI === true,
-            aiConfidence: doc.aiConfidence || undefined,
-          };
+      try {
+        // Build AI user context with questionnaire summary
+        const userContext = await buildAIUserContext(userId, applicationId);
+
+        // Call AI to generate checklist as primary source
+        const aiChecklist = await AIOpenAIService.generateChecklist(
+          userContext,
+          application.country.name,
+          application.visaType.name
+        );
+
+        // Parse AI response into ChecklistItem[]
+        if (
+          aiChecklist.checklist &&
+          Array.isArray(aiChecklist.checklist) &&
+          aiChecklist.checklist.length > 0
+        ) {
+          items = aiChecklist.checklist.map((aiItem: any, index: number) => {
+            const docType =
+              aiItem.document ||
+              aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
+              `document_${index}`;
+            const existingDoc = existingDocumentsMap.get(docType);
+
+            return {
+              id: `checklist-item-${index}`,
+              documentType: docType,
+              name: aiItem.name || aiItem.document || 'Unknown Document',
+              nameUz: aiItem.nameUz || aiItem.name || aiItem.document || "Noma'lum hujjat",
+              nameRu: aiItem.nameRu || aiItem.name || aiItem.document || 'Неизвестный документ',
+              description: aiItem.description || '',
+              descriptionUz: aiItem.descriptionUz || aiItem.description || '',
+              descriptionRu: aiItem.descriptionRu || aiItem.description || '',
+              required: aiItem.required !== undefined ? aiItem.required : true,
+              priority: (aiItem.priority || (aiItem.required ? 'high' : 'medium')) as
+                | 'high'
+                | 'medium'
+                | 'low',
+              status: existingDoc ? (existingDoc.status as any) : 'missing',
+              userDocumentId: existingDoc?.id,
+              fileUrl: existingDoc?.fileUrl,
+              fileName: existingDoc?.fileName,
+              fileSize: existingDoc?.fileSize,
+              uploadedAt: existingDoc?.uploadedAt?.toISOString(),
+              verificationNotes:
+                existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
+              aiVerified: existingDoc?.verifiedByAI === true,
+              aiConfidence: existingDoc?.aiConfidence || undefined,
+            };
+          });
+
+          aiGenerated = true;
+          logInfo('[Checklist][AI] Using AI-generated checklist', {
+            applicationId,
+            itemCount: items.length,
+            country: application.country.name,
+            visaType: application.visaType.name,
+          });
+        } else {
+          throw new Error('AI returned empty checklist');
         }
-        return item;
-      });
+      } catch (aiError: any) {
+        // Fallback to static documentTypes if AI fails
+        logError('[Checklist][AI] Failed, falling back to static documentTypes', aiError as Error, {
+          applicationId,
+          country: application.country.name,
+          visaType: application.visaType.name,
+        });
 
-      // Calculate progress
+        items = await this.generateChecklistItems(
+          application.country,
+          application.visaType,
+          application.user,
+          Array.from(existingDocumentsMap.values())
+        );
+      }
+
+      // Merge full document data including AI verification (if not already done by AI path)
+      const enrichedItems = this.mergeChecklistItemsWithDocuments(items, existingDocumentsMap);
+
+      // Calculate progress using unified formula
+      const progress = this.calculateDocumentProgress(enrichedItems);
       const totalRequired = enrichedItems.filter((item) => item.required).length;
-      const completed = enrichedItems.filter((item) => item.status === 'verified').length;
-      const progress = totalRequired > 0 ? (completed / totalRequired) * 100 : 0;
+      const completed = enrichedItems.filter(
+        (item) => item.required && item.status === 'verified'
+      ).length;
 
       logInfo('Document checklist generated', {
         applicationId,
@@ -150,6 +209,7 @@ export class DocumentChecklistService {
         totalRequired,
         completed,
         progress,
+        aiGenerated,
       });
 
       return {
@@ -161,7 +221,7 @@ export class DocumentChecklistService {
         completed,
         progress,
         generatedAt: new Date().toISOString(),
-        aiGenerated: true,
+        aiGenerated,
       };
     } catch (error) {
       logError('Error generating document checklist', error as Error, {
@@ -418,6 +478,189 @@ Only return the JSON object, no other text.`;
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+  }
+
+  /**
+   * Merge checklist items with existing documents
+   * Reusable helper for both generateChecklist and recalculateDocumentProgress
+   */
+  private static mergeChecklistItemsWithDocuments(
+    items: ChecklistItem[],
+    existingDocumentsMap: Map<string, any>
+  ): ChecklistItem[] {
+    return items.map((item) => {
+      const doc = existingDocumentsMap.get(item.documentType);
+      if (doc) {
+        return {
+          ...item,
+          status: doc.status as any,
+          userDocumentId: doc.id,
+          fileUrl: doc.fileUrl,
+          fileName: doc.fileName,
+          fileSize: doc.fileSize,
+          uploadedAt: doc.uploadedAt?.toISOString(),
+          verificationNotes: doc.aiNotesUz || doc.verificationNotes, // Prefer AI notes
+          aiVerified: doc.verifiedByAI === true,
+          aiConfidence: doc.aiConfidence || undefined,
+        };
+      }
+      return item;
+    });
+  }
+
+  /**
+   * Calculate document-based progress
+   * Single source of truth for progress calculation
+   * Formula: (verified required documents / total required documents) * 100
+   */
+  private static calculateDocumentProgress(items: ChecklistItem[]): number {
+    const requiredItems = items.filter((item) => item.required);
+    const completed = requiredItems.filter((item) => item.status === 'verified');
+    return requiredItems.length > 0
+      ? Math.round((completed.length / requiredItems.length) * 100)
+      : 0;
+  }
+
+  /**
+   * Recalculate document-based progress for an application
+   * Used to update VisaApplication.progressPercentage after document uploads
+   *
+   * @param applicationId - Application ID
+   * @returns Progress percentage (0-100)
+   */
+  static async recalculateDocumentProgress(applicationId: string): Promise<number> {
+    try {
+      // Get application with related data
+      const application = await prisma.visaApplication.findUnique({
+        where: { id: applicationId },
+        include: {
+          country: true,
+          visaType: true,
+          user: true,
+          documents: true,
+        },
+      });
+
+      if (!application) {
+        throw errors.notFound('Application');
+      }
+
+      // Get existing documents with full data
+      const existingDocumentsMap = new Map(
+        application.documents.map((doc: any) => [
+          doc.documentType,
+          {
+            type: doc.documentType,
+            status: doc.status,
+            id: doc.id,
+            fileUrl: doc.fileUrl,
+            fileName: doc.fileName,
+            fileSize: doc.fileSize,
+            uploadedAt: doc.uploadedAt,
+            verificationNotes: doc.verificationNotes,
+            verifiedByAI: doc.verifiedByAI ?? false,
+            aiConfidence: doc.aiConfidence ?? null,
+            aiNotesUz: doc.aiNotesUz ?? null,
+            aiNotesRu: doc.aiNotesRu ?? null,
+            aiNotesEn: doc.aiNotesEn ?? null,
+          },
+        ])
+      );
+
+      // Generate checklist items using same AI-first flow as generateChecklist
+      let items: ChecklistItem[] = [];
+
+      try {
+        // Build AI user context with questionnaire summary
+        const userContext = await buildAIUserContext(application.userId, applicationId);
+
+        // Call AI to generate checklist as primary source
+        const aiChecklist = await AIOpenAIService.generateChecklist(
+          userContext,
+          application.country.name,
+          application.visaType.name
+        );
+
+        // Parse AI response into ChecklistItem[]
+        if (
+          aiChecklist.checklist &&
+          Array.isArray(aiChecklist.checklist) &&
+          aiChecklist.checklist.length > 0
+        ) {
+          items = aiChecklist.checklist.map((aiItem: any, index: number) => {
+            const docType =
+              aiItem.document ||
+              aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
+              `document_${index}`;
+            const existingDoc = existingDocumentsMap.get(docType);
+
+            return {
+              id: `checklist-item-${index}`,
+              documentType: docType,
+              name: aiItem.name || aiItem.document || 'Unknown Document',
+              nameUz: aiItem.nameUz || aiItem.name || aiItem.document || "Noma'lum hujjat",
+              nameRu: aiItem.nameRu || aiItem.name || aiItem.document || 'Неизвестный документ',
+              description: aiItem.description || '',
+              descriptionUz: aiItem.descriptionUz || aiItem.description || '',
+              descriptionRu: aiItem.descriptionRu || aiItem.description || '',
+              required: aiItem.required !== undefined ? aiItem.required : true,
+              priority: (aiItem.priority || (aiItem.required ? 'high' : 'medium')) as
+                | 'high'
+                | 'medium'
+                | 'low',
+              status: existingDoc ? (existingDoc.status as any) : 'missing',
+              userDocumentId: existingDoc?.id,
+              fileUrl: existingDoc?.fileUrl,
+              fileName: existingDoc?.fileName,
+              fileSize: existingDoc?.fileSize,
+              uploadedAt: existingDoc?.uploadedAt?.toISOString(),
+              verificationNotes:
+                existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
+              aiVerified: existingDoc?.verifiedByAI === true,
+              aiConfidence: existingDoc?.aiConfidence || undefined,
+            };
+          });
+        } else {
+          throw new Error('AI returned empty checklist');
+        }
+      } catch (aiError: any) {
+        // Fallback to static documentTypes if AI fails
+        logError(
+          '[DocumentProgress] AI checklist generation failed, using fallback',
+          aiError as Error,
+          {
+            applicationId,
+          }
+        );
+
+        items = await this.generateChecklistItems(
+          application.country,
+          application.visaType,
+          application.user,
+          Array.from(existingDocumentsMap.values())
+        );
+      }
+
+      // Merge with documents
+      const enrichedItems = this.mergeChecklistItemsWithDocuments(items, existingDocumentsMap);
+
+      // Calculate progress using unified formula
+      const progress = this.calculateDocumentProgress(enrichedItems);
+
+      logInfo('[DocumentProgress] Recalculated progress from documents', {
+        applicationId,
+        progress,
+        totalRequired: enrichedItems.filter((i) => i.required).length,
+        verified: enrichedItems.filter((i) => i.required && i.status === 'verified').length,
+      });
+
+      return progress;
+    } catch (error) {
+      logError('[DocumentProgress] Failed to recalculate progress', error as Error, {
+        applicationId,
+      });
+      throw error;
+    }
   }
 
   /**

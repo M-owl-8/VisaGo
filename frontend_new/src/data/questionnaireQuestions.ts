@@ -1,108 +1,35 @@
 /**
- * Questionnaire Questions - NEW Multi-Country, Multi-Visa Structure
+ * Questionnaire Questions v2 - Clean, GPT-friendly structure
  * Supports: Tourist & Student visas for 10 countries
  * Languages: Uzbek, Russian, English
+ *
+ * Designed to give GPT-4o-mini everything needed for document checklist generation
  */
 
 import {Question} from '../types/questionnaire';
 
 export const questionnaireQuestions: Question[] = [
   // ============================================================================
-  // GROUP A: Applicant Identity
+  // GROUP A: Destination & Basic
   // ============================================================================
 
-  // A1: Full Name
+  // A1: Country
   {
-    id: 'fullName',
-    titleEn: 'What is your full name?',
-    titleUz: "To'liq ismingiz nima?",
-    titleRu: 'Как ваше полное имя?',
-    descriptionEn: 'Enter your first and last name as shown on your passport',
-    descriptionUz: "Pasportingizda ko'rsatilgan ism va familiyangizni kiriting",
-    descriptionRu: 'Введите ваше имя и фамилию, как указано в паспорте',
-    type: 'text',
-    required: true,
-    options: [],
-  },
-
-  // A2: Date of Birth
-  {
-    id: 'dateOfBirth',
-    titleEn: 'What is your date of birth?',
-    titleUz: "Tug'ilgan sanangiz qachon?",
-    titleRu: 'Когда вы родились?',
-    descriptionEn: 'Enter your date of birth (DD/MM/YYYY)',
-    descriptionUz: "Tug'ilgan sanangizni kiriting (KK/OO/YYYY)",
-    descriptionRu: 'Введите дату рождения (ДД/ММ/ГГГГ)',
-    type: 'text',
-    required: true,
-    options: [],
-  },
-
-  // A3: Nationality
-  {
-    id: 'nationality',
-    titleEn: 'What is your nationality?',
-    titleUz: 'Fuqaroligingiz qaysi davlat?',
-    titleRu: 'Какое у вас гражданство?',
-    descriptionEn: 'Select your country of citizenship',
-    descriptionUz: 'Fuqarolik davlatingizni tanlang',
-    descriptionRu: 'Выберите страну вашего гражданства',
+    id: 'country',
+    titleEn: 'Which country do you want to go to?',
+    titleUz: 'Qaysi davlatga bormoqchisiz?',
+    titleRu: 'В какую страну вы хотите поехать?',
+    descriptionEn: 'Select your destination country (required)',
+    descriptionUz: 'Borishni xohlagan davlatingizni tanlang (majburiy)',
+    descriptionRu: 'Выберите страну назначения (обязательно)',
     type: 'dropdown',
     required: true,
     options: [
-      {
-        value: 'UZ',
-        labelEn: 'Uzbekistan',
-        labelUz: "O'zbekiston",
-        labelRu: 'Узбекистан',
-        icon: '🇺🇿',
-      },
-      // Will be populated from backend countries list
+      // Will be populated from backend /api/countries list
     ],
   },
 
-  // A4: Passport Status
-  {
-    id: 'passportStatus',
-    titleEn: 'What is your passport status?',
-    titleUz: 'Pasport holatingiz qanday?',
-    titleRu: 'Какой статус вашего паспорта?',
-    descriptionEn: 'Select the current status of your passport',
-    descriptionUz: 'Pasportingizning hozirgi holatini tanlang',
-    descriptionRu: 'Выберите текущий статус вашего паспорта',
-    type: 'single',
-    required: true,
-    options: [
-      {
-        value: 'valid',
-        labelEn: 'Valid passport',
-        labelUz: 'Yaroqli pasport',
-        labelRu: 'Действительный паспорт',
-        icon: '✅',
-      },
-      {
-        value: 'expired',
-        labelEn: 'Expired passport',
-        labelUz: "Muddati o'tgan pasport",
-        labelRu: 'Просроченный паспорт',
-        icon: '⚠️',
-      },
-      {
-        value: 'no_passport',
-        labelEn: 'No passport',
-        labelUz: "Pasport yo'q",
-        labelRu: 'Нет паспорта',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // ============================================================================
-  // GROUP B: Visa Type / Purpose
-  // ============================================================================
-
-  // B1: Visa Type (Purpose) - CRITICAL: This determines tourist vs student
+  // A2: Purpose
   {
     id: 'purpose',
     titleEn: 'What type of visa do you need?',
@@ -131,126 +58,190 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // B2: Purpose of Travel (Tourist) - Conditional, shown only if purpose is tourism
+  // A3: Duration
   {
-    id: 'travelPurpose',
-    titleEn: 'What is the purpose of your travel?',
-    titleUz: 'Sayohat maqsadingiz nima?',
-    titleRu: 'Какова цель вашей поездки?',
-    descriptionEn: 'Select the main reason for your tourist trip',
-    descriptionUz: 'Turistik sayohatingizning asosiy sababini tanlang',
-    descriptionRu: 'Выберите основную причину вашей туристической поездки',
+    id: 'duration',
+    titleEn: 'How long do you plan to stay?',
+    titleUz: 'Qancha vaqt yashashni rejalashtirmoqchisiz?',
+    titleRu: 'Как долго вы планируете оставаться?',
+    descriptionEn: 'Select the duration of your stay',
+    descriptionUz: 'Yashash muddatini tanlang',
+    descriptionRu: 'Выберите продолжительность вашего пребывания',
     type: 'single',
-    required: false, // Only shown for tourist visa
+    required: true,
     options: [
       {
-        value: 'tourism',
-        labelEn: 'Tourism / Sightseeing',
-        labelUz: 'Turizm / Sayyohlik',
-        labelRu: 'Туризм / Осмотр достопримечательностей',
-        icon: '🏛️',
+        value: 'less_than_15_days',
+        labelEn: 'Less than 15 days',
+        labelUz: '15 kundan kam',
+        labelRu: 'Менее 15 дней',
+        icon: '📅',
       },
       {
-        value: 'visiting_friends',
-        labelEn: 'Visiting friends',
-        labelUz: "Do'stlarni ko'rish",
-        labelRu: 'Посещение друзей',
-        icon: '👥',
+        value: '15_30_days',
+        labelEn: '15-30 days',
+        labelUz: '15-30 kun',
+        labelRu: '15-30 дней',
+        icon: '📅',
       },
       {
-        value: 'visiting_relatives',
-        labelEn: 'Visiting relatives',
-        labelUz: "Qarindoshlarni ko'rish",
-        labelRu: 'Посещение родственников',
-        icon: '👨‍👩‍👧‍👦',
+        value: '1_3_months',
+        labelEn: '1-3 months',
+        labelUz: '1-3 oy',
+        labelRu: '1-3 месяца',
+        icon: '📅',
       },
       {
-        value: 'business_meeting',
-        labelEn: 'Business meeting',
-        labelUz: 'Biznes uchrashuvi',
-        labelRu: 'Деловая встреча',
-        icon: '💼',
+        value: '3_6_months',
+        labelEn: '3-6 months',
+        labelUz: '3-6 oy',
+        labelRu: '3-6 месяцев',
+        icon: '📅',
+      },
+      {
+        value: 'more_than_6_months',
+        labelEn: 'More than 6 months',
+        labelUz: "6 oydan ko'p",
+        labelRu: 'Более 6 месяцев',
+        icon: '📅',
       },
     ],
   },
 
-  // B2: Planned Travel Dates
+  // A4: Planned Travel Dates
   {
     id: 'plannedTravelDates',
     titleEn: 'When do you plan to travel?',
     titleUz: 'Qachon sayohat qilmoqchisiz?',
     titleRu: 'Когда вы планируете поехать?',
-    descriptionEn: 'Enter your planned departure and return dates',
-    descriptionUz: 'Rejalashtirilgan ketish va qaytish sanalarini kiriting',
-    descriptionRu: 'Введите запланированные даты выезда и возвращения',
+    descriptionEn: 'Enter your planned departure and return dates (optional)',
+    descriptionUz:
+      'Rejalashtirilgan ketish va qaytish sanalarini kiriting (ixtiyoriy)',
+    descriptionRu:
+      'Введите запланированные даты выезда и возвращения (необязательно)',
     type: 'text',
     required: false,
     options: [],
   },
 
-  // B3: Who is funding the trip
+  // A5: Current Residence Country
   {
-    id: 'tripFunding',
-    titleEn: 'Who is funding your trip?',
-    titleUz: 'Sayohatingizni kim moliyalashtirmoqda?',
-    titleRu: 'Кто финансирует вашу поездку?',
-    descriptionEn: 'Select who will pay for your travel expenses',
-    descriptionUz: "Sayohat xarajatlarini kim to'layotganini tanlang",
-    descriptionRu: 'Выберите, кто будет оплачивать ваши расходы на поездку',
+    id: 'currentResidenceCountry',
+    titleEn: 'Where do you live now?',
+    titleUz: 'Hozir qayerda yashayapsiz?',
+    titleRu: 'Где вы сейчас живете?',
+    descriptionEn: 'Select your current country of residence',
+    descriptionUz: 'Hozirgi yashash davlatingizni tanlang',
+    descriptionRu: 'Выберите страну вашего текущего проживания',
+    type: 'dropdown',
+    required: true,
+    options: [
+      {
+        value: 'UZ',
+        labelEn: 'Uzbekistan',
+        labelUz: "O'zbekiston",
+        labelRu: 'Узбекистан',
+        icon: '🇺🇿',
+      },
+      // Will be populated from backend countries list
+    ],
+  },
+
+  // ============================================================================
+  // GROUP B: Personal / Family / Ties
+  // ============================================================================
+
+  // B1: Marital Status
+  {
+    id: 'maritalStatus',
+    titleEn: 'What is your marital status?',
+    titleUz: 'Oilaviy holatingiz qanday?',
+    titleRu: 'Какое у вас семейное положение?',
+    descriptionEn: 'Select your current marital status',
+    descriptionUz: 'Hozirgi oilaviy holatingizni tanlang',
+    descriptionRu: 'Выберите ваше текущее семейное положение',
     type: 'single',
     required: true,
     options: [
       {
-        value: 'self',
-        labelEn: 'Myself',
-        labelUz: "O'zim",
-        labelRu: 'Сам(а)',
+        value: 'single',
+        labelEn: 'Single',
+        labelUz: 'Bekor',
+        labelRu: 'Холост/Не замужем',
         icon: '👤',
       },
       {
-        value: 'sponsor',
-        labelEn: 'Sponsor (family/friend)',
-        labelUz: "Homiy (oila/do'st)",
-        labelRu: 'Спонсор (семья/друг)',
-        icon: '🤝',
+        value: 'married',
+        labelEn: 'Married',
+        labelUz: 'Oilali',
+        labelRu: 'Женат/Замужем',
+        icon: '💑',
       },
       {
-        value: 'company',
-        labelEn: 'Company / Employer',
-        labelUz: 'Kompaniya / Ish beruvchi',
-        labelRu: 'Компания / Работодатель',
-        icon: '🏢',
+        value: 'divorced',
+        labelEn: 'Divorced',
+        labelUz: 'Ajrashgan',
+        labelRu: 'Разведен/Разведена',
+        icon: '💔',
+      },
+      {
+        value: 'widowed',
+        labelEn: 'Widowed',
+        labelUz: 'Beva',
+        labelRu: 'Вдовец/Вдова',
+        icon: '🕯️',
       },
     ],
   },
 
-  // B4: Financial capacity per month
+  // B2: Has Children
   {
-    id: 'monthlyFinancialCapacity',
-    titleEn: 'What is your monthly financial capacity?',
-    titleUz: 'Oylik moliyaviy imkoniyatingiz qancha?',
-    titleRu: 'Какова ваша ежемесячная финансовая возможность?',
-    descriptionEn: 'Approximate amount you can spend per month (in USD)',
-    descriptionUz:
-      "Oylik sarflay olishingiz mumkin bo'lgan taxminiy miqdor (USD)",
-    descriptionRu:
-      'Примерная сумма, которую вы можете потратить в месяц (в USD)',
-    type: 'text',
-    required: false,
-    options: [],
+    id: 'hasChildren',
+    titleEn: 'Do you have children?',
+    titleUz: 'Farzandlaringiz bormi?',
+    titleRu: 'У вас есть дети?',
+    descriptionEn: 'Select if you have children',
+    descriptionUz: "Farzandlaringiz bor yoki yo'qligini tanlang",
+    descriptionRu: 'Выберите, есть ли у вас дети',
+    type: 'single',
+    required: true,
+    options: [
+      {
+        value: 'none',
+        labelEn: 'No children',
+        labelUz: "Farzand yo'q",
+        labelRu: 'Нет детей',
+        icon: '❌',
+      },
+      {
+        value: 'one',
+        labelEn: 'One child',
+        labelUz: 'Bitta farzand',
+        labelRu: 'Один ребенок',
+        icon: '👶',
+      },
+      {
+        value: 'two_or_more',
+        labelEn: 'Two or more children',
+        labelUz: "Ikki yoki undan ko'p farzand",
+        labelRu: 'Двое или более детей',
+        icon: '👨‍👩‍👧‍👦',
+      },
+    ],
   },
 
-  // B5: University Acceptance (Student only)
+  // B3: Family in Uzbekistan
   {
-    id: 'hasUniversityAcceptance',
-    titleEn: 'Do you have a university acceptance letter?',
-    titleUz: 'Universitet qabul xatingiz bormi?',
-    titleRu: 'У вас есть письмо о зачислении в университет?',
-    descriptionEn: 'I-20, COE, CAS, or similar acceptance document',
-    descriptionUz: "I-20, COE, CAS yoki shunga o'xshash qabul hujjati",
-    descriptionRu: 'I-20, COE, CAS или аналогичный документ о зачислении',
+    id: 'hasFamilyTiesUzbekistan',
+    titleEn: 'Do you have close family in Uzbekistan?',
+    titleUz: "O'zbekistonda yaqin oilangiz bormi?",
+    titleRu: 'У вас есть близкая семья в Узбекистане?',
+    descriptionEn: 'Parents, spouse, or children living in Uzbekistan',
+    descriptionUz:
+      "O'zbekistonda yashayotgan ota-ona, turmush o'rtog'i yoki farzandlar",
+    descriptionRu: 'Родители, супруг(а) или дети, проживающие в Узбекистане',
     type: 'boolean',
-    required: false, // Only shown for student visa
+    required: false,
     options: [
       {
         value: 'true',
@@ -269,7 +260,142 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // B6: Program Type (Student only)
+  // B4: Property Documents
+  {
+    id: 'hasPropertyDocuments',
+    titleEn: 'Do you have property documents in Uzbekistan?',
+    titleUz: "O'zbekistonda mulk hujjatlaringiz bormi?",
+    titleRu: 'У вас есть документы на недвижимость в Узбекистане?',
+    descriptionEn:
+      'Property ownership documents that show ties to home country',
+    descriptionUz: "Vatanga bog'liqlikni ko'rsatadigan mulk egaligi hujjatlari",
+    descriptionRu:
+      'Документы о праве собственности, показывающие связи с родиной',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // ============================================================================
+  // GROUP C: Education / Work Status
+  // ============================================================================
+
+  // C1: Current Status
+  {
+    id: 'currentStatus',
+    titleEn: 'What is your current status?',
+    titleUz: 'Hozirgi holatingiz qanday?',
+    titleRu: 'Каков ваш текущий статус?',
+    descriptionEn: 'Select your current employment or education status',
+    descriptionUz: "Hozirgi ish yoki ta'lim holatingizni tanlang",
+    descriptionRu: 'Выберите ваш текущий статус занятости или образования',
+    type: 'single',
+    required: true,
+    options: [
+      {
+        value: 'student',
+        labelEn: 'Student',
+        labelUz: 'Talaba',
+        labelRu: 'Студент',
+        icon: '🎓',
+      },
+      {
+        value: 'employed',
+        labelEn: 'Employed',
+        labelUz: 'Ishlaydi',
+        labelRu: 'Работает',
+        icon: '💼',
+      },
+      {
+        value: 'self_employed',
+        labelEn: 'Self-employed / Business owner',
+        labelUz: 'Tadbirkor',
+        labelRu: 'Самозанятый / Владелец бизнеса',
+        icon: '🏢',
+      },
+      {
+        value: 'unemployed',
+        labelEn: 'Unemployed',
+        labelUz: 'Ishsiz',
+        labelRu: 'Безработный',
+        icon: '📋',
+      },
+    ],
+  },
+
+  // C2: Employer Details (conditional: if currentStatus is employed or self_employed)
+  {
+    id: 'employerDetails',
+    titleEn: 'What is your employer or company name?',
+    titleUz: 'Ish beruvchi yoki kompaniya nomi nima?',
+    titleRu: 'Как называется ваш работодатель или компания?',
+    descriptionEn: 'Enter your company or employer name',
+    descriptionUz: 'Kompaniya yoki ish beruvchi nomini kiriting',
+    descriptionRu: 'Введите название вашей компании или работодателя',
+    type: 'text',
+    required: false,
+    options: [],
+  },
+
+  // C3: Monthly Salary (conditional: if currentStatus is employed or self_employed)
+  {
+    id: 'monthlySalary',
+    titleEn: 'What is your monthly salary?',
+    titleUz: 'Oylik maoshingiz qancha?',
+    titleRu: 'Какова ваша месячная зарплата?',
+    descriptionEn: 'Enter your monthly salary in USD (approximate)',
+    descriptionUz: 'Oylik maoshingizni USD da kiriting (taxminiy)',
+    descriptionRu: 'Введите вашу месячную зарплату в USD (примерно)',
+    type: 'text',
+    required: false,
+    options: [],
+  },
+
+  // C4: University Acceptance (conditional: if purpose = study)
+  {
+    id: 'hasUniversityAcceptance',
+    titleEn: 'Do you have a university acceptance letter?',
+    titleUz: 'Universitet qabul xatingiz bormi?',
+    titleRu: 'У вас есть письмо о зачислении в университет?',
+    descriptionEn: 'I-20, COE, CAS, or similar acceptance document',
+    descriptionUz: "I-20, COE, CAS yoki shunga o'xshash qabul hujjati",
+    descriptionRu: 'I-20, COE, CAS или аналогичный документ о зачислении',
+    type: 'boolean',
+    required: false, // Will be enforced conditionally in UI
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // C5: Program Type (conditional: if purpose = study)
   {
     id: 'programType',
     titleEn: 'What type of program are you applying for?',
@@ -279,7 +405,7 @@ export const questionnaireQuestions: Question[] = [
     descriptionUz: "Ta'lim dasturi turini tanlang",
     descriptionRu: 'Выберите тип образовательной программы',
     type: 'single',
-    required: false, // Only shown for student visa
+    required: false,
     options: [
       {
         value: 'bachelor',
@@ -319,246 +445,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // B7: Tuition Structure (Student only)
-  {
-    id: 'tuitionStructure',
-    titleEn: 'How is your tuition being paid?',
-    titleUz: "Ta'lim to'lovi qanday amalga oshirilmoqda?",
-    titleRu: 'Как оплачивается ваше обучение?',
-    descriptionEn: 'Select how your tuition fees are structured',
-    descriptionUz: "Ta'lim to'lovi qanday tuzilganini tanlang",
-    descriptionRu: 'Выберите, как структурирована оплата обучения',
-    type: 'single',
-    required: false, // Only shown for student visa
-    options: [
-      {
-        value: 'fully_paid',
-        labelEn: 'Fully paid by me/sponsor',
-        labelUz: "To'liq o'zim/homiy tomonidan to'langan",
-        labelRu: 'Полностью оплачено мной/спонсором',
-        icon: '💰',
-      },
-      {
-        value: 'scholarship',
-        labelEn: 'Full scholarship',
-        labelUz: "To'liq stipendiya",
-        labelRu: 'Полная стипендия',
-        icon: '🎓',
-      },
-      {
-        value: 'partial_scholarship',
-        labelEn: 'Partial scholarship',
-        labelUz: 'Qisman stipendiya',
-        labelRu: 'Частичная стипендия',
-        icon: '💵',
-      },
-    ],
-  },
-
-  // B8: Who is paying living expenses (Student only)
-  {
-    id: 'livingExpensesPayer',
-    titleEn: 'Who is paying your living expenses?',
-    titleUz: "Yashash xarajatlarini kim to'layapti?",
-    titleRu: 'Кто оплачивает ваши расходы на проживание?',
-    descriptionEn:
-      'Select who will cover accommodation, food, and daily expenses',
-    descriptionUz:
-      'Yashash joyi, ovqat va kundalik xarajatlarni kim qoplayotganini tanlang',
-    descriptionRu:
-      'Выберите, кто будет покрывать расходы на жилье, еду и повседневные нужды',
-    type: 'single',
-    required: false, // Only shown for student visa
-    options: [
-      {
-        value: 'self',
-        labelEn: 'Myself',
-        labelUz: "O'zim",
-        labelRu: 'Сам(а)',
-        icon: '👤',
-      },
-      {
-        value: 'parents',
-        labelEn: 'Parents',
-        labelUz: 'Ota-ona',
-        labelRu: 'Родители',
-        icon: '👨‍👩‍👧‍👦',
-      },
-      {
-        value: 'sponsor',
-        labelEn: 'Other sponsor',
-        labelUz: 'Boshqa homiy',
-        labelRu: 'Другой спонсор',
-        icon: '🤝',
-      },
-      {
-        value: 'scholarship',
-        labelEn: 'Scholarship covers it',
-        labelUz: 'Stipendiya qoplaydi',
-        labelRu: 'Стипендия покрывает',
-        icon: '🎓',
-      },
-    ],
-  },
-
-  // B9: Accommodation Status (Student only)
-  {
-    id: 'accommodationStatus',
-    titleEn: 'Do you have accommodation reserved?',
-    titleUz: 'Yashash joyi bron qilinganmi?',
-    titleRu: 'У вас забронировано жилье?',
-    descriptionEn: 'Select your accommodation status',
-    descriptionUz: 'Yashash joyi holatini tanlang',
-    descriptionRu: 'Выберите статус вашего жилья',
-    type: 'single',
-    required: false, // Only shown for student visa
-    options: [
-      {
-        value: 'reserved',
-        labelEn: 'Yes, already reserved',
-        labelUz: 'Ha, allaqachon bron qilingan',
-        labelRu: 'Да, уже забронировано',
-        icon: '✅',
-      },
-      {
-        value: 'university_housing',
-        labelEn: 'University housing',
-        labelUz: 'Universitet yotoqxonasi',
-        labelRu: 'Общежитие университета',
-        icon: '🏠',
-      },
-      {
-        value: 'not_reserved',
-        labelEn: 'Not reserved yet',
-        labelUz: 'Hali bron qilinmagan',
-        labelRu: 'Еще не забронировано',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // ============================================================================
-  // GROUP C: Employment/Education
-  // ============================================================================
-
-  // C1: Employment Status (Tourist)
-  {
-    id: 'isEmployed',
-    titleEn: 'Are you currently employed?',
-    titleUz: 'Hozir ishlayapsizmi?',
-    titleRu: 'Вы сейчас работаете?',
-    descriptionEn: 'Select your current employment status',
-    descriptionUz: 'Hozirgi ish holatingizni tanlang',
-    descriptionRu: 'Выберите ваш текущий статус занятости',
-    type: 'boolean',
-    required: false, // Conditional based on visa type
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // C2: Employer Details (Tourist, if employed)
-  {
-    id: 'employerDetails',
-    titleEn: 'What is your employer name?',
-    titleUz: 'Ish beruvchi nomi nima?',
-    titleRu: 'Как называется ваш работодатель?',
-    descriptionEn: 'Enter your company or employer name',
-    descriptionUz: 'Kompaniya yoki ish beruvchi nomini kiriting',
-    descriptionRu: 'Введите название вашей компании или работодателя',
-    type: 'text',
-    required: false,
-    options: [],
-  },
-
-  // C3: Monthly Salary (Tourist, if employed)
-  {
-    id: 'monthlySalary',
-    titleEn: 'What is your monthly salary?',
-    titleUz: 'Oylik maoshingiz qancha?',
-    titleRu: 'Какова ваша месячная зарплата?',
-    descriptionEn: 'Enter your monthly salary in USD (approximate)',
-    descriptionUz: 'Oylik maoshingizni USD da kiriting (taxminiy)',
-    descriptionRu: 'Введите вашу месячную зарплату в USD (примерно)',
-    type: 'text',
-    required: false,
-    options: [],
-  },
-
-  // C4: Currently Studying (Student)
-  {
-    id: 'isCurrentlyStudying',
-    titleEn: 'Are you currently studying?',
-    titleUz: "Hozir o'qiysizmi?",
-    titleRu: 'Вы сейчас учитесь?',
-    descriptionEn:
-      'Select if you are currently enrolled in an educational program',
-    descriptionUz: "Hozir ta'lim dasturiga qabul qilinganmisiz, tanlang",
-    descriptionRu:
-      'Выберите, зачислены ли вы в настоящее время в образовательную программу',
-    type: 'boolean',
-    required: false, // Only shown for student visa
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // C5: Graduated Already (Student)
-  {
-    id: 'hasGraduated',
-    titleEn: 'Have you already graduated?',
-    titleUz: 'Allaqachon bitirganmisiz?',
-    titleRu: 'Вы уже закончили обучение?',
-    descriptionEn: 'Select if you have completed your previous education',
-    descriptionUz: "Oldingi ta'limingizni tugatganmisiz, tanlang",
-    descriptionRu: 'Выберите, завершили ли вы предыдущее образование',
-    type: 'boolean',
-    required: false, // Only shown for student visa
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // C6: Diploma Available (Student)
+  // C6: Diploma Available (conditional: if purpose = study)
   {
     id: 'diplomaAvailable',
     titleEn: 'Do you have your diploma available?',
@@ -568,7 +455,7 @@ export const questionnaireQuestions: Question[] = [
     descriptionUz: "Ta'lim diplom/sertifikatingiz bormi, tanlang",
     descriptionRu: 'Выберите, есть ли у вас диплом/сертификат об образовании',
     type: 'boolean',
-    required: false, // Only shown for student visa
+    required: false,
     options: [
       {
         value: 'true',
@@ -587,7 +474,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // C7: Transcript Available (Student)
+  // C7: Transcript Available (conditional: if purpose = study)
   {
     id: 'transcriptAvailable',
     titleEn: 'Do you have your academic transcript available?',
@@ -598,7 +485,7 @@ export const questionnaireQuestions: Question[] = [
     descriptionRu:
       'Выберите, есть ли у вас академическая справка/ведомость оценок',
     type: 'boolean',
-    required: false, // Only shown for student visa
+    required: false,
     options: [
       {
         value: 'true',
@@ -618,153 +505,77 @@ export const questionnaireQuestions: Question[] = [
   },
 
   // ============================================================================
-  // GROUP D: Travel History
+  // GROUP D: Finances & Sponsor
   // ============================================================================
 
-  // D1: Visited Countries Before
+  // D1: Trip Funding
   {
-    id: 'visitedCountries',
-    titleEn: 'Have you visited any countries before?',
-    titleUz: 'Ilgari boshqa davlatlarga borganmisiz?',
-    titleRu: 'Вы раньше посещали другие страны?',
-    descriptionEn: 'List countries you have visited (if any)',
-    descriptionUz: "Borgan davlatlaringizni ro'yxatlang (agar bor bo'lsa)",
-    descriptionRu: 'Перечислите страны, которые вы посещали (если есть)',
+    id: 'tripFunding',
+    titleEn: 'Who is funding your trip?',
+    titleUz: 'Sayohatingizni kim moliyalashtirmoqda?',
+    titleRu: 'Кто финансирует вашу поездку?',
+    descriptionEn: 'Select who will pay for your travel expenses',
+    descriptionUz: "Sayohat xarajatlarini kim to'layotganini tanlang",
+    descriptionRu: 'Выберите, кто будет оплачивать ваши расходы на поездку',
+    type: 'single',
+    required: true,
+    options: [
+      {
+        value: 'self',
+        labelEn: 'Myself',
+        labelUz: "O'zim",
+        labelRu: 'Сам(а)',
+        icon: '👤',
+      },
+      {
+        value: 'sponsor',
+        labelEn: 'Sponsor (family/friend)',
+        labelUz: "Homiy (oila/do'st)",
+        labelRu: 'Спонсор (семья/друг)',
+        icon: '🤝',
+      },
+      {
+        value: 'company',
+        labelEn: 'Company / Employer',
+        labelUz: 'Kompaniya / Ish beruvchi',
+        labelRu: 'Компания / Работодатель',
+        icon: '🏢',
+      },
+      {
+        value: 'scholarship',
+        labelEn: 'Scholarship',
+        labelUz: 'Stipendiya',
+        labelRu: 'Стипендия',
+        icon: '🎓',
+      },
+      {
+        value: 'mix',
+        labelEn: 'Mix (self + sponsor/scholarship)',
+        labelUz: "Aralash (o'zim + homiy/stipendiya)",
+        labelRu: 'Смешанное (сам + спонсор/стипендия)',
+        icon: '💰',
+      },
+    ],
+  },
+
+  // D2: Monthly Financial Capacity
+  {
+    id: 'monthlyFinancialCapacity',
+    titleEn:
+      'On average, how much money (in USD) can you show as your own funds?',
+    titleUz:
+      "O'rtacha, o'zingizning mablag'ingiz sifatida qancha pul (USD) ko'rsata olasiz?",
+    titleRu:
+      'В среднем, сколько денег (в USD) вы можете показать как собственные средства?',
+    descriptionEn: 'Enter approximate amount in USD',
+    descriptionUz: 'Taxminiy miqdorni USD da kiriting',
+    descriptionRu: 'Введите примерную сумму в USD',
     type: 'text',
     required: false,
     options: [],
   },
 
-  // D2: Visa Refusals
-  {
-    id: 'hasVisaRefusals',
-    titleEn: 'Have you had any visa refusals?',
-    titleUz: "Viza rad etilgan holatlar bo'lganmi?",
-    titleRu: 'У вас были отказы в визе?',
-    descriptionEn: 'Select if you have ever been refused a visa',
-    descriptionUz: "Sizga viza rad etilgan bo'lsa, tanlang",
-    descriptionRu: 'Выберите, если вам когда-либо отказывали в визе',
-    type: 'boolean',
-    required: true,
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '⚠️',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '✅',
-      },
-    ],
-  },
-
-  // ============================================================================
-  // GROUP E: Supporting Documents
-  // ============================================================================
-
-  // E1: Property Documents
-  {
-    id: 'hasPropertyDocuments',
-    titleEn: 'Do you have property documents in Uzbekistan?',
-    titleUz: "O'zbekistonda mulk hujjatlaringiz bormi?",
-    titleRu: 'У вас есть документы на недвижимость в Узбекистане?',
-    descriptionEn:
-      'Property ownership documents that show ties to home country',
-    descriptionUz: "Vatanga bog'liqlikni ko'rsatadigan mulk egaligi hujjatlari",
-    descriptionRu:
-      'Документы о праве собственности, показывающие связи с родиной',
-    type: 'boolean',
-    required: false,
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // E2: Bank Statements
-  {
-    id: 'hasBankStatements',
-    titleEn: 'Do you have bank statements?',
-    titleUz: "Bank hisob varag'laringiz bormi?",
-    titleRu: 'У вас есть банковские выписки?',
-    descriptionEn: 'Recent bank statements showing financial capacity',
-    descriptionUz:
-      "Moliyaviy imkoniyatni ko'rsatadigan so'nggi bank hisob varag'lari",
-    descriptionRu:
-      'Недавние банковские выписки, показывающие финансовые возможности',
-    type: 'boolean',
-    required: false,
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // E3: Family Ties in Uzbekistan
-  {
-    id: 'hasFamilyTiesUzbekistan',
-    titleEn: 'Do you have close family in Uzbekistan?',
-    titleUz: "O'zbekistonda yaqin oilangiz bormi?",
-    titleRu: 'У вас есть близкая семья в Узбекистане?',
-    descriptionEn: 'Parents, spouse, or children living in Uzbekistan',
-    descriptionUz:
-      "O'zbekistonda yashayotgan ota-ona, turmush o'rtog'i yoki farzandlar",
-    descriptionRu: 'Родители, супруг(а) или дети, проживающие в Узбекистане',
-    type: 'boolean',
-    required: false,
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // ============================================================================
-  // GROUP F: Sponsor (if applicable)
-  // ============================================================================
-
-  // F1: Sponsor Relationship
+  // D3: Sponsor Relationship (conditional: if tripFunding includes sponsor)
   {
     id: 'sponsorRelationship',
     titleEn: 'What is your relationship with the sponsor?',
@@ -776,7 +587,7 @@ export const questionnaireQuestions: Question[] = [
     descriptionRu:
       'Выберите ваши отношения с лицом, финансирующим вашу поездку',
     type: 'single',
-    required: false, // Only shown if tripFunding is 'sponsor'
+    required: false,
     options: [
       {
         value: 'parent',
@@ -816,7 +627,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // F2: Sponsor Employment
+  // D4: Sponsor Employment (conditional: if tripFunding includes sponsor)
   {
     id: 'sponsorEmployment',
     titleEn: "What is your sponsor's employment status?",
@@ -826,7 +637,7 @@ export const questionnaireQuestions: Question[] = [
     descriptionUz: 'Homiyingizning hozirgi ish holatini tanlang',
     descriptionRu: 'Выберите текущую ситуацию с занятостью вашего спонсора',
     type: 'single',
-    required: false, // Only shown if tripFunding is 'sponsor'
+    required: false,
     options: [
       {
         value: 'employed',
@@ -859,7 +670,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // F3: Sponsor Annual Income
+  // D5: Sponsor Annual Income (conditional: if tripFunding includes sponsor)
   {
     id: 'sponsorAnnualIncome',
     titleEn: "What is your sponsor's annual income?",
@@ -870,26 +681,294 @@ export const questionnaireQuestions: Question[] = [
       'Homiyingizning yillik daromadini USD da kiriting (taxminiy)',
     descriptionRu: 'Введите годовой доход спонсора в USD (примерно)',
     type: 'text',
-    required: false, // Only shown if tripFunding is 'sponsor'
+    required: false,
+    options: [],
+  },
+
+  // D6: Tuition Structure (conditional: if purpose = study)
+  {
+    id: 'tuitionStructure',
+    titleEn: 'How is your tuition being paid?',
+    titleUz: "Ta'lim to'lovi qanday amalga oshirilmoqda?",
+    titleRu: 'Как оплачивается ваше обучение?',
+    descriptionEn: 'Select how your tuition fees are structured',
+    descriptionUz: "Ta'lim to'lovi qanday tuzilganini tanlang",
+    descriptionRu: 'Выберите, как структурирована оплата обучения',
+    type: 'single',
+    required: false,
+    options: [
+      {
+        value: 'fully_paid',
+        labelEn: 'Fully paid by me/sponsor',
+        labelUz: "To'liq o'zim/homiy tomonidan to'langan",
+        labelRu: 'Полностью оплачено мной/спонсором',
+        icon: '💰',
+      },
+      {
+        value: 'scholarship',
+        labelEn: 'Full scholarship',
+        labelUz: "To'liq stipendiya",
+        labelRu: 'Полная стипендия',
+        icon: '🎓',
+      },
+      {
+        value: 'partial_scholarship',
+        labelEn: 'Partial scholarship',
+        labelUz: 'Qisman stipendiya',
+        labelRu: 'Частичная стипендия',
+        icon: '💵',
+      },
+    ],
+  },
+
+  // D7: Living Expenses Payer (conditional: if purpose = study)
+  {
+    id: 'livingExpensesPayer',
+    titleEn: 'Who is paying your living expenses?',
+    titleUz: "Yashash xarajatlarini kim to'layapti?",
+    titleRu: 'Кто оплачивает ваши расходы на проживание?',
+    descriptionEn:
+      'Select who will cover accommodation, food, and daily expenses',
+    descriptionUz:
+      'Yashash joyi, ovqat va kundalik xarajatlarni kim qoplayotganini tanlang',
+    descriptionRu:
+      'Выберите, кто будет покрывать расходы на жилье, еду и повседневные нужды',
+    type: 'single',
+    required: false,
+    options: [
+      {
+        value: 'self',
+        labelEn: 'Myself',
+        labelUz: "O'zim",
+        labelRu: 'Сам(а)',
+        icon: '👤',
+      },
+      {
+        value: 'parents',
+        labelEn: 'Parents',
+        labelUz: 'Ota-ona',
+        labelRu: 'Родители',
+        icon: '👨‍👩‍👧‍👦',
+      },
+      {
+        value: 'sponsor',
+        labelEn: 'Other sponsor',
+        labelUz: 'Boshqa homiy',
+        labelRu: 'Другой спонсор',
+        icon: '🤝',
+      },
+      {
+        value: 'scholarship',
+        labelEn: 'Scholarship covers it',
+        labelUz: 'Stipendiya qoplaydi',
+        labelRu: 'Стипендия покрывает',
+        icon: '🎓',
+      },
+    ],
+  },
+
+  // ============================================================================
+  // GROUP E: Travel History & Refusals
+  // ============================================================================
+
+  // E1: Traveled Before
+  {
+    id: 'traveledBefore',
+    titleEn: 'Have you travelled abroad before?',
+    titleUz: 'Ilgari chet elga borganmisiz?',
+    titleRu: 'Вы раньше ездили за границу?',
+    descriptionEn: 'Select if you have traveled to other countries before',
+    descriptionUz: 'Ilgari boshqa davlatlarga borganmisiz, tanlang',
+    descriptionRu: 'Выберите, ездили ли вы раньше в другие страны',
+    type: 'boolean',
+    required: true,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // E2: Visited Countries (conditional: if traveledBefore = true)
+  {
+    id: 'visitedCountries',
+    titleEn: 'Which countries have you visited?',
+    titleUz: 'Qaysi davlatlarga borgansiz?',
+    titleRu: 'Какие страны вы посещали?',
+    descriptionEn: 'List countries you have visited (optional)',
+    descriptionUz: "Borgan davlatlaringizni ro'yxatlang (ixtiyoriy)",
+    descriptionRu: 'Перечислите страны, которые вы посещали (необязательно)',
+    type: 'text',
+    required: false,
+    options: [],
+  },
+
+  // E3: Visa Refusals
+  {
+    id: 'hasVisaRefusals',
+    titleEn: 'Have you had any visa refusals?',
+    titleUz: "Viza rad etilgan holatlar bo'lganmi?",
+    titleRu: 'У вас были отказы в визе?',
+    descriptionEn: 'Select if you have ever been refused a visa',
+    descriptionUz: "Sizga viza rad etilgan bo'lsa, tanlang",
+    descriptionRu: 'Выберите, если вам когда-либо отказывали в визе',
+    type: 'boolean',
+    required: true,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '⚠️',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '✅',
+      },
+    ],
+  },
+
+  // E4: Visa Refusal Details (conditional: if hasVisaRefusals = true)
+  {
+    id: 'visaRefusalDetails',
+    titleEn: 'Please provide details about your visa refusal(s)',
+    titleUz: "Viza rad etilgan holatlar haqida ma'lumot bering",
+    titleRu: 'Пожалуйста, предоставьте подробности об отказе в визе',
+    descriptionEn: 'Which country, when, and reason if known (optional)',
+    descriptionUz: "Qaysi davlat, qachon va sabab (agar ma'lum bo'lsa)",
+    descriptionRu:
+      'Какая страна, когда и причина, если известна (необязательно)',
+    type: 'text',
+    required: false,
     options: [],
   },
 
   // ============================================================================
-  // GROUP C: Destination Country Selection
+  // GROUP F: English Level & Existing Documents
   // ============================================================================
+
+  // F1: English Level
   {
-    id: 'country',
-    titleEn: 'Which country are you interested in?',
-    titleUz: 'Qaysi davlatga bormoqchisiz?',
-    titleRu: 'В какую страну вы хотите поехать?',
-    descriptionEn: 'Select your destination country (required)',
-    descriptionUz: 'Borishni xohlagan davlatingizni tanlang (majburiy)',
-    descriptionRu: 'Выберите страну назначения (обязательно)',
-    type: 'dropdown',
-    required: true, // CRITICAL: Country is required for application creation
+    id: 'englishLevel',
+    titleEn: 'What is your English proficiency level?',
+    titleUz: 'Ingliz tilini bilish darajangiz qanday?',
+    titleRu: 'Какой у вас уровень владения английским языком?',
+    descriptionEn: 'Select your English language proficiency level',
+    descriptionUz: 'Ingliz tilini bilish darajangizni tanlang',
+    descriptionRu: 'Выберите ваш уровень владения английским языком',
+    type: 'single',
+    required: true,
     options: [
-      // Will be populated from backend /api/countries list
-      // Must include at least: USA, Canada, Australia, UK, New Zealand, Japan, South Korea, Spain, Germany, Poland
+      {
+        value: 'basic',
+        labelEn: 'Basic',
+        labelUz: "Boshlang'ich",
+        labelRu: 'Базовый',
+        icon: '📚',
+      },
+      {
+        value: 'pre_intermediate',
+        labelEn: 'Pre-intermediate',
+        labelUz: "O'rtacha boshlang'ich",
+        labelRu: 'Ниже среднего',
+        icon: '📚',
+      },
+      {
+        value: 'intermediate',
+        labelEn: 'Intermediate',
+        labelUz: "O'rtacha",
+        labelRu: 'Средний',
+        icon: '📚',
+      },
+      {
+        value: 'upper_intermediate',
+        labelEn: 'Upper-intermediate',
+        labelUz: "O'rtacha yuqori",
+        labelRu: 'Выше среднего',
+        icon: '📚',
+      },
+      {
+        value: 'advanced',
+        labelEn: 'Advanced',
+        labelUz: 'Yuqori',
+        labelRu: 'Продвинутый',
+        icon: '📚',
+      },
+    ],
+  },
+
+  // F2: Bank Statements
+  {
+    id: 'hasBankStatements',
+    titleEn: 'Do you have bank statements?',
+    titleUz: "Bank hisob varag'laringiz bormi?",
+    titleRu: 'У вас есть банковские выписки?',
+    descriptionEn: 'Recent bank statements showing financial capacity',
+    descriptionUz:
+      "Moliyaviy imkoniyatni ko'rsatadigan so'nggi bank hisob varag'lari",
+    descriptionRu:
+      'Недавние банковские выписки, показывающие финансовые возможности',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // F3: Travel Insurance
+  {
+    id: 'hasInsurance',
+    titleEn: 'Do you have travel insurance?',
+    titleUz: "Sayohat sug'urtangiz bormi?",
+    titleRu: 'У вас есть туристическая страховка?',
+    descriptionEn: 'Travel insurance coverage for your trip',
+    descriptionUz: "Sayohatingiz uchun sayohat sug'urtasi",
+    descriptionRu: 'Страховое покрытие для вашей поездки',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
     ],
   },
 ];

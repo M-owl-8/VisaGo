@@ -27,6 +27,15 @@ export interface VisaQuestionnaireSummary {
   age?: number;
   citizenship?: string;
   currentCountry?: string;
+  maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
+  hasChildren?: 'none' | 'one' | 'two_or_more';
+  duration?:
+    | 'less_than_15_days'
+    | '15_30_days'
+    | '1_3_months'
+    | '3_6_months'
+    | 'more_than_6_months';
+  englishLevel?: 'basic' | 'pre_intermediate' | 'intermediate' | 'upper_intermediate' | 'advanced';
   hasUniversityInvitation?: boolean;
   hasOtherInvitation?: boolean;
   invitationDetails?: string;
@@ -44,31 +53,40 @@ export interface VisaQuestionnaireSummary {
     hasBankStatement?: boolean;
     hasEmploymentOrStudyProof?: boolean;
     hasTravelInsurance?: boolean;
+    hasInsurance?: boolean; // v2: explicit insurance field
     hasFlightBooking?: boolean;
     hasHotelBookingOrAccommodation?: boolean;
   };
   notes?: string;
   mainConcerns?: string;
 
-  // NEW: Extended structure for better AI generation
+  // NEW: Extended structure for better AI generation (v2)
   personalInfo?: {
     fullName?: string;
     dateOfBirth?: string;
     nationality?: string;
     passportStatus?: 'valid' | 'expired' | 'no_passport';
+    currentResidenceCountry?: string; // v2: explicit residence country
   };
   travelInfo?: {
     purpose?: string;
     plannedDates?: string;
-    funding?: 'self' | 'sponsor' | 'company';
+    funding?: 'self' | 'sponsor' | 'company' | 'scholarship' | 'mix'; // v2: added scholarship and mix
     monthlyCapacity?: number;
     accommodation?: 'reserved' | 'university_housing' | 'not_reserved';
     tuitionStatus?: 'fully_paid' | 'scholarship' | 'partial_scholarship';
+    duration?:
+      | 'less_than_15_days'
+      | '15_30_days'
+      | '1_3_months'
+      | '3_6_months'
+      | 'more_than_6_months'; // v2: explicit duration
   };
   employment?: {
     isEmployed?: boolean;
     employerName?: string;
     monthlySalaryUSD?: number;
+    currentStatus?: 'student' | 'employed' | 'self_employed' | 'unemployed'; // v2: explicit status
   };
   education?: {
     isStudent?: boolean;
@@ -89,7 +107,8 @@ export interface VisaQuestionnaireSummary {
   travelHistory?: {
     visitedCountries?: string[];
     hasRefusals?: boolean;
-    refusalDetails?: string;
+    refusalDetails?: string; // v2: explicit refusal details
+    traveledBefore?: boolean; // v2: explicit travel history flag
   };
   ties?: {
     propertyDocs?: boolean;

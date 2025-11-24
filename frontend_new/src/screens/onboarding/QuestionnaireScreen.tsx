@@ -181,46 +181,33 @@ export default function QuestionnaireScreen({navigation}: any) {
         );
       }
 
-      // Map employment status
-      const isEmployed =
-        answers.isEmployed === true || String(answers.isEmployed) === 'true';
-      const isStudent =
-        answers.isCurrentlyStudying === true ||
-        String(answers.isCurrentlyStudying) === 'true';
-      let currentStatus = 'employee';
-      if (isStudent) {
-        currentStatus = 'student';
-      } else if (isEmployed) {
-        currentStatus = 'employee';
-      } else {
-        currentStatus = 'unemployed';
-      }
+      // Map employment status (v2: use explicit currentStatus)
+      const currentStatus = (answers.currentStatus as string) || 'unemployed';
 
-      // Map financial situation from tripFunding
+      // Map financial situation from tripFunding (v2: handle mix and scholarship)
       const tripFunding = answers.tripFunding as string;
       let financialSituation = 'stable_income';
-      if (tripFunding === 'sponsor') {
+      if (tripFunding === 'sponsor' || tripFunding === 'mix') {
         financialSituation = 'sponsor';
       } else if (tripFunding === 'savings') {
         financialSituation = 'savings';
       } else if (tripFunding === 'self') {
         financialSituation = 'stable_income';
+      } else if (tripFunding === 'scholarship') {
+        financialSituation = 'sponsor'; // Scholarship is a form of sponsorship
       }
 
-      // Map travel history
-      const visitedCountries = answers.visitedCountries as string;
-      const traveledBefore = visitedCountries && visitedCountries.trim() !== '';
+      // Map travel history (v2: use explicit traveledBefore)
+      const traveledBefore =
+        answers.traveledBefore === true ||
+        String(answers.traveledBefore) === 'true';
 
-      // Map family status
-      const hasFamilyTies =
-        answers.hasFamilyTiesUzbekistan === true ||
-        String(answers.hasFamilyTiesUzbekistan) === 'true';
-      const maritalStatus = hasFamilyTies ? 'married' : 'single';
-      const hasChildren = hasFamilyTies ? 'one' : 'no';
+      // Map family status (v2: use explicit maritalStatus and hasChildren)
+      const maritalStatus = (answers.maritalStatus as string) || 'single';
+      const hasChildren = (answers.hasChildren as string) || 'none';
 
-      // Map duration from plannedTravelDates or use default
-      // TODO: Extract duration from plannedTravelDates if available
-      const duration = '1_3_months'; // Default, can be enhanced later
+      // Map duration (v2: use explicit duration field)
+      const duration = (answers.duration as string) || '1_3_months';
 
       // Map invitation based on visa type
       let hasInvitation = false;
@@ -233,7 +220,7 @@ export default function QuestionnaireScreen({navigation}: any) {
           answers.hasOtherInvitation === true;
       }
 
-      // Map English level if available
+      // Map English level (v2: use explicit englishLevel)
       const englishLevel = (answers.englishLevel as string) || 'intermediate';
 
       const questionnaireData: QuestionnaireData = {

@@ -468,7 +468,7 @@ CRITICAL REQUIREMENTS:
   "type": "${visaType}",
   "checklist": [
     {
-      "document": "English document name (internal key)",
+      "document": "English document name (internal key, e.g. 'passport', 'i20_form', 'bank_statement')",
       "name": "English display name",
       "nameUz": "Uzbek display name",
       "nameRu": "Russian display name",
@@ -486,14 +486,30 @@ CRITICAL REQUIREMENTS:
 
 2. ALL fields (name, nameUz, nameRu, description, descriptionUz, descriptionRu, whereToObtain, whereToObtainUz, whereToObtainRu) MUST be provided for each checklist item.
 
-3. Use the visa knowledge base and document guides provided below to ensure accuracy.
+3. Generate a FULL, REALISTIC list of ALL required AND important optional documents for this specific visa application. DO NOT limit yourself to a fixed number of documents. The number of documents should vary based on:
+   - Country requirements (e.g., US student visas often need 14-20 documents, Japan tourist visas often need 7-12 documents)
+   - Visa type (student vs tourist have different requirements)
+   - User's questionnaire answers (age, marital status, children, funding source, travel history, ties to home country)
+   - Specific country rules from the visa knowledge base
 
-4. Priority levels:
-   - "high": Essential documents that are always required (passport, application form, etc.)
+4. Consider ALL relevant documents including but not limited to:
+   - Core documents: passport, photos, application forms
+   - Financial documents: bank statements, sponsorship letters, proof of funds
+   - Educational documents: transcripts, diplomas, I-20/DS-2019 (for student visas), acceptance letters
+   - Travel documents: flight bookings, accommodation proof, travel insurance
+   - Supporting documents: employment letters, property certificates, family ties proof, invitation letters
+   - Country-specific documents: SEVIS fee receipt (US), police clearance, medical certificates, etc.
+
+5. Use the visa knowledge base and document guides provided below to ensure accuracy and completeness.
+
+6. Priority levels:
+   - "high": Essential documents that are always required (passport, application form, I-20 for students, etc.)
    - "medium": Important documents that are usually required (bank statements, accommodation proof, etc.)
    - "low": Optional but recommended documents (travel insurance, flight bookings, etc.)
 
-5. For "whereToObtain" fields, provide specific, practical instructions for obtaining each document in Uzbekistan, using the document guides provided.
+7. For "whereToObtain" fields, provide specific, practical instructions for obtaining each document in Uzbekistan, using the document guides provided.
+
+8. The "document" field should use stable internal keys (lowercase, underscore-separated) like: passport, bank_statement, i20_form, sevis_fee_receipt, invitation_letter, etc.
 
 VISA KNOWLEDGE BASE FOR ${country} ${visaType.toUpperCase()} VISA:
 ${visaKb || 'No specific knowledge base available for this country/visa type.'}
@@ -501,10 +517,10 @@ ${visaKb || 'No specific knowledge base available for this country/visa type.'}
 DOCUMENT GUIDES (How to obtain documents in Uzbekistan):
 ${documentGuidesText || 'No specific document guides available.'}
 
-USER CONTEXT:
+USER CONTEXT (including questionnaire answers):
 ${JSON.stringify(userContext, null, 2)}
 
-Based on the user's context, visa knowledge base, and document guides, create a complete, accurate checklist with all required and optional documents. Ensure all multilingual fields are properly filled.`;
+Based on the user's context, visa knowledge base, and document guides, create a COMPLETE, REALISTIC checklist with ALL required and optional documents. The number of documents should reflect the actual requirements for this specific country, visa type, and user situation. Do not artificially limit the count. Ensure all multilingual fields are properly filled.`;
 
       const userPrompt = `Generate a complete document checklist for:
 - Country: ${country}
@@ -553,7 +569,19 @@ Provide a comprehensive checklist with all required documents, including multili
 
       // Ensure the response has the correct structure
       if (!parsed.checklist || !Array.isArray(parsed.checklist)) {
-        throw new Error('Invalid checklist format from AI');
+        throw new Error('Invalid checklist format from AI: missing or invalid checklist array');
+      }
+
+      // Validate that checklist is not empty
+      if (parsed.checklist.length === 0) {
+        throw new Error('AI returned empty checklist array');
+      }
+
+      // Validate required fields for each item
+      for (const item of parsed.checklist) {
+        if (!item.document && !item.name) {
+          throw new Error('Invalid checklist item: missing document or name field');
+        }
       }
 
       // Validate and enrich checklist items

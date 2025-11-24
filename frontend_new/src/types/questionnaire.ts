@@ -9,26 +9,83 @@ export interface QuestionnaireAnswer {
 }
 
 export interface QuestionnaireData {
-  purpose: 'study' | 'work' | 'tourism' | 'business' | 'immigration' | 'other';
+  // Group A: Destination & Basic
   country?: string;
-  duration:
+  purpose?: 'tourism' | 'study';
+  duration?:
+    | 'less_than_15_days'
+    | '15_30_days'
+    | '1_3_months'
+    | '3_6_months'
+    | 'more_than_6_months';
+  plannedTravelDates?: string;
+  currentResidenceCountry?: string;
+
+  // Group B: Personal / Family / Ties
+  maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
+  hasChildren?: 'none' | 'one' | 'two_or_more';
+  hasFamilyTiesUzbekistan?: boolean;
+  hasPropertyDocuments?: boolean;
+
+  // Group C: Education / Work
+  currentStatus?: 'student' | 'employed' | 'self_employed' | 'unemployed';
+  employerDetails?: string;
+  monthlySalary?: string;
+  hasUniversityAcceptance?: boolean;
+  programType?: 'bachelor' | 'master' | 'phd' | 'exchange' | 'language';
+  diplomaAvailable?: boolean;
+  transcriptAvailable?: boolean;
+  hasGraduated?: boolean;
+
+  // Group D: Finances & Sponsor
+  tripFunding?: 'self' | 'sponsor' | 'company' | 'scholarship' | 'mix';
+  monthlyFinancialCapacity?: string;
+  sponsorRelationship?: 'parent' | 'sibling' | 'relative' | 'friend' | 'other';
+  sponsorEmployment?: 'employed' | 'business_owner' | 'retired' | 'other';
+  sponsorAnnualIncome?: string;
+  tuitionStructure?: 'fully_paid' | 'scholarship' | 'partial_scholarship';
+  livingExpensesPayer?: 'self' | 'parents' | 'sponsor' | 'scholarship';
+  accommodationStatus?: 'reserved' | 'university_housing' | 'not_reserved';
+
+  // Group E: Travel History
+  traveledBefore?: boolean;
+  visitedCountries?: string;
+  hasVisaRefusals?: boolean;
+  visaRefusalDetails?: string;
+
+  // Group F: English & Documents
+  englishLevel?:
+    | 'basic'
+    | 'pre_intermediate'
+    | 'intermediate'
+    | 'upper_intermediate'
+    | 'advanced';
+  hasBankStatements?: boolean;
+  hasInsurance?: boolean;
+
+  // Legacy fields (for backward compatibility)
+  hasInvitation?: boolean;
+  financialSituation?: 'stable_income' | 'sponsor' | 'savings' | 'preparing';
+  // Legacy duration options
+  duration_legacy?:
     | 'less_than_1'
     | '1_3_months'
     | '3_6_months'
     | '6_12_months'
     | 'more_than_1_year';
-  traveledBefore: boolean;
-  currentStatus:
+  // Legacy status options
+  currentStatus_legacy?:
     | 'student'
     | 'employee'
     | 'entrepreneur'
     | 'unemployed'
     | 'other';
-  hasInvitation: boolean;
-  financialSituation: 'stable_income' | 'sponsor' | 'savings' | 'preparing';
-  maritalStatus: 'single' | 'married' | 'divorced';
-  hasChildren: 'no' | 'one' | 'two_plus';
-  englishLevel: 'beginner' | 'intermediate' | 'advanced' | 'native';
+  // Legacy children options
+  hasChildren_legacy?: 'no' | 'one' | 'two_plus';
+  // Legacy marital status
+  maritalStatus_legacy?: 'single' | 'married' | 'divorced';
+  // Legacy English level
+  englishLevel_legacy?: 'beginner' | 'intermediate' | 'advanced' | 'native';
 }
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -7,17 +7,17 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/Ionicons";
-import { useDocumentStore } from "../../store/documents";
-import { colors } from "../../theme/colors";
+} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Ionicons';
+import {useDocumentStore} from '../../store/documents';
+import {colors} from '../../theme/colors';
 import {
   getDocumentTypeLabel,
   formatFileSize,
   getOCRStatusLabel,
   getOCRStatusBadgeColor,
-} from "../../utils/documentHelpers";
+} from '../../utils/documentHelpers';
 import {
   pickFromCamera,
   pickFromGallery,
@@ -26,22 +26,23 @@ import {
   isFileSizeValid,
   getFileSizeInMB,
   showFilePickerOptions,
-} from "../../utils/mediaPickerHelpers";
+} from '../../utils/mediaPickerHelpers';
 
-export const DocumentUploadScreen = ({ route, navigation }: any) => {
+export const DocumentUploadScreen = ({route, navigation}: any) => {
   const insets = useSafeAreaInsets();
   const applicationId = route?.params?.applicationId;
+  const onUploadSuccess = route?.params?.onUploadSuccess;
 
-  const { isLoading, uploadDocument, getRequiredDocuments, error, clearError } =
+  const {isLoading, uploadDocument, getRequiredDocuments, error, clearError} =
     useDocumentStore();
 
-  const [selectedDocType, setSelectedDocType] = useState<string>("");
+  const [selectedDocType, setSelectedDocType] = useState<string>('');
   const [requiredDocs, setRequiredDocs] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<any>(null);
 
   useEffect(() => {
     if (applicationId) {
-      getRequiredDocuments(applicationId).then((docs) => {
+      getRequiredDocuments(applicationId).then(docs => {
         setRequiredDocs(docs);
       });
     }
@@ -72,42 +73,48 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
     showFilePickerOptions(
       handleCameraPress,
       handleGalleryPress,
-      handleDocumentPress
+      handleDocumentPress,
     );
   };
 
   const handleUpload = async () => {
     if (!selectedDocType) {
-      Alert.alert("Select Document Type", "Please select a document type first");
+      Alert.alert(
+        'Select Document Type',
+        'Please select a document type first',
+      );
       return;
     }
 
     if (!selectedFile) {
-      Alert.alert("Select File", "Please select a file to upload");
+      Alert.alert('Select File', 'Please select a file to upload');
       return;
     }
 
     if (!isFileSizeValid(selectedFile.size || 0, 20)) {
-      Alert.alert(
-        "File Too Large",
-        "File size must be less than 20 MB"
-      );
+      Alert.alert('File Too Large', 'File size must be less than 20 MB');
       return;
     }
 
     try {
       const fileToUpload = prepareFileForUpload(selectedFile);
       await uploadDocument(applicationId, selectedDocType, fileToUpload);
-      Alert.alert("Success", "Document uploaded successfully");
-      setSelectedDocType("");
+      Alert.alert('Success', 'Document uploaded successfully');
+      setSelectedDocType('');
       setSelectedFile(null);
+
+      // Call success callback if provided (e.g., to refresh checklist)
+      if (onUploadSuccess && typeof onUploadSuccess === 'function') {
+        onUploadSuccess();
+      }
+
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to upload document");
+      Alert.alert('Error', err.message || 'Failed to upload document');
     }
   };
 
-  const renderDocumentTypeButton = ({ item }: { item: string }) => (
+  const renderDocumentTypeButton = ({item}: {item: string}) => (
     <TouchableOpacity
       onPress={() => setSelectedDocType(item)}
       style={{
@@ -118,16 +125,13 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
         backgroundColor:
           selectedDocType === item ? colors.black : colors.gray[200],
         borderRadius: colors.radius[6],
-      }}
-    >
+      }}>
       <Text
         style={{
           fontSize: colors.typography.sizes.sm,
-          color:
-            selectedDocType === item ? colors.white : colors.black,
+          color: selectedDocType === item ? colors.white : colors.black,
           fontWeight: colors.typography.weights.medium as any,
-        }}
-      >
+        }}>
         {getDocumentTypeLabel(item)}
       </Text>
     </TouchableOpacity>
@@ -140,39 +144,39 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
         backgroundColor: colors.white,
         paddingTop: insets.top,
         paddingBottom: insets.bottom,
-      }}
-    >
+      }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: colors.spacing[20],
           paddingVertical: colors.spacing[16],
-        }}
-      >
+        }}>
         {/* Header with Back Button */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: colors.spacing[24] }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: colors.spacing[24],
+          }}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={{ marginRight: colors.spacing[12] }}
-          >
+            style={{marginRight: colors.spacing[12]}}>
             <Icon name="chevron-back" size={28} color={colors.black} />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
+          <View style={{flex: 1}}>
             <Text
               style={{
                 fontSize: colors.typography.sizes.xl,
                 fontWeight: colors.typography.weights.bold as any,
                 color: colors.black,
-              }}
-            >
+              }}>
               Upload Document
             </Text>
             <Text
               style={{
                 fontSize: colors.typography.sizes.xs,
                 color: colors.gray[600],
-              }}
-            >
+              }}>
               Select document type and file
             </Text>
           </View>
@@ -188,15 +192,13 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
               padding: colors.spacing[12],
               borderRadius: colors.radius[4],
               marginBottom: colors.spacing[16],
-            }}
-          >
+            }}>
             <Text
               style={{
                 fontSize: colors.typography.sizes.sm,
                 color: colors.error[700],
                 marginBottom: colors.spacing[8],
-              }}
-            >
+              }}>
               {error}
             </Text>
             <TouchableOpacity onPress={clearError}>
@@ -205,8 +207,7 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                   fontSize: colors.typography.sizes.xs,
                   color: colors.error[600],
                   fontWeight: colors.typography.weights.semibold as any,
-                }}
-              >
+                }}>
                 Dismiss
               </Text>
             </TouchableOpacity>
@@ -214,22 +215,21 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
         )}
 
         {/* Document Type Selection */}
-        <View style={{ marginBottom: colors.spacing[24] }}>
+        <View style={{marginBottom: colors.spacing[24]}}>
           <Text
             style={{
               fontSize: colors.typography.sizes.sm,
               fontWeight: colors.typography.weights.semibold as any,
               color: colors.black,
               marginBottom: colors.spacing[12],
-            }}
-          >
+            }}>
             Document Type
           </Text>
           {requiredDocs.length > 0 ? (
             <FlatList
               data={requiredDocs}
               renderItem={renderDocumentTypeButton}
-              keyExtractor={(item) => item}
+              keyExtractor={item => item}
               scrollEnabled={false}
               numColumns={2}
             />
@@ -238,8 +238,7 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
               style={{
                 fontSize: colors.typography.sizes.sm,
                 color: colors.gray[600],
-              }}
-            >
+              }}>
               Loading required documents...
             </Text>
           )}
@@ -251,20 +250,19 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
             backgroundColor: colors.gray[50],
             borderWidth: 2,
             borderColor: selectedFile ? colors.success[200] : colors.gray[200],
-            borderStyle: selectedFile ? "solid" : "dashed",
+            borderStyle: selectedFile ? 'solid' : 'dashed',
             borderRadius: colors.radius[8],
             padding: colors.spacing[24],
-            alignItems: "center",
+            alignItems: 'center',
             marginBottom: colors.spacing[24],
-          }}
-        >
+          }}>
           {selectedFile ? (
             <>
               <Icon
                 name="checkmark-circle"
                 size={48}
                 color={colors.success[500]}
-                style={{ marginBottom: colors.spacing[12] }}
+                style={{marginBottom: colors.spacing[12]}}
               />
               <Text
                 style={{
@@ -272,9 +270,8 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                   fontWeight: colors.typography.weights.semibold as any,
                   color: colors.black,
                   marginBottom: colors.spacing[8],
-                  textAlign: "center",
-                }}
-              >
+                  textAlign: 'center',
+                }}>
                 {selectedFile.name}
               </Text>
               <Text
@@ -282,11 +279,10 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                   fontSize: colors.typography.sizes.sm,
                   color: colors.gray[600],
                   marginBottom: colors.spacing[12],
-                }}
-              >
+                }}>
                 {selectedFile.size
                   ? formatFileSize(selectedFile.size)
-                  : "Size unknown"}
+                  : 'Size unknown'}
               </Text>
               <TouchableOpacity
                 onPress={handleSelectFileSource}
@@ -295,15 +291,13 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                   paddingHorizontal: colors.spacing[12],
                   backgroundColor: colors.gray[200],
                   borderRadius: colors.radius[4],
-                }}
-              >
+                }}>
                 <Text
                   style={{
                     fontSize: colors.typography.sizes.sm,
                     color: colors.black,
                     fontWeight: colors.typography.weights.medium as any,
-                  }}
-                >
+                  }}>
                   Change File
                 </Text>
               </TouchableOpacity>
@@ -314,7 +308,7 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                 name="cloud-upload-outline"
                 size={48}
                 color={colors.gray[400]}
-                style={{ marginBottom: colors.spacing[12] }}
+                style={{marginBottom: colors.spacing[12]}}
               />
               <Text
                 style={{
@@ -322,9 +316,8 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                   fontWeight: colors.typography.weights.semibold as any,
                   color: colors.black,
                   marginBottom: colors.spacing[8],
-                  textAlign: "center",
-                }}
-              >
+                  textAlign: 'center',
+                }}>
                 Select a File
               </Text>
               <Text
@@ -332,9 +325,8 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                   fontSize: colors.typography.sizes.sm,
                   color: colors.gray[600],
                   marginBottom: colors.spacing[16],
-                  textAlign: "center",
-                }}
-              >
+                  textAlign: 'center',
+                }}>
                 Choose from camera, gallery, or file picker
               </Text>
               <TouchableOpacity
@@ -344,15 +336,13 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                   paddingHorizontal: colors.spacing[24],
                   backgroundColor: colors.black,
                   borderRadius: colors.radius[6],
-                }}
-              >
+                }}>
                 <Text
                   style={{
                     fontSize: colors.typography.sizes.sm,
                     fontWeight: colors.typography.weights.semibold as any,
                     color: colors.white,
-                  }}
-                >
+                  }}>
                   Choose File
                 </Text>
               </TouchableOpacity>
@@ -371,10 +361,9 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                 : colors.success[500],
             paddingVertical: colors.spacing[14],
             borderRadius: colors.radius[8],
-            alignItems: "center",
+            alignItems: 'center',
             marginBottom: colors.spacing[24],
-          }}
-        >
+          }}>
           {isLoading ? (
             <ActivityIndicator color={colors.white} />
           ) : (
@@ -383,8 +372,7 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
                 fontSize: colors.typography.sizes.base,
                 fontWeight: colors.typography.weights.semibold as any,
                 color: colors.white,
-              }}
-            >
+              }}>
               Upload Document
             </Text>
           )}
@@ -393,45 +381,43 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
         {/* OCR Processing Information */}
         <View
           style={{
-            backgroundColor: getOCRStatusBadgeColor("pending").bg,
+            backgroundColor: getOCRStatusBadgeColor('pending').bg,
             borderLeftWidth: 4,
-            borderLeftColor: getOCRStatusBadgeColor("pending").text,
+            borderLeftColor: getOCRStatusBadgeColor('pending').text,
             borderRadius: colors.radius[6],
             padding: colors.spacing[16],
-          }}
-        >
+          }}>
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
+              flexDirection: 'row',
+              alignItems: 'flex-start',
               gap: colors.spacing[12],
-            }}
-          >
+            }}>
             <Icon
               name="information-circle"
               size={20}
-              color={getOCRStatusBadgeColor("pending").text}
-              style={{ marginTop: colors.spacing[2] }}
+              color={getOCRStatusBadgeColor('pending').text}
+              style={{marginTop: colors.spacing[2]}}
             />
-            <View style={{ flex: 1 }}>
+            <View style={{flex: 1}}>
               <Text
                 style={{
                   fontSize: colors.typography.sizes.sm,
                   fontWeight: colors.typography.weights.semibold as any,
-                  color: getOCRStatusBadgeColor("pending").text,
+                  color: getOCRStatusBadgeColor('pending').text,
                   marginBottom: colors.spacing[4],
-                }}
-              >
+                }}>
                 Document Processing
               </Text>
               <Text
                 style={{
                   fontSize: colors.typography.sizes.xs,
-                  color: getOCRStatusBadgeColor("pending").text,
+                  color: getOCRStatusBadgeColor('pending').text,
                   lineHeight: 16,
-                }}
-              >
-                After upload, your document will be processed for OCR (Optical Character Recognition). This helps extract and verify document information automatically.
+                }}>
+                After upload, your document will be processed for OCR (Optical
+                Character Recognition). This helps extract and verify document
+                information automatically.
               </Text>
             </View>
           </View>
@@ -443,9 +429,8 @@ export const DocumentUploadScreen = ({ route, navigation }: any) => {
             fontSize: colors.typography.sizes.xs,
             color: colors.gray[600],
             marginTop: colors.spacing[16],
-            textAlign: "center",
-          }}
-        >
+            textAlign: 'center',
+          }}>
           Maximum file size: 20 MB • Supported: PDF, JPEG, PNG, Word Documents
         </Text>
       </ScrollView>

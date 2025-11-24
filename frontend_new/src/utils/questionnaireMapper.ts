@@ -171,7 +171,12 @@ export function mapExistingQuestionnaireToSummary(
     | 'other'
     | undefined;
 
-  if (tripFunding === 'sponsor' || financialSituation === 'sponsor') {
+  // Map sponsor type (v2: handle 'mix' option)
+  if (
+    tripFunding === 'sponsor' ||
+    tripFunding === 'mix' ||
+    financialSituation === 'sponsor'
+  ) {
     // Use sponsor relationship if available, otherwise default to parent
     const sponsorRel = existingAnswers.sponsorRelationship;
     if (sponsorRel === 'parent') sponsorType = 'parent';
@@ -187,9 +192,11 @@ export function mapExistingQuestionnaireToSummary(
     sponsorType = 'self';
   } else if (tripFunding === 'company') {
     sponsorType = 'company';
+  } else if (tripFunding === 'scholarship') {
+    sponsorType = 'other'; // Scholarship is a form of sponsorship
   }
 
-  // Map travel history (legacy and new)
+  // Map travel history (v2: use explicit traveledBefore)
   const hasInternationalTravel =
     existingAnswers.traveledBefore === true ||
     String(existingAnswers.traveledBefore) === 'true' ||
@@ -201,23 +208,19 @@ export function mapExistingQuestionnaireToSummary(
     String(existingAnswers.hasVisaRefusals) === 'true' ||
     existingAnswers.previousVisaRejections === true;
 
-  // Map family ties (legacy and new)
+  // Map family ties (v2: use explicit maritalStatus and hasChildren, don't infer)
   const maritalStatus = existingAnswers.maritalStatus || 'single';
-  const hasChildren = existingAnswers.hasChildren || 'no';
+  const hasChildren = existingAnswers.hasChildren || 'none';
   const hasFamilyInUzbekistan =
     existingAnswers.hasFamilyTiesUzbekistan === true ||
-    String(existingAnswers.hasFamilyTiesUzbekistan) === 'true' ||
-    maritalStatus === 'married' ||
-    hasChildren !== 'no';
+    String(existingAnswers.hasFamilyTiesUzbekistan) === 'true';
 
-  // Map documents availability
-  const currentStatus = existingAnswers.currentStatus || 'employee';
+  // Map documents availability (v2: use currentStatus explicitly)
+  const currentStatus = existingAnswers.currentStatus || 'unemployed';
   const hasEmploymentOrStudyProof =
-    existingAnswers.isEmployed === true ||
-    existingAnswers.isCurrentlyStudying === true ||
-    currentStatus === 'employee' ||
-    currentStatus === 'student' ||
-    currentStatus === 'entrepreneur';
+    currentStatus === 'employed' ||
+    currentStatus === 'self_employed' ||
+    currentStatus === 'student';
 
   // Parse financial amounts
   const parseAmount = (str?: string): number | undefined => {
@@ -245,14 +248,16 @@ export function mapExistingQuestionnaireToSummary(
       hasEmploymentOrStudyProof,
       hasPassport: existingAnswers.passportStatus === 'valid',
       hasBankStatement: existingAnswers.hasBankStatements === true,
+      hasInsurance: existingAnswers.hasInsurance === true,
     },
 
-    // NEW: Extended structure
+    // NEW: Extended structure (v2)
     personalInfo: {
       fullName: existingAnswers.fullName,
       dateOfBirth: existingAnswers.dateOfBirth,
       nationality: existingAnswers.nationality,
       passportStatus: existingAnswers.passportStatus,
+      currentResidenceCountry: existingAnswers.currentResidenceCountry,
     },
     travelInfo: {
       purpose: existingAnswers.travelPurpose,
@@ -261,14 +266,16 @@ export function mapExistingQuestionnaireToSummary(
       monthlyCapacity: parseAmount(existingAnswers.monthlyFinancialCapacity),
       accommodation: existingAnswers.accommodationStatus,
       tuitionStatus: existingAnswers.tuitionStructure,
+      duration: existingAnswers.duration,
     },
     employment: {
-      isEmployed: existingAnswers.isEmployed,
+      isEmployed:
+        currentStatus === 'employed' || currentStatus === 'self_employed',
       employerName: existingAnswers.employerDetails,
       monthlySalaryUSD: parseAmount(existingAnswers.monthlySalary),
     },
     education: {
-      isStudent: existingAnswers.isCurrentlyStudying || visaType === 'student',
+      isStudent: currentStatus === 'student' || visaType === 'student',
       programType: existingAnswers.programType,
       diplomaAvailable: existingAnswers.diplomaAvailable,
       transcriptAvailable: existingAnswers.transcriptAvailable,
@@ -277,7 +284,7 @@ export function mapExistingQuestionnaireToSummary(
     financialInfo: {
       selfFundsUSD: parseAmount(existingAnswers.monthlyFinancialCapacity),
       sponsorDetails:
-        tripFunding === 'sponsor'
+        tripFunding === 'sponsor' || tripFunding === 'mix'
           ? {
               relationship: existingAnswers.sponsorRelationship,
               employment: existingAnswers.sponsorEmployment,
@@ -293,6 +300,7 @@ export function mapExistingQuestionnaireToSummary(
             .filter(c => c)
         : undefined,
       hasRefusals: hasVisaRefusals,
+      refusalDetails: existingAnswers.visaRefusalDetails,
     },
     ties: {
       propertyDocs: existingAnswers.hasPropertyDocuments === true,
@@ -300,13 +308,25 @@ export function mapExistingQuestionnaireToSummary(
     },
   };
 
-  // Add duration-based notes if relevant (legacy)
+  // Add explicit fields (v2)
+  summary.maritalStatus = maritalStatus as any;
+  summary.hasChildren = hasChildren as any;
+  summary.englishLevel = (existingAnswers.englishLevel ||
+    'intermediate') as any;
+  summary.currentCountry = existingAnswers.currentResidenceCountry;
+  summary.duration = existingAnswers.duration as any;
+
+  // Add duration-based notes if relevant (v2: updated duration options)
   const duration = existingAnswers.duration;
   if (duration) {
     const durationMap: Record<string, string> = {
-      less_than_1: 'Short-term stay (less than 1 month)',
+      less_than_15_days: 'Short-term stay (less than 15 days)',
+      '15_30_days': 'Short-term stay (15-30 days)',
       '1_3_months': 'Short-term stay (1-3 months)',
       '3_6_months': 'Medium-term stay (3-6 months)',
+      more_than_6_months: 'Long-term stay (more than 6 months)',
+      // Legacy support
+      less_than_1: 'Short-term stay (less than 1 month)',
       '6_12_months': 'Long-term stay (6-12 months)',
       more_than_1_year: 'Long-term stay (more than 1 year)',
     };
@@ -318,13 +338,16 @@ export function mapExistingQuestionnaireToSummary(
     }
   }
 
-  // Add current status to notes (legacy)
+  // Add current status to notes (v2: updated status options)
   if (currentStatus) {
     const statusMap: Record<string, string> = {
       student: 'Currently a student',
+      employed: 'Currently employed',
+      self_employed: 'Self-employed / Business owner',
+      unemployed: 'Currently unemployed',
+      // Legacy support
       employee: 'Currently employed',
       entrepreneur: 'Currently an entrepreneur',
-      unemployed: 'Currently unemployed',
       other: 'Other status',
     };
 
@@ -335,13 +358,17 @@ export function mapExistingQuestionnaireToSummary(
     }
   }
 
-  // Add English level to notes if relevant (legacy)
+  // Add English level to notes if relevant (v2: updated levels)
   const englishLevel = existingAnswers.englishLevel;
   if (englishLevel) {
     const levelMap: Record<string, string> = {
-      beginner: 'English level: Beginner',
+      basic: 'English level: Basic',
+      pre_intermediate: 'English level: Pre-intermediate',
       intermediate: 'English level: Intermediate',
+      upper_intermediate: 'English level: Upper-intermediate',
       advanced: 'English level: Advanced',
+      // Legacy support
+      beginner: 'English level: Beginner',
       native: 'English level: Native',
     };
 

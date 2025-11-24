@@ -1,5 +1,7 @@
-import { PrismaClient } from "@prisma/client";
-import { errors } from "../utils/errors";
+import { PrismaClient } from '@prisma/client';
+import { errors } from '../utils/errors';
+import { DocumentChecklistService } from './document-checklist.service';
+import { logError, logInfo } from '../middleware/logger';
 
 const prisma = new PrismaClient();
 
@@ -14,7 +16,7 @@ export class ApplicationsService {
         country: true,
         visaType: true,
         checkpoints: {
-          orderBy: { order: "asc" },
+          orderBy: { order: 'asc' },
         },
         documents: {
           select: {
@@ -26,17 +28,24 @@ export class ApplicationsService {
       // Order by creation date ascending (oldest first)
       // This ensures applications appear in chronological order (first created = first in list)
       orderBy: {
-        createdAt: "asc",
+        createdAt: 'asc',
       },
     });
 
     // Calculate progress percentage for each application
+    // Option B: Use max of checkpoint progress and document progress for backward compatibility
     return applications.map((app: any) => {
       const allCheckpoints = app.checkpoints || [];
       const completedCount = allCheckpoints.filter((cp: any) => cp.isCompleted).length;
-      const progressPercentage = allCheckpoints.length > 0
-        ? Math.round((completedCount / allCheckpoints.length) * 100)
-        : 0;
+      const checkpointProgress =
+        allCheckpoints.length > 0 ? Math.round((completedCount / allCheckpoints.length) * 100) : 0;
+
+      // Use document-based progress from database (updated after uploads)
+      // Fallback to checkpoint progress if document progress not available
+      const progressPercentage =
+        app.progressPercentage !== undefined && app.progressPercentage !== null
+          ? Math.max(checkpointProgress, app.progressPercentage)
+          : checkpointProgress;
 
       return {
         ...app,
@@ -55,13 +64,13 @@ export class ApplicationsService {
         country: true,
         visaType: true,
         checkpoints: {
-          orderBy: { order: "asc" },
+          orderBy: { order: 'asc' },
         },
       },
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     // Verify ownership
@@ -89,7 +98,7 @@ export class ApplicationsService {
     });
 
     if (!country) {
-      throw errors.notFound("Country");
+      throw errors.notFound('Country');
     }
 
     const visaType = await prisma.visaType.findUnique({
@@ -97,7 +106,7 @@ export class ApplicationsService {
     });
 
     if (!visaType) {
-      throw errors.notFound("Visa Type");
+      throw errors.notFound('Visa Type');
     }
 
     // Check if application already exists
@@ -106,12 +115,12 @@ export class ApplicationsService {
         userId,
         countryId: data.countryId,
         visaTypeId: data.visaTypeId,
-        status: { in: ["draft", "submitted"] },
+        status: { in: ['draft', 'submitted'] },
       },
     });
 
     if (existing) {
-      throw errors.conflict("Active application for this country already exists");
+      throw errors.conflict('Active application for this country already exists');
     }
 
     const application = await prisma.visaApplication.create({
@@ -119,40 +128,40 @@ export class ApplicationsService {
         userId,
         countryId: data.countryId,
         visaTypeId: data.visaTypeId,
-        status: "draft",
+        status: 'draft',
         notes: data.notes,
         // Create default checkpoints based on visa type
         checkpoints: {
           create: [
             {
               order: 1,
-              title: "Application Started",
-              description: "Begin visa application process",
+              title: 'Application Started',
+              description: 'Begin visa application process',
               isCompleted: true,
               completedAt: new Date(),
             },
             {
               order: 2,
-              title: "Document Preparation",
-              description: "Gather and prepare required documents",
+              title: 'Document Preparation',
+              description: 'Gather and prepare required documents',
               isCompleted: false,
             },
             {
               order: 3,
-              title: "Application Submission",
-              description: "Submit application to embassy",
+              title: 'Application Submission',
+              description: 'Submit application to embassy',
               isCompleted: false,
             },
             {
               order: 4,
-              title: "Application Review",
-              description: "Embassy reviews application",
+              title: 'Application Review',
+              description: 'Embassy reviews application',
               isCompleted: false,
             },
             {
               order: 5,
-              title: "Visa Decision",
-              description: "Receive visa approval/rejection",
+              title: 'Visa Decision',
+              description: 'Receive visa approval/rejection',
               isCompleted: false,
             },
           ],
@@ -171,17 +180,13 @@ export class ApplicationsService {
   /**
    * Update application status
    */
-  static async updateApplicationStatus(
-    applicationId: string,
-    userId: string,
-    status: string
-  ) {
+  static async updateApplicationStatus(applicationId: string, userId: string, status: string) {
     const application = await prisma.visaApplication.findUnique({
       where: { id: applicationId },
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     if (application.userId !== userId) {
@@ -202,6 +207,49 @@ export class ApplicationsService {
   }
 
   /**
+   * Update application progress based on verified documents
+   * This is called after document uploads to keep progressPercentage in sync with document status
+   *
+   * @param applicationId - Application ID
+   */
+  static async updateProgressFromDocuments(applicationId: string): Promise<void> {
+    try {
+      // Recalculate progress from documents using the same logic as checklist generation
+      const documentProgress =
+        await DocumentChecklistService.recalculateDocumentProgress(applicationId);
+
+      // Option B: Keep checkpoint progress but ensure document progress is at least as high
+      // Get current checkpoint progress
+      const allCheckpoints = await prisma.checkpoint.findMany({
+        where: { applicationId },
+      });
+      const completedCount = allCheckpoints.filter((c: any) => c.isCompleted).length;
+      const checkpointProgress =
+        allCheckpoints.length > 0 ? Math.round((completedCount / allCheckpoints.length) * 100) : 0;
+
+      // Use max of both to ensure progress never goes backward
+      const finalProgress = Math.max(checkpointProgress, documentProgress);
+
+      await prisma.visaApplication.update({
+        where: { id: applicationId },
+        data: { progressPercentage: finalProgress },
+      });
+
+      logInfo('[DocumentProgress] Updated application progress from documents', {
+        applicationId,
+        documentProgress,
+        checkpointProgress,
+        finalProgress,
+      });
+    } catch (error) {
+      logError('[DocumentProgress] Failed to update progress from documents', error as Error, {
+        applicationId,
+      });
+      // Don't throw - this is non-blocking
+    }
+  }
+
+  /**
    * Update checkpoint status
    */
   static async updateCheckpoint(
@@ -216,7 +264,7 @@ export class ApplicationsService {
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     if (application.userId !== userId) {
@@ -228,7 +276,7 @@ export class ApplicationsService {
     });
 
     if (!checkpoint || checkpoint.applicationId !== applicationId) {
-      throw errors.notFound("Checkpoint");
+      throw errors.notFound('Checkpoint');
     }
 
     const updated = await prisma.checkpoint.update({
@@ -239,18 +287,39 @@ export class ApplicationsService {
       },
     });
 
-    // Update application progress
+    // Update application progress (checkpoint-based)
     const allCheckpoints = await prisma.checkpoint.findMany({
       where: { applicationId },
     });
 
     const completedCount = allCheckpoints.filter((c: any): boolean => c.isCompleted).length;
-    const progressPercentage = Math.round((completedCount / allCheckpoints.length) * 100);
+    const checkpointProgress =
+      allCheckpoints.length > 0 ? Math.round((completedCount / allCheckpoints.length) * 100) : 0;
 
-    await prisma.visaApplication.update({
-      where: { id: applicationId },
-      data: { progressPercentage },
-    });
+    // Also get document-based progress and use max of both
+    try {
+      const documentProgress =
+        await DocumentChecklistService.recalculateDocumentProgress(applicationId);
+      const finalProgress = Math.max(checkpointProgress, documentProgress);
+
+      await prisma.visaApplication.update({
+        where: { id: applicationId },
+        data: { progressPercentage: finalProgress },
+      });
+    } catch (error) {
+      // If document progress calculation fails, just use checkpoint progress
+      logError(
+        '[DocumentProgress] Failed to recalc in updateCheckpoint, using checkpoint only',
+        error as Error,
+        {
+          applicationId,
+        }
+      );
+      await prisma.visaApplication.update({
+        where: { id: applicationId },
+        data: { progressPercentage: checkpointProgress },
+      });
+    }
 
     return updated;
   }
@@ -264,7 +333,7 @@ export class ApplicationsService {
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     if (application.userId !== userId) {
@@ -275,6 +344,6 @@ export class ApplicationsService {
       where: { id: applicationId },
     });
 
-    return { success: true, message: "Application deleted" };
+    return { success: true, message: 'Application deleted' };
   }
 }
