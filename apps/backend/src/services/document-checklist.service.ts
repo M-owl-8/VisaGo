@@ -214,7 +214,11 @@ export class DocumentChecklistService {
       }
 
       // Merge full document data including AI verification (if not already done by AI path)
-      const enrichedItems = this.mergeChecklistItemsWithDocuments(items, existingDocumentsMap);
+      const enrichedItems = this.mergeChecklistItemsWithDocuments(
+        items,
+        existingDocumentsMap,
+        applicationId
+      );
       const sanitizedItems = this.applyCountryTerminology(
         enrichedItems,
         application.country,
@@ -508,14 +512,23 @@ Only return the JSON object, no other text.`;
   /**
    * Merge checklist items with existing documents
    * Reusable helper for both generateChecklist and recalculateDocumentProgress
+   *
+   * Matches documents by documentType (stable key) to ensure uploaded documents
+   * are always attached to the correct checklist items, even after regeneration.
    */
   private static mergeChecklistItemsWithDocuments(
     items: ChecklistItem[],
-    existingDocumentsMap: Map<string, any>
+    existingDocumentsMap: Map<string, any>,
+    applicationId?: string
   ): ChecklistItem[] {
-    return items.map((item) => {
+    const documentsFound = existingDocumentsMap.size;
+    let merged = 0;
+
+    const mergedItems = items.map((item) => {
+      // Match by documentType (stable key, not AI-generated name)
       const doc = existingDocumentsMap.get(item.documentType);
       if (doc) {
+        merged++;
         return {
           ...item,
           status: doc.status as any,
@@ -531,6 +544,19 @@ Only return the JSON object, no other text.`;
       }
       return item;
     });
+
+    // Log merge statistics for debugging
+    if (applicationId) {
+      logInfo('[Checklist][Merge] Document merge completed', {
+        applicationId,
+        documentsFound,
+        merged,
+        totalItems: items.length,
+        unmatchedDocuments: documentsFound - merged,
+      });
+    }
+
+    return mergedItems;
   }
 
   /**
@@ -667,7 +693,11 @@ Only return the JSON object, no other text.`;
       }
 
       // Merge with documents and sanitize terminology
-      const enrichedItems = this.mergeChecklistItemsWithDocuments(items, existingDocumentsMap);
+      const enrichedItems = this.mergeChecklistItemsWithDocuments(
+        items,
+        existingDocumentsMap,
+        applicationId
+      );
       const sanitizedItems = this.applyCountryTerminology(
         enrichedItems,
         application.country,

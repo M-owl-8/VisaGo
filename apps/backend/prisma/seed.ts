@@ -1,9 +1,21 @@
 import { PrismaClient } from "@prisma/client";
 
+// NOTE: In production, seeding is NON-DESTRUCTIVE.
+// We only upsert reference data (countries, visa types) and we never delete user data.
+
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log("🌱 Starting database seed...");
+// Detect production environment
+const isProd =
+  process.env.NODE_ENV === 'production' ||
+  process.env.RAILWAY_ENVIRONMENT_NAME === 'production';
+
+/**
+ * Development seed: Clears all data and recreates reference data + demo data
+ * WARNING: This deletes ALL user data (applications, documents, payments, etc.)
+ */
+async function seedDev() {
+  console.log("🌱 Dev seed: clearing ALL data...");
 
   // Clear existing data in correct order (child records first, then parent records)
   // This prevents foreign key constraint violations
@@ -24,7 +36,27 @@ async function main() {
   
   console.log("✅ Existing data cleared");
 
-  // Create countries
+  // Create countries and visa types (shared data)
+  await seedReferenceData();
+}
+
+/**
+ * Production seed: Only upserts reference data (countries, visa types)
+ * NEVER deletes user data (User, VisaApplication, UserDocument, ChatMessage, Payment, etc.)
+ */
+async function seedProd() {
+  console.log("🌱 Prod seed: seeding ONLY reference data (non-destructive)");
+  
+  // Only ensure countries and visaTypes exist using upsert
+  await seedReferenceData();
+}
+
+/**
+ * Shared function to seed reference data (countries and visa types)
+ * Uses upsert to ensure data exists without deleting anything
+ */
+async function seedReferenceData() {
+  // Define countries
   const countries = [
     {
       name: "United States",
@@ -108,15 +140,23 @@ async function main() {
     },
   ];
 
+  // Upsert countries (create if not exists, update if exists)
   const createdCountries = await Promise.all(
     countries.map((country) =>
-      prisma.country.create({
-        data: country,
+      prisma.country.upsert({
+        where: { code: country.code },
+        update: {
+          name: country.name,
+          flagEmoji: country.flagEmoji,
+          description: country.description,
+          requirements: country.requirements,
+        },
+        create: country,
       })
     )
   );
 
-  console.log(`✅ Created ${createdCountries.length} countries`);
+  console.log(`✅ Upserted ${createdCountries.length} countries`);
 
   // Create visa types for each country
   const visaTypes = [
@@ -579,15 +619,41 @@ async function main() {
     },
   ];
 
+  // Upsert visa types (create if not exists, update if exists)
   await Promise.all(
     visaTypes.map((visaType) =>
-      prisma.visaType.create({
-        data: visaType,
+      prisma.visaType.upsert({
+        where: {
+          countryId_name: {
+            countryId: visaType.countryId,
+            name: visaType.name,
+          },
+        },
+        update: {
+          description: visaType.description,
+          processingDays: visaType.processingDays,
+          validity: visaType.validity,
+          fee: visaType.fee,
+          requirements: visaType.requirements,
+          documentTypes: visaType.documentTypes,
+        },
+        create: visaType,
       })
     )
   );
 
-  console.log(`✅ Created ${visaTypes.length} visa types`);
+  console.log(`✅ Upserted ${visaTypes.length} visa types`);
+}
+
+async function main() {
+  console.log("🌱 Starting database seed...");
+
+  if (isProd) {
+    await seedProd();
+  } else {
+    await seedDev();
+  }
+
   console.log("✨ Database seed completed successfully!");
 }
 
