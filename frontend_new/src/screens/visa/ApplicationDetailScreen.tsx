@@ -2,8 +2,9 @@
  * Application Detail Screen
  * Shows complete application information with document checklist
  */
+// Change summary (2025-11-24): Avoid duplicate checklist fetches, add slow-loading status text, and refresh data only when needed.
 
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useState, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -70,6 +71,14 @@ export default function ApplicationDetailScreen({
   const [summary, setSummary] = useState<ChecklistSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showSlowChecklistMessage, setShowSlowChecklistMessage] =
+    useState(false);
+  const isFetchingRef = useRef(false);
+  const hasLoadedOnceRef = useRef(false);
+  const slowMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const skipNextFocusRefreshRef = useRef(false);
 
   useEffect(() => {
     if (applicationId) {
@@ -77,21 +86,40 @@ export default function ApplicationDetailScreen({
     } else {
       navigation.goBack();
     }
-  }, [applicationId]);
+  }, [applicationId, loadApplicationData, navigation]);
 
   // Refresh checklist when screen comes into focus (e.g., after returning from upload)
   useFocusEffect(
     useCallback(() => {
-      if (applicationId) {
+      if (!applicationId) {
+        return;
+      }
+      if (skipNextFocusRefreshRef.current) {
+        skipNextFocusRefreshRef.current = false;
+        return;
+      }
+      if (hasLoadedOnceRef.current) {
         loadApplicationData();
       }
-    }, [applicationId]),
+    }, [applicationId, loadApplicationData]),
   );
 
-  const loadApplicationData = async () => {
-    try {
-      setIsLoading(true);
+  const loadApplicationData = useCallback(async () => {
+    if (!applicationId || isFetchingRef.current) {
+      return;
+    }
 
+    isFetchingRef.current = true;
+    setIsLoading(true);
+
+    if (slowMessageTimeoutRef.current) {
+      clearTimeout(slowMessageTimeoutRef.current);
+    }
+    slowMessageTimeoutRef.current = setTimeout(() => {
+      setShowSlowChecklistMessage(true);
+    }, 8000);
+
+    try {
       // Load application details and checklist in parallel
       const [appResponse, checklistResponse] = await Promise.all([
         apiClient.getApplication(applicationId),
@@ -106,7 +134,6 @@ export default function ApplicationDetailScreen({
         setChecklistItems(checklistResponse.data.items || []);
         setSummary(checklistResponse.data.summary);
       } else if (checklistResponse.error) {
-        // Check if it's an AI-related error
         const errorMessage = checklistResponse.error.message || '';
         const errorCode = checklistResponse.error.code || '';
         const isAIError =
@@ -115,7 +142,6 @@ export default function ApplicationDetailScreen({
           errorMessage.toLowerCase().includes('ai service');
 
         if (isAIError) {
-          // Show user-friendly AI error message
           const aiErrorMessage =
             language === 'uz'
               ? "Hozircha AI asosida hujjatlar ro'yxatini yaratishda xatolik yuz berdi. Server tomoni bu muammoni hal qiladi. Siz mavjud hujjatlarni yuklashda davom etishingiz mumkin."
@@ -152,9 +178,16 @@ export default function ApplicationDetailScreen({
         Alert.alert(t('common.error'), errorMessage || t('errors.loadFailed'));
       }
     } finally {
+      if (slowMessageTimeoutRef.current) {
+        clearTimeout(slowMessageTimeoutRef.current);
+        slowMessageTimeoutRef.current = null;
+      }
+      setShowSlowChecklistMessage(false);
       setIsLoading(false);
+      isFetchingRef.current = false;
+      hasLoadedOnceRef.current = true;
     }
-  };
+  }, [applicationId, language, t]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -162,12 +195,21 @@ export default function ApplicationDetailScreen({
     setRefreshing(false);
   };
 
+  useEffect(() => {
+    return () => {
+      if (slowMessageTimeoutRef.current) {
+        clearTimeout(slowMessageTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleUploadDocument = (documentType: string, documentName: string) => {
     navigation.navigate('DocumentUpload', {
       applicationId,
       documentType,
       documentName,
       onUploadSuccess: () => {
+        skipNextFocusRefreshRef.current = true;
         // Re-fetch checklist after successful upload to show updated status and progress
         loadApplicationData();
       },
@@ -227,11 +269,21 @@ export default function ApplicationDetailScreen({
   };
 
   if (isLoading) {
+    const slowMessage =
+      language === 'uz'
+        ? "AI hujjatlar ro'yxatini tayyorlayapti, bu jarayon 30 sekundgacha davom etishi mumkin..."
+        : language === 'ru'
+          ? 'ИИ подготавливает список документов, это может занять до 30 секунд...'
+          : 'AI is preparing your document list, this may take up to 30 seconds...';
+
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4A9EFF" />
           <Text style={styles.loadingText}>{t('common.loading')}</Text>
+          {showSlowChecklistMessage && (
+            <Text style={styles.slowLoadingText}>{slowMessage}</Text>
+          )}
         </View>
       </View>
     );
@@ -524,6 +576,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#94A3B8',
+  },
+  slowLoadingText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#CBD5F5',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 32,
   },
   errorContainer: {
     flex: 1,

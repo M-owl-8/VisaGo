@@ -2,6 +2,7 @@
  * Document Validation Service
  * Uses GPT-4o-mini to validate uploaded documents
  */
+// Change summary (2025-11-24): Added acceptance-letter validation hints so Canada study permits consistently expect LOA terminology.
 
 import { PrismaClient } from '@prisma/client';
 import { AIOpenAIService } from './ai-openai.service';
@@ -58,6 +59,7 @@ export async function validateDocumentWithAI(params: {
 }): Promise<AIDocumentValidationResult> {
   try {
     const { document, checklistItem, application, countryName, visaTypeName } = params;
+    const isCanada = countryName.toLowerCase().includes('canada');
 
     // Normalize visa type
     const normalizedVisaType =
@@ -124,6 +126,15 @@ export async function validateDocumentWithAI(params: {
 - Verify document authenticity indicators
 - Check if document matches visa type requirements (student visa)
 - Verify document is properly translated if required`;
+        break;
+      case 'acceptance_letter':
+      case 'loa_letter':
+      case 'letter_of_acceptance':
+        documentSpecificInstructions = `
+- Verify the letter is issued by ${isCanada ? 'a Designated Learning Institution (DLI) in Canada' : 'the admitting school'} and matches the applicant's name.
+- Check that program name, start date, and institution details align with the visa application.
+- Confirm the letterhead, signatures, and contact information look authentic (no obvious edits).
+- Reject letters that are incomplete, unsigned, or unrelated to the stated program/country.`;
         break;
       default:
         documentSpecificInstructions = `

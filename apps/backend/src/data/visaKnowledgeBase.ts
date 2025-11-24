@@ -1,5 +1,7 @@
 export type VisaType = 'tourist' | 'student';
 
+// Change summary (2025-11-24): Clarified Canada study permit terminology so AI consistently asks for LOA from a DLI instead of the US-specific I-20.
+
 type VisaKbSection =
   | 'eligibility'
   | 'documents'
@@ -401,13 +403,13 @@ Talabalar uchun:
     section: 'documents',
     content: `
 Talabalar uchun hujjatlar:
-1. Qabul xati (DLI muassasasidan).
-2. To'lov kvitansiyasi.
-3. Bank statement yoki GIC hujjati.
-4. Homiylik xati (agar bor bo'lsa).
-5. Til sertifikati (IELTS, TOEFL yoki boshqa).
-6. Ta'lim hujjatlari (diplomlar, transkriptlar).
-7. Study plan (o'qish rejasi).
+1. Letter of Acceptance (LOA) from a Designated Learning Institution (DLI) – rasmiy qabul xati bo'lib, dastur nomi va boshlanish sanasini ko'rsatadi (Kanadada hech qachon "I-20" deb atalmaydi).
+2. O'qish to'lovi kvitansiyasi yoki to'lov jadvali.
+3. Bank statement, GIC hujjati yoki boshqa moliyaviy isbot.
+4. Homiylik xati (agar ota-ona yoki boshqa shaxs homiy bo'lsa).
+5. Til sertifikati (IELTS, TOEFL yoki konsullik ko'rsatgan boshqa test).
+6. Ta'lim hujjatlari (diplomlar, transkriptlar, attestatlar).
+7. Study plan / ta'lim maqsadini tushuntiruvchi eslatma.
     `.trim(),
   },
   {

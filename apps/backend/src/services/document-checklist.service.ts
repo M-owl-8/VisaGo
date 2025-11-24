@@ -2,11 +2,12 @@
  * Document Checklist Service
  * AI-powered document checklist generation for visa applications
  */
+// Change summary (2025-11-24): Added OpenAI latency warnings and enforced country-specific terminology (e.g., LOA vs I-20).
 
 import { PrismaClient } from '@prisma/client';
 import { getEnvConfig } from '../config/env';
 import { errors } from '../utils/errors';
-import { logError, logInfo } from '../middleware/logger';
+import { logError, logInfo, logWarn } from '../middleware/logger';
 import AIOpenAIService from './ai-openai.service';
 import { getDocumentTranslation } from '../data/document-translations';
 import { buildAIUserContext } from './ai-context.service';
@@ -36,6 +37,9 @@ export interface ChecklistItem {
   verificationNotes?: string;
   aiVerified?: boolean;
   aiConfidence?: number;
+  whereToObtain?: string;
+  whereToObtainUz?: string;
+  whereToObtainRu?: string;
 }
 
 /**
@@ -120,12 +124,28 @@ export class DocumentChecklistService {
         // Build AI user context with questionnaire summary
         const userContext = await buildAIUserContext(userId, applicationId);
 
+        logInfo('[Checklist][AI] Requesting OpenAI checklist', {
+          applicationId,
+          country: application.country.name,
+          visaType: application.visaType.name,
+        });
+        const aiStart = Date.now();
+
         // Call AI to generate checklist as primary source
         const aiChecklist = await AIOpenAIService.generateChecklist(
           userContext,
           application.country.name,
           application.visaType.name
         );
+        const aiDurationMs = Date.now() - aiStart;
+        if (aiDurationMs > 30000) {
+          logWarn('[Checklist][AI] Slow checklist generation', {
+            applicationId,
+            country: application.country.name,
+            visaType: application.visaType.name,
+            durationMs: aiDurationMs,
+          });
+        }
 
         // Parse AI response into ChecklistItem[]
         if (
@@ -195,11 +215,16 @@ export class DocumentChecklistService {
 
       // Merge full document data including AI verification (if not already done by AI path)
       const enrichedItems = this.mergeChecklistItemsWithDocuments(items, existingDocumentsMap);
+      const sanitizedItems = this.applyCountryTerminology(
+        enrichedItems,
+        application.country,
+        application.visaType.name
+      );
 
       // Calculate progress using unified formula
-      const progress = this.calculateDocumentProgress(enrichedItems);
-      const totalRequired = enrichedItems.filter((item) => item.required).length;
-      const completed = enrichedItems.filter(
+      const progress = this.calculateDocumentProgress(sanitizedItems);
+      const totalRequired = sanitizedItems.filter((item) => item.required).length;
+      const completed = sanitizedItems.filter(
         (item) => item.required && item.status === 'verified'
       ).length;
 
@@ -216,7 +241,7 @@ export class DocumentChecklistService {
         applicationId,
         countryId: application.countryId,
         visaTypeId: application.visaTypeId,
-        items: enrichedItems,
+        items: sanitizedItems,
         totalRequired,
         completed,
         progress,
@@ -641,17 +666,22 @@ Only return the JSON object, no other text.`;
         );
       }
 
-      // Merge with documents
+      // Merge with documents and sanitize terminology
       const enrichedItems = this.mergeChecklistItemsWithDocuments(items, existingDocumentsMap);
+      const sanitizedItems = this.applyCountryTerminology(
+        enrichedItems,
+        application.country,
+        application.visaType.name
+      );
 
       // Calculate progress using unified formula
-      const progress = this.calculateDocumentProgress(enrichedItems);
+      const progress = this.calculateDocumentProgress(sanitizedItems);
 
       logInfo('[DocumentProgress] Recalculated progress from documents', {
         applicationId,
         progress,
-        totalRequired: enrichedItems.filter((i) => i.required).length,
-        verified: enrichedItems.filter((i) => i.required && i.status === 'verified').length,
+        totalRequired: sanitizedItems.filter((i) => i.required).length,
+        verified: sanitizedItems.filter((i) => i.required && i.status === 'verified').length,
       });
 
       return progress;
@@ -661,6 +691,93 @@ Only return the JSON object, no other text.`;
       });
       throw error;
     }
+  }
+
+  private static applyCountryTerminology(
+    items: ChecklistItem[],
+    country: { code?: string | null; name?: string | null },
+    visaTypeName: string
+  ): ChecklistItem[] {
+    const code = country?.code?.toUpperCase() || '';
+    const countryName = (country?.name || '').toLowerCase();
+    const isUnitedStates =
+      code === 'US' || countryName.includes('united states') || countryName.includes('usa');
+    const isCanada = code === 'CA' || countryName.includes('canada');
+    const isStudentVisa = visaTypeName.toLowerCase().includes('student');
+
+    return items.map((item) => {
+      const searchable = [
+        item.name,
+        item.nameUz,
+        item.nameRu,
+        item.description,
+        item.descriptionUz,
+        item.descriptionRu,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const mentionsI20 = searchable.includes('i-20') || searchable.includes('i20');
+
+      if (!isUnitedStates && mentionsI20) {
+        return this.buildAcceptanceLetterItem(item, isCanada);
+      }
+
+      if (isCanada && isStudentVisa && item.documentType === 'acceptance_letter') {
+        return this.buildAcceptanceLetterItem(item, true);
+      }
+
+      return item;
+    });
+  }
+
+  private static buildAcceptanceLetterItem(
+    item: ChecklistItem,
+    preferCanadianLoa: boolean
+  ): ChecklistItem {
+    const nameEn = preferCanadianLoa
+      ? 'Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)'
+      : 'Official Acceptance Letter from the admitting school';
+    const nameUz = preferCanadianLoa
+      ? 'Kanadadagi DLI tomonidan berilgan qabul xati (LOA)'
+      : "Ta'lim muassasasidan rasmiy qabul xati";
+    const nameRu = preferCanadianLoa
+      ? 'Письмо о зачислении (LOA) от канадского учебного заведения из списка DLI'
+      : 'Официальное письмо о зачислении от учебного заведения';
+
+    const descriptionEn = preferCanadianLoa
+      ? 'Provide the LOA issued by your Canadian DLI that lists the program, start date, DLI number, and student ID.'
+      : 'Provide the official admission letter confirming your enrolment details.';
+    const descriptionUz = preferCanadianLoa
+      ? 'Kanadadagi DLI tomonidan berilgan LOA (dastur, boshlanish sanasi, DLI raqami, talaba ID) nusxasini yuklang.'
+      : 'Qabul qilinganligingizni tasdiqlovchi rasmiy qabul xatini yuklang.';
+    const descriptionRu = preferCanadianLoa
+      ? 'Загрузите LOA от канадского DLI с указанием программы, даты начала, номера DLI и ID студента.'
+      : 'Загрузите официальное письмо о зачислении с деталями программы.';
+
+    const whereToObtainEn = preferCanadianLoa
+      ? 'Request the LOA directly from the admissions office of your Canadian DLI and upload the original PDF or scan.'
+      : 'Request this letter from the admissions/registrar office of the school that accepted you.';
+    const whereToObtainUz = preferCanadianLoa
+      ? "Kanadadagi DLI qabul bo'limidan LOA ni oling va PDF yoki skan nusxasini yuklang."
+      : "Qabul qilgan ta'lim muassasasining qabul bo'limidan rasmiy qabul xatini so'rang va nusxasini yuklang.";
+    const whereToObtainRu = preferCanadianLoa
+      ? 'Получите LOA в приёмной комиссии канадского DLI и загрузите оригинальный PDF/скан.'
+      : 'Запросите письмо о зачислении в приёмной комиссии выбранного учебного заведения и загрузите его копию.';
+
+    return {
+      ...item,
+      documentType: 'acceptance_letter',
+      name: nameEn,
+      nameUz,
+      nameRu,
+      description: descriptionEn,
+      descriptionUz,
+      descriptionRu,
+      whereToObtain: whereToObtainEn,
+      whereToObtainUz,
+      whereToObtainRu,
+    };
   }
 
   /**

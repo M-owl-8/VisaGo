@@ -1,5 +1,7 @@
-import { create } from 'zustand';
-import { apiClient } from '../services/api';
+import {create} from 'zustand';
+import {apiClient} from '../services/api';
+
+// Change summary (2025-11-24): Preserve the full country list even when performing server-side searches so questionnaire country picker always shows every destination.
 
 interface Country {
   id: string;
@@ -55,17 +57,17 @@ interface VisaState {
   visaTypesForCountry: VisaType[];
   allVisaTypeOptions: VisaTypeOption[]; // All available visa types
   countriesForVisaType: CountryWithVisaType[]; // Countries offering selected visa type
-  
+
   // Loading states
   isLoadingCountries: boolean;
   isLoadingVisaTypes: boolean;
   isLoadingVisaTypeOptions: boolean;
   isLoadingCountriesForVisaType: boolean;
-  
+
   // Search
   searchQuery: string;
   filteredCountries: Country[];
-  
+
   // Actions
   fetchCountries: (search?: string) => Promise<void>;
   selectCountry: (country: Country) => Promise<void>;
@@ -73,7 +75,7 @@ interface VisaState {
   fetchVisaTypes: (countryId: string) => Promise<void>;
   setSearchQuery: (query: string) => Promise<void>;
   clearSelection: () => void;
-  
+
   // New actions for visa type first flow
   fetchAllVisaTypes: (search?: string) => Promise<void>;
   selectVisaTypeName: (visaTypeName: string) => Promise<void>;
@@ -102,35 +104,39 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   // Fetch all countries
   fetchCountries: async (search?: string) => {
     try {
-      set({ isLoadingCountries: true });
+      set({isLoadingCountries: true});
       const response = await apiClient.getCountries(search);
-      
+
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch countries');
       }
 
       const countries = response.data;
+
+      if (search) {
+        set(state => ({
+          countries: state.countries.length ? state.countries : countries,
+          filteredCountries: countries,
+        }));
+        return;
+      }
+
       set({
         countries,
-        filteredCountries: search 
-          ? countries.filter(c => 
-              c.name.toLowerCase().includes(search.toLowerCase()) ||
-              c.code.toLowerCase().includes(search.toLowerCase())
-            )
-          : countries,
+        filteredCountries: countries,
       });
     } catch (error) {
       console.error('Error fetching countries:', error);
       throw error;
     } finally {
-      set({ isLoadingCountries: false });
+      set({isLoadingCountries: false});
     }
   },
 
   // Select a country and fetch its visa types
   selectCountry: async (country: Country) => {
     try {
-      set({ selectedCountry: country, selectedVisaType: null });
+      set({selectedCountry: country, selectedVisaType: null});
       await get().fetchVisaTypes(country.id);
     } catch (error) {
       console.error('Error selecting country:', error);
@@ -141,51 +147,52 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   // Fetch visa types for a country
   fetchVisaTypes: async (countryId: string) => {
     try {
-      set({ isLoadingVisaTypes: true });
+      set({isLoadingVisaTypes: true});
       const response = await apiClient.getVisaTypes(countryId);
-      
+
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch visa types');
       }
 
-      set({ visaTypesForCountry: response.data });
+      set({visaTypesForCountry: response.data});
     } catch (error) {
       console.error('Error fetching visa types:', error);
       throw error;
     } finally {
-      set({ isLoadingVisaTypes: false });
+      set({isLoadingVisaTypes: false});
     }
   },
 
   // Select a visa type
   selectVisaType: (visaType: VisaType) => {
-    set({ selectedVisaType: visaType });
+    set({selectedVisaType: visaType});
   },
 
   // Update search query - filters locally and triggers API call if needed
   setSearchQuery: async (query: string) => {
-    set({ searchQuery: query });
-    const { countries } = get();
-    
+    set({searchQuery: query});
+    const {countries} = get();
+
     // If we have countries, filter locally first for instant feedback
     if (countries.length > 0) {
       if (!query) {
-        set({ filteredCountries: countries });
+        set({filteredCountries: countries});
       } else {
-        const filtered = countries.filter(country =>
-          country.name.toLowerCase().includes(query.toLowerCase()) ||
-          country.code.toLowerCase().includes(query.toLowerCase())
+        const filtered = countries.filter(
+          country =>
+            country.name.toLowerCase().includes(query.toLowerCase()) ||
+            country.code.toLowerCase().includes(query.toLowerCase()),
         );
-        set({ filteredCountries: filtered });
+        set({filteredCountries: filtered});
       }
     }
-    
+
     // Clear existing debounce timer
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer);
       searchDebounceTimer = null;
     }
-    
+
     // Debounce API call to avoid too many requests
     searchDebounceTimer = setTimeout(async () => {
       if (query && query.length >= 2) {
@@ -223,26 +230,30 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   // New: Fetch all visa type options (for visa type first flow)
   fetchAllVisaTypes: async (search?: string) => {
     try {
-      set({ isLoadingVisaTypeOptions: true });
+      set({isLoadingVisaTypeOptions: true});
       const response = await apiClient.getAllVisaTypes(search);
-      
+
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch visa types');
       }
 
-      set({ allVisaTypeOptions: response.data });
+      set({allVisaTypeOptions: response.data});
     } catch (error) {
       console.error('Error fetching visa types:', error);
       throw error;
     } finally {
-      set({ isLoadingVisaTypeOptions: false });
+      set({isLoadingVisaTypeOptions: false});
     }
   },
 
   // New: Select visa type name and fetch countries
   selectVisaTypeName: async (visaTypeName: string) => {
     try {
-      set({ selectedVisaTypeName: visaTypeName, selectedCountry: null, selectedVisaType: null });
+      set({
+        selectedVisaTypeName: visaTypeName,
+        selectedCountry: null,
+        selectedVisaType: null,
+      });
       await get().fetchCountriesByVisaType(visaTypeName);
     } catch (error) {
       console.error('Error selecting visa type:', error);
@@ -253,19 +264,19 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   // New: Fetch countries that offer a specific visa type
   fetchCountriesByVisaType: async (visaTypeName: string) => {
     try {
-      set({ isLoadingCountriesForVisaType: true });
+      set({isLoadingCountriesForVisaType: true});
       const response = await apiClient.getCountriesByVisaType(visaTypeName);
-      
+
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch countries for visa type');
       }
 
-      set({ countriesForVisaType: response.data });
+      set({countriesForVisaType: response.data});
     } catch (error) {
       console.error('Error fetching countries for visa type:', error);
       throw error;
     } finally {
-      set({ isLoadingCountriesForVisaType: false });
+      set({isLoadingCountriesForVisaType: false});
     }
   },
 

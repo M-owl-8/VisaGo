@@ -12,6 +12,7 @@ import { logInfo, logError, logWarn } from '../middleware/logger';
  * - Token counting and cost tracking
  * - Error handling with fallback responses
  */
+// Change summary (2025-11-24): Tightened checklist prompt, enforced country-specific terminology, and lowered token limits for faster responses.
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -458,76 +459,53 @@ If you don't know something, say so clearly and suggest how to find the informat
 
       // Get relevant document guides based on user context
       const userQuery = JSON.stringify(userContext);
-      const documentGuidesText = getRelevantDocumentGuides(userQuery, 5);
+      const documentGuidesText = getRelevantDocumentGuides(userQuery, 3);
 
-      const systemPrompt = `You are a visa application assistant for Ketdik. Generate a comprehensive, multilingual document checklist for a ${visaType} visa application to ${country}.
-
-CRITICAL REQUIREMENTS:
-1. You MUST return a JSON object with this EXACT structure:
+      const systemPrompt = `You are Ketdik's visa document assistant. Reply ONLY with valid JSON that matches:
 {
   "type": "${visaType}",
   "checklist": [
     {
-      "document": "English document name (internal key, e.g. 'passport', 'i20_form', 'bank_statement')",
-      "name": "English display name",
-      "nameUz": "Uzbek display name",
-      "nameRu": "Russian display name",
+      "document": "internal_key",
+      "name": "English name",
+      "nameUz": "Uzbek name",
+      "nameRu": "Russian name",
+      "description": "...",
+      "descriptionUz": "...",
+      "descriptionRu": "...",
       "required": true/false,
-      "description": "English description",
-      "descriptionUz": "Uzbek description",
-      "descriptionRu": "Russian description",
-      "priority": "high" | "medium" | "low",
-      "whereToObtain": "English instructions on where to get this document in Uzbekistan",
-      "whereToObtainUz": "Uzbek instructions on where to get this document in Uzbekistan",
-      "whereToObtainRu": "Russian instructions on where to get this document in Uzbekistan"
+      "priority": "high"|"medium"|"low",
+      "whereToObtain": "English instructions for Uzbekistan",
+      "whereToObtainUz": "...",
+      "whereToObtainRu": "..."
     }
   ]
 }
 
-2. ALL fields (name, nameUz, nameRu, description, descriptionUz, descriptionRu, whereToObtain, whereToObtainUz, whereToObtainRu) MUST be provided for each checklist item.
+Rules:
+- Use country-specific terminology and follow the provided knowledge base / guides.
+- United States student visas may include "Form I-20" and SEVIS language.
+- Canada study permits MUST use "Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)" and must NEVER mention "I-20".
+- Do not mix US-only terms into other countries. If a document is country-specific, use that country's official name.
+- Provide a complete list of required and strong optional documents (passport, finances, accommodation, travel, ties, medical, biometrics, etc.).
+- Multilingual fields must never be empty (reuse English if translation unavailable).
+- Keep responses concise (no markdown, no commentary).`;
 
-3. Generate a FULL, REALISTIC list of ALL required AND important optional documents for this specific visa application. DO NOT limit yourself to a fixed number of documents. The number of documents should vary based on:
-   - Country requirements (e.g., US student visas often need 14-20 documents, Japan tourist visas often need 7-12 documents)
-   - Visa type (student vs tourist have different requirements)
-   - User's questionnaire answers (age, marital status, children, funding source, travel history, ties to home country)
-   - Specific country rules from the visa knowledge base
+      const promptPayload = {
+        country,
+        visaType,
+        visaKnowledgeBase:
+          visaKb || 'No specific knowledge base available for this country/visa type.',
+        documentGuides:
+          documentGuidesText || 'No Uzbekistan-specific document guides matched this request.',
+        applicantContext: userContext,
+      };
 
-4. Consider ALL relevant documents including but not limited to:
-   - Core documents: passport, photos, application forms
-   - Financial documents: bank statements, sponsorship letters, proof of funds
-   - Educational documents: transcripts, diplomas, I-20/DS-2019 (for student visas), acceptance letters
-   - Travel documents: flight bookings, accommodation proof, travel insurance
-   - Supporting documents: employment letters, property certificates, family ties proof, invitation letters
-   - Country-specific documents: SEVIS fee receipt (US), police clearance, medical certificates, etc.
-
-5. Use the visa knowledge base and document guides provided below to ensure accuracy and completeness.
-
-6. Priority levels:
-   - "high": Essential documents that are always required (passport, application form, I-20 for students, etc.)
-   - "medium": Important documents that are usually required (bank statements, accommodation proof, etc.)
-   - "low": Optional but recommended documents (travel insurance, flight bookings, etc.)
-
-7. For "whereToObtain" fields, provide specific, practical instructions for obtaining each document in Uzbekistan, using the document guides provided.
-
-8. The "document" field should use stable internal keys (lowercase, underscore-separated) like: passport, bank_statement, i20_form, sevis_fee_receipt, invitation_letter, etc.
-
-VISA KNOWLEDGE BASE FOR ${country} ${visaType.toUpperCase()} VISA:
-${visaKb || 'No specific knowledge base available for this country/visa type.'}
-
-DOCUMENT GUIDES (How to obtain documents in Uzbekistan):
-${documentGuidesText || 'No specific document guides available.'}
-
-USER CONTEXT (including questionnaire answers):
-${JSON.stringify(userContext, null, 2)}
-
-Based on the user's context, visa knowledge base, and document guides, create a COMPLETE, REALISTIC checklist with ALL required and optional documents. The number of documents should reflect the actual requirements for this specific country, visa type, and user situation. Do not artificially limit the count. Ensure all multilingual fields are properly filled.`;
-
-      const userPrompt = `Generate a complete document checklist for:
-- Country: ${country}
-- Visa Type: ${visaType}
-- User Context: ${JSON.stringify(userContext, null, 2)}
-
-Provide a comprehensive checklist with all required documents, including multilingual names, descriptions, and instructions on where to obtain each document in Uzbekistan.`;
+      const userPrompt = `Generate the checklist strictly following the schema above.\n${JSON.stringify(
+        promptPayload,
+        null,
+        2
+      )}`;
 
       logInfo('[OpenAI][Checklist] Generating checklist', {
         model: this.MODEL,
@@ -544,8 +522,8 @@ Provide a comprehensive checklist with all required documents, including multili
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        max_tokens: 3000,
-        temperature: 0.2, // Very low temperature for deterministic, consistent checklist generation
+        temperature: 0.1,
+        max_completion_tokens: 1200,
         response_format: { type: 'json_object' },
       });
 
@@ -553,6 +531,15 @@ Provide a comprehensive checklist with all required documents, including multili
       const inputTokens = response.usage?.prompt_tokens || 0;
       const outputTokens = response.usage?.completion_tokens || 0;
       const totalTokens = inputTokens + outputTokens;
+
+      if (responseTime > 30000) {
+        logWarn('[OpenAI][Checklist] Slow response', {
+          country,
+          visaType,
+          responseTimeMs: responseTime,
+          tokensUsed: totalTokens,
+        });
+      }
 
       logInfo('[OpenAI][Checklist] Checklist generated', {
         model: this.MODEL,

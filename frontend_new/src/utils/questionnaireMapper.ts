@@ -2,6 +2,7 @@
  * Questionnaire Mapper
  * Maps existing questionnaire answers to standardized VisaQuestionnaireSummary
  */
+// Change summary (2025-11-24): Removed duplicate derived field declarations to keep Metro bundler happy.
 
 import {
   QuestionnaireData,
@@ -218,7 +219,8 @@ export function mapExistingQuestionnaireToSummary(
   // Map v2 fields: ageRange, currentResidenceCountry, englishLevel, duration
   const ageRange = existingAnswers.ageRange;
   const currentResidenceCountry = existingAnswers.currentResidenceCountry;
-  const englishLevel = existingAnswers.englishLevel || 'intermediate';
+  const englishLevelAnswer = existingAnswers.englishLevel;
+  const normalizedEnglishLevel = (englishLevelAnswer || 'intermediate') as any;
   const duration = existingAnswers.duration;
 
   // Map documents availability (v2: use currentStatus explicitly)
@@ -253,7 +255,7 @@ export function mapExistingQuestionnaireToSummary(
     // v2 explicit fields
     maritalStatus: maritalStatus as any,
     hasChildren: hasChildren as any,
-    englishLevel: englishLevel as any,
+    englishLevel: normalizedEnglishLevel,
     duration: duration as any,
     currentCountry: currentResidenceCountry,
     documents: {
@@ -332,14 +334,12 @@ export function mapExistingQuestionnaireToSummary(
   // Add explicit fields (v2) - no inference, use direct values
   summary.maritalStatus = maritalStatus as any;
   summary.hasChildren = hasChildren as any;
-  summary.englishLevel = (existingAnswers.englishLevel ||
-    'intermediate') as any;
+  summary.englishLevel = normalizedEnglishLevel;
   summary.currentCountry = existingAnswers.currentResidenceCountry;
   summary.duration = existingAnswers.duration as any;
   summary.ageRange = existingAnswers.ageRange as any; // v2: explicit age range
 
   // Add duration-based notes if relevant (v2: updated duration options)
-  const duration = existingAnswers.duration;
   if (duration) {
     const durationMap: Record<string, string> = {
       less_than_1_month: 'Short-term stay (less than 1 month)',
@@ -382,8 +382,7 @@ export function mapExistingQuestionnaireToSummary(
   }
 
   // Add English level to notes if relevant (v2: updated levels)
-  const englishLevel = existingAnswers.englishLevel;
-  if (englishLevel) {
+  if (englishLevelAnswer) {
     const levelMap: Record<string, string> = {
       basic: 'English level: Basic',
       pre_intermediate: 'English level: Pre-intermediate',
@@ -396,9 +395,9 @@ export function mapExistingQuestionnaireToSummary(
     };
 
     if (!summary.notes) {
-      summary.notes = levelMap[englishLevel] || '';
+      summary.notes = levelMap[englishLevelAnswer] || '';
     } else {
-      summary.notes += `; ${levelMap[englishLevel]}`;
+      summary.notes += `; ${levelMap[englishLevelAnswer]}`;
     }
   }
 
