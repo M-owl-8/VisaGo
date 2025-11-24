@@ -210,10 +210,16 @@ export function mapExistingQuestionnaireToSummary(
 
   // Map family ties (v2: use explicit maritalStatus and hasChildren, don't infer)
   const maritalStatus = existingAnswers.maritalStatus || 'single';
-  const hasChildren = existingAnswers.hasChildren || 'none';
+  const hasChildren = existingAnswers.hasChildren || 'no';
   const hasFamilyInUzbekistan =
     existingAnswers.hasFamilyTiesUzbekistan === true ||
     String(existingAnswers.hasFamilyTiesUzbekistan) === 'true';
+
+  // Map v2 fields: ageRange, currentResidenceCountry, englishLevel, duration
+  const ageRange = existingAnswers.ageRange;
+  const currentResidenceCountry = existingAnswers.currentResidenceCountry;
+  const englishLevel = existingAnswers.englishLevel || 'intermediate';
+  const duration = existingAnswers.duration;
 
   // Map documents availability (v2: use currentStatus explicitly)
   const currentStatus = existingAnswers.currentStatus || 'unemployed';
@@ -244,6 +250,12 @@ export function mapExistingQuestionnaireToSummary(
     previousVisaRejections: hasVisaRefusals,
     hasFamilyInUzbekistan,
     hasPropertyInUzbekistan: existingAnswers.hasPropertyDocuments === true,
+    // v2 explicit fields
+    maritalStatus: maritalStatus as any,
+    hasChildren: hasChildren as any,
+    englishLevel: englishLevel as any,
+    duration: duration as any,
+    currentCountry: currentResidenceCountry,
     documents: {
       hasEmploymentOrStudyProof,
       hasPassport: existingAnswers.passportStatus === 'valid',
@@ -273,13 +285,21 @@ export function mapExistingQuestionnaireToSummary(
         currentStatus === 'employed' || currentStatus === 'self_employed',
       employerName: existingAnswers.employerDetails,
       monthlySalaryUSD: parseAmount(existingAnswers.monthlySalary),
+      currentStatus: currentStatus as any,
     },
     education: {
-      isStudent: currentStatus === 'student' || visaType === 'student',
+      isStudent:
+        currentStatus === 'student' ||
+        visaType === 'student' ||
+        existingAnswers.isCurrentlyStudying === true ||
+        String(existingAnswers.isCurrentlyStudying) === 'true',
       programType: existingAnswers.programType,
       diplomaAvailable: existingAnswers.diplomaAvailable,
       transcriptAvailable: existingAnswers.transcriptAvailable,
       hasGraduated: existingAnswers.hasGraduated,
+      isCurrentlyStudying:
+        existingAnswers.isCurrentlyStudying === true ||
+        String(existingAnswers.isCurrentlyStudying) === 'true',
     },
     financialInfo: {
       selfFundsUSD: parseAmount(existingAnswers.monthlyFinancialCapacity),
@@ -301,6 +321,7 @@ export function mapExistingQuestionnaireToSummary(
         : undefined,
       hasRefusals: hasVisaRefusals,
       refusalDetails: existingAnswers.visaRefusalDetails,
+      traveledBefore: hasInternationalTravel, // v2: explicit traveledBefore flag
     },
     ties: {
       propertyDocs: existingAnswers.hasPropertyDocuments === true,
@@ -308,27 +329,29 @@ export function mapExistingQuestionnaireToSummary(
     },
   };
 
-  // Add explicit fields (v2)
+  // Add explicit fields (v2) - no inference, use direct values
   summary.maritalStatus = maritalStatus as any;
   summary.hasChildren = hasChildren as any;
   summary.englishLevel = (existingAnswers.englishLevel ||
     'intermediate') as any;
   summary.currentCountry = existingAnswers.currentResidenceCountry;
   summary.duration = existingAnswers.duration as any;
+  summary.ageRange = existingAnswers.ageRange as any; // v2: explicit age range
 
   // Add duration-based notes if relevant (v2: updated duration options)
   const duration = existingAnswers.duration;
   if (duration) {
     const durationMap: Record<string, string> = {
-      less_than_15_days: 'Short-term stay (less than 15 days)',
-      '15_30_days': 'Short-term stay (15-30 days)',
+      less_than_1_month: 'Short-term stay (less than 1 month)',
       '1_3_months': 'Short-term stay (1-3 months)',
       '3_6_months': 'Medium-term stay (3-6 months)',
-      more_than_6_months: 'Long-term stay (more than 6 months)',
-      // Legacy support
-      less_than_1: 'Short-term stay (less than 1 month)',
       '6_12_months': 'Long-term stay (6-12 months)',
       more_than_1_year: 'Long-term stay (more than 1 year)',
+      // Legacy support
+      less_than_15_days: 'Short-term stay (less than 15 days)',
+      '15_30_days': 'Short-term stay (15-30 days)',
+      less_than_1: 'Short-term stay (less than 1 month)',
+      more_than_6_months: 'Long-term stay (more than 6 months)',
     };
 
     if (!summary.notes) {

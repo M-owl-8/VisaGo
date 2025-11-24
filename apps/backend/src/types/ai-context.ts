@@ -28,14 +28,10 @@ export interface VisaQuestionnaireSummary {
   citizenship?: string;
   currentCountry?: string;
   maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
-  hasChildren?: 'none' | 'one' | 'two_or_more';
-  duration?:
-    | 'less_than_15_days'
-    | '15_30_days'
-    | '1_3_months'
-    | '3_6_months'
-    | 'more_than_6_months';
-  englishLevel?: 'basic' | 'pre_intermediate' | 'intermediate' | 'upper_intermediate' | 'advanced';
+  hasChildren?: 'no' | 'one' | 'two_or_more';
+  ageRange?: 'under_18' | '18_25' | '26_35' | '36_45' | '46_plus';
+  duration?: 'less_than_1_month' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year';
+  englishLevel?: 'basic' | 'intermediate' | 'advanced';
   hasUniversityInvitation?: boolean;
   hasOtherInvitation?: boolean;
   invitationDetails?: string;

@@ -13,17 +13,18 @@ export interface QuestionnaireData {
   country?: string;
   purpose?: 'tourism' | 'study';
   duration?:
-    | 'less_than_15_days'
-    | '15_30_days'
+    | 'less_than_1_month'
     | '1_3_months'
     | '3_6_months'
-    | 'more_than_6_months';
+    | '6_12_months'
+    | 'more_than_1_year';
   plannedTravelDates?: string;
   currentResidenceCountry?: string;
 
   // Group B: Personal / Family / Ties
   maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
-  hasChildren?: 'none' | 'one' | 'two_or_more';
+  hasChildren?: 'no' | 'one' | 'two_or_more';
+  ageRange?: 'under_18' | '18_25' | '26_35' | '36_45' | '46_plus';
   hasFamilyTiesUzbekistan?: boolean;
   hasPropertyDocuments?: boolean;
 

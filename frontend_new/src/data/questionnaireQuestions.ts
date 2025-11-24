@@ -1,16 +1,19 @@
 /**
- * Questionnaire Questions v2 - Clean, GPT-friendly structure
+ * Questionnaire Questions v2 – keep in sync with AIUserContext
+ * Clean, GPT-friendly structure for AI document checklist generation
  * Supports: Tourist & Student visas for 10 countries
  * Languages: Uzbek, Russian, English
  *
- * Designed to give GPT-4o-mini everything needed for document checklist generation
+ * Total questions: 32 (A: 5, B: 3, C: 10, D: 8, E: 4, F: 2)
+ * Note: Some questions are conditional (shown based on previous answers)
+ * The step counter uses questionnaireQuestions.length, so all questions are counted
  */
 
 import {Question} from '../types/questionnaire';
 
 export const questionnaireQuestions: Question[] = [
   // ============================================================================
-  // GROUP A: Destination & Basic
+  // GROUP A: Basic Visa Info
   // ============================================================================
 
   // A1: Country
@@ -29,7 +32,30 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // A2: Purpose
+  // A2: Current Residence Country
+  {
+    id: 'currentResidenceCountry',
+    titleEn: 'Where do you live now?',
+    titleUz: 'Hozir qayerda yashayapsiz?',
+    titleRu: 'Где вы сейчас живете?',
+    descriptionEn: 'Select your current country of residence',
+    descriptionUz: 'Hozirgi yashash davlatingizni tanlang',
+    descriptionRu: 'Выберите страну вашего текущего проживания',
+    type: 'dropdown',
+    required: true,
+    options: [
+      {
+        value: 'UZ',
+        labelEn: 'Uzbekistan',
+        labelUz: "O'zbekiston",
+        labelRu: 'Узбекистан',
+        icon: '🇺🇿',
+      },
+      // Will be populated from backend countries list
+    ],
+  },
+
+  // A3: Purpose
   {
     id: 'purpose',
     titleEn: 'What type of visa do you need?',
@@ -58,7 +84,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // A3: Duration
+  // A4: Duration
   {
     id: 'duration',
     titleEn: 'How long do you plan to stay?',
@@ -71,17 +97,10 @@ export const questionnaireQuestions: Question[] = [
     required: true,
     options: [
       {
-        value: 'less_than_15_days',
-        labelEn: 'Less than 15 days',
-        labelUz: '15 kundan kam',
-        labelRu: 'Менее 15 дней',
-        icon: '📅',
-      },
-      {
-        value: '15_30_days',
-        labelEn: '15-30 days',
-        labelUz: '15-30 kun',
-        labelRu: '15-30 дней',
+        value: 'less_than_1_month',
+        labelEn: 'Less than 1 month',
+        labelUz: '1 oydan kam',
+        labelRu: 'Менее 1 месяца',
         icon: '📅',
       },
       {
@@ -99,56 +118,60 @@ export const questionnaireQuestions: Question[] = [
         icon: '📅',
       },
       {
-        value: 'more_than_6_months',
-        labelEn: 'More than 6 months',
-        labelUz: "6 oydan ko'p",
-        labelRu: 'Более 6 месяцев',
+        value: '6_12_months',
+        labelEn: '6-12 months',
+        labelUz: '6-12 oy',
+        labelRu: '6-12 месяцев',
+        icon: '📅',
+      },
+      {
+        value: 'more_than_1_year',
+        labelEn: 'More than 1 year',
+        labelUz: "1 yildan ko'p",
+        labelRu: 'Более 1 года',
         icon: '📅',
       },
     ],
   },
 
-  // A4: Planned Travel Dates
+  // A5: English Level
   {
-    id: 'plannedTravelDates',
-    titleEn: 'When do you plan to travel?',
-    titleUz: 'Qachon sayohat qilmoqchisiz?',
-    titleRu: 'Когда вы планируете поехать?',
-    descriptionEn: 'Enter your planned departure and return dates (optional)',
-    descriptionUz:
-      'Rejalashtirilgan ketish va qaytish sanalarini kiriting (ixtiyoriy)',
-    descriptionRu:
-      'Введите запланированные даты выезда и возвращения (необязательно)',
-    type: 'text',
+    id: 'englishLevel',
+    titleEn: 'What is your English proficiency level?',
+    titleUz: 'Ingliz tilini bilish darajangiz qanday?',
+    titleRu: 'Какой у вас уровень владения английским языком?',
+    descriptionEn: 'Select your English language proficiency level',
+    descriptionUz: 'Ingliz tilini bilish darajangizni tanlang',
+    descriptionRu: 'Выберите ваш уровень владения английским языком',
+    type: 'single',
     required: false,
-    options: [],
-  },
-
-  // A5: Current Residence Country
-  {
-    id: 'currentResidenceCountry',
-    titleEn: 'Where do you live now?',
-    titleUz: 'Hozir qayerda yashayapsiz?',
-    titleRu: 'Где вы сейчас живете?',
-    descriptionEn: 'Select your current country of residence',
-    descriptionUz: 'Hozirgi yashash davlatingizni tanlang',
-    descriptionRu: 'Выберите страну вашего текущего проживания',
-    type: 'dropdown',
-    required: true,
     options: [
       {
-        value: 'UZ',
-        labelEn: 'Uzbekistan',
-        labelUz: "O'zbekiston",
-        labelRu: 'Узбекистан',
-        icon: '🇺🇿',
+        value: 'basic',
+        labelEn: 'Basic',
+        labelUz: "Boshlang'ich",
+        labelRu: 'Базовый',
+        icon: '📚',
       },
-      // Will be populated from backend countries list
+      {
+        value: 'intermediate',
+        labelEn: 'Intermediate',
+        labelUz: "O'rtacha",
+        labelRu: 'Средний',
+        icon: '📚',
+      },
+      {
+        value: 'advanced',
+        labelEn: 'Advanced',
+        labelUz: 'Yuqori',
+        labelRu: 'Продвинутый',
+        icon: '📚',
+      },
     ],
   },
 
   // ============================================================================
-  // GROUP B: Personal / Family / Ties
+  // GROUP B: Personal Situation
   // ============================================================================
 
   // B1: Marital Status
@@ -207,7 +230,7 @@ export const questionnaireQuestions: Question[] = [
     required: true,
     options: [
       {
-        value: 'none',
+        value: 'no',
         labelEn: 'No children',
         labelUz: "Farzand yo'q",
         labelRu: 'Нет детей',
@@ -230,69 +253,58 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // B3: Family in Uzbekistan
+  // B3: Age Range
   {
-    id: 'hasFamilyTiesUzbekistan',
-    titleEn: 'Do you have close family in Uzbekistan?',
-    titleUz: "O'zbekistonda yaqin oilangiz bormi?",
-    titleRu: 'У вас есть близкая семья в Узбекистане?',
-    descriptionEn: 'Parents, spouse, or children living in Uzbekistan',
-    descriptionUz:
-      "O'zbekistonda yashayotgan ota-ona, turmush o'rtog'i yoki farzandlar",
-    descriptionRu: 'Родители, супруг(а) или дети, проживающие в Узбекистане',
-    type: 'boolean',
-    required: false,
+    id: 'ageRange',
+    titleEn: 'What is your age range?',
+    titleUz: 'Yoshingiz qanday?',
+    titleRu: 'Какой у вас возраст?',
+    descriptionEn: 'Select your age range',
+    descriptionUz: "Yosh oralig'ingizni tanlang",
+    descriptionRu: 'Выберите ваш возрастной диапазон',
+    type: 'single',
+    required: true,
     options: [
       {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
+        value: 'under_18',
+        labelEn: 'Under 18',
+        labelUz: '18 yoshdan kichik',
+        labelRu: 'До 18 лет',
+        icon: '👶',
       },
       {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // B4: Property Documents
-  {
-    id: 'hasPropertyDocuments',
-    titleEn: 'Do you have property documents in Uzbekistan?',
-    titleUz: "O'zbekistonda mulk hujjatlaringiz bormi?",
-    titleRu: 'У вас есть документы на недвижимость в Узбекистане?',
-    descriptionEn:
-      'Property ownership documents that show ties to home country',
-    descriptionUz: "Vatanga bog'liqlikni ko'rsatadigan mulk egaligi hujjatlari",
-    descriptionRu:
-      'Документы о праве собственности, показывающие связи с родиной',
-    type: 'boolean',
-    required: false,
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
+        value: '18_25',
+        labelEn: '18-25 years',
+        labelUz: '18-25 yosh',
+        labelRu: '18-25 лет',
+        icon: '👤',
       },
       {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
+        value: '26_35',
+        labelEn: '26-35 years',
+        labelUz: '26-35 yosh',
+        labelRu: '26-35 лет',
+        icon: '👨',
+      },
+      {
+        value: '36_45',
+        labelEn: '36-45 years',
+        labelUz: '36-45 yosh',
+        labelRu: '36-45 лет',
+        icon: '👨‍💼',
+      },
+      {
+        value: '46_plus',
+        labelEn: '46+ years',
+        labelUz: '46+ yosh',
+        labelRu: '46+ лет',
+        icon: '👴',
       },
     ],
   },
 
   // ============================================================================
-  // GROUP C: Education / Work Status
+  // GROUP C: Work & Study
   // ============================================================================
 
   // C1: Current Status
@@ -308,13 +320,6 @@ export const questionnaireQuestions: Question[] = [
     required: true,
     options: [
       {
-        value: 'student',
-        labelEn: 'Student',
-        labelUz: 'Talaba',
-        labelRu: 'Студент',
-        icon: '🎓',
-      },
-      {
         value: 'employed',
         labelEn: 'Employed',
         labelUz: 'Ishlaydi',
@@ -323,10 +328,17 @@ export const questionnaireQuestions: Question[] = [
       },
       {
         value: 'self_employed',
-        labelEn: 'Self-employed / Business owner',
+        labelEn: 'Self-employed',
         labelUz: 'Tadbirkor',
-        labelRu: 'Самозанятый / Владелец бизнеса',
+        labelRu: 'Самозанятый',
         icon: '🏢',
+      },
+      {
+        value: 'student',
+        labelEn: 'Student',
+        labelUz: 'Talaba',
+        labelRu: 'Студент',
+        icon: '🎓',
       },
       {
         value: 'unemployed',
@@ -334,6 +346,13 @@ export const questionnaireQuestions: Question[] = [
         labelUz: 'Ishsiz',
         labelRu: 'Безработный',
         icon: '📋',
+      },
+      {
+        value: 'other',
+        labelEn: 'Other',
+        labelUz: 'Boshqa',
+        labelRu: 'Другое',
+        icon: '📝',
       },
     ],
   },
@@ -366,7 +385,126 @@ export const questionnaireQuestions: Question[] = [
     options: [],
   },
 
-  // C4: University Acceptance (conditional: if purpose = study)
+  // C4: Is Currently Studying (conditional: if purpose = study or currentStatus = student)
+  {
+    id: 'isCurrentlyStudying',
+    titleEn: 'Are you currently studying?',
+    titleUz: "Hozir o'qiysizmi?",
+    titleRu: 'Вы сейчас учитесь?',
+    descriptionEn:
+      'Select if you are currently enrolled in an educational program',
+    descriptionUz: "Hozir ta'lim dasturiga qabul qilinganmisiz, tanlang",
+    descriptionRu:
+      'Выберите, зачислены ли вы в настоящее время в образовательную программу',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // C5: Has Graduated (conditional: for students)
+  {
+    id: 'hasGraduated',
+    titleEn: 'Have you already graduated?',
+    titleUz: 'Allaqachon bitirganmisiz?',
+    titleRu: 'Вы уже закончили обучение?',
+    descriptionEn: 'Select if you have completed your previous education',
+    descriptionUz: "Oldingi ta'limingizni tugatganmisiz, tanlang",
+    descriptionRu: 'Выберите, завершили ли вы предыдущее образование',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // C6: Diploma Available (conditional: for students)
+  {
+    id: 'diplomaAvailable',
+    titleEn: 'Do you have your diploma available?',
+    titleUz: 'Diplomingiz bormi?',
+    titleRu: 'У вас есть диплом?',
+    descriptionEn: 'Select if you have your educational diploma/certificate',
+    descriptionUz: "Ta'lim diplom/sertifikatingiz bormi, tanlang",
+    descriptionRu: 'Выберите, есть ли у вас диплом/сертификат об образовании',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // C7: Transcript Available (conditional: for students)
+  {
+    id: 'transcriptAvailable',
+    titleEn: 'Do you have your academic transcript available?',
+    titleUz: 'Akademik transkriptingiz bormi?',
+    titleRu: 'У вас есть академическая справка?',
+    descriptionEn: 'Select if you have your academic transcript/grade sheet',
+    descriptionUz: "Akademik transkript/baholar varag'angiz bormi, tanlang",
+    descriptionRu:
+      'Выберите, есть ли у вас академическая справка/ведомость оценок',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // C8: University Acceptance (conditional: if purpose = study)
   {
     id: 'hasUniversityAcceptance',
     titleEn: 'Do you have a university acceptance letter?',
@@ -395,7 +533,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // C5: Program Type (conditional: if purpose = study)
+  // C9: Program Type (conditional: if purpose = study)
   {
     id: 'programType',
     titleEn: 'What type of program are you applying for?',
@@ -445,67 +583,44 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // C6: Diploma Available (conditional: if purpose = study)
+  // C10: Accommodation Status (conditional: if purpose = study)
   {
-    id: 'diplomaAvailable',
-    titleEn: 'Do you have your diploma available?',
-    titleUz: 'Diplomingiz bormi?',
-    titleRu: 'У вас есть диплом?',
-    descriptionEn: 'Select if you have your educational diploma/certificate',
-    descriptionUz: "Ta'lim diplom/sertifikatingiz bormi, tanlang",
-    descriptionRu: 'Выберите, есть ли у вас диплом/сертификат об образовании',
-    type: 'boolean',
+    id: 'accommodationStatus',
+    titleEn: 'Do you have accommodation reserved?',
+    titleUz: 'Yashash joyi bron qilinganmi?',
+    titleRu: 'У вас забронировано жилье?',
+    descriptionEn: 'Select your accommodation status',
+    descriptionUz: 'Yashash joyi holatini tanlang',
+    descriptionRu: 'Выберите статус вашего жилья',
+    type: 'single',
     required: false,
     options: [
       {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
+        value: 'university_housing',
+        labelEn: 'University housing',
+        labelUz: 'Universitet yotoqxonasi',
+        labelRu: 'Общежитие университета',
+        icon: '🏠',
+      },
+      {
+        value: 'reserved',
+        labelEn: 'Yes, already reserved',
+        labelUz: 'Ha, allaqachon bron qilingan',
+        labelRu: 'Да, уже забронировано',
         icon: '✅',
       },
       {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
-        icon: '❌',
-      },
-    ],
-  },
-
-  // C7: Transcript Available (conditional: if purpose = study)
-  {
-    id: 'transcriptAvailable',
-    titleEn: 'Do you have your academic transcript available?',
-    titleUz: 'Akademik transkriptingiz bormi?',
-    titleRu: 'У вас есть академическая справка?',
-    descriptionEn: 'Select if you have your academic transcript/grade sheet',
-    descriptionUz: "Akademik transkript/baholar varag'angiz bormi, tanlang",
-    descriptionRu:
-      'Выберите, есть ли у вас академическая справка/ведомость оценок',
-    type: 'boolean',
-    required: false,
-    options: [
-      {
-        value: 'true',
-        labelEn: 'Yes',
-        labelUz: 'Ha',
-        labelRu: 'Да',
-        icon: '✅',
-      },
-      {
-        value: 'false',
-        labelEn: 'No',
-        labelUz: "Yo'q",
-        labelRu: 'Нет',
+        value: 'not_reserved',
+        labelEn: 'Not reserved yet',
+        labelUz: 'Hali bron qilinmagan',
+        labelRu: 'Еще не забронировано',
         icon: '❌',
       },
     ],
   },
 
   // ============================================================================
-  // GROUP D: Finances & Sponsor
+  // GROUP D: Money / Sponsor
   // ============================================================================
 
   // D1: Trip Funding
@@ -575,7 +690,67 @@ export const questionnaireQuestions: Question[] = [
     options: [],
   },
 
-  // D3: Sponsor Relationship (conditional: if tripFunding includes sponsor)
+  // D3: Has Bank Statements
+  {
+    id: 'hasBankStatements',
+    titleEn: 'Do you have bank statements?',
+    titleUz: "Bank hisob varag'laringiz bormi?",
+    titleRu: 'У вас есть банковские выписки?',
+    descriptionEn: 'Recent bank statements showing financial capacity',
+    descriptionUz:
+      "Moliyaviy imkoniyatni ko'rsatadigan so'nggi bank hisob varag'lari",
+    descriptionRu:
+      'Недавние банковские выписки, показывающие финансовые возможности',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // D4: Has Insurance
+  {
+    id: 'hasInsurance',
+    titleEn: 'Do you have travel insurance?',
+    titleUz: "Sayohat sug'urtangiz bormi?",
+    titleRu: 'У вас есть туристическая страховка?',
+    descriptionEn: 'Travel insurance coverage for your trip',
+    descriptionUz: "Sayohatingiz uchun sayohat sug'urtasi",
+    descriptionRu: 'Страховое покрытие для вашей поездки',
+    type: 'boolean',
+    required: false,
+    options: [
+      {
+        value: 'true',
+        labelEn: 'Yes',
+        labelUz: 'Ha',
+        labelRu: 'Да',
+        icon: '✅',
+      },
+      {
+        value: 'false',
+        labelEn: 'No',
+        labelUz: "Yo'q",
+        labelRu: 'Нет',
+        icon: '❌',
+      },
+    ],
+  },
+
+  // D5: Sponsor Relationship (conditional: if tripFunding includes sponsor)
   {
     id: 'sponsorRelationship',
     titleEn: 'What is your relationship with the sponsor?',
@@ -627,7 +802,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // D4: Sponsor Employment (conditional: if tripFunding includes sponsor)
+  // D6: Sponsor Employment (conditional: if tripFunding includes sponsor)
   {
     id: 'sponsorEmployment',
     titleEn: "What is your sponsor's employment status?",
@@ -670,7 +845,7 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // D5: Sponsor Annual Income (conditional: if tripFunding includes sponsor)
+  // D7: Sponsor Annual Income (conditional: if tripFunding includes sponsor)
   {
     id: 'sponsorAnnualIncome',
     titleEn: "What is your sponsor's annual income?",
@@ -685,7 +860,7 @@ export const questionnaireQuestions: Question[] = [
     options: [],
   },
 
-  // D6: Tuition Structure (conditional: if purpose = study)
+  // D8: Tuition Structure (conditional: if purpose = study)
   {
     id: 'tuitionStructure',
     titleEn: 'How is your tuition being paid?',
@@ -721,54 +896,8 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // D7: Living Expenses Payer (conditional: if purpose = study)
-  {
-    id: 'livingExpensesPayer',
-    titleEn: 'Who is paying your living expenses?',
-    titleUz: "Yashash xarajatlarini kim to'layapti?",
-    titleRu: 'Кто оплачивает ваши расходы на проживание?',
-    descriptionEn:
-      'Select who will cover accommodation, food, and daily expenses',
-    descriptionUz:
-      'Yashash joyi, ovqat va kundalik xarajatlarni kim qoplayotganini tanlang',
-    descriptionRu:
-      'Выберите, кто будет покрывать расходы на жилье, еду и повседневные нужды',
-    type: 'single',
-    required: false,
-    options: [
-      {
-        value: 'self',
-        labelEn: 'Myself',
-        labelUz: "O'zim",
-        labelRu: 'Сам(а)',
-        icon: '👤',
-      },
-      {
-        value: 'parents',
-        labelEn: 'Parents',
-        labelUz: 'Ota-ona',
-        labelRu: 'Родители',
-        icon: '👨‍👩‍👧‍👦',
-      },
-      {
-        value: 'sponsor',
-        labelEn: 'Other sponsor',
-        labelUz: 'Boshqa homiy',
-        labelRu: 'Другой спонсор',
-        icon: '🤝',
-      },
-      {
-        value: 'scholarship',
-        labelEn: 'Scholarship covers it',
-        labelUz: 'Stipendiya qoplaydi',
-        labelRu: 'Стипендия покрывает',
-        icon: '🎓',
-      },
-    ],
-  },
-
   // ============================================================================
-  // GROUP E: Travel History & Refusals
+  // GROUP E: Travel History / Refusals
   // ============================================================================
 
   // E1: Traveled Before
@@ -859,70 +988,20 @@ export const questionnaireQuestions: Question[] = [
   },
 
   // ============================================================================
-  // GROUP F: English Level & Existing Documents
+  // GROUP F: Strong Ties to Uzbekistan
   // ============================================================================
 
-  // F1: English Level
+  // F1: Property Documents
   {
-    id: 'englishLevel',
-    titleEn: 'What is your English proficiency level?',
-    titleUz: 'Ingliz tilini bilish darajangiz qanday?',
-    titleRu: 'Какой у вас уровень владения английским языком?',
-    descriptionEn: 'Select your English language proficiency level',
-    descriptionUz: 'Ingliz tilini bilish darajangizni tanlang',
-    descriptionRu: 'Выберите ваш уровень владения английским языком',
-    type: 'single',
-    required: true,
-    options: [
-      {
-        value: 'basic',
-        labelEn: 'Basic',
-        labelUz: "Boshlang'ich",
-        labelRu: 'Базовый',
-        icon: '📚',
-      },
-      {
-        value: 'pre_intermediate',
-        labelEn: 'Pre-intermediate',
-        labelUz: "O'rtacha boshlang'ich",
-        labelRu: 'Ниже среднего',
-        icon: '📚',
-      },
-      {
-        value: 'intermediate',
-        labelEn: 'Intermediate',
-        labelUz: "O'rtacha",
-        labelRu: 'Средний',
-        icon: '📚',
-      },
-      {
-        value: 'upper_intermediate',
-        labelEn: 'Upper-intermediate',
-        labelUz: "O'rtacha yuqori",
-        labelRu: 'Выше среднего',
-        icon: '📚',
-      },
-      {
-        value: 'advanced',
-        labelEn: 'Advanced',
-        labelUz: 'Yuqori',
-        labelRu: 'Продвинутый',
-        icon: '📚',
-      },
-    ],
-  },
-
-  // F2: Bank Statements
-  {
-    id: 'hasBankStatements',
-    titleEn: 'Do you have bank statements?',
-    titleUz: "Bank hisob varag'laringiz bormi?",
-    titleRu: 'У вас есть банковские выписки?',
-    descriptionEn: 'Recent bank statements showing financial capacity',
-    descriptionUz:
-      "Moliyaviy imkoniyatni ko'rsatadigan so'nggi bank hisob varag'lari",
+    id: 'hasPropertyDocuments',
+    titleEn: 'Do you have property documents in Uzbekistan?',
+    titleUz: "O'zbekistonda mulk hujjatlaringiz bormi?",
+    titleRu: 'У вас есть документы на недвижимость в Узбекистане?',
+    descriptionEn:
+      'Property ownership documents that show ties to home country',
+    descriptionUz: "Vatanga bog'liqlikni ko'rsatadigan mulk egaligi hujjatlari",
     descriptionRu:
-      'Недавние банковские выписки, показывающие финансовые возможности',
+      'Документы о праве собственности, показывающие связи с родиной',
     type: 'boolean',
     required: false,
     options: [
@@ -943,15 +1022,16 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 
-  // F3: Travel Insurance
+  // F2: Family Ties in Uzbekistan
   {
-    id: 'hasInsurance',
-    titleEn: 'Do you have travel insurance?',
-    titleUz: "Sayohat sug'urtangiz bormi?",
-    titleRu: 'У вас есть туристическая страховка?',
-    descriptionEn: 'Travel insurance coverage for your trip',
-    descriptionUz: "Sayohatingiz uchun sayohat sug'urtasi",
-    descriptionRu: 'Страховое покрытие для вашей поездки',
+    id: 'hasFamilyTiesUzbekistan',
+    titleEn: 'Do you have close family in Uzbekistan?',
+    titleUz: "O'zbekistonda yaqin oilangiz bormi?",
+    titleRu: 'У вас есть близкая семья в Узбекистане?',
+    descriptionEn: 'Parents, spouse, or children living in Uzbekistan',
+    descriptionUz:
+      "O'zbekistonda yashayotgan ota-ona, turmush o'rtog'i yoki farzandlar",
+    descriptionRu: 'Родители, супруг(а) или дети, проживающие в Узбекистане',
     type: 'boolean',
     required: false,
     options: [
@@ -972,3 +1052,6 @@ export const questionnaireQuestions: Question[] = [
     ],
   },
 ];
+// Total: 32 questions (A: 5, B: 3, C: 10, D: 8, E: 4, F: 2)
+// Note: Some questions are conditional (shown based on previous answers)
+// The step counter uses questionnaireQuestions.length, so all questions are counted

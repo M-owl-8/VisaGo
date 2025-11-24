@@ -290,23 +290,33 @@ export default function QuestionnaireScreen({navigation}: any) {
           // Clear questionnaire progress
           await clearProgress();
 
-          // Show success message and navigate to Applications
-          Alert.alert('Success!', 'Your visa plan is ready!', [
-            {
-              text: 'OK',
-              onPress: async () => {
-                // Refresh applications list before navigating
-                const {fetchUserApplications} = useAuthStore.getState();
-                try {
-                  await fetchUserApplications();
-                } catch (error) {
-                  console.warn('Failed to refresh applications:', error);
-                }
-                // Navigate back to Applications tab
-                navigation?.navigate('MainTabs', {screen: 'Applications'});
+          // Extract application ID from response
+          // response.data should contain { application: {...}, requiredDocuments: [...], aiRecommendations: "..." }
+          const applicationId = response.data.application?.id;
+
+          if (applicationId) {
+            // Navigate directly to Application Detail screen with the new application
+            // This will trigger checklist generation via GET /api/document-checklist/:applicationId
+            navigation?.navigate('ApplicationDetail', {applicationId});
+          } else {
+            // Fallback: navigate to Applications list if ID not found
+            Alert.alert('Success!', 'Your visa plan is ready!', [
+              {
+                text: 'OK',
+                onPress: async () => {
+                  // Refresh applications list before navigating
+                  const {fetchUserApplications} = useAuthStore.getState();
+                  try {
+                    await fetchUserApplications();
+                  } catch (error) {
+                    console.warn('Failed to refresh applications:', error);
+                  }
+                  // Navigate back to Applications tab
+                  navigation?.navigate('MainTabs', {screen: 'Applications'});
+                },
               },
-            },
-          ]);
+            ]);
+          }
         } else {
           // Extract error message properly
           const errorMessage =
