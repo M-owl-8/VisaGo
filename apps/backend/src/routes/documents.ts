@@ -5,6 +5,16 @@ import DocumentService from '../services/documents.service';
 import StorageAdapter from '../services/storage-adapter';
 import { authenticateToken } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
+import { DocumentChecklist } from '../services/document-checklist.service';
+
+/**
+ * Type guard to check if a value is a DocumentChecklist (not a status object)
+ */
+function isDocumentChecklist(
+  value: DocumentChecklist | { status: 'processing' | 'failed'; errorMessage?: string }
+): value is DocumentChecklist {
+  return 'items' in value && Array.isArray(value.items);
+}
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -108,11 +118,16 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     try {
       const { DocumentChecklistService } = await import('../services/document-checklist.service');
       const checklist = await DocumentChecklistService.generateChecklist(applicationId, userId);
-      checklistItem = checklist.items.find(
-        (item: any) =>
-          item.documentType === documentType ||
-          item.documentType?.toLowerCase() === documentType.toLowerCase()
-      );
+      // Handle both checklist object and status object with proper type narrowing
+      if (isDocumentChecklist(checklist)) {
+        checklistItem = checklist.items.find(
+          (item) =>
+            item.documentType === documentType ||
+            item.documentType?.toLowerCase() === documentType.toLowerCase()
+        );
+      }
+      // If checklist is a status object (processing/failed), we skip the lookup
+      // This is expected and not an error - checklist lookup is optional
     } catch (error) {
       // Checklist lookup is optional, continue without it
     }
