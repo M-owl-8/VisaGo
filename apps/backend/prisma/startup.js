@@ -64,30 +64,24 @@ function runMigrationsWithBaseline() {
 
   try {
     console.log('[Startup] Attempting to deploy migrations...');
-    // Capture stderr to detect P3005 errors, but still show output
-    let capturedStderr = '';
-    try {
-      execSync('npx prisma migrate deploy', {
-        stdio: ['inherit', 'inherit', 'pipe'], // stdin: inherit, stdout: inherit, stderr: pipe
-        cwd: backendCwd,
-        encoding: 'utf8',
-      });
-      console.log('[Startup] Migrations completed successfully');
-      return true;
-    } catch (execError) {
-      // Capture stderr if available
-      if (execError.stderr) {
-        capturedStderr = Buffer.isBuffer(execError.stderr) 
-          ? execError.stderr.toString('utf8') 
-          : String(execError.stderr);
-      }
-      // Re-throw to handle in outer catch
-      throw execError;
-    }
+    execSync('npx prisma migrate deploy', {
+      stdio: ['inherit', 'inherit', 'pipe'], // stdin: inherit, stdout: inherit, stderr: pipe
+      cwd: backendCwd,
+      encoding: 'utf8',
+    });
+    console.log('[Startup] Migrations completed successfully');
+    return true;
   } catch (error) {
-    // Enhance error object with captured stderr for detection
-    if (capturedStderr && !error.stderr) {
-      error.stderr = capturedStderr;
+    // Capture stderr if available (it's piped, so it should be in error.stderr)
+    if (error.stderr) {
+      // Ensure stderr is a string for detection
+      if (Buffer.isBuffer(error.stderr)) {
+        error.stderr = error.stderr.toString('utf8');
+      } else if (typeof error.stderr !== 'string') {
+        error.stderr = String(error.stderr);
+      }
+      // Also print stderr so it appears in logs
+      console.error(error.stderr);
     }
     
     // Use robust P3005 detection that checks all error fields
