@@ -17,6 +17,7 @@ import { chatRateLimitMiddleware, attachChatLimitHeaders } from './middleware/ch
 import DatabasePoolService from './services/db-pool.service';
 import FirebaseStorageService from './services/firebase-storage.service';
 import LocalStorageService from './services/local-storage.service';
+import StorageAdapter from './services/storage-adapter';
 import { OptimizedCacheService } from './services/cache.service.optimized';
 import { getCacheInvalidationService } from './services/cache-invalidation.service';
 import { getSlowQueryLogger } from './services/slow-query-logger';
@@ -465,16 +466,33 @@ async function startServer() {
       `💾 Initializing ${storageType === 'firebase' ? 'Firebase Storage' : 'Local Storage'}...`
     );
 
-    if (storageType === 'firebase' && envConfig.FIREBASE_PROJECT_ID) {
+    if (storageType === 'firebase') {
       try {
         await FirebaseStorageService.initialize();
-        console.log('✓ Firebase Storage initialized');
-      } catch (error: any) {
-        // Firebase Storage is optional - fallback to local storage is expected
-        console.log('ℹ️  Firebase Storage not configured, using local storage (this is normal)');
-        if (envConfig.NODE_ENV === 'development') {
-          console.log('   To enable Firebase Storage, configure FIREBASE_* environment variables');
+        if (FirebaseStorageService.isEnabled()) {
+          const bucketName = FirebaseStorageService.getBucketName();
+          console.log(`✓ Firebase Storage initialized (bucket: ${bucketName})`);
+        } else {
+          console.log('ℹ️  Firebase Storage not configured, using local storage');
+          console.log(
+            '   Missing required environment variables. Check: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_STORAGE_BUCKET'
+          );
+          // Initialize local storage as fallback
+          await LocalStorageService.initialize();
+          console.log(
+            `✓ Local Storage initialized (uploads folder: ${envConfig.LOCAL_STORAGE_PATH})`
+          );
         }
+      } catch (error: any) {
+        // Firebase Storage initialization failed - fallback to local storage
+        console.warn(
+          '⚠️  Firebase Storage initialization failed, using local storage:',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+        await LocalStorageService.initialize();
+        console.log(
+          `✓ Local Storage initialized (uploads folder: ${envConfig.LOCAL_STORAGE_PATH})`
+        );
       }
     } else if (storageType === 'local') {
       try {
@@ -595,10 +613,14 @@ async function startServer() {
 
     // Start Express server
     app.listen(PORT, () => {
-      const finalStorageType = envConfig.STORAGE_TYPE === 'firebase' ? 'Firebase' : 'Local';
+      // Get actual storage status (not just STORAGE_TYPE env var)
+      const storageInfo = StorageAdapter.getStorageInfo();
+      const storageDisplay =
+        storageInfo.type === 'firebase' ? `Firebase (${storageInfo.bucket || 'unknown'})` : 'Local';
+
       const envPadding = NODE_ENV.padEnd(42);
       const portPadding = String(PORT).padEnd(52);
-      const storagePadding = finalStorageType.padEnd(44);
+      const storagePadding = storageDisplay.padEnd(44);
 
       console.log(`
 ╔════════════════════════════════════════════════════════════╗

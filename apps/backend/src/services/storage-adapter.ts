@@ -4,28 +4,39 @@
  * Switch implementation via STORAGE_TYPE environment variable
  */
 
-import FirebaseStorageService, { 
+import FirebaseStorageService, {
   UploadOptions as FirebaseUploadOptions,
-  UploadResult as FirebaseUploadResult 
-} from "./firebase-storage.service";
-import LocalStorageService, { 
+  UploadResult as FirebaseUploadResult,
+} from './firebase-storage.service';
+import LocalStorageService, {
   UploadOptions as LocalUploadOptions,
-  UploadResult as LocalUploadResult 
-} from "./local-storage.service";
+  UploadResult as LocalUploadResult,
+} from './local-storage.service';
 
 export type UploadOptions = FirebaseUploadOptions & LocalUploadOptions;
 export type UploadResult = FirebaseUploadResult & LocalUploadResult;
 
-type StorageType = "firebase" | "local";
+type StorageType = 'firebase' | 'local';
 
 class StorageAdapter {
-  private static storageType: StorageType = (process.env.STORAGE_TYPE as StorageType) || "local";
+  private static storageType: StorageType = (process.env.STORAGE_TYPE as StorageType) || 'local';
+
+  /**
+   * Check if Firebase Storage is actually enabled and configured
+   */
+  private static isFirebaseEnabled(): boolean {
+    if (this.storageType !== 'firebase') {
+      return false;
+    }
+    // Check if Firebase is actually initialized and enabled
+    return FirebaseStorageService.isEnabled();
+  }
 
   /**
    * Get storage implementation
    */
   private static getStorage() {
-    if (this.storageType === "firebase") {
+    if (this.isFirebaseEnabled()) {
       return FirebaseStorageService;
     }
     return LocalStorageService;
@@ -39,9 +50,17 @@ class StorageAdapter {
     options: UploadOptions = {}
   ): Promise<UploadResult> {
     const storage = this.getStorage();
-    
+
+    // If Firebase is requested but not enabled, use local storage
+    if (this.storageType === 'firebase' && !this.isFirebaseEnabled()) {
+      console.warn(
+        'Firebase Storage not configured, using local storage. Check FIREBASE_* environment variables.'
+      );
+      return LocalStorageService.uploadFile(fileBuffer, fileName, fileType, userId, options);
+    }
+
     // If using Firebase, try with fallback to local storage
-    if (this.storageType === "firebase") {
+    if (this.isFirebaseEnabled()) {
       try {
         return await storage.uploadFile(fileBuffer, fileName, fileType, userId, options);
       } catch (error) {
@@ -49,12 +68,12 @@ class StorageAdapter {
           `Firebase storage upload failed, falling back to local storage:`,
           error instanceof Error ? error.message : 'Unknown error'
         );
-        
+
         // Fallback to local storage
         return LocalStorageService.uploadFile(fileBuffer, fileName, fileType, userId, options);
       }
     }
-    
+
     // Direct call for local storage
     return storage.uploadFile(fileBuffer, fileName, fileType, userId, options);
   }
@@ -97,6 +116,31 @@ class StorageAdapter {
    */
   static getStorageType(): StorageType {
     return this.storageType;
+  }
+
+  /**
+   * Get effective storage type (actual implementation being used)
+   */
+  static getEffectiveStorageType(): StorageType {
+    if (this.isFirebaseEnabled()) {
+      return 'firebase';
+    }
+    return 'local';
+  }
+
+  /**
+   * Get storage status info for logging
+   */
+  static getStorageInfo(): { type: StorageType; bucket?: string | null } {
+    if (this.isFirebaseEnabled()) {
+      return {
+        type: 'firebase',
+        bucket: FirebaseStorageService.getBucketName(),
+      };
+    }
+    return {
+      type: 'local',
+    };
   }
 }
 
