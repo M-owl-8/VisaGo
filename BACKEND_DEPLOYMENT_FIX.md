@@ -3,6 +3,7 @@
 ## 🔴 **Problem**
 
 Railway deployment is failing with:
+
 ```
 npm error No workspaces found:
 npm error   --workspace=visabuddy-backend
@@ -11,7 +12,8 @@ npm error   --workspace=visabuddy-backend
 ## ✅ **Solution Applied**
 
 Fixed the `nixpacks.toml` files to use the correct workspace path:
-- Changed from: `--workspace=visabuddy-backend` 
+
+- Changed from: `--workspace=visabuddy-backend`
 - Changed to: `-w apps/backend`
 
 ## 📝 **What Was Fixed**
@@ -41,6 +43,7 @@ Railway is configured to use Dockerfile, but it might be auto-detecting nixpacks
 If Railway is using nixpacks, the fix is already applied:
 
 1. **Commit and push the changes:**
+
    ```bash
    git add apps/backend/nixpacks.toml nixpacks.toml
    git commit -m "Fix Railway deployment: correct workspace path"
@@ -122,9 +125,3 @@ Once the backend deploys successfully:
 - [ ] Verify Railway deployment succeeds
 - [ ] Test backend health endpoint
 - [ ] Test mobile app connection
-
-
-
-
-
-

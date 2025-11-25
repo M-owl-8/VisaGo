@@ -100,11 +100,13 @@ The APK will be at: `frontend_new/android/app/build/outputs/apk/release/app-rele
 ### 7. Install on Physical Device
 
 **Via USB:**
+
 ```powershell
 adb install frontend_new/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 **Via ADB over WiFi:**
+
 ```powershell
 # Connect device via USB first
 adb tcpip 5555
@@ -138,6 +140,7 @@ adb install frontend_new/android/app/build/outputs/apk/release/app-release.apk
 **Symptoms**: App shows network errors or can't load data
 
 **Solutions**:
+
 1. Verify Railway backend is running and accessible
 2. Check CORS settings - add your device's network to `CORS_ORIGINS`
 3. Verify the API URL in the APK matches your Railway backend URL
@@ -148,6 +151,7 @@ adb install frontend_new/android/app/build/outputs/apk/release/app-release.apk
 **Symptoms**: Chat/checklist/probability endpoints return errors
 
 **Solutions**:
+
 1. Verify `AI_SERVICE_URL` in backend environment variables
 2. Check AI service logs in Railway
 3. Verify `OPENAI_API_KEY` is set in AI service
@@ -156,10 +160,12 @@ adb install frontend_new/android/app/build/outputs/apk/release/app-release.apk
 ## 📋 Railway Service URLs
 
 After deployment, Railway will provide URLs like:
+
 - Backend: `https://visabuddy-backend-production.up.railway.app`
 - AI Service: `https://visabuddy-ai-service-production.up.railway.app`
 
 Update these in:
+
 1. Backend `AI_SERVICE_URL` (use internal service name for internal calls)
 2. AI Service `BACKEND_URL` (use public backend URL)
 3. Mobile app `EXPO_PUBLIC_API_URL` (use public backend URL)
@@ -185,5 +191,3 @@ Update these in:
 4. Rebuild mobile app with production URL
 5. Test on physical device
 6. Monitor Railway logs for any issues
-
-

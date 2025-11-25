@@ -29,10 +29,12 @@ const getApiBaseUrl = (): string => {
     }
   }
 
-  // Priority 2: Always use Railway URL by default
-  // This ensures physical devices NEVER try to connect to localhost/10.0.2.2
-  // For emulator development, set EXPO_PUBLIC_API_URL=http://10.0.2.2:3000 explicitly
-  return 'https://visago-production.up.railway.app';
+  // LOW PRIORITY FIX: Removed hardcoded Railway URL - must use environment variable
+  // This ensures URLs can be changed per environment without code changes
+  // If no env var is set, throw error to force explicit configuration
+  throw new Error(
+    'API URL not configured. Please set EXPO_PUBLIC_API_URL or REACT_APP_API_URL environment variable.',
+  );
 };
 
 // Determine AI Service URL (separate from backend API)
@@ -59,8 +61,11 @@ const getAiServiceBaseUrl = (): string => {
     }
   }
 
-  // Priority 3: Default to AI service Railway URL
-  return 'https://zippy-perfection-production.up.railway.app';
+  // LOW PRIORITY FIX: Removed hardcoded AI service URL - must use environment variable
+  // If no env var is set, throw error to force explicit configuration
+  throw new Error(
+    'AI Service URL not configured. Please set EXPO_PUBLIC_AI_SERVICE_URL environment variable.',
+  );
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -950,13 +955,36 @@ class ApiClient {
     firstName?: string,
     lastName?: string,
   ): Promise<ApiResponse> {
-    const response = await this.api.post('/auth/register', {
-      email,
-      password,
-      firstName,
-      lastName,
-    });
-    return response.data;
+    try {
+      const response = await this.api.post('/auth/register', {
+        email,
+        password,
+        firstName,
+        lastName,
+      });
+      return response.data;
+    } catch (error: any) {
+      // Extract error code and message from backend response
+      const code =
+        error.response?.data?.error?.code ||
+        error.response?.data?.code ||
+        'UNKNOWN_ERROR';
+      const message =
+        error.response?.data?.error?.message ||
+        error.response?.data?.message ||
+        error.message ||
+        "Noma'lum xatolik yuz berdi. Iltimos, qayta urinib ko'ring.";
+
+      // Return error in expected format with code and message
+      return {
+        success: false,
+        error: {
+          status: error.response?.status || 400,
+          message,
+          code,
+        },
+      };
+    }
   }
 
   async login(email: string, password: string): Promise<ApiResponse> {

@@ -55,7 +55,6 @@ frontend_new/android/app/build/outputs/apk/release/app-release.apk
 1. Enable **Developer Options** on your Android device:
    - Go to Settings → About Phone
    - Tap "Build Number" 7 times
-   
 2. Enable **USB Debugging**:
    - Go to Settings → Developer Options
    - Enable "USB Debugging"
@@ -90,10 +89,13 @@ frontend_new/android/app/build/outputs/apk/release/app-release.apk
 ### API Configuration
 
 The standalone APK uses the production API URL by default:
+
 - **Production**: `https://visabuddy-backend-production.up.railway.app`
 
 To change the API URL, you can:
+
 1. Set environment variable before building:
+
    ```powershell
    $env:EXPO_PUBLIC_API_URL="https://your-api-url.com"
    npm run build:apk
@@ -106,6 +108,7 @@ To change the API URL, you can:
 The current build uses a debug keystore for testing. For production releases:
 
 1. Generate a release keystore:
+
    ```powershell
    keytool -genkeypair -v -storetype PKCS12 -keystore my-release-key.keystore -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
    ```
@@ -132,6 +135,7 @@ The current build uses a debug keystore for testing. For production releases:
 ### Build Fails with "SDK not found"
 
 Make sure you have:
+
 1. Android Studio installed
 2. Android SDK installed (API Level 33)
 3. `ANDROID_HOME` environment variable set
@@ -147,6 +151,7 @@ reactNativeArchitectures=arm64-v8a
 ### App crashes on launch
 
 1. Check device logs:
+
    ```powershell
    adb logcat | Select-String "ReactNativeJS"
    ```
@@ -157,13 +162,8 @@ reactNativeArchitectures=arm64-v8a
 ## Next Steps
 
 After testing the standalone APK:
+
 - Test all features work without Metro bundler
 - Verify API connectivity
 - Test push notifications (if applicable)
 - Consider building an AAB (Android App Bundle) for Play Store distribution
-
-
-
-
-
-

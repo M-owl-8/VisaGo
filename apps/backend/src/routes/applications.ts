@@ -36,7 +36,20 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const application = await ApplicationsService.getApplication(req.params.id, req.userId!);
+    // MEDIUM PRIORITY FIX: Validate application ID format before processing
+    // This prevents Prisma errors from invalid IDs and provides better error messages
+    const applicationId = req.params.id;
+    if (!applicationId || typeof applicationId !== 'string' || applicationId.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid application ID',
+          code: 'INVALID_INPUT',
+        },
+      });
+    }
+
+    const application = await ApplicationsService.getApplication(applicationId, req.userId!);
 
     res.json({
       success: true,
@@ -76,10 +89,19 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.put('/:id/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // MEDIUM PRIORITY FIX: Validate application ID format
+    const applicationId = req.params.id;
+    if (!applicationId || typeof applicationId !== 'string' || applicationId.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Invalid application ID', code: 'INVALID_INPUT' },
+      });
+    }
+
     const { status } = req.body;
 
     const application = await ApplicationsService.updateApplicationStatus(
-      req.params.id,
+      applicationId,
       req.userId!,
       status
     );
@@ -101,12 +123,28 @@ router.put(
   '/:id/checkpoints/:checkpointId',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // MEDIUM PRIORITY FIX: Validate application and checkpoint ID formats
+      const applicationId = req.params.id;
+      const checkpointId = req.params.checkpointId;
+      if (!applicationId || typeof applicationId !== 'string' || applicationId.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Invalid application ID', code: 'INVALID_INPUT' },
+        });
+      }
+      if (!checkpointId || typeof checkpointId !== 'string' || checkpointId.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Invalid checkpoint ID', code: 'INVALID_INPUT' },
+        });
+      }
+
       const { status } = req.body;
 
       const checkpoint = await ApplicationsService.updateCheckpoint(
-        req.params.id,
+        applicationId,
         req.userId!,
-        req.params.checkpointId,
+        checkpointId,
         status
       );
 
@@ -126,7 +164,16 @@ router.put(
  */
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await ApplicationsService.deleteApplication(req.params.id, req.userId!);
+    // MEDIUM PRIORITY FIX: Validate application ID format
+    const applicationId = req.params.id;
+    if (!applicationId || typeof applicationId !== 'string' || applicationId.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Invalid application ID', code: 'INVALID_INPUT' },
+      });
+    }
+
+    const result = await ApplicationsService.deleteApplication(applicationId, req.userId!);
 
     res.json({
       success: true,

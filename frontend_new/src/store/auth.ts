@@ -1,7 +1,7 @@
 import {create} from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNotificationStore} from './notifications';
-import { DEFAULT_TOPIC } from '../services/pushNotifications';
+import {DEFAULT_TOPIC} from '../services/pushNotifications';
 
 // Lazy import to avoid circular dependency
 let apiClient: any = null;
@@ -165,7 +165,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 bio: user.bio,
                 questionnaireCompleted: user.questionnaireCompleted || false,
               };
-              
+
               set({
                 token: storedToken,
                 user: restoredUser,
@@ -176,38 +176,44 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               // Load questionnaire data from user bio
               if (restoredUser.bio) {
                 try {
-                  const { useOnboardingStore } = require('./onboarding');
+                  const {useOnboardingStore} = require('./onboarding');
                   const onboardingStore = useOnboardingStore.getState();
                   onboardingStore.loadFromUserBio(restoredUser.bio);
                 } catch (error) {
-                  console.warn('Failed to load questionnaire data on init:', error);
+                  console.warn(
+                    'Failed to load questionnaire data on init:',
+                    error,
+                  );
                 }
               }
 
-              // Fetch fresh data from server to ensure everything is up to date
-              // Do this in background to not block initialization
-              // Note: This timeout is intentionally not cleaned up as it's in a store method
-              // and should complete even if component unmounts to ensure data is fresh
-              setTimeout(async () => {
-                try {
-                  await get().fetchUserProfile();
-                  await get().fetchUserApplications();
-                  
-                  // Reload questionnaire data after fetching fresh profile
-                  const updatedUser = get().user;
-                  if (updatedUser?.bio) {
-                    try {
-                      const { useOnboardingStore } = require('./onboarding');
-                      const onboardingStore = useOnboardingStore.getState();
-                      onboardingStore.loadFromUserBio(updatedUser.bio);
-                    } catch (error) {
-                      console.warn('Failed to reload questionnaire data after profile fetch:', error);
-                    }
+              // CRITICAL FIX: Fetch fresh data immediately (no setTimeout) to ensure applications load
+              // Applications must be loaded synchronously to prevent them from disappearing
+              try {
+                await get().fetchUserProfile();
+                await get().fetchUserApplications();
+
+                // Reload questionnaire data after fetching fresh profile
+                const updatedUser = get().user;
+                if (updatedUser?.bio) {
+                  try {
+                    const {useOnboardingStore} = require('./onboarding');
+                    const onboardingStore = useOnboardingStore.getState();
+                    onboardingStore.loadFromUserBio(updatedUser.bio);
+                  } catch (error) {
+                    console.warn(
+                      'Failed to reload questionnaire data after profile fetch:',
+                      error,
+                    );
                   }
-                } catch (fetchError) {
-                  console.warn('Failed to fetch fresh data on init, using stored data:', fetchError);
                 }
-              }, 100);
+              } catch (fetchError) {
+                console.warn(
+                  'Failed to fetch fresh data on init, using stored data:',
+                  fetchError,
+                );
+                // Continue with stored data even if fetch fails
+              }
             } catch (parseError) {
               console.error(
                 '=== AUTH STORE: Failed to parse user data ===',
@@ -231,7 +237,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Set timeout of 2 seconds - faster timeout
       let timeoutId: NodeJS.Timeout | null = null;
       const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Initialization timeout')), 2000);
+        timeoutId = setTimeout(
+          () => reject(new Error('Initialization timeout')),
+          2000,
+        );
       });
 
       try {
@@ -264,9 +273,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const {user, token} = response.data;
 
-      // Store tokens and user
-      await AsyncStorage.setItem('@auth_token', token);
-      await AsyncStorage.setItem('@user', JSON.stringify(user));
+      // MEDIUM PRIORITY FIX: Store tokens and user atomically to prevent race conditions
+      await Promise.all([
+        AsyncStorage.setItem('@auth_token', token),
+        AsyncStorage.setItem('@user', JSON.stringify(user)),
+      ]);
 
       // Set initial user state
       const fullUser = {
@@ -292,7 +303,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Sync user's language preference to i18n and AsyncStorage immediately
       if (fullUser.language) {
         try {
-          const { default: i18n } = require('../i18n');
+          const {default: i18n} = require('../i18n');
           await i18n.changeLanguage(fullUser.language);
           await AsyncStorage.setItem('app_language', fullUser.language);
         } catch (error) {
@@ -304,7 +315,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         await get().fetchUserProfile();
       } catch (error) {
-        console.warn('Failed to fetch full profile after login, using initial data:', error);
+        console.warn(
+          'Failed to fetch full profile after login, using initial data:',
+          error,
+        );
       }
 
       // Load user applications
@@ -314,10 +328,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         console.warn('Failed to fetch applications after login:', error);
       }
 
+      // Load chat history from backend after login
+      // CRITICAL FIX: Ensure chat history is loaded so it doesn't appear wiped
+      try {
+        const {useChatStore} = require('./chat');
+        const chatStore = useChatStore.getState();
+        await chatStore.loadChatHistory();
+      } catch (error) {
+        console.warn('Failed to load chat history after login:', error);
+        // Don't fail login if chat history load fails
+      }
+
       // Load questionnaire data if it exists
       if (fullUser.bio) {
         try {
-          const { useOnboardingStore } = require('./onboarding');
+          const {useOnboardingStore} = require('./onboarding');
           const onboardingStore = useOnboardingStore.getState();
           onboardingStore.loadFromUserBio(fullUser.bio);
         } catch (error) {
@@ -350,14 +375,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       );
 
       if (!response.success || !response.data) {
-        throw new Error(response.error?.message || 'Registration failed');
+        // Create error with code and message from backend
+        const error = new Error(
+          response.error?.message || 'Registration failed',
+        ) as any;
+        error.code = response.error?.code || 'UNKNOWN_ERROR';
+        error.message = response.error?.message || 'Registration failed';
+        throw error;
       }
 
       const {user, token} = response.data;
 
-      // Store tokens and user
-      await AsyncStorage.setItem('@auth_token', token);
-      await AsyncStorage.setItem('@user', JSON.stringify(user));
+      // MEDIUM PRIORITY FIX: Store tokens and user atomically to prevent race conditions
+      await Promise.all([
+        AsyncStorage.setItem('@auth_token', token),
+        AsyncStorage.setItem('@user', JSON.stringify(user)),
+      ]);
 
       // Set initial user state
       const fullUser = {
@@ -384,7 +417,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         await get().fetchUserProfile();
       } catch (error) {
-        console.warn('Failed to fetch full profile after registration, using initial data:', error);
+        console.warn(
+          'Failed to fetch full profile after registration, using initial data:',
+          error,
+        );
       }
 
       // Load user applications
@@ -392,6 +428,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await get().fetchUserApplications();
       } catch (error) {
         console.warn('Failed to fetch applications after registration:', error);
+      }
+
+      // Load chat history from backend after registration
+      // CRITICAL FIX: Ensure chat history is available for new users
+      try {
+        const {useChatStore} = require('./chat');
+        const chatStore = useChatStore.getState();
+        await chatStore.loadChatHistory();
+      } catch (error) {
+        console.warn('Failed to load chat history after registration:', error);
+        // Don't fail registration if chat history load fails
       }
     } catch (error: any) {
       console.error('Registration failed:', error.message);
@@ -426,9 +473,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const {user, token} = response.data;
 
-      // Store tokens and user
-      await AsyncStorage.setItem('@auth_token', token);
-      await AsyncStorage.setItem('@user', JSON.stringify(user));
+      // MEDIUM PRIORITY FIX: Store tokens and user atomically to prevent race conditions
+      await Promise.all([
+        AsyncStorage.setItem('@auth_token', token),
+        AsyncStorage.setItem('@user', JSON.stringify(user)),
+      ]);
 
       // Set initial user state
       const fullUser = {
@@ -455,7 +504,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         await get().fetchUserProfile();
       } catch (error) {
-        console.warn('Failed to fetch full profile after Google login, using initial data:', error);
+        console.warn(
+          'Failed to fetch full profile after Google login, using initial data:',
+          error,
+        );
       }
 
       // Load user applications
@@ -465,10 +517,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         console.warn('Failed to fetch applications after Google login:', error);
       }
 
+      // Load chat history from backend after Google login
+      // CRITICAL FIX: Ensure chat history is loaded so it doesn't appear wiped
+      try {
+        const {useChatStore} = require('./chat');
+        const chatStore = useChatStore.getState();
+        await chatStore.loadChatHistory();
+      } catch (error) {
+        console.warn('Failed to load chat history after Google login:', error);
+        // Don't fail login if chat history load fails
+      }
+
       // Load questionnaire data if it exists
       if (fullUser.bio) {
         try {
-          const { useOnboardingStore } = require('./onboarding');
+          const {useOnboardingStore} = require('./onboarding');
           const onboardingStore = useOnboardingStore.getState();
           onboardingStore.loadFromUserBio(fullUser.bio);
         } catch (error) {
@@ -560,7 +623,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Sync user's language preference to i18n and AsyncStorage
       if (updatedUser.language) {
         try {
-          const { default: i18n } = require('../i18n');
+          const {default: i18n} = require('../i18n');
           await i18n.changeLanguage(updatedUser.language);
           await AsyncStorage.setItem('app_language', updatedUser.language);
         } catch (error) {
@@ -571,11 +634,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Load questionnaire data if it exists
       if (updatedUser.bio) {
         try {
-          const { useOnboardingStore } = require('./onboarding');
+          const {useOnboardingStore} = require('./onboarding');
           const onboardingStore = useOnboardingStore.getState();
           onboardingStore.loadFromUserBio(updatedUser.bio);
         } catch (error) {
-          console.warn('Failed to load questionnaire data after profile fetch:', error);
+          console.warn(
+            'Failed to load questionnaire data after profile fetch:',
+            error,
+          );
         }
       }
     } catch (error: any) {
@@ -617,11 +683,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Load questionnaire data if bio was updated
       if (data.bio !== undefined && updatedUser.bio) {
         try {
-          const { useOnboardingStore } = require('./onboarding');
+          const {useOnboardingStore} = require('./onboarding');
           const onboardingStore = useOnboardingStore.getState();
           onboardingStore.loadFromUserBio(updatedUser.bio);
         } catch (error) {
-          console.warn('Failed to load questionnaire data after profile update:', error);
+          console.warn(
+            'Failed to load questionnaire data after profile update:',
+            error,
+          );
         }
       }
 

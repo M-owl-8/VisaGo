@@ -45,13 +45,13 @@ class BackendPerformanceMonitor {
 
     // Merge additional metadata
     if (additionalMetadata) {
-      metric.metadata = {...metric.metadata, ...additionalMetadata};
+      metric.metadata = { ...metric.metadata, ...additionalMetadata };
     }
 
     // Log slow operations
     if (duration > 5000) {
       console.warn(`[Performance] Slow operation: ${name} took ${duration}ms`, metric.metadata);
-      
+
       // Report to Sentry
       Sentry.captureMessage(`Slow operation: ${name}`, {
         level: 'warning',
@@ -78,15 +78,15 @@ class BackendPerformanceMonitor {
   async measureAsync<T>(
     name: string,
     operation: () => Promise<T>,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, any>
   ): Promise<T> {
     this.startMeasure(name, metadata);
     try {
       const result = await operation();
-      this.endMeasure(name, {success: true});
+      this.endMeasure(name, { success: true });
       return result;
     } catch (error) {
-      this.endMeasure(name, {success: false, error: String(error)});
+      this.endMeasure(name, { success: false, error: String(error) });
       throw error;
     }
   }
@@ -94,18 +94,14 @@ class BackendPerformanceMonitor {
   /**
    * Measure a synchronous operation
    */
-  measureSync<T>(
-    name: string,
-    operation: () => T,
-    metadata?: Record<string, any>,
-  ): T {
+  measureSync<T>(name: string, operation: () => T, metadata?: Record<string, any>): T {
     this.startMeasure(name, metadata);
     try {
       const result = operation();
-      this.endMeasure(name, {success: true});
+      this.endMeasure(name, { success: true });
       return result;
     } catch (error) {
-      this.endMeasure(name, {success: false, error: String(error)});
+      this.endMeasure(name, { success: false, error: String(error) });
       throw error;
     }
   }
@@ -113,11 +109,7 @@ class BackendPerformanceMonitor {
   /**
    * Track database query performance
    */
-  trackDbQuery(
-    operation: string,
-    model: string,
-    metadata?: Record<string, any>,
-  ): string {
+  trackDbQuery(operation: string, model: string, metadata?: Record<string, any>): string {
     const measureName = `db_${model}_${operation}`;
     this.startMeasure(measureName, {
       operation,
@@ -141,11 +133,7 @@ class BackendPerformanceMonitor {
   /**
    * Track external API call performance
    */
-  trackExternalApi(
-    service: string,
-    endpoint: string,
-    metadata?: Record<string, any>,
-  ): string {
+  trackExternalApi(service: string, endpoint: string, metadata?: Record<string, any>): string {
     const measureName = `external_${service}_${endpoint}`;
     this.startMeasure(measureName, {
       service,
@@ -158,11 +146,7 @@ class BackendPerformanceMonitor {
   /**
    * Complete external API tracking
    */
-  completeExternalApi(
-    measureName: string,
-    statusCode?: number,
-    error?: any,
-  ): void {
+  completeExternalApi(measureName: string, statusCode?: number, error?: any): void {
     this.endMeasure(measureName, {
       statusCode,
       error: error ? String(error) : undefined,
@@ -205,6 +189,3 @@ export const {
   trackExternalApi,
   completeExternalApi,
 } = performanceMonitor;
-
-
-

@@ -15,6 +15,7 @@ Your APK is built with the production backend URL. It will work automatically wh
 ### Step 1: Verify Backend is Online
 
 **On your phone's browser, visit:**
+
 ```
 https://visabuddy-backend-production.up.railway.app/api/health
 ```
@@ -23,6 +24,7 @@ https://visabuddy-backend-production.up.railway.app/api/health
 **If you see an error** → Backend is down ❌
 
 **If backend is down:**
+
 - Go to Railway dashboard
 - Check if backend service is running
 - Restart if needed
@@ -47,11 +49,13 @@ https://visabuddy-backend-production.up.railway.app/api/health
 ### Error: "Network Error" or "Connection Failed"
 
 **Check:**
+
 1. ✅ Phone has internet? (Try browsing a website)
 2. ✅ Backend is online? (Visit health endpoint in browser)
 3. ✅ Can access backend from phone? (Try health endpoint)
 
 **Fix:**
+
 - Make sure backend is running on Railway
 - Check Railway dashboard for errors
 - Try mobile data instead of WiFi (or vice versa)
@@ -59,11 +63,13 @@ https://visabuddy-backend-production.up.railway.app/api/health
 ### Error: "Backend not accessible"
 
 **Possible causes:**
+
 - Backend is down
 - Backend URL changed
 - Network firewall blocking
 
 **Fix:**
+
 - Check Railway dashboard
 - Verify backend URL is correct
 - Restart backend service
@@ -79,6 +85,7 @@ https://visabuddy-backend-production.up.railway.app/api/health
 **Impact:** Can't use Google Sign-In, but email/password works fine
 
 **To enable:**
+
 1. Get Google OAuth credentials from Google Cloud Console
 2. Rebuild APK with: `$env:EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID="your-id"`
 3. Rebuild: `npm run build:apk`
@@ -92,6 +99,7 @@ https://visabuddy-backend-production.up.railway.app/api/health
 **Impact:** No push notifications, but app works fine
 
 **To enable:**
+
 1. Set up Firebase project
 2. Download `google-services.json`
 3. Add to `frontend_new/android/app/`
@@ -121,10 +129,12 @@ https://visabuddy-backend-production.up.railway.app/api/health
 ## 🎯 **Bottom Line**
 
 **Your app will work online if:**
+
 1. ✅ Backend is online at `https://visabuddy-backend-production.up.railway.app`
 2. ✅ Phone has internet connection
 
 **No laptop needed!** Just:
+
 - Make sure backend is running
 - Install APK on phone
 - Use the app with internet
@@ -147,21 +157,17 @@ https://visabuddy-backend-production.up.railway.app/api/health
 ## 📱 **Expected Behavior**
 
 ### ✅ **If Backend is Online:**
+
 - App opens
 - Login screen appears
 - Can login/register
 - All features work
 
 ### ❌ **If Backend is Offline:**
+
 - App opens
 - Login screen appears
 - Login fails with "Network Error"
 - Can't proceed past login
 
 **Solution:** Make sure backend is online!
-
-
-
-
-
-

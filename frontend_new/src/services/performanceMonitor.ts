@@ -232,10 +232,3 @@ export const {
   completeApiRequest,
   trackNavigation,
 } = performanceMonitor;
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,15 @@ import {
 } from 'react-native';
 import {ScrollView} from 'react-native-gesture-handler';
 import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
-import {DocumentIcons, ApplicationIcons} from '../../components/icons/iconConfig';
-import { useTranslation } from 'react-i18next';
-import { useAuthStore } from '../../store/auth';
-import { useFocusEffect } from '@react-navigation/native';
-import { getTranslatedCountryName } from '../../data/countryTranslations';
-import { getTranslatedVisaTypeName } from '../../utils/visaTypeTranslations';
+import {
+  DocumentIcons,
+  ApplicationIcons,
+} from '../../components/icons/iconConfig';
+import {useTranslation} from 'react-i18next';
+import {useAuthStore} from '../../store/auth';
+import {useFocusEffect} from '@react-navigation/native';
+import {getTranslatedCountryName} from '../../data/countryTranslations';
+import {getTranslatedVisaTypeName} from '../../utils/visaTypeTranslations';
 
 const getOrdinalSuffix = (num: number): string => {
   const j = num % 10;
@@ -25,16 +28,20 @@ const getOrdinalSuffix = (num: number): string => {
   return num + 'th';
 };
 
-export default function VisaApplicationScreen({ navigation }: any) {
-  const { t, i18n } = useTranslation();
+export default function VisaApplicationScreen({navigation}: any) {
+  const {t, i18n} = useTranslation();
   const language = i18n.language || 'en';
-  const user = useAuthStore((state) => state.user);
-  const userApplications = useAuthStore((state) => state.userApplications);
-  const fetchUserApplications = useAuthStore((state) => state.fetchUserApplications);
-  
+  const user = useAuthStore(state => state.user);
+  const userApplications = useAuthStore(state => state.userApplications);
+  const fetchUserApplications = useAuthStore(
+    state => state.fetchUserApplications,
+  );
+
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // MEDIUM PRIORITY FIX: Refresh applications list when screen comes into focus
+  // This ensures newly created applications appear immediately when returning from creation screen
   useFocusEffect(
     React.useCallback(() => {
       loadApplications();
@@ -42,7 +49,7 @@ export default function VisaApplicationScreen({ navigation }: any) {
       return () => {
         // Any cleanup if needed
       };
-    }, [fetchUserApplications])
+    }, [fetchUserApplications]),
   );
 
   const loadApplications = async () => {
@@ -70,7 +77,7 @@ export default function VisaApplicationScreen({ navigation }: any) {
   };
 
   const handleApplicationPress = (applicationId: string) => {
-    navigation?.navigate('ApplicationDetail', { applicationId });
+    navigation?.navigate('ApplicationDetail', {applicationId});
   };
 
   return (
@@ -82,7 +89,7 @@ export default function VisaApplicationScreen({ navigation }: any) {
           <View style={[styles.circle, styles.circle2]} />
         </View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
@@ -93,15 +100,15 @@ export default function VisaApplicationScreen({ navigation }: any) {
               tintColor="#4A9EFF"
               colors={['#4A9EFF']}
             />
-          }
-        >
+          }>
           {/* Start New Applications Header */}
           <View style={styles.startNewHeader}>
-            <Text style={styles.startNewText}>{t('applications.startNewApplications')}</Text>
+            <Text style={styles.startNewText}>
+              {t('applications.startNewApplications')}
+            </Text>
             <TouchableOpacity
               style={styles.addButton}
-              onPress={() => navigation?.navigate('Questionnaire')}
-            >
+              onPress={() => navigation?.navigate('Questionnaire')}>
               <AppIcon
                 name={DocumentIcons.add.name}
                 library={DocumentIcons.add.library}
@@ -113,7 +120,9 @@ export default function VisaApplicationScreen({ navigation }: any) {
 
           {/* My Applications Section */}
           <View style={styles.myApplicationsSection}>
-            <Text style={styles.myApplicationsTitle}>{t('applications.myApplications')}</Text>
+            <Text style={styles.myApplicationsTitle}>
+              {t('applications.myApplications')}
+            </Text>
             <Text style={styles.myApplicationsSubtitle}>
               {t('applications.manageYourApplications')}
             </Text>
@@ -123,17 +132,20 @@ export default function VisaApplicationScreen({ navigation }: any) {
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#4A9EFF" />
-              <Text style={styles.loadingText}>{t('applications.loadingApplications')}</Text>
+              <Text style={styles.loadingText}>
+                {t('applications.loadingApplications')}
+              </Text>
             </View>
-          ) : userApplications && Array.isArray(userApplications) && userApplications.length > 0 ? (
+          ) : userApplications &&
+            Array.isArray(userApplications) &&
+            userApplications.length > 0 ? (
             <View style={styles.applicationsList}>
               {userApplications.map((application: any, index: number) => (
                 <TouchableOpacity
                   key={application.id}
                   style={styles.applicationCard}
                   onPress={() => handleApplicationPress(application.id)}
-                  activeOpacity={0.7}
-                >
+                  activeOpacity={0.7}>
                   <View style={styles.applicationCardContent}>
                     <View style={styles.applicationNumber}>
                       <Text style={styles.applicationNumberText}>
@@ -146,17 +158,22 @@ export default function VisaApplicationScreen({ navigation }: any) {
                           {application.country?.flagEmoji || '🌍'}
                         </Text>
                         <View style={styles.applicationTitleContainer}>
-                          <Text style={styles.applicationTitle} numberOfLines={1}>
+                          <Text
+                            style={styles.applicationTitle}
+                            numberOfLines={1}>
                             {application.country
                               ? getTranslatedCountryName(
                                   application.country.code || '',
                                   language,
-                                  application.country.name
+                                  application.country.name,
                                 )
                               : t('applicationDetail.unknownCountry')}
                           </Text>
                           <Text style={styles.visaTypeText} numberOfLines={1}>
-                            {getTranslatedVisaTypeName(application.visaType?.name, language) || t('applicationDetail.unknownVisaType')}
+                            {getTranslatedVisaTypeName(
+                              application.visaType?.name,
+                              language,
+                            ) || t('applicationDetail.unknownVisaType')}
                           </Text>
                         </View>
                       </View>
@@ -169,11 +186,22 @@ export default function VisaApplicationScreen({ navigation }: any) {
                             color={IconColors.muted}
                           />
                           <Text style={styles.progressText}>
-                            {application.progressPercentage || 0}% {t('applications.complete')}
+                            {application.progressPercentage || 0}%{' '}
+                            {t('applications.complete')}
                           </Text>
                         </View>
-                        <View style={[styles.statusBadge, { backgroundColor: getStatusBgColor(application.status) }]}>
-                          <Text style={styles.statusText}>{getStatusLabel(application.status, t)}</Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            {
+                              backgroundColor: getStatusBgColor(
+                                application.status,
+                              ),
+                            },
+                          ]}>
+                          <Text style={styles.statusText}>
+                            {getStatusLabel(application.status, t)}
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -195,14 +223,16 @@ export default function VisaApplicationScreen({ navigation }: any) {
                 size={IconSizes.large * 2}
                 color={IconColors.muted}
               />
-              <Text style={styles.emptyTitle}>{t('applications.noApplicationsYet')}</Text>
+              <Text style={styles.emptyTitle}>
+                {t('applications.noApplicationsYet')}
+              </Text>
               <Text style={styles.emptyText}>
                 {t('applications.startNewApplicationHint')}
               </Text>
             </View>
           )}
 
-          <View style={{ height: 40 }} />
+          <View style={{height: 40}} />
         </ScrollView>
       </View>
     </View>

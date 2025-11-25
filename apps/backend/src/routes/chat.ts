@@ -225,7 +225,14 @@ router.get('/history', async (req: Request, res: Response) => {
       });
     }
 
-    const history = await ChatService.getConversationHistory(userId, applicationId, limit, offset);
+    // CRITICAL SECURITY FIX: Always pass userId for verification, even in legacy mode
+    const history = await ChatService.getConversationHistory(
+      userId, // For new API, this is userId; for legacy, we still pass it
+      applicationId,
+      limit,
+      offset,
+      userId // Always pass verified userId for security
+    );
 
     res.json({
       success: true,

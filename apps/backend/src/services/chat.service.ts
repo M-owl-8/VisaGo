@@ -30,27 +30,44 @@ export class ChatService {
   /**
    * Create or get a chat session
    */
+  /**
+   * Get or create a chat session
+   * MEDIUM PRIORITY FIX: Ensure session exists before saving messages to prevent orphaned messages
+   * This method is called before every message save to guarantee session exists
+   */
   async getOrCreateSession(userId: string, applicationId?: string): Promise<string> {
-    const session = await prisma.chatSession.findFirst({
-      where: {
-        userId,
-        applicationId: applicationId || null,
-      },
-    });
+    try {
+      const session = await prisma.chatSession.findFirst({
+        where: {
+          userId,
+          applicationId: applicationId || null,
+        },
+      });
 
-    if (session) {
-      return session.id;
+      if (session) {
+        return session.id;
+      }
+
+      // MEDIUM PRIORITY FIX: Create session if it doesn't exist, with proper error handling
+      // This ensures messages are never saved without a valid session
+      const newSession = await prisma.chatSession.create({
+        data: {
+          userId,
+          applicationId: applicationId || null,
+          title: applicationId ? `Chat for ${applicationId}` : 'General Chat',
+        },
+      });
+
+      if (!newSession || !newSession.id) {
+        throw new Error('Failed to create chat session');
+      }
+
+      return newSession.id;
+    } catch (error: any) {
+      // Log error and re-throw to prevent messages from being saved without a session
+      console.error('[ChatService] Failed to get or create session:', error);
+      throw new Error(`Failed to create chat session: ${error.message || 'Unknown error'}`);
     }
-
-    const newSession = await prisma.chatSession.create({
-      data: {
-        userId,
-        applicationId: applicationId || null,
-        title: applicationId ? `Chat for ${applicationId}` : 'General Chat',
-      },
-    });
-
-    return newSession.id;
   }
 
   /**
@@ -212,85 +229,99 @@ User's Current Visa Application:
       }
 
       // Use DeepSeek Reasoner for AI assistant chat
-      // Build full user message with conversation history and context
+      // Build messages array with trimmed history
       let aiResponse;
       try {
-        // Build system prompt with context
+        // Build compact system prompt with context
         const systemPrompt = this.buildSystemPrompt(applicationContext, ragContext, content);
 
-        // Use DeepSeek Reasoner for AI assistant chat
-        // Build full user message with conversation history and context
-        try {
-          // Import DeepSeek service
-          const { deepseekVisaChat } = await import('./deepseek');
+        // Import DeepSeek service
+        const { deepseekVisaChat } = await import('./deepseek');
+        type DeepSeekMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
-          // Build the full user message with conversation history
-          let fullUserMessage = content;
-          if (history.length > 0) {
-            // Include recent conversation history in the message
-            const historyText = history
-              .slice(-5) // Last 5 messages for context
-              .map((msg: any) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-              .join('\n\n');
-            fullUserMessage = `Previous conversation:\n${historyText}\n\nCurrent question: ${content}`;
-          }
+        // Trim conversation history to last 8-10 messages (max ~2000-2500 tokens)
+        const trimmedHistory = this.trimConversationHistory(history, 10);
 
-          // Add application context to the message if available
-          if (applicationContext) {
-            fullUserMessage = `${fullUserMessage}\n\nContext: ${ragContext || 'No additional context available.'}`;
-          }
+        // Build messages array for DeepSeek
+        const messages: DeepSeekMessage[] = [
+          ...trimmedHistory.map((msg: any) => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+          })),
+          { role: 'user' as const, content },
+        ];
 
-          // Call DeepSeek with the system prompt and full user message
-          const deepseekResponse = await deepseekVisaChat(fullUserMessage, systemPrompt);
-
-          // Format response to match expected structure
-          const formattedResponse = {
-            message: deepseekResponse.message,
-            sources: [], // DeepSeek doesn't provide RAG sources, but we keep the structure
-            tokens_used: deepseekResponse.tokensUsed,
-            model: deepseekResponse.model,
-          };
-
-          aiResponse = { data: formattedResponse };
-        } catch (chatError: any) {
-          // Handle DeepSeek errors
-          console.error('DeepSeek chat service failed:', chatError);
-
-          // Check if it's a configuration error
-          if (
-            chatError.message?.includes('not configured') ||
-            chatError.message === 'DEEPSEEK_AUTH_ERROR'
-          ) {
-            throw chatError; // Re-throw configuration errors to be handled by outer catch
-          }
-
-          // For other errors, provide user-friendly message
-          if (chatError.message === 'DEEPSEEK_CHAT_ERROR') {
-            throw new Error(
-              'Ketdik AI assistant is temporarily unavailable. Please try again later.'
-            );
-          }
-
-          throw chatError;
-        }
-      } catch (deepseekError: any) {
-        logError('DeepSeek service error', deepseekError, {
+        // Call DeepSeek with messages array (system prompt is included separately)
+        const deepseekResponse = await deepseekVisaChat(
+          messages,
+          systemPrompt,
           userId,
-          applicationId,
-        });
+          applicationId
+        );
 
-        // Provide user-friendly error message
-        const errorMessage =
-          deepseekError.message ||
-          'AI service temporarily unavailable. Please try again in a moment.';
+        // Format response to match expected structure
+        const formattedResponse = {
+          message: deepseekResponse.message,
+          sources: [], // DeepSeek doesn't provide RAG sources, but we keep the structure
+          tokens_used: deepseekResponse.tokensUsed,
+          model: deepseekResponse.model,
+        };
 
+        aiResponse = { data: formattedResponse };
+      } catch (chatError: any) {
+        // Handle DeepSeek errors with friendly multilingual messages
+        logError(
+          '[DeepSeek][Chat] Service error',
+          chatError instanceof Error ? chatError : new Error(String(chatError)),
+          {
+            userId,
+            applicationId,
+          }
+        );
+
+        // Check if it's a configuration error
+        if (
+          chatError.message?.includes('not configured') ||
+          chatError.message === 'DEEPSEEK_AUTH_ERROR'
+        ) {
+          throw chatError; // Re-throw configuration errors to be handled by outer catch
+        }
+
+        // Handle timeout with friendly message
+        if (chatError.message === 'DEEPSEEK_TIMEOUT') {
+          return this.createFallbackResponse(
+            userId,
+            applicationId,
+            sessionId,
+            content,
+            startTime,
+            "Serverimizdagi AI hozir sekin ishlayapti. Iltimos, birozdan so'ng qayta urinib ko'ring."
+          );
+        }
+
+        // For other errors, provide user-friendly message
+        if (
+          chatError.message === 'DEEPSEEK_CHAT_ERROR' ||
+          chatError.message === 'DEEPSEEK_RATE_LIMIT'
+        ) {
+          return this.createFallbackResponse(
+            userId,
+            applicationId,
+            sessionId,
+            content,
+            startTime,
+            'AI service temporarily unavailable. Please try again in a moment.'
+          );
+        }
+
+        // Generic fallback
         return this.createFallbackResponse(
           userId,
           applicationId,
           sessionId,
           content,
           startTime,
-          errorMessage
+          'AI service temporarily unavailable. Please try again in a moment.'
         );
       }
 
@@ -325,8 +356,9 @@ User's Current Visa Application:
 
       const responseTime = Date.now() - startTime;
 
-      // Save user message
-      await prisma.chatMessage.create({
+      // CRITICAL FIX: Save user message and ensure it's committed before saving assistant message
+      // This prevents race conditions where history is queried before messages are saved
+      const userMessage = await prisma.chatMessage.create({
         data: {
           sessionId,
           userId,
@@ -338,21 +370,52 @@ User's Current Visa Application:
         },
       });
 
-      // Save assistant response with sources and response time
-      const assistantMessage = await prisma.chatMessage.create({
-        data: {
-          sessionId,
-          userId,
-          role: 'assistant',
-          content: message,
-          sources: JSON.stringify(sources || []),
-          model,
-          tokensUsed: tokens_used,
-          responseTime,
-        },
+      // CRITICAL FIX: Update session timestamp immediately after saving user message
+      // This ensures session is marked as active and messages are queryable
+      await prisma.chatSession.update({
+        where: { id: sessionId },
+        data: { updatedAt: new Date() },
       });
 
-      // Update session's last interaction time
+      // Save assistant response with sources and response time
+      let assistantMessage;
+      try {
+        assistantMessage = await prisma.chatMessage.create({
+          data: {
+            sessionId,
+            userId,
+            role: 'assistant',
+            content: message,
+            // MEDIUM PRIORITY FIX: Properly serialize sources - handle both array and already-stringified cases
+            // This prevents double-stringification errors and ensures sources are stored correctly
+            sources: Array.isArray(sources)
+              ? JSON.stringify(sources)
+              : typeof sources === 'string'
+                ? sources
+                : JSON.stringify([]),
+            model,
+            tokensUsed: tokens_used,
+            responseTime,
+          },
+        });
+
+        // CRITICAL FIX: Update session again after assistant message to ensure both messages are queryable
+        await prisma.chatSession.update({
+          where: { id: sessionId },
+          data: { updatedAt: new Date() },
+        });
+      } catch (error) {
+        // CRITICAL FIX: If assistant message save fails, delete user message to maintain consistency
+        // This prevents orphaned user messages without responses
+        await prisma.chatMessage.delete({ where: { id: userMessage.id } }).catch(() => {
+          // Ignore delete errors
+        });
+        throw error;
+      }
+
+      // CRITICAL FIX: Update session timestamp to ensure it's included in history queries
+      // This prevents race conditions where getConversationHistory is called before session is updated
+      // Only update once after both messages are saved
       await prisma.chatSession.update({
         where: { id: sessionId },
         data: { updatedAt: new Date() },
@@ -424,15 +487,16 @@ User's Current Visa Application:
 
   /**
    * Get conversation history
+   * CRITICAL SECURITY FIX: Always require userId for verification
    */
   async getConversationHistory(
     userIdOrSessionId: string,
     applicationId?: string,
     limit = 50,
-    offset = 0
+    offset = 0,
+    verifiedUserId?: string // Required for legacy API to verify session ownership
   ) {
     // If applicationId is provided, it's the new API with userId, applicationId, limit, offset
-    // Otherwise, treat the first param as sessionId (legacy API)
     if (applicationId !== undefined) {
       const userId = userIdOrSessionId;
       const sessions = await prisma.chatSession.findMany({
@@ -459,10 +523,30 @@ User's Current Visa Application:
       return messages.reverse();
     } else {
       // Legacy: treat first param as sessionId
+      // CRITICAL SECURITY FIX: Verify session belongs to requesting user
       const sessionId = userIdOrSessionId;
+
+      // Require verifiedUserId for legacy API to prevent unauthorized access
+      if (!verifiedUserId) {
+        throw new Error('User ID required for session verification');
+      }
+
+      // Verify session ownership - this prevents users from accessing other users' sessions
+      const session = await prisma.chatSession.findFirst({
+        where: {
+          id: sessionId,
+          userId: verifiedUserId, // CRITICAL: Verify session belongs to requesting user
+        },
+      });
+
+      if (!session) {
+        throw new Error('Session not found or access denied');
+      }
+
       const messages = await prisma.chatMessage.findMany({
         where: { sessionId },
         orderBy: { createdAt: 'desc' },
+        skip: offset,
         take: limit,
       });
       return messages.reverse();
@@ -572,75 +656,70 @@ User's Current Visa Application:
   }
 
   /**
-   * Build system prompt with application context
+   * Trim conversation history to last N messages, ensuring total tokens stay under limit
+   * @param history - Full conversation history
+   * @param maxMessages - Maximum number of messages to keep (default: 10)
+   * @param maxTokens - Maximum total tokens for history (default: 2000)
+   * @returns Trimmed history array
+   */
+  private trimConversationHistory(
+    history: any[],
+    maxMessages: number = 10,
+    maxTokens: number = 2000
+  ): any[] {
+    if (!history || history.length === 0) {
+      return [];
+    }
+
+    // Take last N messages
+    let trimmed = history.slice(-maxMessages);
+
+    // Rough token estimation: ~4 characters per token
+    // Count tokens for each message
+    let totalTokens = 0;
+    const result: any[] = [];
+
+    // Add messages from the end until we hit token limit
+    for (let i = trimmed.length - 1; i >= 0; i--) {
+      const msg = trimmed[i];
+      const msgTokens = Math.ceil((msg.content?.length || 0) / 4);
+
+      if (totalTokens + msgTokens > maxTokens && result.length > 0) {
+        break; // Stop if adding this message would exceed limit
+      }
+
+      result.unshift(msg); // Add to beginning
+      totalTokens += msgTokens;
+    }
+
+    return result;
+  }
+
+  /**
+   * Build compact system prompt with application context
+   * Optimized for faster responses and lower token usage
    */
   private buildSystemPrompt(
     applicationContext: any,
     ragContext: string,
     latestUserMessage: string
   ): string {
-    let prompt = `You are the main AI visa consultant inside the Ketdik app.
+    // Compact system prompt - focused on essential instructions
+    let prompt = `You are Ketdik's visa assistant. Answer concisely (short paragraphs, no essays).
 
-ROLE
-- You act like an extremely proficient human visa consultant.
-- You mainly help with two visa types: tourist (short stay) and student (study).
-- You focus on these destination countries: Spain, Germany, Italy, France, Turkey, United Arab Emirates (UAE), United Kingdom (UK), United States of America (USA), Canada, South Korea.
+LANGUAGE: Match user's language (UZ/RU/EN). Keep it simple and polite.
 
-LANGUAGE
-- Always answer in the same language the user mainly uses in their last message:
-  • If the user writes in Uzbek, answer in Uzbek.
-  • If the user writes in Russian, answer in Russian.
-  • Otherwise, answer in English.
-- Keep the language simple, clear and polite. No over-praising and no motivational speeches.
+ROLE: Help with tourist/student visas for Spain, Germany, Italy, France, Turkey, UAE, UK, USA, Canada, South Korea.
 
-HOW YOU WORK
-1) First, make sure you understand the user's profile. If information is missing, ask a few SHORT questions (2–6 questions maximum) about:
-  - Nationality and current country of residence
-  - Destination country and visa type (tourist or student)
-  - Planned duration and purpose of stay
-  - Financial situation (savings, income, sponsor, property)
-  - Travel history (Schengen, US/UK/Canada, etc.)
+RESPONSE FORMAT:
+- If missing info: Ask 2-6 short questions (nationality, destination, visa type, duration, finances, travel history).
+- If you have info: 1-2 sentence summary, then structured answer (Eligibility, Documents, Finances, Process, Refusal risks), end with 3-7 action items.
 
-2) After you understand the profile, give:
-  - A 1–2 sentence summary of their situation.
-  - A structured answer with the following sections:
-    • Eligibility
-    • Required documents
-    • Financial requirements (give safe approximate ranges if exact numbers are unknown and clearly say they are approximate)
-    • Application process (where to apply, online portal, VFS/embassy, key steps)
-    • Common refusal reasons and how to reduce risk
-  - Finish with a short "Action checklist" (3–7 bullet points of what to do next).
+KNOWLEDGE BASE: Use APPLICATION_CONTEXT, VISA_KNOWLEDGE_BASE, DOCUMENT_GUIDES, RAG_CONTEXT when provided. Mark general advice: UZ "Umumiy maslahat, iltimos rasmiy manbadan tekshiring." / RU "Общий совет, проверьте на официальном сайте." / EN "General advice, verify on official sources."
 
-RAG / KNOWLEDGE BASE
-- If the prompt includes specific rules or text under something like KNOWLEDGE_BASE, treat that information as higher priority than your general knowledge.
-- Within KNOWLEDGE_BASE there may be:
-  • APPLICATION CONTEXT: details about this user's visa application.
-  • VISA_KNOWLEDGE_BASE: country and visa-type specific rules (documents, finance, process, refusal reasons).
-  • DOCUMENT_GUIDES: practical instructions (for Uzbekistan) on how the user can obtain specific documents such as bank statements, police clearance, property certificates, etc.
-  • RAG_CONTEXT: additional retrieved information.
-- When the user asks about a specific document (for example, where to get a bank statement or police clearance), prefer to use the DOCUMENT_GUIDES section and adapt it to the user's language.
-- Use that information first. Only add general visa knowledge when needed, and clearly mark it as:
-  - Uzbek: "Umumiy maslahat, iltimos rasmiy manbadan tekshiring."
-  - Russian: "Общий совет, пожалуйста, проверьте на официальном сайте."
-  - English: "General advice, please verify on official sources."
+SAFETY: Never promise approval. Remind users to verify with official sources. Never suggest lying or fake documents.
 
-SAFETY AND HONESTY
-- Visa rules change frequently and can differ by consulate. Remind users to check the official website or call the consulate when something is important.
-- Never promise approval, never give exact percentages of success.
-- Never suggest lying, creating fake documents, or hiding information.
-- If you are not sure, say you are not sure and recommend the user to confirm with official sources.
-
-STYLE
-- Be calm, respectful, and efficient. No unnecessary jokes or hype.
-- Use short paragraphs and SHORT lists.
-- Prefer simple numbered or bulleted lists like "1., 2., 3." instead of Markdown headings.
-- Avoid using Markdown headings such as "##", "###" and avoid too many "**bold**" markers.
-- Use punctuation that is natural for the language:
-  • Uzbek: commas and periods correctly, no extra exclamation marks.
-  • Russian: proper commas and periods, no unnecessary quotes or brackets.
-  • English: clear sentences, no overuse of parentheses or exclamation marks.
-- Do not output chain-of-thought, hidden reasoning, or internal analysis.
-- Never output "<think>" or any similar tags. If you need to reason, do it internally and output only the final answer.`;
+STYLE: Short paragraphs, simple lists (1., 2., 3.), no markdown headings, no chain-of-thought output, no <think> tags.`;
 
     // Extract country and visaType from applicationContext
     const country =

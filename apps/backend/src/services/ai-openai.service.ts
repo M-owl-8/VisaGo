@@ -78,7 +78,7 @@ export class AIOpenAIService {
       }
       AIOpenAIService.openai = new OpenAI({
         apiKey,
-        timeout: 60000, // 60 second timeout
+        timeout: 30000, // HIGH PRIORITY FIX: 30 second timeout (reduced from 60s to prevent slow GPT responses)
       });
       AIOpenAIService.prisma = prisma;
       logInfo('[OpenAI] Service initialized', {

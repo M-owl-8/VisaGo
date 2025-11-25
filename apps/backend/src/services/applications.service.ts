@@ -32,20 +32,36 @@ export class ApplicationsService {
       },
     });
 
-    // Calculate progress percentage for each application
-    // Option B: Use max of checkpoint progress and document progress for backward compatibility
+    // HIGH PRIORITY FIX: Calculate progress based on documents first (primary source), then checkpoints (fallback)
+    // Document-based progress is more accurate as it reflects actual document upload status
+    // This ensures progress percentage correctly reflects document completion, not just checkpoint completion
     return applications.map((app: any) => {
       const allCheckpoints = app.checkpoints || [];
       const completedCount = allCheckpoints.filter((cp: any) => cp.isCompleted).length;
       const checkpointProgress =
         allCheckpoints.length > 0 ? Math.round((completedCount / allCheckpoints.length) * 100) : 0;
 
-      // Use document-based progress from database (updated after uploads)
-      // Fallback to checkpoint progress if document progress not available
-      const progressPercentage =
+      // Calculate document-based progress (primary source of truth)
+      // Count verified documents vs total required documents
+      const documents = app.documents || [];
+      const verifiedDocuments = documents.filter((doc: any) => doc.status === 'verified').length;
+      const documentProgress =
+        documents.length > 0 ? Math.round((verifiedDocuments / documents.length) * 100) : 0;
+
+      // Use document progress if available, otherwise fallback to checkpoint progress
+      // If app.progressPercentage exists in DB (from previous calculation), use it if higher
+      const dbProgress =
         app.progressPercentage !== undefined && app.progressPercentage !== null
-          ? Math.max(checkpointProgress, app.progressPercentage)
-          : checkpointProgress;
+          ? app.progressPercentage
+          : null;
+
+      // Priority: documentProgress > dbProgress > checkpointProgress
+      const progressPercentage =
+        documentProgress > 0
+          ? documentProgress
+          : dbProgress !== null
+            ? dbProgress
+            : checkpointProgress;
 
       return {
         ...app,

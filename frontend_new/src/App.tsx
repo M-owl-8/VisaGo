@@ -307,7 +307,11 @@ class ErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error) {
-    console.error('=== ERROR BOUNDARY: getDerivedStateFromError ===', error);
+    // LOW PRIORITY FIX: Use proper error logging instead of console.error
+    // ErrorBoundary already exists, but improved to use errorLogger for production
+    logError(error, {
+      source: 'ErrorBoundary.getDerivedStateFromError',
+    });
     return {hasError: true, error};
   }
 
@@ -384,6 +388,26 @@ function AppContent() {
       hasUser: !!user,
       userId: user?.id,
     });
+  }, [isSignedIn, user]);
+
+  // HIGH PRIORITY FIX: Load chat history when user signs in or app mounts
+  // This ensures chat history is available immediately after login, not just when ChatScreen opens
+  useEffect(() => {
+    if (isSignedIn && user) {
+      // Load chat history in background (non-blocking)
+      const loadChatHistory = async () => {
+        try {
+          const {useChatStore} = require('./store/chat');
+          const chatStore = useChatStore.getState();
+          await chatStore.loadChatHistory();
+          console.log('[App] Chat history loaded on mount/login');
+        } catch (error) {
+          // Don't fail app initialization if chat history load fails
+          console.warn('[App] Failed to load chat history on mount:', error);
+        }
+      };
+      loadChatHistory();
+    }
   }, [isSignedIn, user]);
 
   useEffect(() => {

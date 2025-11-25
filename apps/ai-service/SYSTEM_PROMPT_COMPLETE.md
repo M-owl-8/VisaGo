@@ -77,6 +77,7 @@ All tasks for creating and integrating the centralized system prompt file have b
 ## Integration Points
 
 ### System Prompt Loading
+
 ```python
 # In services/prompt.py
 def load_system_prompt() -> str:
@@ -85,6 +86,7 @@ def load_system_prompt() -> str:
 ```
 
 ### System Prompt Usage in Chat
+
 ```python
 # In main.py chat endpoint
 system_prompt = prompt_service.build_system_prompt(
@@ -132,5 +134,3 @@ apps/ai-service/
 ## Status: ✅ COMPLETE
 
 All todos have been completed and tested. The system prompt integration is fully functional and ready for production use.
-
-

@@ -3,26 +3,41 @@ import { Request, Response, NextFunction } from 'express';
 
 /**
  * Middleware to handle validation errors
- * Enhanced with user-friendly error messages
+ * Enhanced with user-friendly error messages and specific error codes
  */
 export const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const { formatValidationErrors } = require('../utils/user-friendly-errors');
-    
+
     const errorDetails = errors.array().map((err: any) => ({
       field: err.path || err.param || 'unknown',
       message: err.msg,
     }));
-    
+
     const formatted = formatValidationErrors(errorDetails);
-    
+
+    // Determine specific error code based on validation errors
+    let errorCode = 'INVALID_INPUT';
+    const errorFields = errorDetails.map((e: any) => e.field);
+
+    if (errorFields.includes('password')) {
+      // Check if it's a password strength issue
+      const passwordError = errorDetails.find((e: any) => e.field === 'password');
+      if (
+        passwordError?.message?.includes('letter') ||
+        passwordError?.message?.includes('6 characters')
+      ) {
+        errorCode = 'WEAK_PASSWORD';
+      }
+    }
+
     return res.status(400).json({
       success: false,
       error: {
         status: 400,
         message: formatted.message,
-        code: 'VALIDATION_ERROR',
+        code: errorCode,
         details: formatted.errors,
       },
     });
@@ -32,24 +47,15 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
 
 /**
  * Validation rules for registration
+ * Softened password requirements: minimum 6 characters with at least 1 letter
  */
 export const validateRegister = [
-  body('email')
-    .isEmail()
-    .withMessage('Invalid email address')
-    .normalizeEmail()
-    .toLowerCase(),
+  body('email').isEmail().withMessage('Invalid email address').normalizeEmail().toLowerCase(),
   body('password')
-    .isLength({ min: 12 })
-    .withMessage('Password must be at least 12 characters')
-    .matches(/[A-Z]/)
-    .withMessage('Password must contain at least one uppercase letter')
-    .matches(/[a-z]/)
-    .withMessage('Password must contain at least one lowercase letter')
-    .matches(/[0-9]/)
-    .withMessage('Password must contain at least one number')
-    .matches(/[!@#$%^&*]/)
-    .withMessage('Password must contain at least one special character (!@#$%^&*)')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters')
+    .matches(/[A-Za-z]/)
+    .withMessage('Password must contain at least one letter')
     .custom((value) => !/\s/.test(value))
     .withMessage('Password cannot contain spaces'),
   body('firstName')
@@ -72,47 +78,28 @@ export const validateRegister = [
  * Validation rules for login
  */
 export const validateLogin = [
-  body('email')
-    .isEmail()
-    .withMessage('Invalid email address')
-    .normalizeEmail()
-    .toLowerCase(),
-  body('password')
-    .isLength({ min: 1 })
-    .withMessage('Password is required')
-    .trim(),
+  body('email').isEmail().withMessage('Invalid email address').normalizeEmail().toLowerCase(),
+  body('password').isLength({ min: 1 }).withMessage('Password is required').trim(),
 ];
 
 /**
  * Validation rules for email
  */
 export const validateEmail = [
-  body('email')
-    .isEmail()
-    .withMessage('Invalid email address')
-    .normalizeEmail()
-    .toLowerCase(),
+  body('email').isEmail().withMessage('Invalid email address').normalizeEmail().toLowerCase(),
 ];
 
 /**
  * Validation rules for password change
+ * Softened password requirements: minimum 6 characters with at least 1 letter
  */
 export const validatePasswordChange = [
-  body('currentPassword')
-    .isLength({ min: 1 })
-    .withMessage('Current password is required')
-    .trim(),
+  body('currentPassword').isLength({ min: 1 }).withMessage('Current password is required').trim(),
   body('newPassword')
-    .isLength({ min: 12 })
-    .withMessage('New password must be at least 12 characters')
-    .matches(/[A-Z]/)
-    .withMessage('Password must contain at least one uppercase letter')
-    .matches(/[a-z]/)
-    .withMessage('Password must contain at least one lowercase letter')
-    .matches(/[0-9]/)
-    .withMessage('Password must contain at least one number')
-    .matches(/[!@#$%^&*]/)
-    .withMessage('Password must contain at least one special character (!@#$%^&*)')
+    .isLength({ min: 6 })
+    .withMessage('New password must be at least 6 characters')
+    .matches(/[A-Za-z]/)
+    .withMessage('Password must contain at least one letter')
     .custom((value) => !/\s/.test(value))
     .withMessage('Password cannot contain spaces'),
   body('confirmPassword')
@@ -124,18 +111,14 @@ export const validatePasswordChange = [
  * Validation rules for phone number
  */
 export const validatePhone = [
-  body('phone')
-    .isMobilePhone('any')
-    .withMessage('Invalid phone number'),
+  body('phone').isMobilePhone('any').withMessage('Invalid phone number'),
 ];
 
 /**
  * Validation rules for payment information
  */
 export const validatePayment = [
-  body('amount')
-    .isFloat({ min: 0.01 })
-    .withMessage('Amount must be greater than 0'),
+  body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0'),
   body('paymentMethod')
     .isIn(['card', 'payme', 'click', 'uzum', 'stripe'])
     .withMessage('Invalid payment method'),
@@ -145,12 +128,8 @@ export const validatePayment = [
  * Validation rules for visa application
  */
 export const validateVisaApplication = [
-  body('countryId')
-    .isUUID()
-    .withMessage('Invalid country ID'),
-  body('visaTypeId')
-    .isUUID()
-    .withMessage('Invalid visa type ID'),
+  body('countryId').isUUID().withMessage('Invalid country ID'),
+  body('visaTypeId').isUUID().withMessage('Invalid visa type ID'),
   body('notes')
     .optional()
     .trim()
@@ -165,10 +144,7 @@ export const validateDocumentUpload = [
   body('documentType')
     .isIn(['passport', 'visa', 'bank_statement', 'employment_letter', 'invitation', 'other'])
     .withMessage('Invalid document type'),
-  body('expiryDate')
-    .optional()
-    .isISO8601()
-    .withMessage('Invalid expiry date format (ISO 8601)'),
+  body('expiryDate').optional().isISO8601().withMessage('Invalid expiry date format (ISO 8601)'),
 ];
 
 /**
@@ -185,19 +161,9 @@ export const validateUserProfileUpdate = [
     .trim()
     .isLength({ min: 2, max: 50 })
     .withMessage('Last name must be 2-50 characters'),
-  body('phone')
-    .optional()
-    .isMobilePhone('any')
-    .withMessage('Invalid phone number'),
-  body('language')
-    .optional()
-    .isIn(['en', 'uz', 'ru'])
-    .withMessage('Invalid language selection'),
-  body('timezone')
-    .optional()
-    .trim()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Invalid timezone'),
+  body('phone').optional().isMobilePhone('any').withMessage('Invalid phone number'),
+  body('language').optional().isIn(['en', 'uz', 'ru']).withMessage('Invalid language selection'),
+  body('timezone').optional().trim().isLength({ min: 1, max: 50 }).withMessage('Invalid timezone'),
 ];
 
 /**
@@ -208,7 +174,5 @@ export const validateChatMessage = [
     .trim()
     .isLength({ min: 1, max: 4000 })
     .withMessage('Message must be 1-4000 characters'),
-  body('sessionId')
-    .isUUID()
-    .withMessage('Invalid session ID'),
+  body('sessionId').isUUID().withMessage('Invalid session ID'),
 ];

@@ -7,19 +7,22 @@ Railway is using **cached nixpacks settings** from the dashboard, which override
 ## ✅ **IMMEDIATE FIX - Do This Now:**
 
 ### Step 1: Go to Railway Dashboard
+
 1. Go to https://railway.app
 2. Log in
 3. Select your **VisaBuddy Backend** service
 
 ### Step 2: Open Service Settings
+
 1. Click on your **backend service**
 2. Click **Settings** tab (gear icon)
 3. Scroll to **Build & Deploy** section
 
 ### Step 3: Configure Build Settings
+
 **IMPORTANT - Set these EXACT values:**
 
-1. **Root Directory:** 
+1. **Root Directory:**
    - Set to: **`.`** (just a dot) OR leave **EMPTY**
    - NOT `apps/backend`
 
@@ -31,7 +34,7 @@ Railway is using **cached nixpacks settings** from the dashboard, which override
    - Leave it **EMPTY**
 
 4. **Start Command:**
-   - **DELETE/REMOVE** any value  
+   - **DELETE/REMOVE** any value
    - Leave it **EMPTY**
 
 5. **Nixpacks Build Command:**
@@ -43,6 +46,7 @@ Railway is using **cached nixpacks settings** from the dashboard, which override
    - Leave it **EMPTY**
 
 ### Step 4: Save and Redeploy
+
 1. Click **Save** or **Update**
 2. Go to **Deployments** tab
 3. Click **Redeploy** or wait for auto-deploy
@@ -57,6 +61,7 @@ Railway is using **cached nixpacks settings** from the dashboard, which override
 ## ✅ **Expected Result:**
 
 After saving, Railway will:
+
 1. Use Dockerfile for build
 2. Build successfully
 3. Start the backend
@@ -88,6 +93,3 @@ Nixpacks Start:        (empty)              ← DELETE everything
 ```
 
 **SAVE and REDEPLOY!**
-
-
-

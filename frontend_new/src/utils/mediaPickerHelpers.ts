@@ -4,9 +4,16 @@
  * Uses React Native CLI modules (not Expo)
  */
 
-import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType, CameraOptions, ImageLibraryOptions } from 'react-native-image-picker';
+import {
+  launchImageLibrary,
+  launchCamera,
+  ImagePickerResponse,
+  MediaType,
+  CameraOptions,
+  ImageLibraryOptions,
+} from 'react-native-image-picker';
 import DocumentPicker from 'react-native-document-picker';
-import { Platform, Alert, PermissionsAndroid } from 'react-native';
+import {Platform, Alert, PermissionsAndroid} from 'react-native';
 
 export interface PickedFile {
   uri: string;
@@ -23,10 +30,10 @@ export const requestMediaPermissions = async (): Promise<boolean> => {
   try {
     if (Platform.OS === 'android') {
       const cameraPermission = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.CAMERA
+        PermissionsAndroid.PERMISSIONS.CAMERA,
       );
       const storagePermission = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE
+        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
       );
 
       if (
@@ -37,15 +44,15 @@ export const requestMediaPermissions = async (): Promise<boolean> => {
       }
 
       Alert.alert(
-        "Permissions Denied",
-        "Please enable camera and storage permissions in settings"
+        'Permissions Denied',
+        'Please enable camera and storage permissions in settings',
       );
       return false;
     }
     // iOS permissions are requested automatically by the picker
     return true;
   } catch (error) {
-    console.error("Permission request error:", error);
+    console.error('Permission request error:', error);
     return false;
   }
 };
@@ -72,15 +79,15 @@ export const pickFromCamera = async (): Promise<PickedFile | null> => {
         uri: asset.uri || '',
         name: asset.fileName || `photo_${Date.now()}.jpg`,
         size: asset.fileSize,
-        type: "image",
-        mimeType: asset.type || "image/jpeg",
+        type: 'image',
+        mimeType: asset.type || 'image/jpeg',
       };
     }
 
     return null;
   } catch (error) {
-    console.error("Camera pick error:", error);
-    Alert.alert("Error", "Failed to capture photo");
+    console.error('Camera pick error:', error);
+    Alert.alert('Error', 'Failed to capture photo');
     return null;
   }
 };
@@ -102,21 +109,24 @@ export const pickFromGallery = async (): Promise<PickedFile | null> => {
 
     if (result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      const fileName = asset.fileName || asset.uri?.split("/").pop() || `image_${Date.now()}.jpg`;
+      const fileName =
+        asset.fileName ||
+        asset.uri?.split('/').pop() ||
+        `image_${Date.now()}.jpg`;
 
       return {
         uri: asset.uri || '',
         name: fileName,
         size: asset.fileSize,
-        type: "image",
-        mimeType: asset.type || "image/jpeg",
+        type: 'image',
+        mimeType: asset.type || 'image/jpeg',
       };
     }
 
     return null;
   } catch (error) {
-    console.error("Gallery pick error:", error);
-    Alert.alert("Error", "Failed to pick image");
+    console.error('Gallery pick error:', error);
+    Alert.alert('Error', 'Failed to pick image');
     return null;
   }
 };
@@ -127,7 +137,11 @@ export const pickFromGallery = async (): Promise<PickedFile | null> => {
 export const pickDocument = async (): Promise<PickedFile | null> => {
   try {
     const result = await DocumentPicker.pick({
-      type: [DocumentPicker.types.pdf, DocumentPicker.types.doc, DocumentPicker.types.docx],
+      type: [
+        DocumentPicker.types.pdf,
+        DocumentPicker.types.doc,
+        DocumentPicker.types.docx,
+      ],
       copyTo: 'cachesDirectory',
     });
 
@@ -137,8 +151,8 @@ export const pickDocument = async (): Promise<PickedFile | null> => {
         uri: file.uri,
         name: file.name || `document_${Date.now()}.pdf`,
         size: file.size,
-        type: "document",
-        mimeType: file.type || "application/pdf",
+        type: 'document',
+        mimeType: file.type || 'application/pdf',
       };
     }
 
@@ -148,8 +162,8 @@ export const pickDocument = async (): Promise<PickedFile | null> => {
       // User cancelled
       return null;
     }
-    console.error("Document pick error:", error);
-    Alert.alert("Error", "Failed to pick document");
+    console.error('Document pick error:', error);
+    Alert.alert('Error', 'Failed to pick document');
     return null;
   }
 };
@@ -159,7 +173,7 @@ export const pickDocument = async (): Promise<PickedFile | null> => {
  */
 export const prepareFileForUpload = (file: PickedFile): any => {
   const fileName = file.name;
-  const mimeType = file.mimeType || "application/octet-stream";
+  const mimeType = file.mimeType || 'application/octet-stream';
 
   return {
     uri: file.uri,
@@ -173,7 +187,7 @@ export const prepareFileForUpload = (file: PickedFile): any => {
  */
 export const isFileSizeValid = (
   sizeInBytes: number,
-  maxSizeInMB: number = 20
+  maxSizeInMB: number = 20,
 ): boolean => {
   const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
   return sizeInBytes <= maxSizeInBytes;
@@ -192,27 +206,25 @@ export const getFileSizeInMB = (sizeInBytes: number): number => {
 export const showFilePickerOptions = (
   onCameraPress: () => void,
   onGalleryPress: () => void,
-  onDocumentPress: () => void
+  onDocumentPress: () => void,
 ): void => {
-  Alert.alert("Select File Source", "Choose how to upload your document", [
+  Alert.alert('Select File Source', 'Choose how to upload your document', [
     {
-      text: "Take Photo",
+      text: 'Take Photo',
       onPress: onCameraPress,
     },
     {
-      text: "Choose from Gallery",
+      text: 'Choose from Gallery',
       onPress: onGalleryPress,
     },
     {
-      text: "Pick Document (PDF/Word)",
+      text: 'Pick Document (PDF/Word)',
       onPress: onDocumentPress,
     },
     {
-      text: "Cancel",
+      text: 'Cancel',
       onPress: () => {},
-      style: "cancel",
+      style: 'cancel',
     },
   ]);
 };
-
-

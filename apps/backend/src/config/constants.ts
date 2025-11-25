@@ -27,7 +27,7 @@ export const RATE_LIMIT_CONFIG = {
 // Security Configuration
 export const SECURITY_CONFIG = {
   JWT_EXPIRES_IN: '7d',
-  PASSWORD_MIN_LENGTH: 12,
+  PASSWORD_MIN_LENGTH: 6, // Softened: minimum 6 characters with at least 1 letter
   PASSWORD_HASH_ROUNDS: 12,
   CORS_ALLOWED_METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   CORS_ALLOWED_HEADERS: ['Content-Type', 'Authorization', 'X-CSRF-Token'],

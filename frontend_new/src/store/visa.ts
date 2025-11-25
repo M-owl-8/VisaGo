@@ -126,8 +126,16 @@ export const useVisaStore = create<VisaState>((set, get) => ({
 
       // No search: Load ALL countries into both master list and filtered list
       // This ensures the questionnaire always has access to all 8 countries
+      // HIGH PRIORITY FIX: Verify we have all 8 countries - log warning if not
+      if (countries.length < 8) {
+        console.warn(
+          '[VisaStore] Expected 8 countries, but received:',
+          countries.length,
+          'countries',
+        );
+      }
       set({
-        countries, // Master list: ALL countries from backend
+        countries, // Master list: ALL countries from backend (should be 8)
         filteredCountries: countries, // Display list: ALL countries (no filter applied)
       });
     } catch (error) {

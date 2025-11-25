@@ -13,10 +13,10 @@ const router = express.Router();
 router.get('/health', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const envConfig = getEnvConfig();
-    
+
     // Check JWT secret strength
     const jwtValidation = validateJWTSecret(envConfig.JWT_SECRET);
-    
+
     // Check environment configuration
     const checks = {
       jwtSecret: {
@@ -136,8 +136,3 @@ router.post('/check-password', async (req: Request, res: Response) => {
 });
 
 export default router;
-
-
-
-
-

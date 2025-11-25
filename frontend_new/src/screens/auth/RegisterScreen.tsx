@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -11,35 +11,48 @@ import {
   Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuthStore } from '../../store/auth';
-import { signInWithGoogle } from '../../services/google-oauth';
+import {useAuthStore} from '../../store/auth';
+import {signInWithGoogle} from '../../services/google-oauth';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
-export default function RegisterScreen({ navigation }: any) {
+export default function RegisterScreen({navigation}: any) {
+  const {t} = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const register = useAuthStore((state) => state.register);
-  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+  const register = useAuthStore(state => state.register);
+  const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
 
   const handleRegister = async () => {
     if (!fullName || !email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      // LOW PRIORITY FIX: Use translation system for error messages
+      Alert.alert(t('common.error'), t('auth.fillAllFields'));
       return;
     }
 
     if (!agreedToTerms) {
-      Alert.alert('Error', 'Please agree to the Terms & Conditions and Privacy Policy');
+      // LOW PRIORITY FIX: Use translation system for error messages
+      Alert.alert(t('common.error'), t('auth.agreeToTerms'));
       return;
     }
 
+    // Clear previous error
+    setErrorMessage(null);
+
+    // Basic client-side validation (matches backend)
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setErrorMessage('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!/[A-Za-z]/.test(password)) {
+      setErrorMessage('Password must contain at least one letter');
       return;
     }
 
@@ -49,10 +62,28 @@ export default function RegisterScreen({ navigation }: any) {
       const nameParts = fullName.trim().split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || nameParts[0];
-      
+
       await register(email, password, firstName, lastName);
     } catch (error: any) {
-      Alert.alert('Registration Failed', error.message || 'An error occurred');
+      // Extract error code and message from backend
+      const code = error.code || 'UNKNOWN_ERROR';
+      const message =
+        error.message ||
+        "Noma'lum xatolik yuz berdi. Iltimos, qayta urinib ko'ring.";
+
+      // Show localized error message based on code
+      let displayMessage = message;
+
+      if (code === 'EMAIL_ALREADY_EXISTS') {
+        displayMessage = 'Bu email bilan foydalanuvchi allaqachon mavjud.';
+      } else if (code === 'WEAK_PASSWORD') {
+        displayMessage =
+          "Parol juda oddiy. Iltimos kamida 6 ta belgidan iborat va hech bo'lmaganda bitta harf bo'lsin.";
+      } else if (code === 'INVALID_INPUT') {
+        displayMessage = "Kiritilgan ma'lumotlar noto'g'ri.";
+      }
+
+      setErrorMessage(displayMessage);
     } finally {
       setLoading(false);
     }
@@ -67,11 +98,15 @@ export default function RegisterScreen({ navigation }: any) {
         googleUserInfo.email,
         googleUserInfo.firstName,
         googleUserInfo.lastName,
-        googleUserInfo.avatar
+        googleUserInfo.avatar,
       );
     } catch (error: any) {
       if (!error.message?.includes('cancelled')) {
-        Alert.alert('Google Sign Up Failed', error.message || 'An error occurred');
+        // LOW PRIORITY FIX: Use translation system for error messages
+        Alert.alert(
+          t('auth.googleSignUpFailed'),
+          error.message || t('common.errorOccurred'),
+        );
       }
     } finally {
       setLoading(false);
@@ -93,15 +128,16 @@ export default function RegisterScreen({ navigation }: any) {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+          keyboardShouldPersistTaps="handled">
           {/* Logo and Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
               <Icon name="globe-outline" size={48} color="#4A9EFF" />
             </View>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Start your visa application journey.</Text>
+            <Text style={styles.subtitle}>
+              Start your visa application journey.
+            </Text>
           </View>
 
           {/* Register Card */}
@@ -110,7 +146,12 @@ export default function RegisterScreen({ navigation }: any) {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Full Name</Text>
               <View style={styles.inputContainer}>
-                <Icon name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <Icon
+                  name="person-outline"
+                  size={20}
+                  color="#6B7280"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="John Doe"
@@ -126,7 +167,12 @@ export default function RegisterScreen({ navigation }: any) {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <View style={styles.inputContainer}>
-                <Icon name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <Icon
+                  name="mail-outline"
+                  size={20}
+                  color="#6B7280"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="your@email.com"
@@ -144,7 +190,12 @@ export default function RegisterScreen({ navigation }: any) {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <View style={styles.inputContainer}>
-                <Icon name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <Icon
+                  name="lock-closed-outline"
+                  size={20}
+                  color="#6B7280"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Create a strong password"
@@ -156,8 +207,7 @@ export default function RegisterScreen({ navigation }: any) {
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
+                  style={styles.eyeIcon}>
                   <Icon
                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                     size={20}
@@ -171,10 +221,15 @@ export default function RegisterScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.checkboxContainer}
               onPress={() => setAgreedToTerms(!agreedToTerms)}
-              disabled={loading}
-            >
-              <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
-                {agreedToTerms && <Icon name="checkmark" size={16} color="#FFFFFF" />}
+              disabled={loading}>
+              <View
+                style={[
+                  styles.checkbox,
+                  agreedToTerms && styles.checkboxChecked,
+                ]}>
+                {agreedToTerms && (
+                  <Icon name="checkmark" size={16} color="#FFFFFF" />
+                )}
               </View>
               <Text style={styles.checkboxText}>
                 I agree with the{' '}
@@ -183,16 +238,28 @@ export default function RegisterScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
 
+            {/* Error Message */}
+            {errorMessage && (
+              <View style={styles.errorContainer}>
+                <Icon name="alert-circle" size={16} color="#EF4444" />
+                <Text style={styles.errorText}>{errorMessage}</Text>
+              </View>
+            )}
+
             {/* Create Account Button */}
             <TouchableOpacity
-              style={[styles.createAccountButton, loading && styles.disabledButton]}
+              style={[
+                styles.createAccountButton,
+                loading && styles.disabledButton,
+              ]}
               onPress={handleRegister}
-              disabled={loading}
-            >
+              disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.createAccountButtonText}>Create Account</Text>
+                <Text style={styles.createAccountButtonText}>
+                  Create Account
+                </Text>
               )}
             </TouchableOpacity>
 
@@ -200,7 +267,8 @@ export default function RegisterScreen({ navigation }: any) {
             <View style={styles.privacyNotice}>
               <Icon name="shield-checkmark-outline" size={20} color="#4A9EFF" />
               <Text style={styles.privacyText}>
-                We protect your data. Your information is encrypted and never shared.
+                We protect your data. Your information is encrypted and never
+                shared.
               </Text>
             </View>
 
@@ -209,8 +277,7 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={styles.signInText}>Already have an account? </Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('Login')}
-                disabled={loading}
-              >
+                disabled={loading}>
                 <Text style={styles.signInLink}>Sign in</Text>
               </TouchableOpacity>
             </View>
@@ -262,14 +329,14 @@ const styles = StyleSheet.create({
     height: 300,
     top: 100,
     left: '30%',
-    transform: [{ rotate: '15deg' }],
+    transform: [{rotate: '15deg'}],
   },
   line2: {
     width: 2,
     height: 250,
     bottom: 150,
     right: '25%',
-    transform: [{ rotate: '-15deg' }],
+    transform: [{rotate: '-15deg'}],
   },
   scrollContent: {
     flexGrow: 1,
@@ -438,5 +505,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4A9EFF',
     fontWeight: '600',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#EF4444',
+    marginLeft: 8,
+    lineHeight: 18,
   },
 });

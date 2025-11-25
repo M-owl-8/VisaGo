@@ -4,11 +4,11 @@
  * These routes may have different authentication/authorization requirements
  */
 
-import express, { Request, Response, NextFunction } from "express";
-import { authenticateToken } from "../middleware/auth";
-import { ApiError } from "../utils/errors";
-import { buildAIUserContext } from "../services/ai-context.service";
-import { logError } from "../middleware/logger";
+import express, { Request, Response, NextFunction } from 'express';
+import { authenticateToken } from '../middleware/auth';
+import { ApiError } from '../utils/errors';
+import { buildAIUserContext } from '../services/ai-context.service';
+import { logError } from '../middleware/logger';
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ const router = express.Router();
  * Protected route - requires JWT token & user ownership
  */
 router.get(
-  "/ai-context/:applicationId",
+  '/ai-context/:applicationId',
   authenticateToken,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -27,7 +27,7 @@ router.get(
       const applicationId = req.params.applicationId;
 
       if (!applicationId) {
-        throw new ApiError(400, "Application ID is required");
+        throw new ApiError(400, 'Application ID is required');
       }
 
       // Build AI user context
@@ -38,7 +38,7 @@ router.get(
         data: context,
       });
     } catch (error) {
-      logError("Failed to get AI context", error as Error, {
+      logError('Failed to get AI context', error as Error, {
         userId: (req as any).userId,
         applicationId: req.params.applicationId,
       });
@@ -48,5 +48,3 @@ router.get(
 );
 
 export default router;
-
-

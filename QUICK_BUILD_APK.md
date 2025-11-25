@@ -9,6 +9,7 @@ From the project root, run:
 ```
 
 This will:
+
 1. ✅ Install dependencies
 2. ✅ Clean previous builds (optional with `-Clean` flag)
 3. ✅ Build the release APK
@@ -18,6 +19,7 @@ This will:
 ## 📱 APK Location
 
 After building, find your APK at:
+
 ```
 frontend_new/android/app/build/outputs/apk/release/app-release.apk
 ```
@@ -40,12 +42,14 @@ adb install frontend_new/android/app/build/outputs/apk/release/app-release.apk
 ## ⚙️ Alternative Build Methods
 
 ### Using npm (from frontend_new directory):
+
 ```powershell
 cd frontend_new
 npm run build:apk
 ```
 
 ### Direct Gradle (from frontend_new/android directory):
+
 ```powershell
 cd frontend_new/android
 .\gradlew.bat assembleRelease
@@ -61,18 +65,14 @@ cd frontend_new/android
 ## 🔍 Troubleshooting
 
 **Build fails?** Make sure you have:
+
 - Node.js >= 16 installed
 - Java JDK 17 installed
 - Android SDK installed (via Android Studio)
 
-**APK won't install?** 
+**APK won't install?**
+
 - Enable "Install from Unknown Sources" in Android settings
 - Check that your device architecture is supported (ARM64, ARMv7, x86, x86_64)
 
 For more details, see `frontend_new/BUILD_APK_GUIDE.md`
-
-
-
-
-
-

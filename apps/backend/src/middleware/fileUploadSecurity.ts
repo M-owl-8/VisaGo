@@ -5,11 +5,7 @@ import * as Sentry from '@sentry/node';
 /**
  * Middleware to validate file uploads for security
  */
-export const validateFileUploadMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const validateFileUploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
   // Check if file exists in request
   if (!req.file && !req.files) {
     return next();
@@ -18,11 +14,7 @@ export const validateFileUploadMiddleware = (
   const files = req.file ? [req.file] : Array.isArray(req.files) ? req.files : [];
 
   for (const file of files) {
-    const validation = validateFileUpload(
-      file.originalname,
-      file.mimetype,
-      file.size,
-    );
+    const validation = validateFileUpload(file.originalname, file.mimetype, file.size);
 
     if (!validation.valid) {
       console.warn('🚨 File upload validation failed:', {
@@ -78,18 +70,15 @@ export const fileUploadLimits = {
 /**
  * Middleware to prevent file bomb attacks
  */
-export const preventFileBomb = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const preventFileBomb = (req: Request, res: Response, next: NextFunction) => {
   const contentLength = req.headers['content-length'];
 
   if (contentLength) {
     const size = parseInt(contentLength, 10);
-    
+
     // Check for suspiciously large requests
-    if (size > 50 * 1024 * 1024) { // 50MB
+    if (size > 50 * 1024 * 1024) {
+      // 50MB
       console.warn('🚨 Suspiciously large file upload attempt:', {
         size,
         ip: req.ip,
@@ -109,11 +98,3 @@ export const preventFileBomb = (
 
   next();
 };
-
-
-
-
-
-
-
-

@@ -16,7 +16,10 @@ export interface IconConfig {
 export const TabIcons = {
   applications: {
     active: {name: 'document-text-outline', library: 'ionicons' as IconLibrary},
-    inactive: {name: 'document-text-outline', library: 'ionicons' as IconLibrary},
+    inactive: {
+      name: 'document-text-outline',
+      library: 'ionicons' as IconLibrary,
+    },
   },
   chat: {
     active: {name: 'chatbubble-outline', library: 'ionicons' as IconLibrary},
@@ -34,7 +37,10 @@ export const TabIcons = {
 export const ProfileIcons = {
   personalInfo: {name: 'person-outline', library: 'ionicons' as IconLibrary},
   language: {name: 'language-outline', library: 'ionicons' as IconLibrary},
-  notifications: {name: 'notifications-outline', library: 'ionicons' as IconLibrary},
+  notifications: {
+    name: 'notifications-outline',
+    library: 'ionicons' as IconLibrary,
+  },
   security: {name: 'shield-outline', library: 'ionicons' as IconLibrary},
   help: {name: 'help-circle-outline', library: 'ionicons' as IconLibrary},
   logout: {name: 'log-out-outline', library: 'ionicons' as IconLibrary},
@@ -80,10 +86,16 @@ export const DocumentIcons = {
  */
 export const ApplicationIcons = {
   add: {name: 'add-outline', library: 'ionicons' as IconLibrary},
-  chevron: {name: 'chevron-forward-outline', library: 'ionicons' as IconLibrary},
+  chevron: {
+    name: 'chevron-forward-outline',
+    library: 'ionicons' as IconLibrary,
+  },
   calendar: {name: 'calendar-outline', library: 'ionicons' as IconLibrary},
   time: {name: 'time-outline', library: 'ionicons' as IconLibrary},
-  info: {name: 'information-circle-outline', library: 'ionicons' as IconLibrary},
+  info: {
+    name: 'information-circle-outline',
+    library: 'ionicons' as IconLibrary,
+  },
   alert: {name: 'alert-circle-outline', library: 'ionicons' as IconLibrary},
 };
 
@@ -91,19 +103,27 @@ export const ApplicationIcons = {
  * Status Icons
  */
 export const StatusIcons = {
-  success: {name: 'checkmark-circle-outline', library: 'ionicons' as IconLibrary},
+  success: {
+    name: 'checkmark-circle-outline',
+    library: 'ionicons' as IconLibrary,
+  },
   error: {name: 'close-circle-outline', library: 'ionicons' as IconLibrary},
   warning: {name: 'warning-outline', library: 'ionicons' as IconLibrary},
-  info: {name: 'information-circle-outline', library: 'ionicons' as IconLibrary},
+  info: {
+    name: 'information-circle-outline',
+    library: 'ionicons' as IconLibrary,
+  },
 };
 
 /**
  * Quick Action Icons (for chat quick actions)
  */
 export const QuickActionIcons = {
-  documents: {name: 'document-text-outline', library: 'ionicons' as IconLibrary},
+  documents: {
+    name: 'document-text-outline',
+    library: 'ionicons' as IconLibrary,
+  },
   timeline: {name: 'time-outline', library: 'ionicons' as IconLibrary},
   requirements: {name: 'cash-outline', library: 'ionicons' as IconLibrary},
   mistakes: {name: 'warning-outline', library: 'ionicons' as IconLibrary},
 };
-

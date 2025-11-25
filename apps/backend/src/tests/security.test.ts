@@ -99,9 +99,7 @@ describe('Security - Input Sanitization', () => {
 describe('Security - Authentication', () => {
   describe('JWT Secret Validation', () => {
     it('should validate strong JWT secrets', () => {
-      const result = validateJWTSecret(
-        'MyStr0ng!Secret#With$Numbers&Special@Characters123',
-      );
+      const result = validateJWTSecret('MyStr0ng!Secret#With$Numbers&Special@Characters123');
       expect(result.valid).toBe(true);
       expect(result.issues).toHaveLength(0);
     });
@@ -158,7 +156,7 @@ describe('Security - File Upload', () => {
       const result = validateFileUpload(
         'document.pdf',
         'application/pdf',
-        1024 * 1024, // 1MB
+        1024 * 1024 // 1MB
       );
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -168,42 +166,28 @@ describe('Security - File Upload', () => {
       const result = validateFileUpload(
         'large.pdf',
         'application/pdf',
-        20 * 1024 * 1024, // 20MB
+        20 * 1024 * 1024 // 20MB
       );
       expect(result.valid).toBe(false);
       expect(result.errors.some((e) => e.includes('size'))).toBe(true);
     });
 
     it('should reject invalid MIME types', () => {
-      const result = validateFileUpload(
-        'script.exe',
-        'application/x-msdownload',
-        1024,
-      );
+      const result = validateFileUpload('script.exe', 'application/x-msdownload', 1024);
       expect(result.valid).toBe(false);
       expect(result.errors.some((e) => e.includes('not allowed'))).toBe(true);
     });
 
     it('should reject double extensions', () => {
-      const result = validateFileUpload(
-        'document.pdf.exe',
-        'application/pdf',
-        1024,
-      );
+      const result = validateFileUpload('document.pdf.exe', 'application/pdf', 1024);
       expect(result.valid).toBe(false);
       expect(result.errors.some((e) => e.includes('double'))).toBe(true);
     });
 
     it('should reject mismatched extensions', () => {
-      const result = validateFileUpload(
-        'document.exe',
-        'application/pdf',
-        1024,
-      );
+      const result = validateFileUpload('document.exe', 'application/pdf', 1024);
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('does not match'))).toBe(
-        true,
-      );
+      expect(result.errors.some((e) => e.includes('does not match'))).toBe(true);
     });
   });
 });
@@ -216,11 +200,3 @@ describe('Security - Rate Limiting', () => {
     expect(process.env.REDIS_URL).toBeDefined();
   });
 });
-
-
-
-
-
-
-
-

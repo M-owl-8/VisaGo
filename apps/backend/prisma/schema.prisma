@@ -343,6 +343,11 @@ model ChatMessage {
   @@index([sessionId])
   @@index([userId])
   @@index([createdAt])
+  // HIGH PRIORITY FIX: Composite indexes for common query patterns
+  // These indexes significantly speed up chat history queries that filter by sessionId/userId and order by createdAt
+  @@index([sessionId, createdAt]) // For getConversationHistory queries
+  @@index([userId, createdAt]) // For user chat history queries
+  // Note: applicationId is on ChatSession, not ChatMessage, so queries filter by sessionId which has applicationId
 }
 
 model AIUsageMetrics {

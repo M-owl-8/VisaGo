@@ -7,6 +7,11 @@ export class CountriesService {
   /**
    * Get all countries with visa types
    */
+  /**
+   * Get all countries with visa types
+   * HIGH PRIORITY FIX: Always return ALL countries (no limit) to ensure questionnaire shows all 8 destination countries
+   * This method must never limit results - the frontend questionnaire depends on all 8 countries being available
+   */
   static async getAllCountries(search?: string) {
     const where: any = search
       ? {
@@ -14,13 +19,21 @@ export class CountriesService {
         }
       : {};
 
+    // CRITICAL: No limit, no take() - return ALL countries from database
+    // The questionnaire requires all 8 destination countries to be available
     const countries = await prisma.country.findMany({
       where,
       include: {
         visaTypes: true,
       },
       orderBy: { name: 'asc' },
+      // Explicitly NO limit - return all countries
     });
+
+    // Log warning if we don't have 8 countries (expected count from seed)
+    if (!search && countries.length !== 8) {
+      console.warn('[CountriesService] Expected 8 countries in database, found:', countries.length);
+    }
 
     return countries;
   }

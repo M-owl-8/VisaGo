@@ -8,7 +8,7 @@ export const countryTranslations: Record<string, Record<string, string>> = {
   US: {
     en: 'United States',
     ru: 'Соединенные Штаты',
-    uz: 'Qo\'shma Shtatlar',
+    uz: "Qo'shma Shtatlar",
   },
   // Australia
   AU: {
@@ -244,7 +244,7 @@ export const countryTranslations: Record<string, Record<string, string>> = {
 export const getTranslatedCountryName = (
   countryCode: string,
   language: string,
-  fallbackName: string
+  fallbackName: string,
 ): string => {
   const translations = countryTranslations[countryCode.toUpperCase()];
   if (translations && translations[language]) {
@@ -252,5 +252,3 @@ export const getTranslatedCountryName = (
   }
   return fallbackName;
 };
-
-

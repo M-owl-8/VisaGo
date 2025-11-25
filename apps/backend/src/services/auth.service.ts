@@ -10,6 +10,7 @@ import { errors, ApiError } from '../utils/errors';
 import { validatePassword, validateAndNormalizeEmail } from '../utils/validation';
 import { SECURITY_CONFIG, HTTP_STATUS } from '../config/constants';
 import { resilientOperation, getDatabaseErrorMessage } from '../utils/db-resilience';
+import { logError, logInfo, logWarn } from '../middleware/logger';
 import db from '../db';
 
 const prisma = db; // Use shared resilient instance
@@ -75,20 +76,21 @@ export class AuthService {
 
       // Validate password
       if (!payload.password) {
-        console.warn('[AUTH][REGISTER] Failed', {
-          email: normalizedEmail,
+        // LOW PRIORITY FIX: Use proper logger instead of console.warn for production
+        // Note: Email is logged for debugging but should be sanitized in production logs
+        logWarn('[AUTH][REGISTER] Failed - password required', {
+          email: normalizedEmail.substring(0, 3) + '***', // Sanitize email in logs
           code: 'INVALID_INPUT',
-          message: 'Password is required',
         });
         throw new ApiError(HTTP_STATUS.BAD_REQUEST, 'Parol kiritilishi shart.', 'INVALID_INPUT');
       }
 
       const passwordValidation = validatePassword(payload.password);
       if (!passwordValidation.isValid) {
-        console.warn('[AUTH][REGISTER] Failed', {
-          email: normalizedEmail,
+        // LOW PRIORITY FIX: Use proper logger, sanitize email in logs
+        logWarn('[AUTH][REGISTER] Failed - weak password', {
+          email: normalizedEmail.substring(0, 3) + '***', // Sanitize email
           code: 'WEAK_PASSWORD',
-          message: passwordValidation.errors.join(', '),
         });
         throw new ApiError(
           HTTP_STATUS.BAD_REQUEST,
@@ -114,10 +116,10 @@ export class AuthService {
       });
 
       if (existingUser) {
-        console.warn('[AUTH][REGISTER] Failed', {
-          email: normalizedEmail,
+        // LOW PRIORITY FIX: Use proper logger, sanitize email
+        logWarn('[AUTH][REGISTER] Failed - email already exists', {
+          email: normalizedEmail.substring(0, 3) + '***', // Sanitize email
           code: 'EMAIL_ALREADY_EXISTS',
-          message: 'Email already registered',
         });
         throw new ApiError(
           HTTP_STATUS.BAD_REQUEST,
@@ -149,10 +151,10 @@ export class AuthService {
       } catch (createError: any) {
         // Handle Prisma unique constraint error (P2002) for email
         if (createError?.code === 'P2002' && createError?.meta?.target?.includes('email')) {
-          console.warn('[AUTH][REGISTER] Failed', {
-            email: normalizedEmail,
+          // LOW PRIORITY FIX: Use proper logger, sanitize email
+          logWarn('[AUTH][REGISTER] Failed - email exists (Prisma constraint)', {
+            email: normalizedEmail.substring(0, 3) + '***', // Sanitize email
             code: 'EMAIL_ALREADY_EXISTS',
-            message: 'Email already exists (Prisma unique constraint)',
           });
           throw new ApiError(
             HTTP_STATUS.BAD_REQUEST,

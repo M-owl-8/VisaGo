@@ -127,20 +127,33 @@ export const useChatStore = create<ChatStore>()(
                   msg => msg.status === 'sending' || msg.status === 'error',
                 );
 
+                // MEDIUM PRIORITY FIX: Improved merge logic to prevent message loss
                 // Merge: server messages + optimistic messages that aren't on server yet
                 const serverMessageIds = new Set(serverMessages.map(m => m.id));
-                const mergedMessages = [
-                  ...serverMessages,
-                  ...optimisticMessages.filter(
-                    msg => !serverMessageIds.has(msg.id),
-                  ),
-                ];
+                const optimisticToAdd = optimisticMessages.filter(
+                  msg => !serverMessageIds.has(msg.id),
+                );
 
-                // Sort by createdAt to maintain order
-                mergedMessages.sort(
+                // Combine all messages and deduplicate by ID to prevent duplicates
+                const allMessages = [...serverMessages, ...optimisticToAdd];
+                const messageMap = new Map();
+                allMessages.forEach(msg => {
+                  // Use ID as key, keep the one with latest timestamp if duplicate
+                  const existing = messageMap.get(msg.id);
+                  if (
+                    !existing ||
+                    new Date(msg.createdAt || 0) >
+                      new Date(existing.createdAt || 0)
+                  ) {
+                    messageMap.set(msg.id, msg);
+                  }
+                });
+
+                // Convert back to array and sort by createdAt to maintain chronological order
+                const mergedMessages = Array.from(messageMap.values()).sort(
                   (a, b) =>
-                    new Date(a.createdAt).getTime() -
-                    new Date(b.createdAt).getTime(),
+                    new Date(a.createdAt || 0).getTime() -
+                    new Date(b.createdAt || 0).getTime(),
                 );
 
                 const mergedConversation = {
@@ -726,6 +739,10 @@ export const useChatStore = create<ChatStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: state => ({
         conversations: state.conversations,
+        // CRITICAL FIX: Also persist current conversation to ensure messages are saved
+        currentConversation: state.currentConversation,
+        currentApplicationId: state.currentApplicationId,
+        currentSessionId: state.currentSessionId,
       }),
       // Add error handling for storage operations
       onRehydrateStorage: () => (state, error) => {

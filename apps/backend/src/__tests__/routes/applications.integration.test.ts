@@ -264,9 +264,7 @@ describe('Applications Routes - GET /api/applications', () => {
   });
 
   test('should return 401 for unauthenticated request', async () => {
-    const response = await request(app)
-      .get('/api/applications')
-      .expect(401);
+    const response = await request(app).get('/api/applications').expect(401);
 
     expect(response.body).toHaveProperty('error');
   });
@@ -593,11 +591,3 @@ describe('Applications Routes - PUT /api/applications/:id/checkpoints/:checkpoin
     expect(response.body.error).toContain('not found');
   });
 });
-
-
-
-
-
-
-
-

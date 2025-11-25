@@ -92,6 +92,17 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       });
     }
 
+    // HIGH PRIORITY FIX: Update application progress after document upload
+    // This ensures progress percentage reflects document completion status
+    try {
+      const { ApplicationsService } = await import('../services/applications.service');
+      await ApplicationsService.updateProgressFromDocuments(applicationId);
+      console.log('[Documents] Updated application progress after upload', { applicationId });
+    } catch (progressError) {
+      // Log but don't fail document upload if progress update fails
+      console.warn('[Documents] Failed to update application progress:', progressError);
+    }
+
     // Try to find matching checklist item (optional)
     let checklistItem: any = undefined;
     try {

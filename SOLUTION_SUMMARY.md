@@ -20,6 +20,7 @@ Your backend at `https://visabuddy-backend-production.up.railway.app` is **not c
 ### Step 2: Start Backend if It's Down
 
 **If backend is stopped:**
+
 1. Click on your backend service
 2. Click "Deploy" or "Start"
 3. Wait for it to start (usually 1-2 minutes)
@@ -28,6 +29,7 @@ Your backend at `https://visabuddy-backend-production.up.railway.app` is **not c
 ### Step 3: Verify Backend is Accessible
 
 **On your phone's browser, visit:**
+
 ```
 https://visabuddy-backend-production.up.railway.app/api/health
 ```
@@ -38,6 +40,7 @@ https://visabuddy-backend-production.up.railway.app/api/health
 ### Step 4: Test the App
 
 Once backend is online:
+
 1. Open the app on your phone
 2. Try to login
 3. If it works → ✅ Success!
@@ -47,18 +50,21 @@ Once backend is online:
 ## 📋 **Complete Checklist**
 
 ### ✅ **App Configuration** (Already Done)
+
 - [x] APK is built with production backend URL
 - [x] Internet permission configured
 - [x] Network handling implemented
 - [x] Offline queue system enabled
 
 ### ⚠️ **Backend Requirements** (You Need to Do)
+
 - [ ] Backend is running on Railway
 - [ ] Backend is publicly accessible
 - [ ] Backend URL is correct: `https://visabuddy-backend-production.up.railway.app`
 - [ ] Backend health endpoint responds: `/api/health`
 
 ### ⚠️ **Phone Requirements** (You Need to Do)
+
 - [ ] Phone has internet connection (WiFi or mobile data)
 - [ ] APK is installed on phone
 - [ ] App has internet permission (already granted)
@@ -72,6 +78,7 @@ Once backend is online:
 **Impact:** Can't use Google Sign-In, but email/password works
 
 **To Enable:**
+
 1. Get Google OAuth credentials from [Google Cloud Console](https://console.cloud.google.com)
 2. Rebuild APK:
    ```powershell
@@ -91,6 +98,7 @@ Once backend is online:
 **Impact:** No push notifications, but app works fine
 
 **To Enable:**
+
 1. Set up Firebase project at [Firebase Console](https://console.firebase.google.com)
 2. Add Android app with package: `com.visabuddy.app`
 3. Download `google-services.json`
@@ -106,11 +114,13 @@ Once backend is online:
 ### Problem: Backend is not accessible
 
 **Symptoms:**
+
 - Connection timeout
 - "Network Error" in app
 - Can't reach backend URL
 
 **Solutions:**
+
 1. **Check Railway Dashboard:**
    - Is backend service running?
    - Are there any errors in logs?
@@ -134,6 +144,7 @@ Once backend is online:
 ### Problem: App shows "Network Error"
 
 **Solutions:**
+
 1. Verify backend is online (visit health endpoint)
 2. Check phone's internet connection
 3. Try mobile data instead of WiFi (or vice versa)
@@ -142,6 +153,7 @@ Once backend is online:
 ### Problem: Can't login
 
 **Solutions:**
+
 1. Make sure backend is online
 2. Check if you have a valid account
 3. Try registering a new account
@@ -165,12 +177,14 @@ Once your backend is online and accessible:
 ## 🎯 **Summary**
 
 **Your app is already configured correctly!** The APK is built with:
+
 - ✅ Production backend URL
 - ✅ Internet permissions
 - ✅ Network handling
 - ✅ Offline support
 
 **You just need to:**
+
 1. ✅ **Make sure backend is online** on Railway
 2. ✅ **Verify backend is accessible** from your phone
 3. ✅ **Install APK** on your phone
@@ -200,9 +214,3 @@ Once your backend is online and accessible:
 5. **Optional** - Configure Google Sign-In and Push Notifications if needed
 
 **The app will work automatically once the backend is online!**
-
-
-
-
-
-

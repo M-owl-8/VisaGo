@@ -13,6 +13,7 @@ import { isValidEmail } from '../utils/validation';
 import { successResponse, createdResponse, errorResponse } from '../utils/response';
 import { HTTP_STATUS, ERROR_CODES } from '../config/constants';
 import { loginLimiter, registerLimiter } from '../middleware/rate-limit';
+import { logInfo } from '../middleware/logger';
 
 const router = express.Router();
 
@@ -31,7 +32,9 @@ const router = express.Router();
 router.post(
   '/register',
   (req: Request, res: Response, next: NextFunction) => {
-    console.log('[AUTH] Register route hit:', req.method, req.path, req.body?.email);
+    // LOW PRIORITY FIX: Use proper logger instead of console.log
+    // Note: Email logging removed for security - only log route access
+    logInfo('[AUTH] Register route accessed', { method: req.method, path: req.path });
     next();
   },
   registerLimiter, // Apply rate limiter directly to the route
@@ -59,7 +62,21 @@ router.post(
       });
 
       createdResponse(res, result);
-    } catch (error) {
+    } catch (error: any) {
+      // Log error details for debugging
+      if (error instanceof ApiError) {
+        console.warn('[AUTH][REGISTER] Route error', {
+          email: req.body?.email,
+          code: error.code,
+          message: error.message,
+          status: error.status,
+        });
+      } else {
+        console.error('[AUTH][REGISTER] Unexpected error', {
+          email: req.body?.email,
+          error: error?.message || String(error),
+        });
+      }
       next(error);
     }
   }
@@ -78,7 +95,8 @@ router.post(
 router.post(
   '/login',
   (req: Request, res: Response, next: NextFunction) => {
-    console.log('[AUTH] Login route hit:', req.method, req.path, req.body?.email);
+    // LOW PRIORITY FIX: Use proper logger instead of console.log
+    logInfo('[AUTH] Login route accessed', { method: req.method, path: req.path });
     next();
   },
   loginLimiter, // Apply rate limiter directly to the route

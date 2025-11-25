@@ -1,11 +1,24 @@
 import axios from 'axios';
+import { logInfo, logWarn, logError } from '../middleware/logger';
 
 /**
  * DeepSeek Service (via Together.ai)
  * Handles DeepSeek-R1 API calls for AI assistant chat using Together.ai as the provider
+ *
+ * Optimizations (2025-01-XX):
+ * - Bounded response tokens (max_completion_tokens: 500)
+ * - Lower temperature (0.5) for more focused responses
+ * - 15s timeout with friendly error messages
+ * - Conversation history trimming (handled in chat.service.ts)
+ * - Comprehensive logging ([DeepSeek][Chat] format)
  */
 
 const TOGETHER_API_URL = 'https://api.together.xyz/v1/chat/completions';
+// HIGH PRIORITY FIX: 15 second timeout ensures fast AI assistant responses
+// This prevents 40-60 second hangs that make the app feel unresponsive
+const REQUEST_TIMEOUT_MS = 15000; // 15 seconds (optimized for speed)
+const MAX_COMPLETION_TOKENS = 500; // Bounded response length
+const TEMPERATURE = 0.5; // Lower temperature for more focused responses
 
 if (!process.env.DEEPSEEK_API_KEY) {
   console.warn('⚠️ DEEPSEEK_API_KEY is not set in environment variables.');
@@ -15,51 +28,81 @@ export interface DeepSeekResponse {
   message: string;
   tokensUsed: number;
   model: string;
+  promptTokens?: number;
+  completionTokens?: number;
+}
+
+export interface DeepSeekMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
 /**
  * Call DeepSeek-R1 for visa chat assistant (via Together.ai)
- * @param userMessage - The user's message
- * @param systemPrompt - Optional custom system prompt
+ * @param messages - Array of messages (system, user, assistant) - history is pre-trimmed
+ * @param systemPrompt - Optional custom system prompt (if not in messages)
+ * @param userId - User ID for logging
+ * @param applicationId - Optional application ID for logging
  * @returns AI response with message, tokens, and model
  */
 export async function deepseekVisaChat(
-  userMessage: string,
-  systemPrompt?: string
+  messages: DeepSeekMessage[],
+  systemPrompt?: string,
+  userId?: string,
+  applicationId?: string
 ): Promise<DeepSeekResponse> {
+  const startTime = Date.now();
+  const modelName = 'deepseek-ai/DeepSeek-R1';
+
   try {
     if (!process.env.DEEPSEEK_API_KEY) {
       throw new Error('DEEPSEEK_API_KEY not configured');
     }
 
-    const defaultSystemPrompt =
-      systemPrompt ||
-      "You are Ketdik's main visa assistant. You help users understand visa requirements, eligibility, risks, and documents. Always think step-by-step, but only return a clear final answer to the user. If something is uncertain or depends on the embassy, clearly warn the user and avoid guessing.";
+    // Ensure system prompt is included
+    let finalMessages = messages;
+    if (systemPrompt && !messages.some((m) => m.role === 'system')) {
+      finalMessages = [{ role: 'system', content: systemPrompt }, ...messages];
+    }
 
-    console.log('[DeepSeek/Together] Sending visa chat request with model deepseek-ai/DeepSeek-R1');
+    logInfo('[DeepSeek][Chat] Request started', {
+      model: modelName,
+      userId,
+      applicationId,
+      messageCount: finalMessages.length,
+      systemPromptLength: systemPrompt?.length || 0,
+    });
 
-    const response = await axios.post(
+    // Create timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('DEEPSEEK_TIMEOUT'));
+      }, REQUEST_TIMEOUT_MS);
+    });
+
+    // Create API request promise
+    const apiPromise = axios.post(
       TOGETHER_API_URL,
       {
-        model: 'deepseek-ai/DeepSeek-R1',
-        messages: [
-          {
-            role: 'system',
-            content: defaultSystemPrompt,
-          },
-          { role: 'user', content: userMessage },
-        ],
+        model: modelName,
+        messages: finalMessages,
         stream: false,
+        max_tokens: MAX_COMPLETION_TOKENS,
+        temperature: TEMPERATURE,
       },
       {
         headers: {
           Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        timeout: 60000, // 60 second timeout
+        timeout: REQUEST_TIMEOUT_MS,
       }
     );
 
+    // Race between API call and timeout
+    const response = await Promise.race([apiPromise, timeoutPromise]);
+
+    const responseTime = Date.now() - startTime;
     const content = response.data?.choices?.[0]?.message?.content ?? null;
 
     if (!content) {
@@ -67,20 +110,64 @@ export async function deepseekVisaChat(
     }
 
     // Extract token usage if available
-    const tokensUsed = response.data?.usage?.total_tokens || 0;
-    const modelName = response.data?.model || 'deepseek-ai/DeepSeek-R1';
+    const promptTokens = response.data?.usage?.prompt_tokens || 0;
+    const completionTokens = response.data?.usage?.completion_tokens || 0;
+    const totalTokens = response.data?.usage?.total_tokens || promptTokens + completionTokens;
 
-    console.log(
-      `[DeepSeek/Together] Response received from model: ${modelName}, tokens used: ${tokensUsed}`
-    );
+    logInfo('[DeepSeek][Chat] Response received', {
+      model: modelName,
+      userId,
+      applicationId,
+      tokensUsed: totalTokens,
+      promptTokens,
+      completionTokens,
+      responseTimeMs: responseTime,
+    });
+
+    // Warn if response is slow
+    if (responseTime > 4000) {
+      logWarn('[DeepSeek][Chat] Slow response', {
+        model: modelName,
+        userId,
+        applicationId,
+        responseTimeMs: responseTime,
+        tokensUsed: totalTokens,
+      });
+    }
 
     return {
       message: content,
-      tokensUsed,
-      model: 'deepseek-ai/DeepSeek-R1',
+      tokensUsed: totalTokens,
+      promptTokens,
+      completionTokens,
+      model: modelName,
     };
   } catch (err: any) {
-    console.error('DeepSeek/Together visa chat error:', err?.response?.data || err?.message || err);
+    const responseTime = Date.now() - startTime;
+
+    // Handle timeout specifically
+    if (
+      err?.code === 'ECONNABORTED' ||
+      err?.code === 'ETIMEDOUT' ||
+      err?.message === 'DEEPSEEK_TIMEOUT'
+    ) {
+      logWarn('[DeepSeek][Chat] Timeout', {
+        model: modelName,
+        userId,
+        applicationId,
+        responseTimeMs: responseTime,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+      });
+      throw new Error('DEEPSEEK_TIMEOUT');
+    }
+
+    logError('[DeepSeek][Chat] Error', err instanceof Error ? err : new Error(String(err)), {
+      model: modelName,
+      userId,
+      applicationId,
+      responseTimeMs: responseTime,
+      errorType: err?.response?.status || err?.code || 'unknown',
+    });
 
     // Provide user-friendly error messages
     if (err?.response?.status === 401) {
@@ -88,9 +175,6 @@ export async function deepseekVisaChat(
     }
     if (err?.response?.status === 429) {
       throw new Error('DEEPSEEK_RATE_LIMIT');
-    }
-    if (err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT') {
-      throw new Error('DEEPSEEK_TIMEOUT');
     }
 
     throw new Error('DEEPSEEK_CHAT_ERROR');

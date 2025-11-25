@@ -5,6 +5,7 @@
 ### 1. Enhanced Sentry Integration with Performance Monitoring
 
 #### Frontend (`frontend_new/src/services/errorLogger.ts`)
+
 - ✅ Added `ReactNativeTracing` with comprehensive configuration:
   - Navigation instrumentation
   - Stall tracking
@@ -28,6 +29,7 @@
 - ✅ Enhanced `logError()` and `logMessage()` with severity levels and tags
 
 #### Backend (`apps/backend/src/index.ts`)
+
 - ✅ Sentry already configured with:
   - Node profiling integration
   - Request and tracing handlers
@@ -37,6 +39,7 @@
 ### 2. Performance Tracking Utilities
 
 #### Frontend Performance Monitor (`frontend_new/src/services/performanceMonitor.ts`)
+
 - ✅ Comprehensive performance tracking class with:
   - `startMeasure()` / `endMeasure()` - Manual measurement
   - `measureAsync()` / `measureSync()` - Automatic measurement wrappers
@@ -48,6 +51,7 @@
   - Automatic cleanup and timeouts
 
 #### Backend Performance Monitor (`apps/backend/src/utils/performanceMonitor.ts`)
+
 - ✅ Backend performance tracking with:
   - Same core measurement APIs as frontend
   - `trackDbQuery()` / `completeDbQuery()` - Database query tracking
@@ -57,6 +61,7 @@
   - Production-only mode
 
 #### Performance Middleware (`apps/backend/src/middleware/performanceMiddleware.ts`)
+
 - ✅ Express middleware for automatic request tracking:
   - Sentry transaction per request
   - Response time tracking
@@ -68,6 +73,7 @@
 ### 3. API Client Performance Integration
 
 #### Enhanced API Client (`frontend_new/src/services/api.ts`)
+
 - ✅ Integrated performance monitoring into all API requests:
   - Automatic tracking start for every request
   - Performance completion on success
@@ -79,6 +85,7 @@
 ### 4. Screen Tracking Hook
 
 #### useScreenTracking Hook (`frontend_new/src/hooks/useScreenTracking.ts`)
+
 - ✅ React hook for automatic screen tracking:
   - Performance monitoring integration
   - Sentry breadcrumb for navigation
@@ -89,6 +96,7 @@
 ## 📊 Monitoring Capabilities
 
 ### Frontend Monitoring
+
 1. **Performance Metrics**
    - Screen load times
    - API request durations
@@ -109,6 +117,7 @@
    - Network status correlation
 
 ### Backend Monitoring
+
 1. **Request Performance**
    - Response times per endpoint
    - Slow request detection
@@ -136,11 +145,13 @@
 ### Environment Variables
 
 #### Frontend
+
 ```env
 EXPO_PUBLIC_SENTRY_DSN=your_sentry_dsn_here
 ```
 
 #### Backend
+
 ```env
 SENTRY_DSN=your_sentry_dsn_here
 NODE_ENV=production
@@ -149,10 +160,12 @@ NODE_ENV=production
 ### Sentry Configuration
 
 #### Sample Rates
+
 - **Development**: 100% traces, 100% profiles
 - **Production**: 10% traces, 10% profiles
 
 #### Thresholds
+
 - **Frontend Slow Operation**: >3 seconds
 - **Backend Slow Operation**: >5 seconds
 - **Backend Slow Request**: >3 seconds
@@ -162,18 +175,20 @@ NODE_ENV=production
 ### Frontend
 
 #### Track Screen Performance
+
 ```typescript
-import {useScreenTracking} from '../hooks/useScreenTracking';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 
 function MyScreen() {
-  useScreenTracking('MyScreen', {feature: 'auth'});
+  useScreenTracking('MyScreen', { feature: 'auth' });
   // Component code...
 }
 ```
 
 #### Track Custom Operations
+
 ```typescript
-import {measureAsync} from '../services/performanceMonitor';
+import { measureAsync } from '../services/performanceMonitor';
 
 const result = await measureAsync(
   'complex_calculation',
@@ -181,28 +196,30 @@ const result = await measureAsync(
     // Your async operation
     return await doSomething();
   },
-  {userId: user.id}
+  { userId: user.id }
 );
 ```
 
 #### Manual Tracking
-```typescript
-import {startMeasure, endMeasure} from '../services/performanceMonitor';
 
-startMeasure('data_processing', {items: 100});
+```typescript
+import { startMeasure, endMeasure } from '../services/performanceMonitor';
+
+startMeasure('data_processing', { items: 100 });
 // ... do work ...
-const duration = endMeasure('data_processing', {success: true});
+const duration = endMeasure('data_processing', { success: true });
 ```
 
 ### Backend
 
 #### Track Database Queries
-```typescript
-import {trackDbQuery, completeDbQuery} from '../utils/performanceMonitor';
 
-const measure = trackDbQuery('findMany', 'User', {filters: 'active'});
+```typescript
+import { trackDbQuery, completeDbQuery } from '../utils/performanceMonitor';
+
+const measure = trackDbQuery('findMany', 'User', { filters: 'active' });
 try {
-  const users = await prisma.user.findMany({where: {active: true}});
+  const users = await prisma.user.findMany({ where: { active: true } });
   completeDbQuery(measure, users.length);
 } catch (error) {
   completeDbQuery(measure, undefined, error);
@@ -211,6 +228,7 @@ try {
 ```
 
 #### Track External API Calls
+
 ```typescript
 import {trackExternalApi, completeExternalApi} from '../utils/performanceMonitor';
 
@@ -227,6 +245,7 @@ try {
 ## 🎯 Next Steps (Day 10+)
 
 ### Remaining Tasks
+
 1. ✅ Admin panel completion
 2. ✅ Enhanced error handling & offline support
 3. ✅ Push notifications integration
@@ -237,6 +256,7 @@ try {
 8. ⏳ App store submission
 
 ### Analytics Integration Points to Add
+
 - [ ] Track user signup/login events
 - [ ] Track visa selection events
 - [ ] Track document upload events
@@ -251,6 +271,7 @@ try {
   - [ ] PaymentScreen
 
 ### Monitoring Enhancements
+
 - [ ] Set up Sentry alerts for:
   - High error rates
   - Slow response times
@@ -263,18 +284,21 @@ try {
 ## 📝 Notes
 
 ### Performance Considerations
+
 - Performance monitoring is enabled in production with 10% sampling to minimize overhead
 - Slow operation thresholds are conservative to catch real issues
 - Breadcrumbs are limited to 100 to prevent memory issues
 - Sensitive data is automatically filtered from error reports
 
 ### Security
+
 - Authorization headers are stripped from error reports
 - CSRF tokens are filtered
 - Password-related console logs are excluded from breadcrumbs
 - User context includes only ID and email (no sensitive data)
 
 ### Best Practices
+
 1. Always use `measureAsync` for async operations
 2. Add meaningful metadata to measurements
 3. Use consistent naming conventions for measurements
@@ -285,6 +309,7 @@ try {
 ## 🚀 Deployment Checklist
 
 Before deploying to production:
+
 - [x] Sentry DSN configured in environment variables
 - [x] Sample rates set appropriately for production
 - [x] Sensitive data filtering enabled
@@ -301,11 +326,3 @@ Before deploying to production:
 - [Sentry Node.js Documentation](https://docs.sentry.io/platforms/node/)
 - [Sentry Performance Monitoring](https://docs.sentry.io/product/performance/)
 - [Sentry Profiling](https://docs.sentry.io/product/profiling/)
-
-
-
-
-
-
-
-

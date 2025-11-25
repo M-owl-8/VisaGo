@@ -23,7 +23,9 @@ console.log('[Startup] Environment check:', {
 if (isProd) {
   console.log('[Startup] Production mode: Running migrations only (non-destructive)');
   try {
-    execSync('npx prisma migrate deploy --skip-generate', {
+    // CRITICAL FIX: Remove --skip-generate flag - prisma migrate deploy doesn't support it
+    // prisma generate is already run before this script, so no need for --skip-generate
+    execSync('npx prisma migrate deploy', {
       stdio: 'inherit',
       cwd: path.join(__dirname, '..'),
     });

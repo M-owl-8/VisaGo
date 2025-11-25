@@ -4,11 +4,7 @@ import { Request, Response, NextFunction } from 'express';
  * Enhanced security headers middleware
  * Adds comprehensive security headers beyond helmet defaults
  */
-export const securityHeaders = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
   // Prevent clickjacking
   res.setHeader('X-Frame-Options', 'DENY');
 
@@ -22,10 +18,7 @@ export const securityHeaders = (
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
   // Permissions policy (restrict browser features)
-  res.setHeader(
-    'Permissions-Policy',
-    'geolocation=(), microphone=(), camera=(), payment=()',
-  );
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
 
   // Content Security Policy (CSP)
   const csp = [
@@ -43,10 +36,7 @@ export const securityHeaders = (
 
   // Strict Transport Security (HTTPS only)
   if (process.env.NODE_ENV === 'production') {
-    res.setHeader(
-      'Strict-Transport-Security',
-      'max-age=31536000; includeSubDomains; preload',
-    );
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
 
   next();
@@ -55,11 +45,7 @@ export const securityHeaders = (
 /**
  * Remove sensitive headers from responses
  */
-export const removeSensitiveHeaders = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const removeSensitiveHeaders = (req: Request, res: Response, next: NextFunction) => {
   // Remove server identification
   res.removeHeader('X-Powered-By');
   res.removeHeader('Server');
@@ -70,11 +56,7 @@ export const removeSensitiveHeaders = (
 /**
  * Add cache control headers based on route
  */
-export const cacheControl = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const cacheControl = (req: Request, res: Response, next: NextFunction) => {
   const path = req.path;
 
   // No cache for API endpoints
@@ -90,8 +72,3 @@ export const cacheControl = (
 
   next();
 };
-
-
-
-
-

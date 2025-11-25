@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {useTranslation} from 'react-i18next';
 import {useDocumentStore} from '../../store/documents';
 import {colors} from '../../theme/colors';
 import {
@@ -29,6 +30,7 @@ import {
 } from '../../utils/mediaPickerHelpers';
 
 export const DocumentUploadScreen = ({route, navigation}: any) => {
+  const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const applicationId = route?.params?.applicationId;
   const onUploadSuccess = route?.params?.onUploadSuccess;
@@ -48,9 +50,17 @@ export const DocumentUploadScreen = ({route, navigation}: any) => {
     }
   }, [applicationId]);
 
+  // MEDIUM PRIORITY FIX: Validate file size immediately after selection to provide instant feedback
+  // This prevents users from filling out the form only to discover the file is too large at upload time
   const handleCameraPress = async () => {
     const file = await pickFromCamera();
     if (file) {
+      // Validate file size immediately after selection
+      if (!isFileSizeValid(file.size || 0, 20)) {
+        // LOW PRIORITY FIX: Use translation system for error messages
+        Alert.alert(t('errors.fileTooLarge'), t('errors.fileTooLargeMessage'));
+        return;
+      }
       setSelectedFile(file);
     }
   };
@@ -58,6 +68,12 @@ export const DocumentUploadScreen = ({route, navigation}: any) => {
   const handleGalleryPress = async () => {
     const file = await pickFromGallery();
     if (file) {
+      // Validate file size immediately after selection
+      if (!isFileSizeValid(file.size || 0, 20)) {
+        // LOW PRIORITY FIX: Use translation system for error messages
+        Alert.alert(t('errors.fileTooLarge'), t('errors.fileTooLargeMessage'));
+        return;
+      }
       setSelectedFile(file);
     }
   };
@@ -65,6 +81,12 @@ export const DocumentUploadScreen = ({route, navigation}: any) => {
   const handleDocumentPress = async () => {
     const file = await pickDocument();
     if (file) {
+      // Validate file size immediately after selection
+      if (!isFileSizeValid(file.size || 0, 20)) {
+        // LOW PRIORITY FIX: Use translation system for error messages
+        Alert.alert(t('errors.fileTooLarge'), t('errors.fileTooLargeMessage'));
+        return;
+      }
       setSelectedFile(file);
     }
   };
@@ -79,38 +101,46 @@ export const DocumentUploadScreen = ({route, navigation}: any) => {
 
   const handleUpload = async () => {
     if (!selectedDocType) {
+      // LOW PRIORITY FIX: Use translation system for error messages
       Alert.alert(
-        'Select Document Type',
-        'Please select a document type first',
+        t('errors.selectDocumentType'),
+        t('errors.selectDocumentTypeMessage'),
       );
       return;
     }
 
     if (!selectedFile) {
-      Alert.alert('Select File', 'Please select a file to upload');
+      // LOW PRIORITY FIX: Use translation system for error messages
+      Alert.alert(t('errors.selectFile'), t('errors.selectFileMessage'));
       return;
     }
 
+    // MEDIUM PRIORITY FIX: File size is now validated immediately after selection
+    // This check remains as a safety fallback, but should rarely trigger
     if (!isFileSizeValid(selectedFile.size || 0, 20)) {
-      Alert.alert('File Too Large', 'File size must be less than 20 MB');
+      // LOW PRIORITY FIX: Use translation system for error messages
+      Alert.alert(t('errors.fileTooLarge'), t('errors.fileTooLargeMessage'));
       return;
     }
 
     try {
       const fileToUpload = prepareFileForUpload(selectedFile);
       await uploadDocument(applicationId, selectedDocType, fileToUpload);
-      Alert.alert('Success', 'Document uploaded successfully');
+      // LOW PRIORITY FIX: Use translation system for success messages
+      Alert.alert(t('common.success'), t('documents.uploadSuccess'));
       setSelectedDocType('');
       setSelectedFile(null);
 
-      // Call success callback if provided (e.g., to refresh checklist)
+      // CRITICAL FIX: Call success callback to force refresh checklist
+      // Pass true to indicate force refresh is needed
       if (onUploadSuccess && typeof onUploadSuccess === 'function') {
-        onUploadSuccess();
+        onUploadSuccess(true);
       }
 
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to upload document');
+      // LOW PRIORITY FIX: Use translation system for error messages
+      Alert.alert(t('common.error'), err.message || t('errors.uploadFailed'));
     }
   };
 

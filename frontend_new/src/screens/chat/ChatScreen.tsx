@@ -98,12 +98,14 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     setIsNearBottom(true);
   };
 
-  // Load chat history from AsyncStorage on mount
+  // HIGH PRIORITY FIX: Load chat history from BOTH AsyncStorage (for instant display) AND backend (for sync)
+  // This ensures chat history persists across devices and app reinstalls
   useEffect(() => {
     let isCancelled = false;
 
     const loadChatHistory = async () => {
       try {
+        // Step 1: Load from AsyncStorage first for instant display (optimistic loading)
         const stored = await AsyncStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
@@ -112,7 +114,7 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
             if (!isCancelled) {
               setMessages(parsed);
               console.log(
-                '[ChatScreen] Loaded chat history:',
+                '[ChatScreen] Loaded chat history from storage:',
                 parsed.length,
                 'messages',
               );
@@ -120,6 +122,55 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
           }
         } else {
           console.log('[ChatScreen] No stored chat history found');
+        }
+
+        // Step 2: Sync with backend to get latest messages and ensure persistence
+        // This is critical for multi-device support and data recovery
+        if (isSignedIn && user) {
+          try {
+            const {useChatStore} = require('../../store/chat');
+            const chatStore = useChatStore.getState();
+            await chatStore.loadChatHistory(applicationId);
+
+            // Merge backend messages with local messages (backend is source of truth)
+            const backendConversation = chatStore.currentConversation;
+            if (backendConversation && backendConversation.messages) {
+              const backendMessages = backendConversation.messages.map(
+                (msg: any) => ({
+                  id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                  role: msg.role,
+                  content: msg.content,
+                  createdAt: msg.createdAt || new Date().toISOString(),
+                  status: 'sent' as const,
+                  sources: msg.sources || [],
+                  model: msg.model,
+                  tokensUsed: msg.tokensUsed,
+                }),
+              );
+
+              if (!isCancelled) {
+                // Use backend messages as source of truth
+                // Get current messages state to preserve optimistic updates
+                setMessages(currentMessages => {
+                  const localOptimistic = currentMessages.filter(
+                    m => m.status === 'sending' || m.status === 'thinking',
+                  );
+                  return [...backendMessages, ...localOptimistic];
+                });
+                console.log(
+                  '[ChatScreen] Synced with backend:',
+                  backendMessages.length,
+                  'messages',
+                );
+              }
+            }
+          } catch (backendError) {
+            console.warn(
+              '[ChatScreen] Failed to load chat from backend, using local storage:',
+              backendError,
+            );
+            // Continue with local storage if backend fails
+          }
         }
       } catch (error) {
         console.warn(
@@ -139,7 +190,7 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [isSignedIn, user, applicationId]);
 
   // Save chat history to AsyncStorage whenever messages change
   useEffect(() => {
@@ -210,9 +261,9 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
 
   // Handle sending a message
   const handleSendMessage = async () => {
-    // Validation
+    // Validation - prevent duplicate requests
     if (!messageInput.trim() || isSending) {
-      return;
+      return; // Already sending or empty input
     }
 
     if (!isSignedIn || !user) {
@@ -306,13 +357,45 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
       // Remove the thinking placeholder
       setMessages(prev => prev.filter(msg => msg.id !== thinkingMessageId));
 
-      // Set friendly error message
-      const friendlyError =
-        err?.message?.includes('unavailable') ||
-        err?.message?.includes('timeout') ||
-        err?.message?.includes('network')
-          ? 'Ketdik AI is temporarily unavailable. Please try again in a moment.'
-          : 'Failed to send message. Please try again.';
+      // Set friendly multilingual error message
+      let friendlyError = '';
+      const errorMessage = err?.message || '';
+      const isTimeout =
+        errorMessage.includes('timeout') || errorMessage.includes('TIMEOUT');
+      const isNetwork =
+        errorMessage.includes('network') || errorMessage.includes('Network');
+      const isUnavailable =
+        errorMessage.includes('unavailable') ||
+        errorMessage.includes('UNAVAILABLE');
+
+      // Detect user language from last message (simple heuristic)
+      const lastUserMessage = messages.find(m => m.role === 'user');
+      const userLang = lastUserMessage?.content || '';
+      const isUzbek =
+        /[а-яё]/.test(userLang) === false &&
+        /[А-ЯЁ]/.test(userLang) === false &&
+        userLang.length > 0;
+      const isRussian = /[а-яёА-ЯЁ]/.test(userLang);
+
+      if (isTimeout || isNetwork || isUnavailable) {
+        if (isUzbek) {
+          friendlyError =
+            "AI javob bera olmadi. Iltimos, qayta urinib ko'ring.";
+        } else if (isRussian) {
+          friendlyError = 'ИИ не смог ответить. Попробуйте еще раз.';
+        } else {
+          friendlyError = 'AI could not respond. Please try again.';
+        }
+      } else {
+        if (isUzbek) {
+          friendlyError =
+            "Xabar yuborib bo'lmadi. Iltimos, qayta urinib ko'ring.";
+        } else if (isRussian) {
+          friendlyError = 'Не удалось отправить сообщение. Попробуйте еще раз.';
+        } else {
+          friendlyError = 'Failed to send message. Please try again.';
+        }
+      }
 
       setErrorMessage(friendlyError);
 

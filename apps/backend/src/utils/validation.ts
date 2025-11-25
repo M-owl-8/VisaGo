@@ -3,8 +3,8 @@
  * Centralized validation functions for common use cases
  */
 
-import { SECURITY_CONFIG } from "../config/constants";
-import { errors } from "./errors";
+import { SECURITY_CONFIG } from '../config/constants';
+import { errors } from './errors';
 
 /**
  * Password validation result
@@ -16,13 +16,14 @@ export interface PasswordValidationResult {
 
 /**
  * Validates password strength
- * 
+ * Softened requirements: minimum 6 characters with at least 1 letter
+ *
  * @param password - Password to validate
  * @returns Validation result with errors array
- * 
+ *
  * @example
  * ```typescript
- * const result = validatePassword("MyP@ssw0rd");
+ * const result = validatePassword("abcdef");
  * if (!result.isValid) {
  *   throw errors.validationError(result.errors.join(", "));
  * }
@@ -32,7 +33,7 @@ export function validatePassword(password: string): PasswordValidationResult {
   const errors: string[] = [];
 
   if (!password) {
-    errors.push("Password is required");
+    errors.push('Password is required');
     return { isValid: false, errors };
   }
 
@@ -40,20 +41,9 @@ export function validatePassword(password: string): PasswordValidationResult {
     errors.push(`Password must be at least ${SECURITY_CONFIG.PASSWORD_MIN_LENGTH} characters`);
   }
 
-  if (!/[A-Z]/.test(password)) {
-    errors.push("Password must contain at least one uppercase letter");
-  }
-
-  if (!/[a-z]/.test(password)) {
-    errors.push("Password must contain at least one lowercase letter");
-  }
-
-  if (!/[0-9]/.test(password)) {
-    errors.push("Password must contain at least one number");
-  }
-
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-    errors.push("Password must contain at least one special character");
+  // Require at least one letter (uppercase or lowercase)
+  if (!/[A-Za-z]/.test(password)) {
+    errors.push('Password must contain at least one letter');
   }
 
   return {
@@ -64,10 +54,10 @@ export function validatePassword(password: string): PasswordValidationResult {
 
 /**
  * Validates email format
- * 
+ *
  * @param email - Email to validate
  * @returns True if valid email format
- * 
+ *
  * @example
  * ```typescript
  * if (!isValidEmail(email)) {
@@ -85,11 +75,11 @@ export function isValidEmail(email: string): boolean {
 
 /**
  * Validates and normalizes email
- * 
+ *
  * @param email - Email to validate and normalize
  * @returns Normalized email (lowercase, trimmed)
  * @throws {ApiError} If email is invalid
- * 
+ *
  * @example
  * ```typescript
  * const normalized = validateAndNormalizeEmail("  User@Example.COM  ");
@@ -97,14 +87,14 @@ export function isValidEmail(email: string): boolean {
  * ```
  */
 export function validateAndNormalizeEmail(email: string): string {
-  if (!email || typeof email !== "string") {
-    throw errors.validationError("Email is required");
+  if (!email || typeof email !== 'string') {
+    throw errors.validationError('Email is required');
   }
 
   const trimmed = email.trim().toLowerCase();
 
   if (!isValidEmail(trimmed)) {
-    throw errors.validationError("Invalid email format");
+    throw errors.validationError('Invalid email format');
   }
 
   return trimmed;
@@ -112,7 +102,7 @@ export function validateAndNormalizeEmail(email: string): string {
 
 /**
  * Validates UUID format
- * 
+ *
  * @param uuid - UUID string to validate
  * @returns True if valid UUID format
  */
@@ -124,7 +114,7 @@ export function isValidUUID(uuid: string): boolean {
 
 /**
  * Validates URL format
- * 
+ *
  * @param url - URL to validate
  * @returns True if valid URL format
  */
@@ -140,25 +130,25 @@ export function isValidURL(url: string): boolean {
 
 /**
  * Sanitizes string input (removes dangerous characters)
- * 
+ *
  * @param input - String to sanitize
  * @returns Sanitized string
  */
 export function sanitizeString(input: string): string {
-  if (typeof input !== "string") {
-    return "";
+  if (typeof input !== 'string') {
+    return '';
   }
 
   return input
     .trim()
-    .replace(/[<>]/g, "") // Remove potential HTML tags
-    .replace(/javascript:/gi, "") // Remove javascript: protocol
-    .replace(/on\w+=/gi, ""); // Remove event handlers
+    .replace(/[<>]/g, '') // Remove potential HTML tags
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+=/gi, ''); // Remove event handlers
 }
 
 /**
  * Validates pagination parameters
- * 
+ *
  * @param page - Page number
  * @param limit - Items per page
  * @param maxLimit - Maximum allowed limit (default: 100)
@@ -169,27 +159,14 @@ export function validatePagination(
   limit?: number | string,
   maxLimit = 100
 ): { page: number; limit: number } {
-  const pageNum = typeof page === "string" ? parseInt(page, 10) : page || 1;
-  const limitNum = typeof limit === "string" ? parseInt(limit, 10) : limit || 10;
+  const pageNum = typeof page === 'string' ? parseInt(page, 10) : page || 1;
+  const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit || 10;
 
   const validatedPage = Math.max(1, isNaN(pageNum) ? 1 : pageNum);
-  const validatedLimit = Math.min(
-    maxLimit,
-    Math.max(1, isNaN(limitNum) ? 10 : limitNum)
-  );
+  const validatedLimit = Math.min(maxLimit, Math.max(1, isNaN(limitNum) ? 10 : limitNum));
 
   return {
     page: validatedPage,
     limit: validatedLimit,
   };
 }
-
-
-
-
-
-
-
-
-
-

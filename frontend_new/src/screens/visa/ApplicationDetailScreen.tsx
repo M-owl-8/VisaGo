@@ -88,6 +88,10 @@ export default function ApplicationDetailScreen({
     }
   }, [applicationId, loadApplicationData, navigation]);
 
+  // HIGH PRIORITY FIX: Debounce checklist refresh to prevent expensive AI calls on every focus
+  // Only refresh if more than 30 seconds have passed since last load, or if forced
+  const lastLoadTimeRef = useRef<number>(0);
+
   // Refresh checklist when screen comes into focus (e.g., after returning from upload)
   useFocusEffect(
     useCallback(() => {
@@ -98,47 +102,91 @@ export default function ApplicationDetailScreen({
         skipNextFocusRefreshRef.current = false;
         return;
       }
-      if (hasLoadedOnceRef.current) {
+
+      // HIGH PRIORITY FIX: Only reload if more than 30 seconds since last load
+      // This prevents expensive checklist regeneration on every navigation
+      const now = Date.now();
+      const timeSinceLastLoad = now - lastLoadTimeRef.current;
+      const DEBOUNCE_MS = 30000; // 30 seconds
+
+      if (hasLoadedOnceRef.current && timeSinceLastLoad > DEBOUNCE_MS) {
         loadApplicationData();
+        lastLoadTimeRef.current = now;
+      } else if (!hasLoadedOnceRef.current) {
+        // First load - always load
+        loadApplicationData();
+        lastLoadTimeRef.current = now;
       }
     }, [applicationId, loadApplicationData]),
   );
 
-  const loadApplicationData = useCallback(async () => {
-    if (!applicationId || isFetchingRef.current) {
-      return;
-    }
-
-    isFetchingRef.current = true;
-    setIsLoading(true);
-
-    if (slowMessageTimeoutRef.current) {
-      clearTimeout(slowMessageTimeoutRef.current);
-    }
-    slowMessageTimeoutRef.current = setTimeout(() => {
-      setShowSlowChecklistMessage(true);
-    }, 8000);
-
-    try {
-      // Load application details and checklist in parallel
-      const [appResponse, checklistResponse] = await Promise.all([
-        apiClient.getApplication(applicationId),
-        apiClient.getDocumentChecklist(applicationId),
-      ]);
-
-      if (appResponse.success && appResponse.data) {
-        setApplication(appResponse.data);
+  const loadApplicationData = useCallback(
+    async (force = false) => {
+      // CRITICAL FIX: Allow force refresh after document upload to ensure checklist updates
+      // HIGH PRIORITY FIX: Force refresh bypasses debounce to ensure checklist updates after document upload
+      if (!applicationId || (isFetchingRef.current && !force)) {
+        return;
       }
 
-      if (checklistResponse.success && checklistResponse.data) {
-        setChecklistItems(checklistResponse.data.items || []);
-        setSummary(checklistResponse.data.summary);
-      } else if (checklistResponse.error) {
-        const errorMessage = checklistResponse.error.message || '';
-        const errorCode = checklistResponse.error.code || '';
+      // Update last load time when force is true (bypasses debounce)
+      if (force) {
+        lastLoadTimeRef.current = Date.now();
+      }
+
+      isFetchingRef.current = true;
+      setIsLoading(true);
+
+      if (slowMessageTimeoutRef.current) {
+        clearTimeout(slowMessageTimeoutRef.current);
+      }
+      slowMessageTimeoutRef.current = setTimeout(() => {
+        setShowSlowChecklistMessage(true);
+      }, 8000);
+
+      try {
+        // Load application details and checklist in parallel
+        const [appResponse, checklistResponse] = await Promise.all([
+          apiClient.getApplication(applicationId),
+          apiClient.getDocumentChecklist(applicationId),
+        ]);
+
+        if (appResponse.success && appResponse.data) {
+          setApplication(appResponse.data);
+        }
+
+        if (checklistResponse.success && checklistResponse.data) {
+          setChecklistItems(checklistResponse.data.items || []);
+          setSummary(checklistResponse.data.summary);
+        } else if (checklistResponse.error) {
+          const errorMessage = checklistResponse.error.message || '';
+          const errorCode = checklistResponse.error.code || '';
+          const isAIError =
+            errorMessage.toLowerCase().includes('openai') ||
+            errorCode.includes('OPENAI') ||
+            errorMessage.toLowerCase().includes('ai service');
+
+          if (isAIError) {
+            const aiErrorMessage =
+              language === 'uz'
+                ? "Hozircha AI asosida hujjatlar ro'yxatini yaratishda xatolik yuz berdi. Server tomoni bu muammoni hal qiladi. Siz mavjud hujjatlarni yuklashda davom etishingiz mumkin."
+                : language === 'ru'
+                  ? 'При создании списка документов с помощью ИИ произошла ошибка. Команда уже работает над этим. Вы можете продолжать загружать документы.'
+                  : 'There was an error generating the document list with AI. Our team is working on it. You can still upload your documents.';
+
+            Alert.alert(t('common.error'), aiErrorMessage);
+          } else {
+            Alert.alert(
+              t('common.error'),
+              errorMessage || t('errors.loadFailed'),
+            );
+          }
+        }
+      } catch (error: any) {
+        console.error('Error loading application:', error);
+        const errorMessage =
+          error?.message || error?.response?.data?.message || '';
         const isAIError =
           errorMessage.toLowerCase().includes('openai') ||
-          errorCode.includes('OPENAI') ||
           errorMessage.toLowerCase().includes('ai service');
 
         if (isAIError) {
@@ -156,38 +204,19 @@ export default function ApplicationDetailScreen({
             errorMessage || t('errors.loadFailed'),
           );
         }
+      } finally {
+        if (slowMessageTimeoutRef.current) {
+          clearTimeout(slowMessageTimeoutRef.current);
+          slowMessageTimeoutRef.current = null;
+        }
+        setShowSlowChecklistMessage(false);
+        setIsLoading(false);
+        isFetchingRef.current = false;
+        hasLoadedOnceRef.current = true;
       }
-    } catch (error: any) {
-      console.error('Error loading application:', error);
-      const errorMessage =
-        error?.message || error?.response?.data?.message || '';
-      const isAIError =
-        errorMessage.toLowerCase().includes('openai') ||
-        errorMessage.toLowerCase().includes('ai service');
-
-      if (isAIError) {
-        const aiErrorMessage =
-          language === 'uz'
-            ? "Hozircha AI asosida hujjatlar ro'yxatini yaratishda xatolik yuz berdi. Server tomoni bu muammoni hal qiladi. Siz mavjud hujjatlarni yuklashda davom etishingiz mumkin."
-            : language === 'ru'
-              ? 'При создании списка документов с помощью ИИ произошла ошибка. Команда уже работает над этим. Вы можете продолжать загружать документы.'
-              : 'There was an error generating the document list with AI. Our team is working on it. You can still upload your documents.';
-
-        Alert.alert(t('common.error'), aiErrorMessage);
-      } else {
-        Alert.alert(t('common.error'), errorMessage || t('errors.loadFailed'));
-      }
-    } finally {
-      if (slowMessageTimeoutRef.current) {
-        clearTimeout(slowMessageTimeoutRef.current);
-        slowMessageTimeoutRef.current = null;
-      }
-      setShowSlowChecklistMessage(false);
-      setIsLoading(false);
-      isFetchingRef.current = false;
-      hasLoadedOnceRef.current = true;
-    }
-  }, [applicationId, language, t]);
+    },
+    [applicationId, language, t],
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -208,10 +237,10 @@ export default function ApplicationDetailScreen({
       applicationId,
       documentType,
       documentName,
-      onUploadSuccess: () => {
-        skipNextFocusRefreshRef.current = true;
-        // Re-fetch checklist after successful upload to show updated status and progress
-        loadApplicationData();
+      onUploadSuccess: (force?: boolean) => {
+        skipNextFocusRefreshRef.current = false; // Allow refresh after upload
+        // CRITICAL FIX: Force refresh checklist after successful upload to show updated status
+        loadApplicationData(force !== false); // Force refresh by default, allow override
       },
     });
   };

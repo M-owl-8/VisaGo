@@ -211,6 +211,29 @@ export class AIApplicationService {
         notes: `AI-generated application based on questionnaire. ${aiRecommendations}`,
       });
 
+      // CRITICAL FIX: Generate checklist immediately after application creation
+      // This ensures checklist exists even if user navigates away
+      // Wrap in try-catch so application creation doesn't fail if checklist generation fails
+      try {
+        const { DocumentChecklistService } = await import('./document-checklist.service');
+        await DocumentChecklistService.generateChecklist(application.id, userId);
+        console.log('[AIApplication] Checklist generated successfully', {
+          applicationId: application.id,
+          userId,
+        });
+      } catch (checklistError: any) {
+        // Log but don't fail application creation
+        // Checklist can be generated on-demand later via GET endpoint
+        console.warn(
+          '[AIApplication] Failed to generate initial checklist, will generate on-demand',
+          {
+            applicationId: application.id,
+            userId,
+            error: checklistError.message,
+          }
+        );
+      }
+
       return {
         application,
         requiredDocuments,

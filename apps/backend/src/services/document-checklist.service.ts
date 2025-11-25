@@ -94,6 +94,29 @@ export class DocumentChecklistService {
         throw errors.forbidden();
       }
 
+      // CRITICAL FIX: Cache checklist generation to avoid expensive AI calls on every GET
+      // Only regenerate if documents have changed since last generation
+      const documentCount = application.documents.length;
+      const lastDocumentUpload =
+        application.documents.length > 0
+          ? new Date(
+              Math.max(...application.documents.map((d: any) => new Date(d.uploadedAt).getTime()))
+            )
+          : null;
+
+      // Check if application was updated recently (within last hour)
+      // If so, and no new documents uploaded, skip AI generation and just merge existing checklist
+      const applicationUpdatedAt = new Date(application.updatedAt);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const hasRecentUpdate = applicationUpdatedAt > oneHourAgo;
+      const hasNewDocuments = lastDocumentUpload && lastDocumentUpload > applicationUpdatedAt;
+
+      // Skip expensive AI generation if:
+      // - Application was updated recently AND
+      // - No new documents were uploaded AND
+      // - We have existing documents to merge
+      const shouldSkipAI = hasRecentUpdate && !hasNewDocuments && documentCount > 0;
+
       // Get existing documents with full data for AI verification
       const existingDocumentsMap = new Map(
         application.documents.map((doc: any) => [
@@ -120,97 +143,124 @@ export class DocumentChecklistService {
       let items: ChecklistItem[] = [];
       let aiGenerated = false;
 
-      try {
-        // Build AI user context with questionnaire summary
-        const userContext = await buildAIUserContext(userId, applicationId);
-
-        logInfo('[Checklist][AI] Requesting OpenAI checklist', {
-          applicationId,
-          country: application.country.name,
-          visaType: application.visaType.name,
-        });
-        const aiStart = Date.now();
-
-        // Call AI to generate checklist as primary source
-        const aiChecklist = await AIOpenAIService.generateChecklist(
-          userContext,
-          application.country.name,
-          application.visaType.name
+      // CRITICAL FIX: Skip expensive AI generation if checklist was recently generated
+      // and no new documents were uploaded. This prevents 40-60 second delays on every GET request.
+      if (shouldSkipAI) {
+        logInfo(
+          '[Checklist][Cache] Skipping AI generation - using cached structure with existing documents',
+          {
+            applicationId,
+            documentCount,
+            hasRecentUpdate,
+            hasNewDocuments,
+          }
         );
-        const aiDurationMs = Date.now() - aiStart;
-        if (aiDurationMs > 30000) {
-          logWarn('[Checklist][AI] Slow checklist generation', {
-            applicationId,
-            country: application.country.name,
-            visaType: application.visaType.name,
-            durationMs: aiDurationMs,
-          });
-        }
 
-        // Parse AI response into ChecklistItem[]
-        if (
-          aiChecklist.checklist &&
-          Array.isArray(aiChecklist.checklist) &&
-          aiChecklist.checklist.length > 0
-        ) {
-          items = aiChecklist.checklist.map((aiItem: any, index: number) => {
-            const docType =
-              aiItem.document ||
-              aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
-              `document_${index}`;
-            const existingDoc = existingDocumentsMap.get(docType);
-
-            return {
-              id: `checklist-item-${index}`,
-              documentType: docType,
-              name: aiItem.name || aiItem.document || 'Unknown Document',
-              nameUz: aiItem.nameUz || aiItem.name || aiItem.document || "Noma'lum hujjat",
-              nameRu: aiItem.nameRu || aiItem.name || aiItem.document || 'Неизвестный документ',
-              description: aiItem.description || '',
-              descriptionUz: aiItem.descriptionUz || aiItem.description || '',
-              descriptionRu: aiItem.descriptionRu || aiItem.description || '',
-              required: aiItem.required !== undefined ? aiItem.required : true,
-              priority: (aiItem.priority || (aiItem.required ? 'high' : 'medium')) as
-                | 'high'
-                | 'medium'
-                | 'low',
-              status: existingDoc ? (existingDoc.status as any) : 'missing',
-              userDocumentId: existingDoc?.id,
-              fileUrl: existingDoc?.fileUrl,
-              fileName: existingDoc?.fileName,
-              fileSize: existingDoc?.fileSize,
-              uploadedAt: existingDoc?.uploadedAt?.toISOString(),
-              verificationNotes:
-                existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
-              aiVerified: existingDoc?.verifiedByAI === true,
-              aiConfidence: existingDoc?.aiConfidence || undefined,
-            };
-          });
-
-          aiGenerated = true;
-          logInfo('[Checklist][AI] Using AI-generated checklist', {
-            applicationId,
-            itemCount: items.length,
-            country: application.country.name,
-            visaType: application.visaType.name,
-          });
-        } else {
-          throw new Error('AI returned empty checklist');
-        }
-      } catch (aiError: any) {
-        // Fallback to static documentTypes if AI fails
-        logError('[Checklist][AI] Failed, falling back to static documentTypes', aiError as Error, {
-          applicationId,
-          country: application.country.name,
-          visaType: application.visaType.name,
-        });
-
+        // Use fallback checklist generation (faster, no AI call)
         items = await this.generateChecklistItems(
           application.country,
           application.visaType,
           application.user,
           Array.from(existingDocumentsMap.values())
         );
+        aiGenerated = false;
+      } else {
+        try {
+          // Build AI user context with questionnaire summary
+          const userContext = await buildAIUserContext(userId, applicationId);
+
+          logInfo('[Checklist][AI] Requesting OpenAI checklist', {
+            applicationId,
+            country: application.country.name,
+            visaType: application.visaType.name,
+          });
+          const aiStart = Date.now();
+
+          // Call AI to generate checklist as primary source
+          const aiChecklist = await AIOpenAIService.generateChecklist(
+            userContext,
+            application.country.name,
+            application.visaType.name
+          );
+          const aiDurationMs = Date.now() - aiStart;
+          if (aiDurationMs > 30000) {
+            logWarn('[Checklist][AI] Slow checklist generation', {
+              applicationId,
+              country: application.country.name,
+              visaType: application.visaType.name,
+              durationMs: aiDurationMs,
+            });
+          }
+
+          // Parse AI response into ChecklistItem[]
+          if (
+            aiChecklist.checklist &&
+            Array.isArray(aiChecklist.checklist) &&
+            aiChecklist.checklist.length > 0
+          ) {
+            items = aiChecklist.checklist.map((aiItem: any, index: number) => {
+              const docType =
+                aiItem.document ||
+                aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
+                `document_${index}`;
+              const existingDoc = existingDocumentsMap.get(docType);
+
+              return {
+                id: `checklist-item-${index}`,
+                documentType: docType,
+                name: aiItem.name || aiItem.document || 'Unknown Document',
+                nameUz: aiItem.nameUz || aiItem.name || aiItem.document || "Noma'lum hujjat",
+                nameRu: aiItem.nameRu || aiItem.name || aiItem.document || 'Неизвестный документ',
+                description: aiItem.description || '',
+                descriptionUz: aiItem.descriptionUz || aiItem.description || '',
+                descriptionRu: aiItem.descriptionRu || aiItem.description || '',
+                required: aiItem.required !== undefined ? aiItem.required : true,
+                priority: (aiItem.priority || (aiItem.required ? 'high' : 'medium')) as
+                  | 'high'
+                  | 'medium'
+                  | 'low',
+                status: existingDoc ? (existingDoc.status as any) : 'missing',
+                userDocumentId: existingDoc?.id,
+                fileUrl: existingDoc?.fileUrl,
+                fileName: existingDoc?.fileName,
+                fileSize: existingDoc?.fileSize,
+                uploadedAt: existingDoc?.uploadedAt?.toISOString(),
+                verificationNotes:
+                  existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
+                aiVerified: existingDoc?.verifiedByAI === true,
+                aiConfidence: existingDoc?.aiConfidence || undefined,
+              };
+            });
+
+            aiGenerated = true;
+            logInfo('[Checklist][AI] Using AI-generated checklist', {
+              applicationId,
+              itemCount: items.length,
+              country: application.country.name,
+              visaType: application.visaType.name,
+            });
+          } else {
+            throw new Error('AI returned empty checklist');
+          }
+        } catch (aiError: any) {
+          // Fallback to static documentTypes if AI fails
+          logError(
+            '[Checklist][AI] Failed, falling back to static documentTypes',
+            aiError as Error,
+            {
+              applicationId,
+              country: application.country.name,
+              visaType: application.visaType.name,
+            }
+          );
+
+          items = await this.generateChecklistItems(
+            application.country,
+            application.visaType,
+            application.user,
+            Array.from(existingDocumentsMap.values())
+          );
+        }
       }
 
       // Merge full document data including AI verification (if not already done by AI path)
