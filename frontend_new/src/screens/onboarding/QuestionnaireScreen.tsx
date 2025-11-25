@@ -1,6 +1,16 @@
 /**
- * Questionnaire Screen - Complete 10-Question Flow
- * AI-powered visa planning with personalized recommendations
+ * LEGACY: Questionnaire Screen - 32-Question Flow (V1)
+ *
+ * ⚠️ DEPRECATED: This is the old 32-question questionnaire system.
+ *
+ * The new 10-question QuestionnaireV2 system is now active:
+ * - See: frontend_new/src/screens/onboarding/QuestionnaireV2Screen.tsx
+ * - Backend supports both V1 and V2 formats (backward compatible)
+ *
+ * This file is kept for backward compatibility with existing users who may have
+ * V1 questionnaire data stored. New users should use QuestionnaireV2Screen.
+ *
+ * DO NOT USE THIS SCREEN FOR NEW IMPLEMENTATIONS.
  */
 
 import React, {useState, useEffect} from 'react';
@@ -218,7 +228,7 @@ export default function QuestionnaireScreen({navigation}: any) {
         // For tourist, check if they have hotel booking or invitation
         hasInvitation =
           answers.accommodationStatus === 'reserved' ||
-          answers.hasOtherInvitation === true;
+          answers.hasInvitation === true;
       }
 
       // Map English level (v2: use explicit englishLevel)
@@ -235,6 +245,21 @@ export default function QuestionnaireScreen({navigation}: any) {
         maritalStatus: maritalStatus as any,
         hasChildren: hasChildren as any,
         englishLevel: englishLevel as any,
+      };
+
+      // Ensure all required fields for API call are present
+      const apiQuestionnaireData = {
+        purpose: questionnaireData.purpose || 'tourism',
+        country: questionnaireData.country,
+        duration: questionnaireData.duration || '1_3_months',
+        traveledBefore: questionnaireData.traveledBefore || false,
+        currentStatus: questionnaireData.currentStatus || 'unemployed',
+        hasInvitation: questionnaireData.hasInvitation || false,
+        financialSituation:
+          questionnaireData.financialSituation || 'stable_income',
+        maritalStatus: questionnaireData.maritalStatus || 'single',
+        hasChildren: questionnaireData.hasChildren || 'no',
+        englishLevel: questionnaireData.englishLevel || 'intermediate',
       };
 
       // Create standardized summary
@@ -283,9 +308,9 @@ export default function QuestionnaireScreen({navigation}: any) {
       };
 
       try {
-        const response = await apiClient.generateApplicationWithAI(
-          questionnaireDataWithSummary,
-        );
+        // generateApplicationWithAI expects the old QuestionnaireData format with all required fields
+        const response =
+          await apiClient.generateApplicationWithAI(apiQuestionnaireData);
 
         if (response.success && response.data) {
           // Clear questionnaire progress
@@ -321,8 +346,9 @@ export default function QuestionnaireScreen({navigation}: any) {
         } else {
           // Extract error message properly
           const errorMessage =
-            response.error?.message ||
-            response.error?.error?.message ||
+            (response as any).error?.message ||
+            (response as any).error?.error?.message ||
+            (response as any).data?.error?.message ||
             'Failed to generate application';
           throw new Error(errorMessage);
         }
@@ -403,7 +429,9 @@ export default function QuestionnaireScreen({navigation}: any) {
                 immigration: 'immigration',
               };
               const visaTypeName =
-                purposeMap[questionnaireData.purpose] || 'tourist';
+                (questionnaireData.purpose &&
+                  purposeMap[questionnaireData.purpose]) ||
+                'tourist';
               const matchingVisaType = visaTypes.data.find(
                 (vt: any) =>
                   vt.name && vt.name.toLowerCase().includes(visaTypeName),
@@ -666,7 +694,7 @@ export default function QuestionnaireScreen({navigation}: any) {
           <TouchableOpacity
             style={[
               styles.searchButton,
-              currentAnswer && styles.searchButtonSelected,
+              currentAnswer ? styles.searchButtonSelected : undefined,
             ]}
             onPress={() => setShowCountrySearch(true)}>
             <Icon
@@ -677,7 +705,7 @@ export default function QuestionnaireScreen({navigation}: any) {
             <Text
               style={[
                 styles.searchButtonText,
-                currentAnswer && styles.searchButtonTextSelected,
+                currentAnswer ? styles.searchButtonTextSelected : undefined,
               ]}>
               {displayName ||
                 t('questionnaire.questions.country.searchPlaceholder')}

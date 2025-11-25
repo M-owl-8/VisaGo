@@ -41,7 +41,9 @@ import SplashScreen from './screens/SplashScreen';
 import LoginScreen from './screens/auth/LoginScreen';
 import RegisterScreen from './screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './screens/auth/ForgotPasswordScreen';
-import QuestionnaireScreen from './screens/onboarding/QuestionnaireScreen';
+// Legacy 32-question questionnaire (kept for backward compatibility, not used)
+// import QuestionnaireScreen from './screens/onboarding/QuestionnaireScreen';
+import QuestionnaireV2Screen from './screens/onboarding/QuestionnaireV2Screen';
 import VisaApplicationScreen from './screens/visa/VisaApplicationScreen';
 import ApplicationDetailScreen from './screens/visa/ApplicationDetailScreen';
 import {ChatScreen} from './screens/chat/ChatScreen';
@@ -247,7 +249,7 @@ function MainAppStack() {
       />
       <Stack.Screen
         name="Questionnaire"
-        component={QuestionnaireScreen}
+        component={QuestionnaireV2Screen}
         options={{
           presentation: 'card',
           animation: 'slide_from_right',
