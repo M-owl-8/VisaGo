@@ -22,6 +22,38 @@ console.log('[Startup] Environment check:', {
 });
 
 /**
+ * Check if an error is a P3005 error (database schema not empty, needs baseline)
+ * Inspects all error fields to robustly detect P3005 errors
+ */
+function isP3005Error(err) {
+  if (!err) return false;
+
+  const parts = [];
+
+  // Collect all possible error text sources
+  if (typeof err.message === 'string') parts.push(err.message);
+  if (typeof err.stderr === 'string') parts.push(err.stderr);
+  if (Buffer.isBuffer(err.stderr)) parts.push(err.stderr.toString());
+  if (typeof err.stdout === 'string') parts.push(err.stdout);
+  if (Buffer.isBuffer(err.stdout)) parts.push(err.stdout.toString());
+  if (typeof err.toString === 'function') {
+    try {
+      parts.push(err.toString());
+    } catch (e) {
+      // Ignore toString errors
+    }
+  }
+
+  // Combine all text and check for P3005 indicators
+  const text = parts.join('\n').toLowerCase();
+
+  return (
+    text.includes('p3005') ||
+    text.includes('the database schema is not empty')
+  );
+}
+
+/**
  * Run prisma migrate deploy with automatic baseline handling for P3005 errors
  * If the database is non-empty but has no migration history, baseline all migrations
  * and retry the deploy.
@@ -32,27 +64,34 @@ function runMigrationsWithBaseline() {
 
   try {
     console.log('[Startup] Attempting to deploy migrations...');
-    execSync('npx prisma migrate deploy', {
-      stdio: 'inherit',
-      cwd: backendCwd,
-    });
-    console.log('[Startup] Migrations completed successfully');
-    return true;
+    // Capture stderr to detect P3005 errors, but still show output
+    let capturedStderr = '';
+    try {
+      execSync('npx prisma migrate deploy', {
+        stdio: ['inherit', 'inherit', 'pipe'], // stdin: inherit, stdout: inherit, stderr: pipe
+        cwd: backendCwd,
+        encoding: 'utf8',
+      });
+      console.log('[Startup] Migrations completed successfully');
+      return true;
+    } catch (execError) {
+      // Capture stderr if available
+      if (execError.stderr) {
+        capturedStderr = Buffer.isBuffer(execError.stderr) 
+          ? execError.stderr.toString('utf8') 
+          : String(execError.stderr);
+      }
+      // Re-throw to handle in outer catch
+      throw execError;
+    }
   } catch (error) {
-    // Capture error output - execSync with stdio: 'inherit' doesn't capture output,
-    // but error.message should contain the error text
-    const errorMessage = error.message || '';
-    const errorOutput = error.stdout?.toString() || error.stderr?.toString() || errorMessage;
+    // Enhance error object with captured stderr for detection
+    if (capturedStderr && !error.stderr) {
+      error.stderr = capturedStderr;
+    }
     
-    // Check for P3005 error - can appear in error message or output
-    const isP3005 = (
-      errorMessage.includes('P3005') ||
-      errorMessage.includes('The database schema is not empty') ||
-      errorMessage.includes('baseline') ||
-      errorOutput.includes('P3005') ||
-      errorOutput.includes('The database schema is not empty') ||
-      errorOutput.includes('baseline')
-    );
+    // Use robust P3005 detection that checks all error fields
+    const isP3005 = isP3005Error(error);
 
     if (isP3005) {
       console.log('[Startup] Detected existing non-empty database without Prisma migration history (P3005).');
@@ -108,9 +147,15 @@ function runMigrationsWithBaseline() {
       }
     } else {
       // For any other migration error, log and abort
+      // Collect all error information for logging
+      const errorParts = [];
+      if (error.message) errorParts.push(`message: ${error.message}`);
+      if (error.stderr) errorParts.push(`stderr: ${Buffer.isBuffer(error.stderr) ? error.stderr.toString() : error.stderr}`);
+      if (error.stdout) errorParts.push(`stdout: ${Buffer.isBuffer(error.stdout) ? error.stdout.toString() : error.stdout}`);
+      
       console.error('[Startup] Migration failed with non-P3005 error:', error.message);
-      if (errorOutput) {
-        console.error('[Startup] Error output:', errorOutput);
+      if (errorParts.length > 0) {
+        console.error('[Startup] Error details:', errorParts.join(' | '));
       }
       throw error;
     }
