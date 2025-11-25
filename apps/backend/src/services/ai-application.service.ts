@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 interface QuestionnaireData {
   purpose: string; // study, work, tourism, business, immigration, other
-  country?: string; // country ID or "not_sure"
+  country?: string; // country ID or "not_sure" or country code (US, GB, etc.)
   duration?: string; // less_than_1, 1_3_months, 3_6_months, 6_12_months, more_than_1_year
   traveledBefore?: boolean;
   currentStatus?: string; // student, employee, entrepreneur, unemployed, other
@@ -18,6 +18,10 @@ interface QuestionnaireData {
   maritalStatus?: string; // single, married, divorced
   hasChildren?: string; // no, one, two_plus
   englishLevel?: string; // beginner, intermediate, advanced, native
+  // V2 support: if version is 2.0, this might be a QuestionnaireV2 converted to legacy format
+  version?: string;
+  targetCountry?: string; // Country code for V2
+  visaType?: 'tourist' | 'student';
 }
 
 interface AIApplicationResult {
@@ -57,8 +61,18 @@ export class AIApplicationService {
       let requiredDocuments: string[] = [];
       let aiRecommendations = '';
 
-      // If country is "not-sure" or not provided, use AI to suggest best country
-      if (
+      // Handle QuestionnaireV2 format
+      if (questionnaireData.version === '2.0' && questionnaireData.targetCountry) {
+        // Try to find country by code
+        const country = await CountriesService.getCountryByCodeOrName(
+          questionnaireData.targetCountry
+        );
+        if (country) {
+          countryId = country.id;
+        } else {
+          throw new Error(`Country not found for code: ${questionnaireData.targetCountry}`);
+        }
+      } else if (
         !questionnaireData.country ||
         questionnaireData.country === 'not_sure' ||
         questionnaireData.country.trim() === ''

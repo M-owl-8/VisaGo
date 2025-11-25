@@ -1,0 +1,384 @@
+/**
+ * Questionnaire V2 Mapper
+ * Maps QuestionnaireV2 to VisaQuestionnaireSummary for AI checklist generation
+ */
+
+import { QuestionnaireV2 } from '../types/questionnaire-v2';
+import { VisaQuestionnaireSummary } from '../types/ai-context';
+
+/**
+ * Map income range to approximate USD amount
+ */
+function mapIncomeRangeToUSD(range: string): number | undefined {
+  const map: Record<string, number> = {
+    less_500: 300,
+    '500_1000': 750,
+    '1000_3000': 2000,
+    '3000_plus': 4000,
+  };
+  return map[range];
+}
+
+/**
+ * Map age range to approximate age
+ */
+function mapAgeRangeToNumber(ageRange: string): number | undefined {
+  const map: Record<string, number> = {
+    under_18: 16,
+    '18_25': 22,
+    '26_35': 30,
+    '36_50': 43,
+    '51_plus': 55,
+  };
+  return map[ageRange];
+}
+
+/**
+ * Map duration category to summary duration format
+ */
+function mapDurationCategory(
+  category: string,
+  visaType: 'tourist' | 'student'
+): 'less_than_1_month' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year' {
+  if (visaType === 'student') {
+    // Students typically have longer stays
+    if (category === 'more_than_90_days') {
+      return 'more_than_1_year';
+    }
+    return '6_12_months';
+  }
+
+  // Tourist mapping
+  switch (category) {
+    case 'up_to_30_days':
+      return 'less_than_1_month';
+    case '31_90_days':
+      return '1_3_months';
+    case 'more_than_90_days':
+      return '3_6_months';
+    default:
+      return '1_3_months';
+  }
+}
+
+/**
+ * Map sponsor/payer to sponsorType
+ */
+function mapPayerToSponsorType(
+  payer: string
+): 'self' | 'parent' | 'relative' | 'company' | 'other' {
+  switch (payer) {
+    case 'self':
+      return 'self';
+    case 'parents':
+      return 'parent';
+    case 'other_family':
+      return 'relative';
+    case 'employer':
+      return 'company';
+    case 'scholarship':
+    case 'other_sponsor':
+      return 'other';
+    default:
+      return 'self';
+  }
+}
+
+/**
+ * Map current status to employment/education fields
+ */
+function mapCurrentStatus(status: string): {
+  isEmployed: boolean;
+  isStudent: boolean;
+  currentStatus: 'student' | 'employed' | 'self_employed' | 'unemployed';
+} {
+  switch (status) {
+    case 'student':
+      return {
+        isEmployed: false,
+        isStudent: true,
+        currentStatus: 'student',
+      };
+    case 'employed':
+      return {
+        isEmployed: true,
+        isStudent: false,
+        currentStatus: 'employed',
+      };
+    case 'self_employed':
+    case 'business_owner':
+      return {
+        isEmployed: true,
+        isStudent: false,
+        currentStatus: 'self_employed',
+      };
+    case 'unemployed':
+    case 'school_child':
+      return {
+        isEmployed: false,
+        isStudent: status === 'school_child',
+        currentStatus: status === 'school_child' ? 'student' : 'unemployed',
+      };
+    default:
+      return {
+        isEmployed: false,
+        isStudent: false,
+        currentStatus: 'unemployed',
+      };
+  }
+}
+
+/**
+ * Map accommodation type to summary format
+ */
+function mapAccommodationType(
+  type: string,
+  visaType: 'tourist' | 'student'
+): 'reserved' | 'university_housing' | 'not_reserved' {
+  if (visaType === 'student') {
+    if (type === 'dormitory') {
+      return 'university_housing';
+    }
+    if (type === 'rented_apartment' || type === 'host_family') {
+      return 'reserved';
+    }
+    return 'not_reserved';
+  }
+
+  // Tourist
+  if (type === 'hotel' || type === 'rented_apartment' || type === 'relative') {
+    return 'reserved';
+  }
+  return 'not_reserved';
+}
+
+/**
+ * Map regions visited to country list
+ */
+function mapRegionsToCountries(regions: string[]): string[] {
+  const countryMap: Record<string, string[]> = {
+    schengen: ['ES', 'DE', 'FR', 'IT', 'NL', 'BE', 'AT', 'CH'],
+    usa_canada: ['US', 'CA'],
+    uk: ['GB'],
+    asia: ['JP', 'KR', 'CN', 'SG'],
+    middle_east: ['AE', 'SA', 'QA'],
+  };
+
+  const countries: string[] = [];
+  for (const region of regions) {
+    if (countryMap[region]) {
+      countries.push(...countryMap[region]);
+    }
+  }
+  return [...new Set(countries)]; // Remove duplicates
+}
+
+/**
+ * Build VisaQuestionnaireSummary from QuestionnaireV2
+ * This ensures compatibility with existing AI checklist generation pipeline
+ */
+export function buildSummaryFromQuestionnaireV2(
+  q: QuestionnaireV2,
+  appLanguage: 'uz' | 'ru' | 'en' = 'en'
+): VisaQuestionnaireSummary {
+  const statusMapping = mapCurrentStatus(q.status.currentStatus);
+  const duration = mapDurationCategory(q.travel.durationCategory, q.visaType);
+  const sponsorType = mapPayerToSponsorType(q.finance.payer);
+  const accommodation = mapAccommodationType(q.stay.accommodationType, q.visaType);
+  const visitedCountries = mapRegionsToCountries(q.history.regionsVisited);
+  const monthlyIncome = mapIncomeRangeToUSD(q.finance.approxMonthlyIncomeRange);
+  const age = mapAgeRangeToNumber(q.personal.ageRange);
+
+  // Map invitation types
+  const hasUniversityInvitation =
+    q.visaType === 'student' &&
+    q.invitation.hasInvitation &&
+    q.invitation.studentInvitationType === 'university_acceptance';
+  const hasOtherInvitation =
+    q.visaType === 'tourist' &&
+    q.invitation.hasInvitation &&
+    q.invitation.touristInvitationType !== 'no_invitation';
+
+  // Map education program type
+  let programType: 'bachelor' | 'master' | 'phd' | 'exchange' | 'language' | undefined;
+  if (q.visaType === 'student' && q.invitation.studentInvitationType) {
+    switch (q.invitation.studentInvitationType) {
+      case 'university_acceptance':
+        // Infer from highest education
+        if (q.status.highestEducation === 'bachelor') programType = 'bachelor';
+        else if (q.status.highestEducation === 'master') programType = 'master';
+        else if (q.status.highestEducation === 'phd') programType = 'phd';
+        break;
+      case 'language_course':
+        programType = 'language';
+        break;
+      case 'exchange_program':
+        programType = 'exchange';
+        break;
+    }
+  }
+
+  // Build the summary
+  const summary: VisaQuestionnaireSummary = {
+    version: '2.0',
+    visaType: q.visaType,
+    targetCountry: q.targetCountry,
+    appLanguage,
+
+    // Legacy fields
+    age,
+    citizenship: q.personal.nationality,
+    maritalStatus: q.personal.maritalStatus,
+    hasChildren: q.special.travelingWithChildren ? 'one' : 'no', // Simplified mapping
+    ageRange:
+      q.personal.ageRange === '36_50'
+        ? '36_45'
+        : q.personal.ageRange === '51_plus'
+          ? '46_plus'
+          : (q.personal.ageRange as any),
+    duration,
+    hasUniversityInvitation,
+    hasOtherInvitation,
+    sponsorType,
+    hasPropertyInUzbekistan: q.ties.hasProperty,
+    hasFamilyInUzbekistan: q.ties.hasCloseFamilyInUzbekistan,
+    hasInternationalTravel: q.history.hasTraveledBefore,
+    previousVisaRejections: q.history.hasVisaRefusals,
+    monthlyIncomeUSD: monthlyIncome,
+    bankBalanceUSD: q.finance.hasBankStatement ? monthlyIncome : undefined, // Approximate
+    documents: {
+      hasPassport: q.documents.hasPassport && q.personal.passportStatus !== 'no_passport',
+      hasBankStatement: q.finance.hasBankStatement,
+      hasEmploymentOrStudyProof: q.documents.hasEmploymentOrStudyProof,
+      hasInsurance: q.documents.hasInsurance,
+      hasFlightBooking: q.stay.hasRoundTripTicket,
+      hasHotelBookingOrAccommodation: q.stay.accommodationType !== 'not_decided',
+    },
+
+    // Extended structure (v2)
+    personalInfo: {
+      nationality: q.personal.nationality,
+      passportStatus:
+        q.personal.passportStatus === 'valid_6plus_months' ||
+        q.personal.passportStatus === 'valid_less_6_months'
+          ? 'valid'
+          : q.personal.passportStatus === 'no_passport'
+            ? 'no_passport'
+            : 'expired',
+    },
+    travelInfo: {
+      funding:
+        q.finance.payer === 'self'
+          ? 'self'
+          : q.finance.payer === 'scholarship'
+            ? 'scholarship'
+            : 'sponsor',
+      monthlyCapacity: monthlyIncome,
+      accommodation,
+      duration:
+        duration === 'less_than_1_month'
+          ? 'less_than_15_days'
+          : duration === '1_3_months'
+            ? '1_3_months'
+            : duration === '3_6_months'
+              ? '3_6_months'
+              : 'more_than_6_months',
+    },
+    employment: {
+      isEmployed: statusMapping.isEmployed,
+      monthlySalaryUSD: monthlyIncome,
+      currentStatus: statusMapping.currentStatus,
+    },
+    education: {
+      isStudent: statusMapping.isStudent || q.visaType === 'student',
+      programType,
+      diplomaAvailable: q.status.highestEducation !== 'school',
+      transcriptAvailable: q.status.highestEducation !== 'school',
+      hasGraduated: q.status.highestEducation !== 'school' && q.status.currentStatus !== 'student',
+    },
+    financialInfo: {
+      selfFundsUSD: q.finance.payer === 'self' ? monthlyIncome : undefined,
+      sponsorDetails:
+        q.finance.payer !== 'self'
+          ? {
+              relationship:
+                q.finance.payer === 'parents'
+                  ? 'parent'
+                  : q.finance.payer === 'other_family'
+                    ? 'relative'
+                    : 'other',
+              employment: q.finance.hasStableIncome ? 'employed' : 'other',
+              annualIncomeUSD: monthlyIncome ? monthlyIncome * 12 : undefined,
+            }
+          : undefined,
+    },
+    travelHistory: {
+      visitedCountries: visitedCountries.length > 0 ? visitedCountries : undefined,
+      hasRefusals: q.history.hasVisaRefusals,
+      traveledBefore: q.history.hasTraveledBefore,
+    },
+    ties: {
+      propertyDocs: q.ties.hasProperty || q.documents.hasPropertyDocs,
+      familyTies: q.ties.hasCloseFamilyInUzbekistan,
+    },
+  };
+
+  return summary;
+}
+
+/**
+ * Convert QuestionnaireV2 to legacy QuestionnaireData format
+ * For backward compatibility with AIApplicationService
+ */
+export function convertV2ToLegacyQuestionnaireData(q: QuestionnaireV2): any {
+  return {
+    purpose: q.visaType === 'student' ? 'study' : 'tourism',
+    country: q.targetCountry, // This will need to be mapped to country ID by the service
+    duration: mapDurationCategory(q.travel.durationCategory, q.visaType),
+    traveledBefore: q.history.hasTraveledBefore,
+    currentStatus: q.status.currentStatus,
+    hasInvitation: q.invitation.hasInvitation,
+    financialSituation: q.finance.payer === 'self' ? 'stable_income' : 'sponsor',
+    maritalStatus: q.personal.maritalStatus,
+    hasChildren: q.special.travelingWithChildren ? 'one' : 'no',
+    englishLevel: 'intermediate', // Default, as V2 doesn't explicitly ask
+    // Include summary for direct use
+    summary: buildSummaryFromQuestionnaireV2(q, 'en'),
+  };
+}
+
+/**
+ * Validate QuestionnaireV2 structure
+ */
+export function validateQuestionnaireV2(q: any): q is QuestionnaireV2 {
+  if (!q || typeof q !== 'object') return false;
+  if (q.version !== '2.0') return false;
+  if (!['tourist', 'student'].includes(q.visaType)) return false;
+  if (!['US', 'GB', 'ES', 'DE', 'JP', 'AE', 'CA', 'AU'].includes(q.targetCountry)) return false;
+
+  // Check required sections
+  const requiredSections = [
+    'personal',
+    'travel',
+    'status',
+    'finance',
+    'invitation',
+    'stay',
+    'history',
+    'ties',
+    'documents',
+    'special',
+  ];
+  for (const section of requiredSections) {
+    if (!q[section] || typeof q[section] !== 'object') return false;
+  }
+
+  // Validate visa-type-specific fields
+  if (q.visaType === 'student') {
+    if (!q.invitation.studentInvitationType) return false;
+  } else if (q.visaType === 'tourist') {
+    if (!q.invitation.touristInvitationType) return false;
+  }
+
+  return true;
+}

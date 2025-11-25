@@ -268,14 +268,26 @@ Talabalar uchun:
     visaType: 'student',
     section: 'documents',
     content: `
-Talabalar uchun hujjatlar:
-1. I-20 hujjati (o'quv muassasasi tomonidan beriladi).
-2. SEVIS to'lovi kvitansiyasi.
-3. DS-160 formasi.
-4. Pasport va surat.
-5. Bank statement yoki homiylik xati (o'qish va yashash xarajatlari uchun).
-6. Ta'lim hujjatlari (diplomlar, transkriptlar).
-7. Til sertifikati (agar talab qilinsa).
+CRITICAL TERMINOLOGY RULE: USA student visas use "Form I-20" (for F-1) or "DS-2019" (for J-1 exchange programs). This is US-specific and should NOT be used for other countries.
+
+Talabalar uchun hujjatlar (8-15 items recommended):
+1. Form I-20 (Certificate of Eligibility for Nonimmigrant Student Status) - o'quv muassasasi tomonidan beriladi, F-1 talabalar uchun.
+2. DS-2019 (Certificate of Eligibility for Exchange Visitor Status) - agar J-1 exchange dasturida bo'lsa.
+3. SEVIS fee payment receipt (I-901) - SEVIS to'lovi kvitansiyasi, I-20 yoki DS-2019 dan oldin to'lanishi kerak.
+4. DS-160 formasi - onlayn to'ldirilgan va tasdiqlangan nonimmigrant visa application form.
+5. DS-160 confirmation page - interview uchun kerak.
+6. MRV fee receipt - visa application to'lovi kvitansiyasi.
+7. Pasport - kamida 6 oy muddati qolgan, kamida 2 bo'sh sahifa.
+8. Passport photos - 5x5 cm, US specifications ga mos kelishi kerak.
+9. Bank statement (so'nggi 6-12 oy) - o'qish va yashash xarajatlarini qoplaydigan mablag' isboti.
+10. Homiylik xati (sponsor letter) - agar ota-ona yoki boshqa shaxs homiy bo'lsa.
+11. Homiydan bank statement va employment letter - agar homiylik mavjud bo'lsa.
+12. Ta'lim hujjatlari (diplomlar, transkriptlar, attestatlar) - notarial tasdiqlangan yoki apostille bilan.
+13. Til sertifikati (TOEFL, IELTS yoki boshqa) - agar talab qilinsa.
+14. Proof of ties to Uzbekistan - mulk hujjatlari, ish joyidan ma'lumotnoma, oila hujjatlari, vatanga qaytish niyatini ko'rsatuvchi hujjatlar.
+15. Travel itinerary yoki flight reservation (agar mavjud bo'lsa).
+
+USA-specific: Always use "Form I-20" terminology, not "LOA" or generic "acceptance letter".
     `.trim(),
   },
   {
@@ -402,14 +414,26 @@ Talabalar uchun:
     visaType: 'student',
     section: 'documents',
     content: `
-Talabalar uchun hujjatlar:
-1. Letter of Acceptance (LOA) from a Designated Learning Institution (DLI) – rasmiy qabul xati bo'lib, dastur nomi va boshlanish sanasini ko'rsatadi (Kanadada hech qachon "I-20" deb atalmaydi).
-2. O'qish to'lovi kvitansiyasi yoki to'lov jadvali.
-3. Bank statement, GIC hujjati yoki boshqa moliyaviy isbot.
-4. Homiylik xati (agar ota-ona yoki boshqa shaxs homiy bo'lsa).
-5. Til sertifikati (IELTS, TOEFL yoki konsullik ko'rsatgan boshqa test).
-6. Ta'lim hujjatlari (diplomlar, transkriptlar, attestatlar).
-7. Study plan / ta'lim maqsadini tushuntiruvchi eslatma.
+CRITICAL TERMINOLOGY RULE: Canada study permits use "Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)". NEVER use "I-20" or "Form I-20" for Canada - that is US-specific terminology.
+
+Talabalar uchun hujjatlar (8-15 items recommended):
+1. Letter of Acceptance (LOA) from a Designated Learning Institution (DLI) – rasmiy qabul xati bo'lib, dastur nomi, boshlanish sanasi, DLI raqami va talaba ID ni ko'rsatadi. Kanadada hech qachon "I-20" deb atalmaydi.
+2. O'qish to'lovi kvitansiyasi yoki to'lov jadvali (tuition payment receipt or payment schedule).
+3. Bank statement (so'nggi 4 oy) - o'qish va yashash xarajatlarini qoplaydigan mablag' isboti.
+4. GIC (Guaranteed Investment Certificate) hujjati - agar talab qilinsa, kamida 10,000 CAD.
+5. Homiylik xati (sponsor letter) - agar ota-ona yoki boshqa shaxs homiy bo'lsa, ularning moliyaviy hujjatlari bilan birga.
+6. Homiydan bank statement - agar homiylik mavjud bo'lsa.
+7. Til sertifikati (IELTS, TOEFL, CELPIP yoki konsullik ko'rsatgan boshqa test).
+8. Ta'lim hujjatlari (diplomlar, transkriptlar, attestatlar) - apostille yoki notarial tasdiqlangan.
+9. Study plan / Statement of Purpose - ta'lim maqsadini, rejasini va vatanga qaytish niyatini tushuntiruvchi eslatma.
+10. Passport va passport photos (biometric specifications).
+11. Medical examination certificate - agar talab qilinsa.
+12. Police clearance certificate - agar talab qilinsa.
+13. Proof of ties to Uzbekistan - mulk hujjatlari, ish joyidan ma'lumotnoma, oila hujjatlari.
+14. Travel itinerary yoki flight reservation (agar mavjud bo'lsa).
+15. Accommodation proof - yashash joyi isboti (agar mavjud bo'lsa).
+
+DO NOT mention I-20 for Canada. Always use LOA from DLI terminology.
     `.trim(),
   },
   {
@@ -1146,15 +1170,26 @@ const GERMANY_VISA_RULES: VisaKbEntry[] = [
     visaType: 'tourist',
     section: 'documents',
     content: `
-Asosiy hujjatlar:
-1. Pasport (kamida 3 oy muddat qolgan, 2+ bo'sh sahifa).
-2. Schengen visa ariza formasi.
-3. Biometrik surat (passport-size).
-4. Sug'urta (kamida 30,000 EUR qoplama).
-5. Mehmonxona bron yoki taklif xati.
-6. Aviabilet bron.
-7. Bank statement (so'nggi 3-6 oy).
-8. Ish joyidan ma'lumotnoma yoki tadbirkorlik hujjatlari.
+CRITICAL SCHENGEN REQUIREMENTS: Germany is a Schengen country. All Schengen tourist visas require travel health insurance covering at least 30,000 EUR and proof of accommodation.
+
+Asosiy hujjatlar (8-15 items recommended):
+1. Pasport (kamida 3 oy muddat qolgan, 2+ bo'sh sahifa, issued within last 10 years).
+2. Schengen visa application form - to'ldirilgan va imzolangan.
+3. Biometrik surat (passport-size, Schengen specifications ga mos).
+4. Travel health insurance - kamida 30,000 EUR qoplama, butun Schengen bo'ylab amal qilishi kerak (CRITICAL for Schengen).
+5. Proof of accommodation - mehmonxona bron, Airbnb, taklif xati yoki boshqa yashash joyi isboti (CRITICAL for Schengen).
+6. Round-trip flight reservation yoki aviabilet bron - butun safar davri uchun.
+7. Bank statement (so'nggi 3-6 oy) - safar xarajatlarini qoplaydigan mablag' isboti.
+8. Ish joyidan ma'lumotnoma yoki tadbirkorlik hujjatlari - vatanga qaytish bog'liqligini ko'rsatadi.
+9. Proof of ties to home country - mulk hujjatlari, oila hujjatlari, ish shartnomasi.
+10. Travel itinerary - batafsil safar rejasi (qaysi shaharlar, qancha vaqt).
+11. Invitation letter - agar qarindosh yoki do'st taklif qilgan bo'lsa.
+12. Sponsor financial documents - agar homiylik mavjud bo'lsa.
+13. Previous visa copies - agar oldingi Schengen yoki boshqa vizalar bo'lsa (ijobiy omil).
+14. Employment verification letter - ish beruvchidan rasmiy ma'lumotnoma.
+15. Cover letter - safar maqsadini tushuntiruvchi eslatma (ixtiyoriy, lekin tavsiya etiladi).
+
+Schengen-specific: Always include travel health insurance (minimum 30,000 EUR coverage) and accommodation proof.
     `.trim(),
   },
   {

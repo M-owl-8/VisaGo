@@ -449,6 +449,7 @@ If you don't know something, say so clearly and suggest how to find the informat
     }>;
     type: string;
   }> {
+    const startTime = Date.now();
     try {
       // Import visa knowledge base and document guides
       const { getVisaKnowledgeBase } = await import('../data/visaKnowledgeBase');
@@ -461,35 +462,151 @@ If you don't know something, say so clearly and suggest how to find the informat
       const userQuery = JSON.stringify(userContext);
       const documentGuidesText = getRelevantDocumentGuides(userQuery, 3);
 
-      const systemPrompt = `You are Ketdik's visa document assistant. Reply ONLY with valid JSON that matches:
+      const systemPrompt = `You are Ketdik's visa document assistant. Generate a comprehensive, country-specific document checklist.
+
+CRITICAL REQUIREMENTS:
+1. ALWAYS return between 8 and 15 document items (minimum 8, maximum 15).
+2. Each item must include all required fields with proper multilingual support.
+3. Use country-specific terminology correctly - this is critical for accuracy.
+
+TERMINOLOGY RULES (STRICTLY ENFORCED):
+- CANADA (Study Permit):
+  * MUST use: "Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)"
+  * NEVER mention "I-20" or "Form I-20" for Canada
+  * Include: GIC (Guaranteed Investment Certificate) if applicable
+  * Use Canadian-specific terms: "Study Permit" not "Student Visa"
+
+- USA (F-1, J-1 Student):
+  * MUST use: "Form I-20" (for F-1) or "DS-2019" (for J-1 exchange programs)
+  * Include: SEVIS fee receipt
+  * Use US-specific terms: "F-1 Student Visa" not generic "Student Visa"
+
+- SCHENGEN COUNTRIES (Germany, Spain, Italy, France, etc.):
+  * MUST include: "Travel health insurance" covering at least 30,000 EUR
+  * Include: "Accommodation proof" (hotel booking, invitation, etc.)
+  * Use: "Schengen visa application form" terminology
+  * Include: Round-trip flight reservation
+
+- GENERIC TOURIST VISAS:
+  * Core: Passport, passport photos, application form, financial proof
+  * Travel: Travel itinerary, accommodation proof, travel insurance (if required)
+  * Ties: Employment letter, property documents, family ties proof
+
+DOCUMENT STRUCTURE:
+Reply ONLY with valid JSON matching this exact schema:
 {
   "type": "${visaType}",
   "checklist": [
     {
-      "document": "internal_key",
-      "name": "English name",
+      "document": "internal_key_underscore_format",
+      "name": "Short English name (2-5 words)",
       "nameUz": "Uzbek name",
       "nameRu": "Russian name",
-      "description": "...",
-      "descriptionUz": "...",
-      "descriptionRu": "...",
-      "required": true/false,
+      "description": "1-2 sentences in neutral, simple English explaining what this document is and why it's needed",
+      "descriptionUz": "Uzbek translation of description",
+      "descriptionRu": "Russian translation of description",
+      "required": true,
       "priority": "high"|"medium"|"low",
-      "whereToObtain": "English instructions for Uzbekistan",
-      "whereToObtainUz": "...",
-      "whereToObtainRu": "..."
+      "whereToObtain": "Clear English instructions for obtaining this document in Uzbekistan",
+      "whereToObtainUz": "Uzbek translation",
+      "whereToObtainRu": "Russian translation"
     }
   ]
 }
 
-Rules:
-- Use country-specific terminology and follow the provided knowledge base / guides.
-- United States student visas may include "Form I-20" and SEVIS language.
-- Canada study permits MUST use "Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)" and must NEVER mention "I-20".
-- Do not mix US-only terms into other countries. If a document is country-specific, use that country's official name.
-- Provide a complete list of required and strong optional documents (passport, finances, accommodation, travel, ties, medical, biometrics, etc.).
-- Multilingual fields must never be empty (reuse English if translation unavailable).
-- Keep responses concise (no markdown, no commentary).`;
+QUALITY REQUIREMENTS:
+- Think about: travel purpose, duration, sponsor type, travel history, previous refusals
+- Tailor document list to risk level (e.g., add stronger proof of ties when risk is high)
+- Include both required documents and strongly recommended optional documents
+- Ensure all multilingual fields are filled (reuse English if translation unavailable)
+- Keep descriptions concise but informative (1-2 sentences)
+- No markdown, no commentary, only valid JSON`;
+
+      // Extract risk factors and key information from user context
+      const riskFactors: string[] = [];
+      const keyInfo: {
+        duration?: string;
+        sponsorType?: string;
+        travelHistory?: boolean;
+        previousRefusals?: boolean;
+        bankBalance?: number;
+        hasProperty?: boolean;
+        hasFamily?: boolean;
+      } = {};
+
+      if (userContext.questionnaireSummary) {
+        const summary = userContext.questionnaireSummary;
+
+        // Duration
+        if (summary.travelInfo?.duration) {
+          keyInfo.duration = summary.travelInfo.duration;
+          if (
+            summary.travelInfo.duration.includes('more_than_6_months') ||
+            summary.travelInfo.duration.includes('more_than_1_year')
+          ) {
+            riskFactors.push(
+              'Long stay duration - requires stronger proof of ties and financial capacity'
+            );
+          }
+        } else if (summary.duration) {
+          keyInfo.duration = summary.duration;
+        }
+
+        // Sponsor type
+        if (summary.financialInfo?.sponsorDetails) {
+          keyInfo.sponsorType = summary.financialInfo.sponsorDetails.relationship || 'sponsor';
+          riskFactors.push(
+            `Sponsored by ${keyInfo.sponsorType} - include sponsor financial documents`
+          );
+        } else if (summary.sponsorType && summary.sponsorType !== 'self') {
+          keyInfo.sponsorType = summary.sponsorType;
+          riskFactors.push(
+            `Sponsored by ${keyInfo.sponsorType} - include sponsor financial documents`
+          );
+        }
+
+        // Travel history
+        if (
+          summary.travelHistory?.traveledBefore === false ||
+          (summary.travelHistory?.visitedCountries &&
+            summary.travelHistory.visitedCountries.length === 0)
+        ) {
+          keyInfo.travelHistory = false;
+          riskFactors.push(
+            'No previous international travel - include stronger proof of ties to home country'
+          );
+        } else {
+          keyInfo.travelHistory = true;
+        }
+
+        // Previous refusals
+        if (summary.previousVisaRejections || summary.travelHistory?.hasRefusals) {
+          keyInfo.previousRefusals = true;
+          riskFactors.push(
+            'Previous visa refusal - include explanation letter and stronger supporting documents'
+          );
+        }
+
+        // Financial situation
+        if (summary.financialInfo?.selfFundsUSD) {
+          keyInfo.bankBalance = summary.financialInfo.selfFundsUSD;
+        } else if (summary.bankBalanceUSD) {
+          keyInfo.bankBalance = summary.bankBalanceUSD;
+        }
+
+        // Ties to home country
+        if (summary.ties?.propertyDocs || summary.hasPropertyInUzbekistan) {
+          keyInfo.hasProperty = true;
+        }
+        if (summary.ties?.familyTies || summary.hasFamilyInUzbekistan) {
+          keyInfo.hasFamily = true;
+        }
+      }
+
+      // Add risk factors from riskScore if available
+      if (userContext.riskScore) {
+        riskFactors.push(...userContext.riskScore.riskFactors);
+      }
 
       const promptPayload = {
         country,
@@ -498,14 +615,51 @@ Rules:
           visaKb || 'No specific knowledge base available for this country/visa type.',
         documentGuides:
           documentGuidesText || 'No Uzbekistan-specific document guides matched this request.',
-        applicantContext: userContext,
+        applicantContext: {
+          // Include only non-sensitive summary information
+          visaType: userContext.questionnaireSummary?.visaType,
+          duration: keyInfo.duration,
+          sponsorType: keyInfo.sponsorType,
+          hasTravelHistory: keyInfo.travelHistory,
+          hasPreviousRefusals: keyInfo.previousRefusals,
+          financialCapacity: keyInfo.bankBalance
+            ? `Bank balance: ~$${keyInfo.bankBalance}`
+            : 'Not specified',
+          tiesToHomeCountry: {
+            hasProperty: keyInfo.hasProperty,
+            hasFamily: keyInfo.hasFamily,
+          },
+        },
+        riskFactors:
+          riskFactors.length > 0
+            ? riskFactors
+            : ['Standard application - include all standard required documents'],
+        instructions:
+          'Generate a comprehensive checklist with 8-15 items tailored to this specific applicant profile. Consider the risk factors when determining which additional documents to include.',
       };
 
-      const userPrompt = `Generate the checklist strictly following the schema above.\n${JSON.stringify(
-        promptPayload,
-        null,
-        2
-      )}`;
+      const userPrompt = `Generate the document checklist following the schema and rules above.
+
+Key Applicant Information:
+- Country: ${country}
+- Visa Type: ${visaType}
+- Duration: ${keyInfo.duration || 'Not specified'}
+- Sponsor: ${keyInfo.sponsorType || 'Self-funded'}
+- Travel History: ${keyInfo.travelHistory ? 'Has previous travel' : 'No previous international travel'}
+- Previous Refusals: ${keyInfo.previousRefusals ? 'Yes' : 'No'}
+- Financial Capacity: ${keyInfo.bankBalance ? `~$${keyInfo.bankBalance}` : 'Not specified'}
+
+Risk Factors to Consider:
+${riskFactors.length > 0 ? riskFactors.map((f) => `- ${f}`).join('\n') : '- Standard application profile'}
+
+Knowledge Base Context:
+${visaKb || 'No specific knowledge base available - use general requirements for this country/visa type.'}
+
+${documentGuidesText ? `\nDocument Guides:\n${documentGuidesText}` : ''}
+
+IMPORTANT: Generate exactly 8-15 high-quality, country-specific document items. Use correct terminology for ${country} (e.g., ${country.toLowerCase().includes('canada') ? 'LOA from DLI, NOT I-20' : country.toLowerCase().includes('usa') || country.toLowerCase().includes('united states') ? 'Form I-20 for students' : 'country-specific terms'}).
+
+Return ONLY valid JSON matching the schema, no other text.`;
 
       logInfo('[OpenAI][Checklist] Generating checklist', {
         model: this.MODEL,
@@ -515,15 +669,14 @@ Rules:
         hasDocumentGuides: !!documentGuidesText && documentGuidesText.length > 0,
       });
 
-      const startTime = Date.now();
       const response = await AIOpenAIService.openai.chat.completions.create({
         model: this.MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.1,
-        max_completion_tokens: 1200,
+        temperature: 0.5, // Increased from 0.1 to 0.5 for more creative but still controlled responses
+        max_completion_tokens: 2000, // Increased from 1200 to 2000 to allow for 8-15 items with full multilingual fields
         response_format: { type: 'json_object' },
       });
 
@@ -541,6 +694,31 @@ Rules:
         });
       }
 
+      const rawContent = response.choices[0]?.message?.content || '{}';
+
+      // Extract and clean JSON from response
+      let checklistJson: any;
+      try {
+        const jsonString = this.extractJson(rawContent);
+        checklistJson = JSON.parse(jsonString);
+      } catch (err) {
+        // Log enough to debug, but not the entire huge string
+        logError(
+          '[Checklist][JSON] Failed to parse AI JSON',
+          err instanceof Error ? err : new Error(String(err)),
+          {
+            snippet: rawContent.slice(0, 1000),
+            error: (err as Error).message,
+            country,
+            visaType,
+          }
+        );
+        throw new Error('Failed to generate AI checklist JSON');
+      }
+
+      const parsed = checklistJson;
+
+      // STEP 3: Enhanced logging for checklist generation
       logInfo('[OpenAI][Checklist] Checklist generated', {
         model: this.MODEL,
         country,
@@ -549,10 +727,8 @@ Rules:
         inputTokens,
         outputTokens,
         responseTimeMs: responseTime,
+        itemCount: parsed.checklist?.length || 0,
       });
-
-      const content = response.choices[0]?.message?.content || '{}';
-      const parsed = JSON.parse(content);
 
       // Ensure the response has the correct structure
       if (!parsed.checklist || !Array.isArray(parsed.checklist)) {
@@ -562,6 +738,31 @@ Rules:
       // Validate that checklist is not empty
       if (parsed.checklist.length === 0) {
         throw new Error('AI returned empty checklist array');
+      }
+
+      // STEP 3: Enforce minimum 8 items requirement
+      const MIN_ITEMS = 8;
+      const MAX_ITEMS = 15;
+      if (parsed.checklist.length < MIN_ITEMS) {
+        logWarn('[OpenAI][Checklist] AI returned too few items, will trigger fallback', {
+          country,
+          visaType,
+          itemCount: parsed.checklist.length,
+          minimumRequired: MIN_ITEMS,
+        });
+        throw new Error(
+          `AI returned only ${parsed.checklist.length} items, minimum ${MIN_ITEMS} required`
+        );
+      }
+
+      // Warn if too many items (but don't fail)
+      if (parsed.checklist.length > MAX_ITEMS) {
+        logWarn('[OpenAI][Checklist] AI returned more than recommended items', {
+          country,
+          visaType,
+          itemCount: parsed.checklist.length,
+          recommendedMax: MAX_ITEMS,
+        });
       }
 
       // Validate required fields for each item
@@ -592,6 +793,9 @@ Rules:
         checklist: enrichedChecklist,
       };
     } catch (error: any) {
+      // STEP 3: Enhanced error logging (no sensitive user data)
+      // Note: startTime may not be in scope if error occurs before declaration
+      const errorResponseTime = Date.now() - startTime;
       logError(
         '[OpenAI][Checklist] Checklist generation failed',
         error instanceof Error ? error : new Error(String(error)),
@@ -602,58 +806,124 @@ Rules:
           errorType: error?.type || 'unknown',
           statusCode: error?.status || error?.response?.status,
           errorMessage: error?.message || String(error),
+          responseTimeMs: errorResponseTime,
         }
       );
 
       // Return a basic fallback checklist with multilingual support
+      // Note: This is a minimal fallback for API errors. DocumentChecklistService
+      // will use generateRobustFallbackChecklist() for better fallback behavior.
+      const isStudent =
+        visaType.toLowerCase().includes('student') || visaType.toLowerCase().includes('study');
+      const baseChecklist = [
+        {
+          document: 'passport',
+          name: 'Passport',
+          nameUz: 'Pasport',
+          nameRu: 'Паспорт',
+          required: true,
+          description: 'Valid passport with at least 6 months validity',
+          descriptionUz: 'Kamida 6 oy muddati qolgan yaroqli pasport',
+          descriptionRu: 'Действительный паспорт со сроком действия не менее 6 месяцев',
+          priority: 'high' as const,
+          whereToObtain: 'Apply at migration service or internal affairs office',
+          whereToObtainUz: 'Migratsiya xizmatiga yoki Ichki ishlar organlariga murojaat qiling',
+          whereToObtainRu: 'Обратитесь в службу миграции или органы внутренних дел',
+        },
+        {
+          document: 'passport_photo',
+          name: 'Passport Photo',
+          nameUz: 'Pasport Fotosi',
+          nameRu: 'Фото на Паспорт',
+          required: true,
+          description: '2x2 inch photo with white background',
+          descriptionUz: '2x2 dyuymli foto, oq fon',
+          descriptionRu: 'Фото 2x2 дюйма на белом фоне',
+          priority: 'high' as const,
+          whereToObtain: 'Take at photo studio',
+          whereToObtainUz: 'Foto studiyada oling',
+          whereToObtainRu: 'Сделайте в фотостудии',
+        },
+        {
+          document: 'visa_application_form',
+          name: 'Visa Application Form',
+          nameUz: 'Viza ariza formasi',
+          nameRu: 'Форма заявления на визу',
+          required: true,
+          description: 'Completed and signed visa application form',
+          descriptionUz: "To'ldirilgan va imzolangan viza ariza formasi",
+          descriptionRu: 'Заполненная и подписанная форма заявления на визу',
+          priority: 'high' as const,
+          whereToObtain: 'Download from embassy/consulate website or VFS center',
+          whereToObtainUz: 'Elchixona/konsullik veb-saytidan yoki VFS markazidan yuklab oling',
+          whereToObtainRu: 'Скачайте с веб-сайта посольства/консульства или центра VFS',
+        },
+        {
+          document: 'bank_statement',
+          name: 'Bank Statement',
+          nameUz: 'Bank Hisobi',
+          nameRu: 'Банковская Выписка',
+          required: true,
+          description: 'Recent bank statement showing sufficient funds',
+          descriptionUz: "Yeterli mablag'ni ko'rsatadigan so'nggi bank hisobi",
+          descriptionRu: 'Недавняя банковская выписка, показывающая достаточные средства',
+          priority: 'high' as const,
+          whereToObtain: 'Obtain from your bank',
+          whereToObtainUz: 'Bankingizdan oling',
+          whereToObtainRu: 'Получите в вашем банке',
+        },
+      ];
+
+      // Add student-specific documents if applicable
+      if (isStudent) {
+        baseChecklist.push({
+          document: 'acceptance_letter',
+          name: 'Acceptance Letter',
+          nameUz: 'Qabul Xati',
+          nameRu: 'Письмо о Зачислении',
+          required: true,
+          description: 'Official acceptance letter from educational institution',
+          descriptionUz: "Ta'lim muassasasidan rasmiy qabul xati",
+          descriptionRu: 'Официальное письмо о зачислении от учебного заведения',
+          priority: 'high' as const,
+          whereToObtain: 'Request from your school or university',
+          whereToObtainUz: "Maktabingiz yoki universitetingizdan so'rang",
+          whereToObtainRu: 'Запросите в вашей школе или университете',
+        });
+      }
+
       return {
         type: visaType,
-        checklist: [
-          {
-            document: 'passport',
-            name: 'Passport',
-            nameUz: 'Pasport',
-            nameRu: 'Паспорт',
-            required: true,
-            description: 'Valid passport with at least 6 months validity',
-            descriptionUz: 'Kamida 6 oy muddati qolgan yaroqli pasport',
-            descriptionRu: 'Действительный паспорт со сроком действия не менее 6 месяцев',
-            priority: 'high',
-            whereToObtain: 'Apply at migration service or internal affairs office',
-            whereToObtainUz: 'Migratsiya xizmatiga yoki Ichki ishlar organlariga murojaat qiling',
-            whereToObtainRu: 'Обратитесь в службу миграции или органы внутренних дел',
-          },
-          {
-            document: 'visa_application_form',
-            name: 'Visa Application Form',
-            nameUz: 'Viza ariza formasi',
-            nameRu: 'Форма заявления на визу',
-            required: true,
-            description: 'Completed and signed visa application form',
-            descriptionUz: "To'ldirilgan va imzolangan viza ariza formasi",
-            descriptionRu: 'Заполненная и подписанная форма заявления на визу',
-            priority: 'high',
-            whereToObtain: 'Download from embassy/consulate website or VFS center',
-            whereToObtainUz: 'Elchixona/konsullik veb-saytidan yoki VFS markazidan yuklab oling',
-            whereToObtainRu: 'Скачайте с веб-сайта посольства/консульства или центра VFS',
-          },
-          {
-            document: 'financial_proof',
-            name: 'Financial Proof',
-            nameUz: 'Moliyaviy isbot',
-            nameRu: 'Финансовое подтверждение',
-            required: true,
-            description: 'Bank statements or proof of sufficient funds',
-            descriptionUz: "Bank hisob varag'lari yoki yetarli mablag' isboti",
-            descriptionRu: 'Банковские выписки или подтверждение достаточных средств',
-            priority: 'high',
-            whereToObtain: 'Obtain from your bank',
-            whereToObtainUz: 'Bankingizdan oling',
-            whereToObtainRu: 'Получите в вашем банке',
-          },
-        ],
+        checklist: baseChecklist,
       };
     }
+  }
+
+  /**
+   * Extract JSON from OpenAI response
+   * Handles cases where JSON is wrapped in markdown code fences or has extra text
+   */
+  private static extractJson(raw: string): string {
+    // If the model wraps JSON in ```json ... ```
+    const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/i);
+    if (jsonMatch) {
+      return jsonMatch[1].trim();
+    }
+
+    // If wrapped in generic ``` ... ```
+    const genericMatch = raw.match(/```\s*([\s\S]*?)\s*```/);
+    if (genericMatch) {
+      return genericMatch[1].trim();
+    }
+
+    // Try to find JSON object boundaries
+    const jsonObjectMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonObjectMatch) {
+      return jsonObjectMatch[0].trim();
+    }
+
+    // Return trimmed raw content as fallback
+    return raw.trim();
   }
 
   /**

@@ -3,17 +3,21 @@
  * Builds structured AIUserContext for AI service consumption
  */
 
-import { PrismaClient } from "@prisma/client";
-import { errors } from "../utils/errors";
-import { logError, logInfo } from "../middleware/logger";
-import { AIUserContext, VisaQuestionnaireSummary, VisaProbabilityResult } from "../types/ai-context";
+import { PrismaClient } from '@prisma/client';
+import { errors } from '../utils/errors';
+import { logError, logInfo } from '../middleware/logger';
+import {
+  AIUserContext,
+  VisaQuestionnaireSummary,
+  VisaProbabilityResult,
+} from '../types/ai-context';
 
 const prisma = new PrismaClient();
 
 /**
  * Calculate visa probability based on questionnaire summary
  * Rule-based calculator tuned for common Uzbek cases
- * 
+ *
  * @param summary - VisaQuestionnaireSummary
  * @returns VisaProbabilityResult with score, level, and factors
  */
@@ -24,34 +28,34 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
 
   // Money - Bank Balance
   if (summary.bankBalanceUSD !== undefined) {
-    if (summary.visaType === "tourist" && summary.bankBalanceUSD < 2000) {
+    if (summary.visaType === 'tourist' && summary.bankBalanceUSD < 2000) {
       score -= 10;
-      riskFactors.push("Bank balance is relatively low for a tourist trip.");
+      riskFactors.push('Bank balance is relatively low for a tourist trip.');
     }
-    if (summary.visaType === "student" && summary.bankBalanceUSD < 10000) {
+    if (summary.visaType === 'student' && summary.bankBalanceUSD < 10000) {
       score -= 15;
-      riskFactors.push("Savings may be low compared to common student visa expectations.");
+      riskFactors.push('Savings may be low compared to common student visa expectations.');
     }
   }
 
   // Rejections / overstays
   if (summary.previousVisaRejections) {
     score -= 15;
-    riskFactors.push("Previous visa rejection increases the level of scrutiny.");
+    riskFactors.push('Previous visa rejection increases the level of scrutiny.');
   }
   if (summary.previousOverstay) {
     score -= 25;
-    riskFactors.push("Previous overstay strongly reduces chances of approval.");
+    riskFactors.push('Previous overstay strongly reduces chances of approval.');
   }
 
   // Ties to Uzbekistan
   if (summary.hasPropertyInUzbekistan) {
     score += 5;
-    positiveFactors.push("Property in Uzbekistan strengthens your ties to home country.");
+    positiveFactors.push('Property in Uzbekistan strengthens your ties to home country.');
   }
   if (summary.hasFamilyInUzbekistan) {
     score += 5;
-    positiveFactors.push("Close family in Uzbekistan is a strong tie to home country.");
+    positiveFactors.push('Close family in Uzbekistan is a strong tie to home country.');
   }
 
   // Clamp score to valid range
@@ -59,13 +63,13 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
   if (score > 90) score = 90;
 
   // Determine level
-  let level: "low" | "medium" | "high";
+  let level: 'low' | 'medium' | 'high';
   if (score < 40) {
-    level = "low";
+    level = 'low';
   } else if (score < 70) {
-    level = "medium";
+    level = 'medium';
   } else {
-    level = "high";
+    level = 'high';
   }
 
   return { score, level, riskFactors, positiveFactors };
@@ -73,7 +77,7 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
 
 /**
  * Extract VisaQuestionnaireSummary from user bio
- * Handles both legacy and new formats
+ * Handles both legacy and new formats (including QuestionnaireV2)
  */
 function extractQuestionnaireSummary(
   bio: string | null | undefined
@@ -83,10 +87,23 @@ function extractQuestionnaireSummary(
   try {
     const parsed = JSON.parse(bio);
 
+    // Check if it's QuestionnaireV2 format
+    if (parsed.version === '2.0' && parsed.targetCountry && parsed.visaType) {
+      const {
+        buildSummaryFromQuestionnaireV2,
+        validateQuestionnaireV2,
+      } = require('./questionnaire-v2-mapper');
+      if (validateQuestionnaireV2(parsed)) {
+        // Extract appLanguage from user or default to 'en'
+        const appLanguage = parsed.appLanguage || 'en';
+        return buildSummaryFromQuestionnaireV2(parsed, appLanguage as 'uz' | 'ru' | 'en');
+      }
+    }
+
     // Check if it's the new format with summary
     if (parsed._hasSummary && parsed.summary) {
       const summary = parsed.summary;
-      
+
       // Validate summary structure
       if (
         summary &&
@@ -107,14 +124,14 @@ function extractQuestionnaireSummary(
     // For now, return null and let AI service handle legacy format
     return null;
   } catch (error) {
-    logError("Failed to extract questionnaire summary from bio", error as Error);
+    logError('Failed to extract questionnaire summary from bio', error as Error);
     return null;
   }
 }
 
 /**
  * Build AI User Context for an application
- * 
+ *
  * @param userId - User ID
  * @param applicationId - Application ID
  * @returns AIUserContext object
@@ -153,7 +170,7 @@ export async function buildAIUserContext(
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     // Verify ownership
@@ -165,26 +182,29 @@ export async function buildAIUserContext(
     const questionnaireSummary = extractQuestionnaireSummary(application.user.bio);
 
     // Determine visa type from application or summary
-    let visaType: "student" | "tourist" = "tourist";
+    let visaType: 'student' | 'tourist' = 'tourist';
     if (questionnaireSummary) {
       visaType = questionnaireSummary.visaType;
     } else {
       // Fallback: infer from visa type name
       const visaTypeName = application.visaType.name.toLowerCase();
-      if (visaTypeName.includes("student") || visaTypeName.includes("study")) {
-        visaType = "student";
+      if (visaTypeName.includes('student') || visaTypeName.includes('study')) {
+        visaType = 'student';
       }
     }
 
     // Map application status
-    const statusMap: Record<string, "draft" | "in_progress" | "submitted" | "approved" | "rejected"> = {
-      "draft": "draft",
-      "in_progress": "in_progress",
-      "submitted": "submitted",
-      "approved": "approved",
-      "rejected": "rejected",
+    const statusMap: Record<
+      string,
+      'draft' | 'in_progress' | 'submitted' | 'approved' | 'rejected'
+    > = {
+      draft: 'draft',
+      in_progress: 'in_progress',
+      submitted: 'submitted',
+      approved: 'approved',
+      rejected: 'rejected',
     };
-    const applicationStatus = statusMap[application.status.toLowerCase()] || "draft";
+    const applicationStatus = statusMap[application.status.toLowerCase()] || 'draft';
 
     // Get country code (prefer from summary, fallback to application)
     let countryCode = application.country.code;
@@ -197,13 +217,16 @@ export async function buildAIUserContext(
       type: doc.documentType,
       fileName: doc.documentName || doc.documentType,
       url: doc.fileUrl || undefined,
-      status: doc.status === "verified" ? "approved" as const : 
-              doc.status === "rejected" ? "rejected" as const : 
-              "uploaded" as const,
+      status:
+        doc.status === 'verified'
+          ? ('approved' as const)
+          : doc.status === 'rejected'
+            ? ('rejected' as const)
+            : ('uploaded' as const),
     }));
 
     // Get app language from user or summary
-    let appLanguage: "uz" | "ru" | "en" = (application.user.language as "uz" | "ru" | "en") || "en";
+    let appLanguage: 'uz' | 'ru' | 'en' = (application.user.language as 'uz' | 'ru' | 'en') || 'en';
     if (questionnaireSummary && questionnaireSummary.appLanguage) {
       appLanguage = questionnaireSummary.appLanguage;
     }
@@ -244,7 +267,7 @@ export async function buildAIUserContext(
       };
     }
 
-    logInfo("AI user context built", {
+    logInfo('AI user context built', {
       userId,
       applicationId,
       hasSummary: !!questionnaireSummary,
@@ -255,7 +278,7 @@ export async function buildAIUserContext(
 
     return context;
   } catch (error) {
-    logError("Failed to build AI user context", error as Error, {
+    logError('Failed to build AI user context', error as Error, {
       userId,
       applicationId,
     });
@@ -265,7 +288,7 @@ export async function buildAIUserContext(
 
 /**
  * Get questionnaire summary for a user
- * 
+ *
  * @param userId - User ID
  * @returns VisaQuestionnaireSummary or null
  */
@@ -284,8 +307,7 @@ export async function getQuestionnaireSummary(
 
     return extractQuestionnaireSummary(user.bio);
   } catch (error) {
-    logError("Failed to get questionnaire summary", error as Error, { userId });
+    logError('Failed to get questionnaire summary', error as Error, { userId });
     return null;
   }
 }
-
