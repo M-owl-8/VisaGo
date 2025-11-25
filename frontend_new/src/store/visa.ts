@@ -102,6 +102,7 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   filteredCountries: [],
 
   // Fetch all countries
+  // IMPORTANT: Always fetch ALL countries (no limit). The questionnaire must show all 8 destination countries.
   fetchCountries: async (search?: string) => {
     try {
       set({isLoadingCountries: true});
@@ -113,17 +114,21 @@ export const useVisaStore = create<VisaState>((set, get) => ({
 
       const countries = response.data;
 
+      // When searching, update filtered list but preserve the full master list
       if (search) {
         set(state => ({
-          countries: state.countries.length ? state.countries : countries,
-          filteredCountries: countries,
+          // Always preserve the full master list - never overwrite with search results
+          countries: state.countries.length > 0 ? state.countries : countries,
+          filteredCountries: countries, // Search results for display
         }));
         return;
       }
 
+      // No search: Load ALL countries into both master list and filtered list
+      // This ensures the questionnaire always has access to all 8 countries
       set({
-        countries,
-        filteredCountries: countries,
+        countries, // Master list: ALL countries from backend
+        filteredCountries: countries, // Display list: ALL countries (no filter applied)
       });
     } catch (error) {
       console.error('Error fetching countries:', error);
@@ -169,15 +174,18 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   },
 
   // Update search query - filters locally and triggers API call if needed
+  // IMPORTANT: When search is cleared, show ALL countries (all 8). Never limit to 5.
   setSearchQuery: async (query: string) => {
     set({searchQuery: query});
     const {countries} = get();
 
     // If we have countries, filter locally first for instant feedback
     if (countries.length > 0) {
-      if (!query) {
+      if (!query || !query.trim()) {
+        // No search query: show ALL countries (all 8 destination countries)
         set({filteredCountries: countries});
       } else {
+        // Search query: filter by name or code, but show ALL matching results (no limit)
         const filtered = countries.filter(
           country =>
             country.name.toLowerCase().includes(query.toLowerCase()) ||

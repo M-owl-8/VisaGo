@@ -375,10 +375,16 @@
     "title": "Help & Support",
     "emailSupport": "Email Support",
     "phoneSupport": "Phone Support",
+    "telegramSupportTitle": "Telegram Support",
+    "telegramSupportSubtitle": "@Ketdikuz",
+    "whatsappSupportTitle": "WhatsApp Support",
+    "whatsappSupportSubtitle": "+998997614313",
+    "instagramSupportTitle": "Instagram Support",
+    "instagramSupportSubtitle": "_ketdik",
     "needHelp": "Need Help?",
     "supportAvailable": "Our support team is available 24/7 to assist you with any questions or issues you may have.",
-    "supportEmail": "support@visabuddy.com",
-    "supportPhone": "+1 (234) 567-890"
+    "supportEmail": "ketdik@gmail.com",
+    "supportPhone": "+998997614313"
   },
   "notifications": {
     "title": "Notification Settings",

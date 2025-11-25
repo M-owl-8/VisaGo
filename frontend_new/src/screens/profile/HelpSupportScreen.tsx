@@ -13,16 +13,26 @@ import {
   Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useTranslation } from 'react-i18next';
+import {useTranslation} from 'react-i18next';
 
-export const HelpSupportScreen = ({ navigation }: any) => {
-  const { t } = useTranslation();
-  
-  const handleContact = (type: 'email' | 'phone') => {
+export const HelpSupportScreen = ({navigation}: any) => {
+  const {t} = useTranslation();
+
+  const handleContact = (
+    type: 'email' | 'phone' | 'telegram' | 'whatsapp' | 'instagram',
+  ) => {
     if (type === 'email') {
       Linking.openURL(`mailto:${t('helpSupport.supportEmail')}`);
-    } else {
-      Linking.openURL(`tel:${t('helpSupport.supportPhone').replace(/\s/g, '')}`);
+    } else if (type === 'phone') {
+      Linking.openURL(
+        `tel:${t('helpSupport.supportPhone').replace(/\s/g, '')}`,
+      );
+    } else if (type === 'telegram') {
+      Linking.openURL('https://t.me/Ketdikuz');
+    } else if (type === 'whatsapp') {
+      Linking.openURL('https://wa.me/998997614313');
+    } else if (type === 'instagram') {
+      Linking.openURL('https://instagram.com/_ketdik');
     }
   };
 
@@ -38,14 +48,12 @@ export const HelpSupportScreen = ({ navigation }: any) => {
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
+              onPress={() => navigation.goBack()}>
               <Icon name="arrow-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{t('helpSupport.title')}</Text>
@@ -57,14 +65,21 @@ export const HelpSupportScreen = ({ navigation }: any) => {
             <TouchableOpacity
               style={styles.helpItem}
               onPress={() => handleContact('email')}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.helpIcon, { backgroundColor: 'rgba(6, 182, 212, 0.2)' }]}>
+              activeOpacity={0.7}>
+              <View
+                style={[
+                  styles.helpIcon,
+                  {backgroundColor: 'rgba(6, 182, 212, 0.2)'},
+                ]}>
                 <Icon name="mail-outline" size={24} color="#06B6D4" />
               </View>
               <View style={styles.helpContent}>
-                <Text style={styles.helpTitle}>{t('helpSupport.emailSupport')}</Text>
-                <Text style={styles.helpSubtitle}>{t('helpSupport.supportEmail')}</Text>
+                <Text style={styles.helpTitle}>
+                  {t('helpSupport.emailSupport')}
+                </Text>
+                <Text style={styles.helpSubtitle}>
+                  {t('helpSupport.supportEmail')}
+                </Text>
               </View>
               <Icon name="chevron-forward" size={20} color="#6B7280" />
             </TouchableOpacity>
@@ -72,22 +87,101 @@ export const HelpSupportScreen = ({ navigation }: any) => {
             <TouchableOpacity
               style={styles.helpItem}
               onPress={() => handleContact('phone')}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.helpIcon, { backgroundColor: 'rgba(6, 182, 212, 0.2)' }]}>
+              activeOpacity={0.7}>
+              <View
+                style={[
+                  styles.helpIcon,
+                  {backgroundColor: 'rgba(6, 182, 212, 0.2)'},
+                ]}>
                 <Icon name="call-outline" size={24} color="#06B6D4" />
               </View>
               <View style={styles.helpContent}>
-                <Text style={styles.helpTitle}>{t('helpSupport.phoneSupport')}</Text>
-                <Text style={styles.helpSubtitle}>{t('helpSupport.supportPhone')}</Text>
+                <Text style={styles.helpTitle}>
+                  {t('helpSupport.phoneSupport')}
+                </Text>
+                <Text style={styles.helpSubtitle}>
+                  {t('helpSupport.supportPhone')}
+                </Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color="#6B7280" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.helpItem}
+              onPress={() => handleContact('telegram')}
+              activeOpacity={0.7}>
+              <View
+                style={[
+                  styles.helpIcon,
+                  {backgroundColor: 'rgba(6, 182, 212, 0.2)'},
+                ]}>
+                <Icon name="chatbubbles-outline" size={24} color="#06B6D4" />
+              </View>
+              <View style={styles.helpContent}>
+                <Text style={styles.helpTitle}>
+                  {t('helpSupport.telegramSupportTitle')}
+                </Text>
+                <Text style={styles.helpSubtitle}>
+                  {t('helpSupport.telegramSupportSubtitle')}
+                </Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color="#6B7280" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.helpItem}
+              onPress={() => handleContact('whatsapp')}
+              activeOpacity={0.7}>
+              <View
+                style={[
+                  styles.helpIcon,
+                  {backgroundColor: 'rgba(6, 182, 212, 0.2)'},
+                ]}>
+                <Icon name="logo-whatsapp" size={24} color="#06B6D4" />
+              </View>
+              <View style={styles.helpContent}>
+                <Text style={styles.helpTitle}>
+                  {t('helpSupport.whatsappSupportTitle')}
+                </Text>
+                <Text style={styles.helpSubtitle}>
+                  {t('helpSupport.whatsappSupportSubtitle')}
+                </Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color="#6B7280" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.helpItem}
+              onPress={() => handleContact('instagram')}
+              activeOpacity={0.7}>
+              <View
+                style={[
+                  styles.helpIcon,
+                  {backgroundColor: 'rgba(6, 182, 212, 0.2)'},
+                ]}>
+                <Icon name="logo-instagram" size={24} color="#06B6D4" />
+              </View>
+              <View style={styles.helpContent}>
+                <Text style={styles.helpTitle}>
+                  {t('helpSupport.instagramSupportTitle')}
+                </Text>
+                <Text style={styles.helpSubtitle}>
+                  {t('helpSupport.instagramSupportSubtitle')}
+                </Text>
               </View>
               <Icon name="chevron-forward" size={20} color="#6B7280" />
             </TouchableOpacity>
 
             <View style={styles.infoCard}>
-              <Icon name="information-circle-outline" size={24} color="#06B6D4" />
+              <Icon
+                name="information-circle-outline"
+                size={24}
+                color="#06B6D4"
+              />
               <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>{t('helpSupport.needHelp')}</Text>
+                <Text style={styles.infoTitle}>
+                  {t('helpSupport.needHelp')}
+                </Text>
                 <Text style={styles.infoText}>
                   {t('helpSupport.supportAvailable')}
                 </Text>
@@ -216,4 +310,3 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
-

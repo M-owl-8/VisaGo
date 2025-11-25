@@ -375,10 +375,16 @@
     "title": "Yordam va qo'llab-quvvatlash",
     "emailSupport": "Email orqali yordam",
     "phoneSupport": "Telefon orqali yordam",
+    "telegramSupportTitle": "Telegram orqali yordam",
+    "telegramSupportSubtitle": "@Ketdikuz",
+    "whatsappSupportTitle": "WhatsApp orqali yordam",
+    "whatsappSupportSubtitle": "+998997614313",
+    "instagramSupportTitle": "Instagram orqali yordam",
+    "instagramSupportSubtitle": "_ketdik",
     "needHelp": "Yordam kerakmi?",
     "supportAvailable": "Bizning yordam jamoamiz 24/7 sizning barcha savollaringiz va muammolaringizga yordam berish uchun mavjud.",
-    "supportEmail": "support@visabuddy.com",
-    "supportPhone": "+1 (234) 567-890"
+    "supportEmail": "ketdik@gmail.com",
+    "supportPhone": "+998997614313"
   },
   "notifications": {
     "title": "Bildirishnoma sozlamalari",

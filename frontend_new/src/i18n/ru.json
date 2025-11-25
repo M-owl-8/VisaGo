@@ -363,10 +363,16 @@
     "title": "Помощь и поддержка",
     "emailSupport": "Поддержка по email",
     "phoneSupport": "Телефонная поддержка",
+    "telegramSupportTitle": "Поддержка через Telegram",
+    "telegramSupportSubtitle": "@Ketdikuz",
+    "whatsappSupportTitle": "Поддержка через WhatsApp",
+    "whatsappSupportSubtitle": "+998997614313",
+    "instagramSupportTitle": "Поддержка через Instagram",
+    "instagramSupportSubtitle": "_ketdik",
     "needHelp": "Нужна помощь?",
     "supportAvailable": "Наша команда поддержки доступна 24/7, чтобы помочь вам с любыми вопросами или проблемами.",
-    "supportEmail": "support@visabuddy.com",
-    "supportPhone": "+1 (234) 567-890"
+    "supportEmail": "ketdik@gmail.com",
+    "supportPhone": "+998997614313"
   },
   "notifications": {
     "title": "Настройки уведомлений",

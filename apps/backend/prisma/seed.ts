@@ -10,12 +10,25 @@ const isProd =
   process.env.NODE_ENV === 'production' ||
   process.env.RAILWAY_ENVIRONMENT_NAME === 'production';
 
+// Check if destructive operations are allowed
+const allowWipe = process.env.ALLOW_DB_WIPE === 'true';
+
 /**
  * Development seed: Clears all data and recreates reference data + demo data
  * WARNING: This deletes ALL user data (applications, documents, payments, etc.)
+ * ONLY runs if ALLOW_DB_WIPE=true is explicitly set
  */
 async function seedDev() {
-  console.log("🌱 Dev seed: clearing ALL data...");
+  console.log("[Seed] NODE_ENV=", process.env.NODE_ENV, "ALLOW_DB_WIPE=", process.env.ALLOW_DB_WIPE);
+  
+  if (!allowWipe) {
+    console.log("🌱 Dev seed: Skipping destructive data wipe (ALLOW_DB_WIPE not set to 'true')");
+    console.log("🌱 Dev seed: Only upserting reference data (non-destructive)");
+    await seedReferenceData();
+    return;
+  }
+
+  console.log("🌱 Dev seed: clearing ALL data... (ALLOW_DB_WIPE=true)");
 
   // Clear existing data in correct order (child records first, then parent records)
   // This prevents foreign key constraint violations
@@ -42,10 +55,12 @@ async function seedDev() {
 
 /**
  * Production seed: Only upserts reference data (countries, visa types)
- * NEVER deletes user data (User, VisaApplication, UserDocument, ChatMessage, Payment, etc.)
+ * NEVER deletes user data (User, VisaApplication, UserDocument, ChatMessage, ChatSession, Payment, etc.)
  */
 async function seedProd() {
+  console.log("[Seed] NODE_ENV=", process.env.NODE_ENV, "ALLOW_DB_WIPE=", process.env.ALLOW_DB_WIPE);
   console.log("🌱 Prod seed: seeding ONLY reference data (non-destructive)");
+  console.log("🌱 Prod seed: Skipping destructive data wipe (production mode)");
   
   // Only ensure countries and visaTypes exist using upsert
   await seedReferenceData();
@@ -647,6 +662,7 @@ async function seedReferenceData() {
 
 async function main() {
   console.log("🌱 Starting database seed...");
+  console.log("[Seed] Environment check: isProd=", isProd, "ALLOW_DB_WIPE=", allowWipe);
 
   if (isProd) {
     await seedProd();

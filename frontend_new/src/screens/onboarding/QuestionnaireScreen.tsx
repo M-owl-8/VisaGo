@@ -55,8 +55,9 @@ export default function QuestionnaireScreen({navigation}: any) {
   const [fadeAnim] = useState(new Animated.Value(0));
 
   // Load countries on mount
+  // IMPORTANT: Always load ALL countries (all 8 destination countries) for the questionnaire
   useEffect(() => {
-    fetchCountries();
+    fetchCountries(); // Load all countries without search query
   }, []);
 
   // Fade in animation
@@ -695,17 +696,21 @@ export default function QuestionnaireScreen({navigation}: any) {
     }
 
     // Show country search - filter by translated names
-    const filteredCountries = countries.filter(country => {
-      const translatedName = getTranslatedCountryName(
-        country.code,
-        language,
-        country.name,
-      );
-      return (
-        translatedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        country.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    });
+    // IMPORTANT: Show ALL countries when search is empty. Only filter when user types.
+    // The questionnaire must always display all 8 destination countries by default.
+    const filteredCountries = searchQuery.trim()
+      ? countries.filter(country => {
+          const translatedName = getTranslatedCountryName(
+            country.code,
+            language,
+            country.name,
+          );
+          return (
+            translatedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            country.name.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        })
+      : countries; // No search query: show ALL countries (all 8)
 
     return (
       <View style={styles.countrySearchContainer}>

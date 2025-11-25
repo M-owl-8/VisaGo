@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 import { generateToken } from '../middleware/auth';
 import { errors, ApiError } from '../utils/errors';
 import { validatePassword, validateAndNormalizeEmail } from '../utils/validation';
-import { SECURITY_CONFIG } from '../config/constants';
+import { SECURITY_CONFIG, HTTP_STATUS } from '../config/constants';
 import { resilientOperation, getDatabaseErrorMessage } from '../utils/db-resilience';
 import db from '../db';
 
@@ -69,67 +69,132 @@ export class AuthService {
    * ```
    */
   static async register(payload: RegisterPayload): Promise<AuthResponse> {
-    // Validate email
-    const normalizedEmail = validateAndNormalizeEmail(payload.email);
+    try {
+      // Validate and normalize email (trim + toLowerCase)
+      const normalizedEmail = validateAndNormalizeEmail(payload.email);
 
-    // Validate password
-    if (!payload.password) {
-      throw errors.validationError('Password is required');
-    }
+      // Validate password
+      if (!payload.password) {
+        console.warn('[AUTH][REGISTER] Failed', {
+          email: normalizedEmail,
+          code: 'INVALID_INPUT',
+          message: 'Password is required',
+        });
+        throw new ApiError(HTTP_STATUS.BAD_REQUEST, 'Parol kiritilishi shart.', 'INVALID_INPUT');
+      }
 
-    const passwordValidation = validatePassword(payload.password);
-    if (!passwordValidation.isValid) {
-      throw errors.validationError(passwordValidation.errors.join(', '), {
-        field: 'password',
-        errors: passwordValidation.errors,
+      const passwordValidation = validatePassword(payload.password);
+      if (!passwordValidation.isValid) {
+        console.warn('[AUTH][REGISTER] Failed', {
+          email: normalizedEmail,
+          code: 'WEAK_PASSWORD',
+          message: passwordValidation.errors.join(', '),
+        });
+        throw new ApiError(
+          HTTP_STATUS.BAD_REQUEST,
+          "Parol juda oddiy. Iltimos kamida 6 ta belgidan iborat va hech bo'lmaganda bitta harf bo'lsin.",
+          'WEAK_PASSWORD'
+        );
+      }
+
+      // Check if user already exists (with resilience)
+      const existingUser = await resilientOperation(
+        prisma,
+        () =>
+          prisma.user.findUnique({
+            where: { email: normalizedEmail },
+          }),
+        { retry: { maxAttempts: 2 } }
+      ).catch((error) => {
+        console.error('[AUTH][REGISTER] Database error checking existing user', {
+          email: normalizedEmail,
+          error: getDatabaseErrorMessage(error),
+        });
+        throw errors.internalServer(getDatabaseErrorMessage(error));
       });
-    }
 
-    // Check if user already exists (with resilience)
-    const existingUser = await resilientOperation(
-      prisma,
-      () =>
-        prisma.user.findUnique({
-          where: { email: normalizedEmail },
-        }),
-      { retry: { maxAttempts: 2 } }
-    ).catch((error) => {
-      throw errors.internalServer(getDatabaseErrorMessage(error));
-    });
+      if (existingUser) {
+        console.warn('[AUTH][REGISTER] Failed', {
+          email: normalizedEmail,
+          code: 'EMAIL_ALREADY_EXISTS',
+          message: 'Email already registered',
+        });
+        throw new ApiError(
+          HTTP_STATUS.BAD_REQUEST,
+          'Bu email bilan foydalanuvchi allaqachon mavjud.',
+          'EMAIL_ALREADY_EXISTS'
+        );
+      }
 
-    if (existingUser) {
-      throw errors.conflict('Email');
-    }
+      // Hash password with configured rounds for production security
+      const passwordHash = await bcrypt.hash(
+        payload.password,
+        SECURITY_CONFIG.PASSWORD_HASH_ROUNDS
+      );
 
-    // Hash password with configured rounds for production security
-    const passwordHash = await bcrypt.hash(payload.password, SECURITY_CONFIG.PASSWORD_HASH_ROUNDS);
+      // Create user
+      let user;
+      try {
+        user = await prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            passwordHash,
+            firstName: payload.firstName?.trim(),
+            lastName: payload.lastName?.trim(),
+            preferences: {
+              create: {},
+            },
+          },
+        });
+      } catch (createError: any) {
+        // Handle Prisma unique constraint error (P2002) for email
+        if (createError?.code === 'P2002' && createError?.meta?.target?.includes('email')) {
+          console.warn('[AUTH][REGISTER] Failed', {
+            email: normalizedEmail,
+            code: 'EMAIL_ALREADY_EXISTS',
+            message: 'Email already exists (Prisma unique constraint)',
+          });
+          throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            'Bu email bilan foydalanuvchi allaqachon mavjud.',
+            'EMAIL_ALREADY_EXISTS'
+          );
+        }
+        // Re-throw other errors
+        throw createError;
+      }
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        passwordHash,
-        firstName: payload.firstName?.trim(),
-        lastName: payload.lastName?.trim(),
-        preferences: {
-          create: {},
+      // Generate token
+      const token = generateToken(user.id, user.email);
+
+      return {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName || undefined,
+          lastName: user.lastName || undefined,
+          emailVerified: user.emailVerified,
         },
-      },
-    });
+      };
+    } catch (error) {
+      // Re-throw ApiError as-is
+      if (error instanceof ApiError) {
+        throw error;
+      }
 
-    // Generate token
-    const token = generateToken(user.id, user.email);
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName || undefined,
-        lastName: user.lastName || undefined,
-        emailVerified: user.emailVerified,
-      },
-    };
+      // Handle other errors
+      console.error('[AUTH][REGISTER] Unknown error', {
+        email: payload.email || 'unknown',
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        "Ro'yxatdan o'tishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+        'INTERNAL_ERROR'
+      );
+    }
   }
 
   /**
