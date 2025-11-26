@@ -100,6 +100,16 @@ export const ApplicationIcons = {
 };
 
 /**
+ * Admin Panel Icons
+ */
+export const AdminIcons = {
+  admin: {
+    active: {name: 'settings-outline', library: 'ionicons' as IconLibrary},
+    inactive: {name: 'settings-outline', library: 'ionicons' as IconLibrary},
+  },
+};
+
+/**
  * Status Icons
  */
 export const StatusIcons = {
