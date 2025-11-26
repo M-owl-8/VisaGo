@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,33 +10,42 @@ import {
   Modal,
   Pressable,
   TextInput,
-} from "react-native";
-import axios from "axios";
-import { useFocusEffect } from "@react-navigation/native";
+} from 'react-native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useIsAdmin} from '../../hooks/useIsAdmin';
+import {adminApi, DocumentVerificationQueue} from '../../services/adminApi';
 
-interface Document {
-  id: string;
-  userId: string;
-  userEmail: string;
-  userName: string;
-  documentName: string;
-  documentType: string;
-  applicationCountry: string;
-  status: string;
-  uploadedAt: string;
-}
-
-const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+const AdminDocumentsScreen: React.FC<any> = ({navigation}) => {
+  const isAdmin = useIsAdmin();
+  const nav = useNavigation();
+  const [documents, setDocuments] = useState<DocumentVerificationQueue[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const [selectedDoc, setSelectedDoc] =
+    useState<DocumentVerificationQueue | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [verificationNotes, setVerificationNotes] = useState("");
-  const [selectedAction, setSelectedAction] = useState<"verified" | "rejected" | null>(null);
+  const [verificationNotes, setVerificationNotes] = useState('');
+  const [selectedAction, setSelectedAction] = useState<
+    'verified' | 'rejected' | null
+  >(null);
   const [processedCount, setProcessedCount] = useState(0);
+
+  // Screen-level guard
+  useEffect(() => {
+    if (!isAdmin) {
+      if (nav.canGoBack()) {
+        nav.goBack();
+      } else {
+        nav.navigate('MainTabs' as never);
+      }
+    }
+  }, [isAdmin, nav]);
+
+  if (!isAdmin) {
+    return null;
+  }
 
   useFocusEffect(
     React.useCallback(() => {
@@ -44,7 +53,7 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
       setDocuments([]);
       setProcessedCount(0);
       fetchDocuments(0);
-    }, [])
+    }, []),
   );
 
   const fetchDocuments = async (pageNum: number) => {
@@ -52,25 +61,21 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
       if (pageNum === 0) {
         setLoading(true);
       }
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || "http://localhost:3000"}/api/admin/documents/verification-queue?skip=${pageNum * 20}&take=20`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      const response = await adminApi.getDocumentVerificationQueue({
+        skip: pageNum * 20,
+        take: 20,
+      });
 
       if (pageNum === 0) {
-        setDocuments(response.data.data);
+        setDocuments(response.data);
         setProcessedCount(0);
       } else {
-        setDocuments((prev) => [...prev, ...response.data.data]);
+        setDocuments(prev => [...prev, ...response.data]);
       }
 
-      setHasMore(response.data.data.length === 20);
+      setHasMore(response.data.length === 20);
     } catch (error) {
-      console.error("Error fetching documents:", error);
+      console.error('Error fetching documents:', error);
     } finally {
       setLoading(false);
     }
@@ -93,29 +98,21 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
     }
   };
 
-  const handleVerification = async (docId: string, status: "verified" | "rejected") => {
+  const handleVerification = async (
+    docId: string,
+    status: 'verified' | 'rejected',
+  ) => {
     try {
-      await axios.patch(
-        `${process.env.REACT_APP_API_URL || "http://localhost:3000"}/api/admin/documents/${docId}/verify`,
-        {
-          status,
-          notes: verificationNotes,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      await adminApi.updateDocumentStatus(docId, status, verificationNotes);
 
       // Remove verified/rejected document from list
-      setDocuments((prev) => prev.filter((d) => d.id !== docId));
-      setProcessedCount((prev) => prev + 1);
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+      setProcessedCount(prev => prev + 1);
       setModalVisible(false);
-      setVerificationNotes("");
+      setVerificationNotes('');
       setSelectedAction(null);
     } catch (error) {
-      console.error("Error verifying document:", error);
+      console.error('Error verifying document:', error);
     }
   };
 
@@ -128,18 +125,17 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
     );
   }
 
-  const renderDocItem = ({ item }: { item: Document }) => (
+  const renderDocItem = ({item}: {item: DocumentVerificationQueue}) => (
     <TouchableOpacity
       style={styles.docCard}
       onPress={() => {
         setSelectedDoc(item);
-        setVerificationNotes("");
+        setVerificationNotes('');
         setSelectedAction(null);
         setModalVisible(true);
-      }}
-    >
+      }}>
       <View style={styles.docHeader}>
-        <View style={{ flex: 1 }}>
+        <View style={{flex: 1}}>
           <Text style={styles.docName}>{item.documentName}</Text>
           <Text style={styles.docType}>{item.documentType}</Text>
         </View>
@@ -162,22 +158,20 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
             style={[styles.actionButton, styles.approveButton]}
             onPress={() => {
               setSelectedDoc(item);
-              setSelectedAction("verified");
-              setVerificationNotes("");
+              setSelectedAction('verified');
+              setVerificationNotes('');
               setModalVisible(true);
-            }}
-          >
+            }}>
             <Text style={styles.actionButtonText}>✓</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.rejectButton]}
             onPress={() => {
               setSelectedDoc(item);
-              setSelectedAction("rejected");
-              setVerificationNotes("");
+              setSelectedAction('rejected');
+              setVerificationNotes('');
               setModalVisible(true);
-            }}
-          >
+            }}>
             <Text style={styles.actionButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -206,15 +200,21 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
       ) : (
         <FlatList
           data={documents}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={renderDocItem}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           contentContainerStyle={styles.listContent}
           ListFooterComponent={() =>
             loading && documents.length > 0 ? (
-              <ActivityIndicator size="small" color="#007AFF" style={styles.loadMoreIndicator} />
+              <ActivityIndicator
+                size="small"
+                color="#007AFF"
+                style={styles.loadMoreIndicator}
+              />
             ) : null
           }
         />
@@ -225,23 +225,29 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
         visible={modalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+        onRequestClose={() => setModalVisible(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Document Verification</Text>
-            <Text style={styles.modalSubtitle}>{selectedDoc?.documentName}</Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedDoc?.documentName}
+            </Text>
 
             <View style={styles.documentInfo}>
-              <InfoRow label="Type" value={selectedDoc?.documentType || ""} />
-              <InfoRow label="User" value={selectedDoc?.userEmail || ""} />
-              <InfoRow label="Country" value={selectedDoc?.applicationCountry || ""} />
+              <InfoRow label="Type" value={selectedDoc?.documentType || ''} />
+              <InfoRow label="User" value={selectedDoc?.userEmail || ''} />
+              <InfoRow
+                label="Country"
+                value={selectedDoc?.applicationCountry || ''}
+              />
               <InfoRow
                 label="Uploaded"
                 value={
                   selectedDoc
                     ? new Date(selectedDoc.uploadedAt).toLocaleDateString()
-                    : ""
+                    : ''
                 }
               />
             </View>
@@ -249,9 +255,9 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
             {selectedAction && (
               <>
                 <Text style={styles.notesLabel}>
-                  {selectedAction === "verified"
-                    ? "Verification Notes (optional)"
-                    : "Rejection Reason (optional)"}
+                  {selectedAction === 'verified'
+                    ? 'Verification Notes (optional)'
+                    : 'Rejection Reason (optional)'}
                 </Text>
                 <TextInput
                   style={styles.notesInput}
@@ -269,14 +275,12 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
               <>
                 <TouchableOpacity
                   style={[styles.actionButtonLarge, styles.approveButtonLarge]}
-                  onPress={() => setSelectedAction("verified")}
-                >
+                  onPress={() => setSelectedAction('verified')}>
                   <Text style={styles.actionButtonLargeText}>✓ Approve</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionButtonLarge, styles.rejectButtonLarge]}
-                  onPress={() => setSelectedAction("rejected")}
-                >
+                  onPress={() => setSelectedAction('rejected')}>
                   <Text style={styles.actionButtonLargeText}>✕ Reject</Text>
                 </TouchableOpacity>
               </>
@@ -285,22 +289,21 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
                 <TouchableOpacity
                   style={[
                     styles.actionButtonLarge,
-                    selectedAction === "verified"
+                    selectedAction === 'verified'
                       ? styles.approveButtonLarge
                       : styles.rejectButtonLarge,
                   ]}
                   onPress={() =>
-                    selectedDoc && handleVerification(selectedDoc.id, selectedAction)
-                  }
-                >
+                    selectedDoc &&
+                    handleVerification(selectedDoc.id, selectedAction)
+                  }>
                   <Text style={styles.actionButtonLargeText}>
                     Confirm {selectedAction}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionButtonLarge, styles.cancelButtonLarge]}
-                  onPress={() => setSelectedAction(null)}
-                >
+                  onPress={() => setSelectedAction(null)}>
                   <Text style={styles.actionButtonLargeTextCancel}>Back</Text>
                 </TouchableOpacity>
               </>
@@ -308,8 +311,7 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
 
             <TouchableOpacity
               style={[styles.actionButtonLarge, styles.cancelButtonLarge]}
-              onPress={() => setModalVisible(false)}
-            >
+              onPress={() => setModalVisible(false)}>
               <Text style={styles.actionButtonLargeTextCancel}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -319,7 +321,7 @@ const AdminDocumentsScreen: React.FC<any> = ({ navigation }) => {
   );
 };
 
-const InfoRow = ({ label, value }: { label: string; value: string }) => (
+const InfoRow = ({label, value}: {label: string; value: string}) => (
   <View style={styles.infoRow}>
     <Text style={styles.infoLabel}>{label}:</Text>
     <Text style={styles.infoValue}>{value}</Text>
@@ -329,49 +331,49 @@ const InfoRow = ({ label, value }: { label: string; value: string }) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#F5F5F5',
   },
   centerContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    color: '#666',
   },
   header: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
     fontSize: 28,
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
   },
   subtitle: {
     fontSize: 14,
-    color: "#666",
+    color: '#666',
     marginTop: 4,
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#34C759",
+    fontWeight: '700',
+    color: '#34C759',
   },
   emptySubtitle: {
     fontSize: 14,
-    color: "#999",
+    color: '#999',
     marginTop: 8,
   },
   listContent: {
@@ -379,152 +381,152 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   docCard: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
   docHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   docName: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
   },
   docType: {
     fontSize: 12,
-    color: "#666",
+    color: '#666',
     marginTop: 2,
   },
   docBadge: {
-    backgroundColor: "#007AFF",
+    backgroundColor: '#007AFF',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
   },
   docBadgeText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   docUser: {
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: '#f0f0f0',
   },
   docUserName: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#000",
+    fontWeight: '600',
+    color: '#000',
   },
   docUserEmail: {
     fontSize: 12,
-    color: "#999",
+    color: '#999',
     marginTop: 2,
   },
   docFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   docDate: {
     fontSize: 12,
-    color: "#999",
+    color: '#999',
   },
   actionButtons: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
   },
   actionButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   approveButton: {
-    backgroundColor: "#34C759",
+    backgroundColor: '#34C759',
   },
   rejectButton: {
-    backgroundColor: "#FF3B30",
+    backgroundColor: '#FF3B30',
   },
   actionButtonText: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   loadMoreIndicator: {
     marginVertical: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
-    width: "85%",
+    width: '85%',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 4,
   },
   modalSubtitle: {
     fontSize: 13,
-    color: "#666",
+    color: '#666',
     marginBottom: 12,
   },
   documentInfo: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
   infoRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     marginBottom: 8,
   },
   infoLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#666",
+    fontWeight: '600',
+    color: '#666',
     width: 80,
   },
   infoValue: {
     fontSize: 12,
-    color: "#000",
+    color: '#000',
     flex: 1,
   },
   notesLabel: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#000",
+    fontWeight: '600',
+    color: '#000',
     marginBottom: 8,
   },
   notesInput: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 10,
     fontSize: 13,
-    color: "#000",
+    color: '#000',
     marginBottom: 16,
-    textAlignVertical: "top",
+    textAlignVertical: 'top',
   },
   actionButtonLarge: {
     borderRadius: 10,
@@ -532,25 +534,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   approveButtonLarge: {
-    backgroundColor: "#34C759",
+    backgroundColor: '#34C759',
   },
   rejectButtonLarge: {
-    backgroundColor: "#FF3B30",
+    backgroundColor: '#FF3B30',
   },
   cancelButtonLarge: {
-    backgroundColor: "#f0f0f0",
+    backgroundColor: '#f0f0f0',
   },
   actionButtonLargeText: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-    textAlign: "center",
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
   },
   actionButtonLargeTextCancel: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
-    textAlign: "center",
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

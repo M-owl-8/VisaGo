@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,43 +10,44 @@ import {
   FlatList,
   Modal,
   Pressable,
-} from "react-native";
-import axios from "axios";
-import { useFocusEffect } from "@react-navigation/native";
+} from 'react-native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useIsAdmin} from '../../hooks/useIsAdmin';
+import {adminApi, ApplicationData} from '../../services/adminApi';
 
-interface Application {
-  id: string;
-  userId: string;
-  userEmail: string;
-  userName: string;
-  countryName: string;
-  visaTypeName: string;
-  status: string;
-  progressPercentage: number;
-  documentCount: number;
-  verifiedDocuments: number;
-  paymentStatus: string;
-  paymentAmount: number;
-  submissionDate: string | null;
-  createdAt: string;
-}
-
-const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
-  const [applications, setApplications] = useState<Application[]>([]);
+const AdminApplicationsScreen: React.FC<any> = ({navigation}) => {
+  const isAdmin = useIsAdmin();
+  const nav = useNavigation();
+  const [applications, setApplications] = useState<ApplicationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [selectedApp, setSelectedApp] = useState<ApplicationData | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [newStatus, setNewStatus] = useState<string>("");
+  const [newStatus, setNewStatus] = useState<string>('');
+
+  // Screen-level guard
+  useEffect(() => {
+    if (!isAdmin) {
+      if (nav.canGoBack()) {
+        nav.goBack();
+      } else {
+        nav.navigate('MainTabs' as never);
+      }
+    }
+  }, [isAdmin, nav]);
+
+  if (!isAdmin) {
+    return null;
+  }
 
   useFocusEffect(
     React.useCallback(() => {
       setPage(0);
       setApplications([]);
       fetchApplications(0);
-    }, [])
+    }, []),
   );
 
   const fetchApplications = async (pageNum: number) => {
@@ -54,22 +55,18 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
       if (pageNum === 0) {
         setLoading(true);
       }
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || "http://localhost:3000"}/api/admin/applications?skip=${pageNum * 20}&take=20`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      const response = await adminApi.getApplications({
+        skip: pageNum * 20,
+        take: 20,
+      });
       if (pageNum === 0) {
-        setApplications(response.data.data);
+        setApplications(response.data);
       } else {
-        setApplications((prev) => [...prev, ...response.data.data]);
+        setApplications(prev => [...prev, ...response.data]);
       }
-      setHasMore(response.data.data.length === 20);
+      setHasMore(response.data.length === 20);
     } catch (error) {
-      console.error("Error fetching applications:", error);
+      console.error('Error fetching applications:', error);
     } finally {
       setLoading(false);
     }
@@ -93,21 +90,13 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
 
   const handleStatusChange = async (appId: string, status: string) => {
     try {
-      await axios.patch(
-        `${process.env.REACT_APP_API_URL || "http://localhost:3000"}/api/admin/applications/${appId}/status`,
-        { status },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      setApplications((prev) =>
-        prev.map((a) => (a.id === appId ? { ...a, status } : a))
+      await adminApi.updateApplicationStatus(appId, status);
+      setApplications(prev =>
+        prev.map(a => (a.id === appId ? {...a, status} : a)),
       );
       setModalVisible(false);
     } catch (error) {
-      console.error("Error updating application status:", error);
+      console.error('Error updating application status:', error);
     }
   };
 
@@ -120,22 +109,25 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
     );
   }
 
-  const renderAppItem = ({ item }: { item: Application }) => (
+  const renderAppItem = ({item}: {item: ApplicationData}) => (
     <TouchableOpacity
       style={styles.appCard}
       onPress={() => {
         setSelectedApp(item);
         setNewStatus(item.status);
         setModalVisible(true);
-      }}
-    >
+      }}>
       <View style={styles.appHeader}>
-        <View style={{ flex: 1 }}>
+        <View style={{flex: 1}}>
           <Text style={styles.appCountry}>{item.countryName}</Text>
           <Text style={styles.appType}>{item.visaTypeName}</Text>
           <Text style={styles.appUser}>{item.userEmail}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+        <View
+          style={[
+            styles.statusBadge,
+            {backgroundColor: getStatusColor(item.status)},
+          ]}>
           <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
         </View>
       </View>
@@ -152,7 +144,9 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
             ]}
           />
         </View>
-        <Text style={styles.progressText}>{item.progressPercentage}% Complete</Text>
+        <Text style={styles.progressText}>
+          {item.progressPercentage}% Complete
+        </Text>
       </View>
 
       <View style={styles.appStats}>
@@ -162,7 +156,7 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
         />
         <StatItem
           label="Payment"
-          value={`${item.paymentStatus === "no_payment" ? "Not Paid" : item.paymentStatus} - $${item.paymentAmount.toFixed(2)}`}
+          value={`${item.paymentStatus === 'no_payment' ? 'Not Paid' : item.paymentStatus} - $${item.paymentAmount.toFixed(2)}`}
         />
       </View>
 
@@ -181,15 +175,21 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
 
       <FlatList
         data={applications}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderAppItem}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         contentContainerStyle={styles.listContent}
         ListFooterComponent={() =>
           loading && applications.length > 0 ? (
-            <ActivityIndicator size="small" color="#007AFF" style={styles.loadMoreIndicator} />
+            <ActivityIndicator
+              size="small"
+              color="#007AFF"
+              style={styles.loadMoreIndicator}
+            />
           ) : null
         }
       />
@@ -199,56 +199,56 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
         visible={modalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+        onRequestClose={() => setModalVisible(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Change Application Status</Text>
             <Text style={styles.modalSubtitle}>
               {selectedApp?.countryName} - {selectedApp?.visaTypeName}
             </Text>
 
-            {["draft", "submitted", "approved", "rejected", "expired"].map((status) => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  styles.statusOption,
-                  newStatus === status && styles.statusOptionSelected,
-                ]}
-                onPress={() => setNewStatus(status)}
-              >
-                <View
+            {['draft', 'submitted', 'approved', 'rejected', 'expired'].map(
+              status => (
+                <TouchableOpacity
+                  key={status}
                   style={[
-                    styles.statusRadio,
-                    newStatus === status && styles.statusRadioSelected,
+                    styles.statusOption,
+                    newStatus === status && styles.statusOptionSelected,
                   ]}
-                />
-                <View style={styles.statusOptionContent}>
-                  <Text style={styles.statusOptionText}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </Text>
+                  onPress={() => setNewStatus(status)}>
                   <View
                     style={[
-                      styles.miniStatusBadge,
-                      { backgroundColor: getStatusColor(status) },
+                      styles.statusRadio,
+                      newStatus === status && styles.statusRadioSelected,
                     ]}
                   />
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.statusOptionContent}>
+                    <Text style={styles.statusOptionText}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                    <View
+                      style={[
+                        styles.miniStatusBadge,
+                        {backgroundColor: getStatusColor(status)},
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+              ),
+            )}
 
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() =>
                 selectedApp && handleStatusChange(selectedApp.id, newStatus)
-              }
-            >
+              }>
               <Text style={styles.modalButtonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modalButton, styles.modalButtonCancel]}
-              onPress={() => setModalVisible(false)}
-            >
+              onPress={() => setModalVisible(false)}>
               <Text style={styles.modalButtonTextCancel}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -258,7 +258,7 @@ const AdminApplicationsScreen: React.FC<any> = ({ navigation }) => {
   );
 };
 
-const StatItem = ({ label, value }: { label: string; value: string | number }) => (
+const StatItem = ({label, value}: {label: string; value: string | number}) => (
   <View style={styles.statItem}>
     <Text style={styles.statLabel}>{label}</Text>
     <Text style={styles.statValue}>{value}</Text>
@@ -267,41 +267,41 @@ const StatItem = ({ label, value }: { label: string; value: string | number }) =
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "draft":
-      return "#999";
-    case "submitted":
-      return "#007AFF";
-    case "approved":
-      return "#34C759";
-    case "rejected":
-      return "#FF3B30";
-    case "expired":
-      return "#FF9500";
+    case 'draft':
+      return '#999';
+    case 'submitted':
+      return '#007AFF';
+    case 'approved':
+      return '#34C759';
+    case 'rejected':
+      return '#FF3B30';
+    case 'expired':
+      return '#FF9500';
     default:
-      return "#999";
+      return '#999';
   }
 };
 
 const getProgressColor = (progress: number) => {
-  if (progress < 33) return "#FF3B30";
-  if (progress < 66) return "#FF9500";
-  return "#34C759";
+  if (progress < 33) return '#FF3B30';
+  if (progress < 66) return '#FF9500';
+  return '#34C759';
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: '#F5F5F5',
   },
   centerContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    color: '#666',
   },
   header: {
     paddingHorizontal: 16,
@@ -310,12 +310,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
   },
   subtitle: {
     fontSize: 14,
-    color: "#666",
+    color: '#666',
     marginTop: 4,
   },
   listContent: {
@@ -323,34 +323,34 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   appCard: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
   appHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
   appCountry: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
   },
   appType: {
     fontSize: 13,
-    color: "#666",
+    color: '#666',
     marginTop: 2,
   },
   appUser: {
     fontSize: 12,
-    color: "#999",
+    color: '#999',
     marginTop: 4,
   },
   statusBadge: {
@@ -360,29 +360,29 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#fff",
+    fontWeight: '700',
+    color: '#fff',
   },
   appProgress: {
     marginBottom: 12,
   },
   progressBar: {
     height: 6,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: '#f0f0f0',
     borderRadius: 3,
-    overflow: "hidden",
+    overflow: 'hidden',
     marginBottom: 4,
   },
   progressFill: {
-    height: "100%",
+    height: '100%',
   },
   progressText: {
     fontSize: 12,
-    color: "#666",
-    textAlign: "right",
+    color: '#666',
+    textAlign: 'right',
   },
   appStats: {
-    flexDirection: "row",
+    flexDirection: 'row',
     marginBottom: 8,
   },
   statItem: {
@@ -391,78 +391,78 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    color: "#999",
+    color: '#999',
     marginBottom: 2,
   },
   statValue: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#007AFF",
+    fontWeight: '600',
+    color: '#007AFF',
   },
   appDate: {
     fontSize: 12,
-    color: "#999",
+    color: '#999',
   },
   loadMoreIndicator: {
     marginVertical: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
-    width: "80%",
+    width: '80%',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#000",
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 4,
   },
   modalSubtitle: {
     fontSize: 13,
-    color: "#666",
+    color: '#666',
     marginBottom: 16,
   },
   statusOption: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
     marginBottom: 8,
     borderRadius: 8,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: '#f5f5f5',
   },
   statusOptionSelected: {
-    backgroundColor: "#e3f2fd",
+    backgroundColor: '#e3f2fd',
   },
   statusRadio: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: "#999",
+    borderColor: '#999',
     marginRight: 12,
   },
   statusRadioSelected: {
-    borderColor: "#007AFF",
-    backgroundColor: "#007AFF",
+    borderColor: '#007AFF',
+    backgroundColor: '#007AFF',
   },
   statusOptionContent: {
     flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   statusOptionText: {
     fontSize: 15,
-    fontWeight: "500",
-    color: "#000",
+    fontWeight: '500',
+    color: '#000',
   },
   miniStatusBadge: {
     paddingHorizontal: 8,
@@ -471,29 +471,29 @@ const styles = StyleSheet.create({
   },
   miniStatusBadgeText: {
     fontSize: 10,
-    fontWeight: "600",
-    color: "#fff",
+    fontWeight: '600',
+    color: '#fff',
   },
   modalButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: '#007AFF',
     borderRadius: 10,
     paddingVertical: 12,
     marginTop: 12,
   },
   modalButtonText: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-    textAlign: "center",
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
   },
   modalButtonCancel: {
-    backgroundColor: "#f0f0f0",
+    backgroundColor: '#f0f0f0',
   },
   modalButtonTextCancel: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
-    textAlign: "center",
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

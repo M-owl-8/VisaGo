@@ -12,6 +12,8 @@ const getApiClient = () => {
   return apiClient;
 };
 
+export type UserRole = 'user' | 'admin' | 'super_admin';
+
 interface User {
   id: string;
   email: string;
@@ -27,6 +29,7 @@ interface User {
   updatedAt?: string;
   bio?: string; // JSON string containing questionnaire data
   questionnaireCompleted?: boolean;
+  role?: UserRole; // User role: 'user', 'admin', or 'super_admin'
   preferences?: {
     notificationsEnabled?: boolean;
     emailNotifications?: boolean;
@@ -158,6 +161,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 emailVerified: user.emailVerified,
                 bio: user.bio,
                 questionnaireCompleted: user.questionnaireCompleted || false,
+                role: user.role || 'user',
               };
 
               set({
@@ -286,6 +290,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
+        role: user.role || 'user',
       };
 
       set({
@@ -399,6 +404,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
+        role: user.role || 'user',
       };
 
       set({
@@ -479,6 +485,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
+        role: user.role || 'user',
       };
 
       set({
@@ -600,6 +607,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         currency: response.data.currency || 'USD',
         bio: response.data.bio,
         questionnaireCompleted: response.data.questionnaireCompleted,
+        role: response.data.role || 'user',
       };
 
       // Update AsyncStorage

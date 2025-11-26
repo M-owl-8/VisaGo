@@ -33,6 +33,8 @@ import {
 import './i18n'; // Initialize i18next
 import {useTranslation} from 'react-i18next';
 import {isHomePageFrozen} from './config/features';
+import AdminNavigator from './navigation/AdminNavigator';
+import {useIsAdmin} from './hooks/useIsAdmin';
 
 initializeErrorLogger();
 
@@ -94,6 +96,7 @@ function AuthStack() {
 // ============================================================================
 function AppTabs() {
   const {t} = useTranslation();
+  const isAdmin = useIsAdmin();
 
   return (
     <Tab.Navigator
@@ -119,6 +122,13 @@ function AppTabs() {
               iconConfig = focused
                 ? TabIcons.profile.active
                 : TabIcons.profile.inactive;
+              break;
+            case 'AdminPanel':
+              // Use settings icon for admin panel
+              iconConfig = {
+                name: focused ? 'settings' : 'settings-outline',
+                library: 'ionicons' as const,
+              };
               break;
             default:
               iconConfig = TabIcons.applications.inactive;
@@ -201,6 +211,16 @@ function AppTabs() {
         component={ProfileScreen}
         options={{title: t('profile.profile')}}
       />
+      {isAdmin && (
+        <Tab.Screen
+          name="AdminPanel"
+          component={AdminNavigator}
+          options={{
+            title: 'Admin',
+            headerShown: false, // AdminNavigator handles its own headers
+          }}
+        />
+      )}
     </Tab.Navigator>
   );
 }
