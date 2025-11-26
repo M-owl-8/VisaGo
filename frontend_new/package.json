@@ -18,7 +18,8 @@
     "build:ios:eas:dev": "eas build --platform ios --profile development",
     "icons:android": "node scripts/generate-android-icons.js",
     "icons:ios": "node scripts/generate-ios-icons.js",
-    "icons:all": "node scripts/generate-android-icons.js && node scripts/generate-ios-icons.js"
+    "icons:all": "node scripts/generate-android-icons.js && node scripts/generate-ios-icons.js",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.4",
@@ -39,12 +40,14 @@
     "react-hook-form": "^7.64.0",
     "react-i18next": "^15.3.4",
     "react-native": "0.72.10",
+    "react-native-chart-kit": "^6.12.0",
     "react-native-document-picker": "^9.1.1",
     "react-native-gesture-handler": "2.12.0",
     "react-native-image-picker": "5.6.0",
     "react-native-reanimated": "3.2.0",
     "react-native-safe-area-context": "^4.8.2",
     "react-native-screens": "3.22.0",
+    "react-native-svg": "^15.15.0",
     "react-native-vector-icons": "^10.1.0",
     "zod": "^3.25.0",
     "zustand": "^5.0.0"
@@ -76,6 +79,8 @@
     "jest": "^29.2.1",
     "metro": "^0.83.3",
     "metro-react-native-babel-preset": "0.76.8",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "prettier": "^3.2.5",
     "react-test-renderer": "18.2.0",
     "ts-jest": "^29.4.5",

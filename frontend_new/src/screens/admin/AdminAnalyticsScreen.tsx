@@ -15,7 +15,7 @@ import {LineChart, BarChart, PieChart} from 'react-native-chart-kit';
 import {useNavigation} from '@react-navigation/native';
 import {useIsAdmin} from '../../hooks/useIsAdmin';
 import {adminApi} from '../../services/adminApi';
-import Colors from '../../constants/Colors';
+import {COLORS} from '../../theme/colors';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -95,7 +95,7 @@ export default function AdminAnalyticsScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={COLORS.PRIMARY} />
       </View>
     );
   }
@@ -222,9 +222,9 @@ export default function AdminAnalyticsScreen() {
             width={screenWidth - 32}
             height={220}
             chartConfig={{
-              backgroundColor: Colors.background,
-              backgroundGradientFrom: Colors.background,
-              backgroundGradientTo: Colors.background,
+              backgroundColor: COLORS.BG_PRIMARY,
+              backgroundGradientFrom: COLORS.BG_PRIMARY,
+              backgroundGradientTo: COLORS.BG_PRIMARY,
               color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
               labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
               strokeWidth: 2,
@@ -243,9 +243,9 @@ export default function AdminAnalyticsScreen() {
             width={screenWidth - 32}
             height={220}
             chartConfig={{
-              backgroundColor: Colors.background,
-              backgroundGradientFrom: Colors.background,
-              backgroundGradientTo: Colors.background,
+              backgroundColor: COLORS.BG_PRIMARY,
+              backgroundGradientFrom: COLORS.BG_PRIMARY,
+              backgroundGradientTo: COLORS.BG_PRIMARY,
               color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
               labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
             }}
@@ -408,7 +408,7 @@ export default function AdminAnalyticsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: COLORS.BG_PRIMARY,
   },
   centerContent: {
     justifyContent: 'center',
@@ -426,22 +426,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: COLORS.CARD_BG,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: COLORS.BORDER,
   },
   periodButtonActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
   },
   periodButtonText: {
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '500',
-    color: Colors.text,
+    color: COLORS.TEXT_PRIMARY,
   },
   periodButtonTextActive: {
-    color: Colors.white,
+    color: COLORS.WHITE,
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -451,26 +451,26 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: COLORS.CARD_BG,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: COLORS.BORDER,
   },
   metricLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: COLORS.TEXT_SECONDARY,
     marginBottom: 8,
   },
   metricValue: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: COLORS.PRIMARY,
     marginBottom: 4,
   },
   metricChange: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: COLORS.TEXT_SECONDARY,
   },
   section: {
     marginHorizontal: 16,
@@ -480,29 +480,29 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     padding: 16,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: COLORS.CARD_BG,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: COLORS.BORDER,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: COLORS.TEXT_PRIMARY,
     marginBottom: 12,
   },
   sectionSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: COLORS.TEXT_SECONDARY,
   },
   chartContainer: {
     marginHorizontal: 16,
     marginBottom: 20,
-    backgroundColor: Colors.cardBackground,
+    backgroundColor: COLORS.CARD_BG,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: COLORS.BORDER,
   },
   listItem: {
     flexDirection: 'row',
@@ -510,18 +510,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: COLORS.BORDER,
   },
   listLabel: {
     flex: 1,
     fontSize: 14,
-    color: Colors.text,
+    color: COLORS.TEXT_PRIMARY,
     textTransform: 'capitalize',
   },
   listValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: COLORS.PRIMARY,
   },
   listValueContainer: {
     flex: 0.5,
@@ -531,13 +531,13 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: COLORS.PRIMARY,
     borderRadius: 3,
     marginRight: 8,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: COLORS.BG_PRIMARY,
     paddingTop: 16,
   },
   closeButton: {
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: COLORS.PRIMARY,
   },
   modalContent: {
     flex: 1,
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: COLORS.TEXT_PRIMARY,
     marginBottom: 24,
   },
   funnelStep: {
@@ -571,23 +571,23 @@ const styles = StyleSheet.create({
   funnelNumber: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: COLORS.PRIMARY,
   },
   funnelLabel: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: COLORS.TEXT_SECONDARY,
     marginTop: 4,
   },
   conversionText: {
     fontSize: 12,
-    color: Colors.success,
+    color: COLORS.GREEN,
     fontWeight: '600',
     marginBottom: 8,
   },
   funnelBar: {
     width: '100%',
     height: 4,
-    backgroundColor: Colors.primary,
+    backgroundColor: COLORS.PRIMARY,
     borderRadius: 2,
   },
 });

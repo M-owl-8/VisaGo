@@ -33,14 +33,20 @@ subprojects {
     afterEvaluate { project ->
         if (project.hasProperty("android")) {
             project.android {
+                // Only set compileSdkVersion at android extension level
                 if (!project.android.hasProperty("compileSdkVersion") || project.android.compileSdkVersion == null) {
                     compileSdkVersion rootProject.ext.compileSdkVersion
                 }
-                if (!project.android.hasProperty("minSdkVersion") || project.android.minSdkVersion == null) {
-                    minSdkVersion rootProject.ext.minSdkVersion
-                }
-                if (!project.android.hasProperty("targetSdkVersion") || project.android.targetSdkVersion == null) {
-                    targetSdkVersion rootProject.ext.targetSdkVersion
+                // minSdkVersion and targetSdkVersion should be set in defaultConfig, not here
+                // But we can set them in defaultConfig if it exists
+                if (project.android.hasProperty("defaultConfig")) {
+                    def defaultConfig = project.android.defaultConfig
+                    if (defaultConfig && !defaultConfig.hasProperty("minSdkVersion") || defaultConfig.minSdkVersion == null) {
+                        defaultConfig.minSdkVersion rootProject.ext.minSdkVersion
+                    }
+                    if (defaultConfig && !defaultConfig.hasProperty("targetSdkVersion") || defaultConfig.targetSdkVersion == null) {
+                        defaultConfig.targetSdkVersion rootProject.ext.targetSdkVersion
+                    }
                 }
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_17

@@ -1,0 +1,33 @@
+diff --git a/node_modules/react-native-svg/android/build.gradle b/node_modules/react-native-svg/android/build.gradle
+index 4fe912c..812aad8 100644
+--- a/node_modules/react-native-svg/android/build.gradle
++++ b/node_modules/react-native-svg/android/build.gradle
+@@ -67,15 +67,22 @@ def REACT_NATIVE_MINOR_VERSION = REACT_NATIVE_VERSION.startsWith("0.0.0-") ? 100
+ def getFrescoVersion() {
+     def reactNativeRootDir = resolveReactNativeDirectory()
+     def frescoVersion = null
+-    file("$reactNativeRootDir/gradle/libs.versions.toml").withInputStream { stream ->
+-        stream.eachLine { line ->
+-            if (line.contains("fresco") && !line.contains("ref")) {
+-                def keyValue = line.split("=")
+-                if (keyValue.size() == 2) {
+-                    frescoVersion = keyValue[1].trim().replaceAll(/["']/, "")
++    try {
++        def tomlFile = file("$reactNativeRootDir/gradle/libs.versions.toml")
++        if (tomlFile.exists()) {
++            tomlFile.withInputStream { stream ->
++                stream.eachLine { line ->
++                    if (line.contains("fresco") && !line.contains("ref")) {
++                        def keyValue = line.split("=")
++                        if (keyValue.size() == 2) {
++                            frescoVersion = keyValue[1].trim().replaceAll(/["']/, "")
++                        }
++                    }
+                 }
+             }
+         }
++    } catch (Exception e) {
++        // TOML file doesn't exist or is invalid, use default
+     }
+     if (!frescoVersion) {
+         return "3.2.0"
