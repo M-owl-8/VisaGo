@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -12,19 +12,19 @@ import {
   ImageBackground,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuthStore } from '../../store/auth';
-import { signInWithGoogle } from '../../services/google-oauth';
+import {useAuthStore} from '../../store/auth';
+import {signInWithGoogle} from '../../services/google-oauth';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen({navigation}: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
-  const login = useAuthStore((state) => state.login);
-  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+
+  const login = useAuthStore(state => state.login);
+  const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -45,17 +45,21 @@ export default function LoginScreen({ navigation }: any) {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
+      // Get Google ID token from Google Sign-In SDK
       const googleUserInfo = await signInWithGoogle();
-      await loginWithGoogle(
-        googleUserInfo.googleId,
-        googleUserInfo.email,
-        googleUserInfo.firstName,
-        googleUserInfo.lastName,
-        googleUserInfo.avatar
-      );
+
+      // SECURE: Send idToken to backend for server-side verification
+      if (!googleUserInfo.token) {
+        throw new Error('No ID token returned from Google Sign-In');
+      }
+
+      await loginWithGoogle(googleUserInfo.token);
     } catch (error: any) {
       if (!error.message?.includes('cancelled')) {
-        Alert.alert('Google Login Failed', error.message || 'An error occurred');
+        Alert.alert(
+          'Google Login Failed',
+          error.message || 'An error occurred',
+        );
       }
     } finally {
       setLoading(false);
@@ -77,15 +81,16 @@ export default function LoginScreen({ navigation }: any) {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+          keyboardShouldPersistTaps="handled">
           {/* Logo and Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
               <Icon name="globe-outline" size={48} color="#4A9EFF" />
             </View>
             <Text style={styles.title}>Ketdik</Text>
-            <Text style={styles.subtitle}>Your trusted digital visa companion.</Text>
+            <Text style={styles.subtitle}>
+              Your trusted digital visa companion.
+            </Text>
           </View>
 
           {/* Login Card */}
@@ -94,7 +99,12 @@ export default function LoginScreen({ navigation }: any) {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <View style={styles.inputContainer}>
-                <Icon name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <Icon
+                  name="mail-outline"
+                  size={20}
+                  color="#6B7280"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="your@email.com"
@@ -114,13 +124,17 @@ export default function LoginScreen({ navigation }: any) {
                 <Text style={styles.label}>Password</Text>
                 <TouchableOpacity
                   onPress={() => navigation.navigate('ForgotPassword')}
-                  disabled={loading}
-                >
+                  disabled={loading}>
                   <Text style={styles.forgotPassword}>Forgot password?</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.inputContainer}>
-                <Icon name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <Icon
+                  name="lock-closed-outline"
+                  size={20}
+                  color="#6B7280"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Enter your password"
@@ -132,8 +146,7 @@ export default function LoginScreen({ navigation }: any) {
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
+                  style={styles.eyeIcon}>
                   <Icon
                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                     size={20}
@@ -147,8 +160,7 @@ export default function LoginScreen({ navigation }: any) {
             <TouchableOpacity
               style={[styles.signInButton, loading && styles.disabledButton]}
               onPress={handleLogin}
-              disabled={loading}
-            >
+              disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
@@ -167,19 +179,19 @@ export default function LoginScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.googleButton}
               onPress={handleGoogleLogin}
-              disabled={loading}
-            >
+              disabled={loading}>
               <Icon name="logo-google" size={20} color="#FFFFFF" />
               <Text style={styles.googleButtonText}>Continue with Google</Text>
             </TouchableOpacity>
 
             {/* Create Account Link */}
             <View style={styles.createAccountContainer}>
-              <Text style={styles.createAccountText}>Don't have an account? </Text>
+              <Text style={styles.createAccountText}>
+                Don't have an account?{' '}
+              </Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('Register')}
-                disabled={loading}
-              >
+                disabled={loading}>
                 <Text style={styles.createAccountLink}>Create account</Text>
               </TouchableOpacity>
             </View>
@@ -231,14 +243,14 @@ const styles = StyleSheet.create({
     height: 300,
     top: 100,
     left: '30%',
-    transform: [{ rotate: '15deg' }],
+    transform: [{rotate: '15deg'}],
   },
   line2: {
     width: 2,
     height: 250,
     bottom: 150,
     right: '25%',
-    transform: [{ rotate: '-15deg' }],
+    transform: [{rotate: '-15deg'}],
   },
   scrollContent: {
     flexGrow: 1,

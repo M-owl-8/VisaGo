@@ -130,6 +130,7 @@ model VisaApplication {
   documents         UserDocument[]
   payment           Payment?
   checkpoints       Checkpoint[]
+  checklist         DocumentChecklist?
 
   @@unique([userId, countryId, visaTypeId])
   @@index([userId])
@@ -152,6 +153,23 @@ model Checkpoint {
 
   @@index([applicationId])
   @@index([isCompleted])
+}
+
+model DocumentChecklist {
+  id                String    @id @default(cuid())
+  applicationId     String    @unique
+  status            String    @default("pending") // pending, ready, failed
+  checklistData     String    // JSON string containing checklist items
+  errorMessage      String?
+  aiGenerated       Boolean   @default(false)
+  generatedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([status])
 }
 
 model DocumentType {

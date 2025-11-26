@@ -10,6 +10,13 @@ import {Platform} from 'react-native';
 import {useNetworkStore} from '../store/network';
 import {logError, logMessage, addBreadcrumb} from './errorLogger';
 
+// Fallback URLs (matching constants.ts)
+const FALLBACK_API_URL = 'https://visago-production.up.railway.app';
+const FALLBACK_AI_SERVICE_URL =
+  'https://zippy-perfection-production.up.railway.app';
+const DEV_FALLBACK_API_URL = 'http://localhost:3000';
+const DEV_FALLBACK_AI_SERVICE_URL = 'http://localhost:8001';
+
 // Determine API URL based on environment
 // IMPORTANT: Physical devices ALWAYS use Railway URL (or env var)
 // Only emulators/simulators can use localhost/10.0.2.2 (via explicit env var)
@@ -29,12 +36,22 @@ const getApiBaseUrl = (): string => {
     }
   }
 
-  // LOW PRIORITY FIX: Removed hardcoded Railway URL - must use environment variable
-  // This ensures URLs can be changed per environment without code changes
-  // If no env var is set, throw error to force explicit configuration
-  throw new Error(
-    'API URL not configured. Please set EXPO_PUBLIC_API_URL or REACT_APP_API_URL environment variable.',
+  // Priority 2: Use fallback from constants (production Railway URL)
+  if (FALLBACK_API_URL) {
+    console.warn(
+      '⚠️ API base URL is not configured via environment variables. Using fallback:',
+      FALLBACK_API_URL,
+    );
+    return FALLBACK_API_URL;
+  }
+
+  // Priority 3: Dev fallback (should never reach here, but safety net)
+  console.warn(
+    '⚠️ API base URL is not configured. Using development fallback:',
+    DEV_FALLBACK_API_URL,
+    '(development only)',
   );
+  return DEV_FALLBACK_API_URL;
 };
 
 // Determine AI Service URL (separate from backend API)
@@ -61,11 +78,22 @@ const getAiServiceBaseUrl = (): string => {
     }
   }
 
-  // LOW PRIORITY FIX: Removed hardcoded AI service URL - must use environment variable
-  // If no env var is set, throw error to force explicit configuration
-  throw new Error(
-    'AI Service URL not configured. Please set EXPO_PUBLIC_AI_SERVICE_URL environment variable.',
+  // Priority 3: Use fallback from constants (production Railway URL)
+  if (FALLBACK_AI_SERVICE_URL) {
+    console.warn(
+      '⚠️ AI Service base URL is not configured via environment variables. Using fallback:',
+      FALLBACK_AI_SERVICE_URL,
+    );
+    return FALLBACK_AI_SERVICE_URL;
+  }
+
+  // Priority 4: Dev fallback (should never reach here, but safety net)
+  console.warn(
+    '⚠️ AI Service base URL is not configured. Using development fallback:',
+    DEV_FALLBACK_AI_SERVICE_URL,
+    '(development only)',
   );
+  return DEV_FALLBACK_AI_SERVICE_URL;
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -995,19 +1023,20 @@ class ApiClient {
     return response.data;
   }
 
-  async loginWithGoogle(
-    googleId: string,
-    email: string,
-    firstName?: string,
-    lastName?: string,
-    avatar?: string,
-  ): Promise<ApiResponse> {
+  /**
+   * Login with Google OAuth
+   * SECURE: Sends Google ID token for server-side verification
+   *
+   * @param idToken - Google ID token from Google Sign-In SDK
+   * @returns Authentication response with token and user data
+   */
+  async loginWithGoogle(idToken: string): Promise<ApiResponse> {
+    if (!idToken || typeof idToken !== 'string') {
+      throw new Error('Google ID token is required');
+    }
+
     const response = await this.api.post('/auth/google', {
-      googleId,
-      email,
-      firstName,
-      lastName,
-      avatar,
+      idToken,
     });
     return response.data;
   }

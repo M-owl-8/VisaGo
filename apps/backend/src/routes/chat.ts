@@ -239,10 +239,25 @@ router.get('/history', async (req: Request, res: Response) => {
       data: history,
     });
   } catch (error: any) {
+    // Enhanced error logging for debugging
+    const { logError } = await import('../middleware/logger');
+    logError(
+      '[ChatHistory] Error loading history',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        userId: req.userId || (req as any).user?.id,
+        applicationId: req.query.applicationId,
+        limit: req.query.limit,
+        offset: req.query.offset,
+        errorMessage: error.message,
+        errorStack: error.stack,
+      }
+    );
+
     res.status(500).json({
       success: false,
       error: {
-        message: error.message,
+        message: error.message || 'Failed to load chat history',
       },
     });
   }

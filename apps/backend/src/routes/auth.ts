@@ -130,43 +130,46 @@ router.post(
 /**
  * POST /api/auth/google
  * Login/Register with Google OAuth
- * Enhanced with better error messages and validation
+ * SECURE: Verifies Google ID token server-side
  *
  * @route POST /api/auth/google
  * @access Public
- * @body {string} googleId - Google user ID
- * @body {string} email - User email address
- * @body {string} [firstName] - User first name (optional)
- * @body {string} [lastName] - User last name (optional)
- * @body {string} [avatar] - User avatar URL (optional)
+ * @body {string} idToken - Google ID token from Google Sign-In SDK
  * @returns {object} Authentication response with token and user data
  */
 router.post(
   '/google',
   validateRequest({
     body: {
-      required: ['googleId', 'email'],
-      optional: ['firstName', 'lastName', 'avatar'],
-      sanitize: ['email', 'firstName', 'lastName'],
+      required: ['idToken'],
+      optional: [],
+      sanitize: [],
       validate: {
-        email: (val) => isValidEmail(val),
+        idToken: (val) => {
+          if (!val || typeof val !== 'string' || val.trim().length === 0) {
+            return false;
+          }
+          return true;
+        },
       },
     },
   }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { googleId, email, firstName, lastName, avatar } = req.body;
+      const { idToken } = req.body;
 
-      // Google OAuth is now optional - allow it to work without server-side verification
-      // The client-side Google Sign-In already verifies the token
-      // We just need to trust the Google ID provided by the client
-      const result = await AuthService.verifyGoogleAuth({
-        googleId,
-        email,
-        firstName,
-        lastName,
-        avatar,
-      });
+      if (!idToken || typeof idToken !== 'string' || idToken.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'ID_TOKEN_REQUIRED',
+            message: 'Google ID token is required',
+          },
+        });
+      }
+
+      // Verify Google ID token server-side and authenticate user
+      const result = await AuthService.verifyGoogleAuth(idToken);
 
       successResponse(res, result);
     } catch (error) {

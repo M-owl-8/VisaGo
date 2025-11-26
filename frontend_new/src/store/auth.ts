@@ -105,13 +105,7 @@ interface AuthState {
     firstName: string,
     lastName: string,
   ) => Promise<void>;
-  loginWithGoogle: (
-    googleId: string,
-    email: string,
-    firstName?: string,
-    lastName?: string,
-    avatar?: string,
-  ) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
@@ -449,23 +443,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   // Google OAuth Login
-  loginWithGoogle: async (
-    googleId: string,
-    email: string,
-    firstName?: string,
-    lastName?: string,
-    avatar?: string,
-  ) => {
+  // SECURE: Accepts Google ID token for server-side verification
+  loginWithGoogle: async (idToken: string) => {
     try {
       set({isLoading: true});
 
-      const response = await getApiClient().loginWithGoogle(
-        googleId,
-        email,
-        firstName || '',
-        lastName || '',
-        avatar,
-      );
+      if (!idToken || typeof idToken !== 'string') {
+        throw new Error('Google ID token is required');
+      }
+
+      const response = await getApiClient().loginWithGoogle(idToken);
 
       if (!response.success || !response.data) {
         throw new Error(response.error?.message || 'Google login failed');
@@ -486,7 +473,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
-        avatar: user.avatar || avatar,
+        avatar: user.avatar,
         language: user.language || 'en',
         currency: user.currency || 'USD',
         emailVerified: user.emailVerified,

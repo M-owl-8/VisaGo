@@ -5,12 +5,14 @@
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 import { generateToken } from '../middleware/auth';
 import { errors, ApiError } from '../utils/errors';
 import { validatePassword, validateAndNormalizeEmail } from '../utils/validation';
 import { SECURITY_CONFIG, HTTP_STATUS } from '../config/constants';
 import { resilientOperation, getDatabaseErrorMessage } from '../utils/db-resilience';
 import { logError, logInfo, logWarn } from '../middleware/logger';
+import { getEnvConfig } from '../config/env';
 import db from '../db';
 
 const prisma = db; // Use shared resilient instance
@@ -225,10 +227,17 @@ export class AuthService {
 
     // Validate password
     if (!payload.password) {
+      logWarn('[AUTH][LOGIN] Password required', {
+        email: normalizedEmail.substring(0, 3) + '***',
+      });
       throw errors.validationError('Password is required');
     }
 
     if (payload.password.length < 8) {
+      logWarn('[AUTH][LOGIN] Password too short', {
+        email: normalizedEmail.substring(0, 3) + '***',
+        passwordLength: payload.password.length,
+      });
       throw errors.validationError('Password must be at least 8 characters');
     }
 
@@ -410,93 +419,227 @@ export class AuthService {
 
   /**
    * Verify Google OAuth login/registration
-   * Enhanced with better error handling and validation
+   * SECURE: Verifies idToken server-side using google-auth-library
+   *
+   * @param idToken - Google ID token from client
+   * @returns Authentication response with token and user data
+   * @throws {ApiError} If token verification fails or user creation fails
    */
-  static async verifyGoogleAuth(payload: {
-    googleId: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    avatar?: string;
-  }): Promise<AuthResponse> {
-    // Validate required fields
-    if (!payload.googleId || !payload.email) {
-      throw errors.validationError('Google ID and email are required for Google Sign-In');
+  static async verifyGoogleAuth(idToken: string): Promise<AuthResponse> {
+    // Validate idToken is provided
+    if (!idToken || typeof idToken !== 'string') {
+      throw errors.validationError('Google ID token is required');
     }
 
-    // Validate email format
-    const normalizedEmail = validateAndNormalizeEmail(payload.email);
+    const envConfig = getEnvConfig();
 
-    // Validate Google ID format (should be numeric string)
-    if (!/^\d+$/.test(payload.googleId)) {
-      throw errors.validationError('Invalid Google ID format');
+    // Check if Google OAuth is configured
+    if (!envConfig.GOOGLE_CLIENT_ID) {
+      logError(
+        '[GoogleAuth] GOOGLE_CLIENT_ID not configured',
+        new Error('Google OAuth not configured'),
+        {}
+      );
+      throw errors.internalServer('Google Sign-In is not configured. Please contact support.');
     }
 
     try {
-      // Try to find existing user
-      let user = await prisma.user.findFirst({
-        where: {
-          OR: [{ googleId: payload.googleId }, { email: normalizedEmail }],
-        },
+      // Initialize OAuth2Client with Google Client ID
+      const client = new OAuth2Client(envConfig.GOOGLE_CLIENT_ID);
+
+      // Verify the ID token
+      logInfo('[GoogleAuth] Verifying Google ID token', {
+        clientIdLength: envConfig.GOOGLE_CLIENT_ID.length,
       });
 
-      // Create new user if doesn't exist
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            email: normalizedEmail,
-            googleId: payload.googleId,
-            firstName: payload.firstName,
-            lastName: payload.lastName,
-            avatar: payload.avatar,
-            emailVerified: true, // Google verified
-            preferences: {
-              create: {},
-            },
-          },
-        });
-      } else if (!user.googleId) {
-        // Link Google ID to existing user
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            googleId: payload.googleId,
-            avatar: payload.avatar || user.avatar,
-          },
-        });
-      } else if (user.googleId !== payload.googleId) {
-        // Google ID mismatch - security issue
-        throw errors.forbidden(
-          'This email is already associated with a different Google account. Please use the original account or contact support.'
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: envConfig.GOOGLE_CLIENT_ID,
+      });
+
+      // Extract payload from verified token
+      const payload = ticket.getPayload();
+      if (!payload || !payload.sub) {
+        logError(
+          '[GoogleAuth] Invalid token payload',
+          new Error('Missing payload or sub in Google token'),
+          {}
+        );
+        throw errors.unauthorized('Invalid Google ID token: missing user information');
+      }
+
+      // Extract verified user data from token (SECURE - from Google, not client)
+      const googleId = payload.sub; // Google user ID
+      const email = payload.email || null;
+      const firstName = payload.given_name || null;
+      const lastName = payload.family_name || null;
+      const avatar = payload.picture || null;
+      const emailVerified = payload.email_verified ?? false;
+
+      logInfo('[GoogleAuth] Token verified successfully', {
+        googleId,
+        email: email ? `${email.substring(0, 3)}***` : 'no-email',
+        hasName: !!(firstName || lastName),
+      });
+
+      // Validate email is present (required for user account)
+      if (!email) {
+        throw errors.validationError(
+          'Email not found in Google account. Please ensure your Google account has an email address.'
         );
       }
 
-      const token = generateToken(user.id, user.email);
+      // Normalize email
+      const normalizedEmail = validateAndNormalizeEmail(email);
 
-      return {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName || undefined,
-          lastName: user.lastName || undefined,
-          emailVerified: user.emailVerified,
-        },
-      };
+      try {
+        // Try to find existing user by Google ID first
+        let user = await prisma.user.findUnique({
+          where: { googleId },
+        });
+
+        // If not found by Google ID, try to find by email (for account linking)
+        if (!user && normalizedEmail) {
+          user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+          });
+        }
+
+        // Create new user if doesn't exist
+        if (!user) {
+          logInfo('[GoogleAuth] Creating new user', {
+            googleId,
+            email: `${normalizedEmail.substring(0, 3)}***`,
+          });
+
+          user = await prisma.user.create({
+            data: {
+              email: normalizedEmail,
+              googleId,
+              firstName: firstName || undefined,
+              lastName: lastName || undefined,
+              avatar: avatar || undefined,
+              emailVerified: true, // Google verified
+              preferences: {
+                create: {},
+              },
+            },
+          });
+
+          logInfo('[GoogleAuth] New user created', {
+            userId: user.id,
+            googleId,
+          });
+        } else {
+          // User exists - update Google ID if not set, or verify it matches
+          if (!user.googleId) {
+            // Link Google ID to existing email account
+            logInfo('[GoogleAuth] Linking Google ID to existing user', {
+              userId: user.id,
+              googleId,
+            });
+
+            user = await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                googleId,
+                avatar: avatar || user.avatar,
+                emailVerified: emailVerified || user.emailVerified,
+                // Update name if not set
+                firstName: user.firstName || firstName || undefined,
+                lastName: user.lastName || lastName || undefined,
+              },
+            });
+          } else if (user.googleId !== googleId) {
+            // Google ID mismatch - security issue
+            logError(
+              '[GoogleAuth] Google ID mismatch',
+              new Error('Email already associated with different Google account'),
+              {
+                userId: user.id,
+                existingGoogleId: user.googleId,
+                newGoogleId: googleId,
+              }
+            );
+            throw errors.forbidden(
+              'This email is already associated with a different Google account. Please use the original account or contact support.'
+            );
+          } else {
+            // User exists with matching Google ID - update profile info if needed
+            user = await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                avatar: avatar || user.avatar,
+                emailVerified: emailVerified || user.emailVerified,
+                firstName: user.firstName || firstName || undefined,
+                lastName: user.lastName || lastName || undefined,
+              },
+            });
+          }
+        }
+
+        // Generate JWT token (same format as email/password login)
+        const token = generateToken(user.id, user.email);
+
+        logInfo('[GoogleAuth] Authentication successful', {
+          userId: user.id,
+          email: `${user.email.substring(0, 3)}***`,
+        });
+
+        return {
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName || undefined,
+            lastName: user.lastName || undefined,
+            emailVerified: user.emailVerified,
+          },
+        };
+      } catch (error) {
+        // Database errors
+        if (error instanceof ApiError) {
+          throw error;
+        }
+
+        if (error && typeof error === 'object' && 'code' in error) {
+          if (error.code === 'P2002') {
+            logError(
+              '[GoogleAuth] Database conflict',
+              error instanceof Error ? error : new Error(String(error)),
+              { googleId, email: normalizedEmail }
+            );
+            throw errors.conflict('Email or Google ID already exists');
+          }
+        }
+
+        logError(
+          '[GoogleAuth] Database error',
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            googleId,
+            email: normalizedEmail,
+          }
+        );
+        throw errors.internalServer('Failed to authenticate with Google. Please try again.');
+      }
     } catch (error) {
-      // Provide user-friendly error messages
+      // Handle Google token verification errors
       if (error instanceof ApiError) {
         throw error;
       }
 
-      // Database errors
-      if (error && typeof error === 'object' && 'code' in error) {
-        if (error.code === 'P2002') {
-          throw errors.conflict('Email or Google ID');
+      logError('[GoogleAuth] Token verification failed', error as Error, {});
+
+      // Check for specific Google auth errors
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMessage = String(error.message).toLowerCase();
+        if (errorMessage.includes('invalid token') || errorMessage.includes('expired')) {
+          throw errors.unauthorized('Invalid or expired Google token. Please sign in again.');
         }
       }
 
-      throw errors.internalServer('Failed to authenticate with Google. Please try again.');
+      throw errors.unauthorized('Google Sign-In verification failed. Please try again.');
     }
   }
   /**

@@ -27,6 +27,7 @@ import {
   TargetCountry,
   VisaType,
 } from '../../types/questionnaire-v2';
+import {mapQuestionnaireV2ToLegacy} from '../../utils/questionnaireV2ToLegacyMapper';
 
 const TOTAL_STEPS = 10;
 
@@ -205,7 +206,7 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 
   const handleNext = () => {
     if (!canProceed()) {
-      Alert.alert(t('common.error'), 'Please answer all required questions');
+      Alert.alert(t('common.error'), t('questionnaireV2.pleaseAnswerAll'));
       return;
     }
     if (currentStep < TOTAL_STEPS - 1) {
@@ -257,15 +258,24 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       });
 
       // Generate AI application
-      // Backend's /applications/ai-generate accepts questionnaireData directly
-      // Backend will detect version: '2.0' and process QuestionnaireV2 accordingly
+      // Map V2 format to legacy format for backend route validation
+      // Backend route requires 'purpose' and 'country' fields, but V2 has 'visaType' and 'targetCountry'
       try {
-        // Use the API client's internal axios instance to bypass type restrictions
-        // The backend endpoint accepts QuestionnaireV2 format
+        // Convert V2 to legacy format that backend route expects
+        const legacyQuestionnaireData =
+          mapQuestionnaireV2ToLegacy(questionnaireV2);
+
+        // Include the full V2 object so backend service can use it
+        const questionnaireDataForBackend = {
+          ...legacyQuestionnaireData,
+          // Include full V2 structure for backend service processing
+          ...questionnaireV2,
+        };
+
         const response = await (apiClient as any).api.post(
           '/applications/ai-generate',
           {
-            questionnaireData: questionnaireV2,
+            questionnaireData: questionnaireDataForBackend,
           },
         );
 
@@ -278,9 +288,19 @@ export default function QuestionnaireV2Screen({navigation}: any) {
         } else {
           navigation.navigate('MainTabs', {screen: 'Applications'});
         }
-      } catch (error) {
-        console.warn('AI generation failed, but questionnaire saved:', error);
-        navigation.navigate('MainTabs', {screen: 'Applications'});
+      } catch (error: any) {
+        console.error('AI generation failed:', error);
+        const errorMessage =
+          error.response?.data?.error?.message ||
+          error.message ||
+          'Failed to generate application';
+        Alert.alert(t('common.error'), errorMessage, [
+          {
+            text: t('common.ok'),
+            onPress: () =>
+              navigation.navigate('MainTabs', {screen: 'Applications'}),
+          },
+        ]);
       }
     } catch (error: any) {
       console.error('Questionnaire submission error:', error);
@@ -323,12 +343,14 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 0: Country & Visa Type
   const renderStep0_CountryAndVisaType = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Select Destination</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step0.title')}</Text>
       <Text style={styles.stepDescription}>
-        Choose your destination country and visa type
+        {t('questionnaireV2.step0.description')}
       </Text>
 
-      <Text style={styles.fieldLabel}>Country *</Text>
+      <Text style={styles.fieldLabel}>
+        {t('questionnaireV2.step0.country')}
+      </Text>
       <View style={styles.optionsGrid}>
         {SUPPORTED_COUNTRIES.map(country => (
           <TouchableOpacity
@@ -345,7 +367,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
         ))}
       </View>
 
-      <Text style={[styles.fieldLabel, {marginTop: 24}]}>Visa Type *</Text>
+      <Text style={[styles.fieldLabel, {marginTop: 24}]}>
+        {t('questionnaireV2.step0.visaType')}
+      </Text>
       <View style={styles.optionsRow}>
         <TouchableOpacity
           style={[
@@ -354,7 +378,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
           ]}
           onPress={() => updateFormData('visaType', 'tourist')}>
           <Icon name="airplane" size={24} color="#4A9EFF" />
-          <Text style={styles.optionText}>Tourist</Text>
+          <Text style={styles.optionText}>
+            {t('questionnaireV2.step0.tourist')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
@@ -363,7 +389,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
           ]}
           onPress={() => updateFormData('visaType', 'student')}>
           <Icon name="school" size={24} color="#4A9EFF" />
-          <Text style={styles.optionText}>Student</Text>
+          <Text style={styles.optionText}>
+            {t('questionnaireV2.step0.student')}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -372,17 +400,21 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 1: Personal
   const renderStep1_Personal = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Personal Information</Text>
-      <Text style={styles.stepDescription}>Tell us about yourself</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step1.title')}</Text>
+      <Text style={styles.stepDescription}>
+        {t('questionnaireV2.step1.description')}
+      </Text>
 
-      <Text style={styles.fieldLabel}>Age Range *</Text>
+      <Text style={styles.fieldLabel}>
+        {t('questionnaireV2.step1.ageRange')}
+      </Text>
       <View style={styles.optionsRow}>
         {[
-          {value: 'under_18', label: 'Under 18'},
-          {value: '18_25', label: '18-25'},
-          {value: '26_35', label: '26-35'},
-          {value: '36_50', label: '36-50'},
-          {value: '51_plus', label: '51+'},
+          {value: 'under_18', labelKey: 'under_18'},
+          {value: '18_25', labelKey: '18_25'},
+          {value: '26_35', labelKey: '26_35'},
+          {value: '36_50', labelKey: '36_50'},
+          {value: '51_plus', labelKey: '51_plus'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -400,19 +432,21 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                 formData.personal?.ageRange === opt.value &&
                   styles.optionButtonTextSelected,
               ]}>
-              {opt.label}
+              {t(`questionnaireV2.step1.${opt.labelKey}`)}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={[styles.fieldLabel, {marginTop: 24}]}>Marital Status *</Text>
+      <Text style={[styles.fieldLabel, {marginTop: 24}]}>
+        {t('questionnaireV2.step1.maritalStatus')}
+      </Text>
       <View style={styles.optionsRow}>
         {[
-          {value: 'single', label: 'Single'},
-          {value: 'married', label: 'Married'},
-          {value: 'divorced', label: 'Divorced'},
-          {value: 'widowed', label: 'Widowed'},
+          {value: 'single', labelKey: 'single'},
+          {value: 'married', labelKey: 'married'},
+          {value: 'divorced', labelKey: 'divorced'},
+          {value: 'widowed', labelKey: 'widowed'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -430,17 +464,19 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                 formData.personal?.maritalStatus === opt.value &&
                   styles.optionButtonTextSelected,
               ]}>
-              {opt.label}
+              {t(`questionnaireV2.step1.${opt.labelKey}`)}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={[styles.fieldLabel, {marginTop: 24}]}>Nationality *</Text>
+      <Text style={[styles.fieldLabel, {marginTop: 24}]}>
+        {t('questionnaireV2.step1.nationality')}
+      </Text>
       <View style={styles.optionsRow}>
         {[
-          {value: 'UZ', label: 'Uzbekistan'},
-          {value: 'other', label: 'Other'},
+          {value: 'UZ', labelKey: 'uzbekistan'},
+          {value: 'other', labelKey: 'other'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -452,25 +488,27 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             onPress={() =>
               updateFormData('personal', {nationality: opt.value as any})
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step1.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-        Passport Status *
+        {t('questionnaireV2.step1.passportStatus')}
       </Text>
       <View style={styles.optionsColumn}>
         {[
           {
             value: 'valid_6plus_months',
-            label: 'Valid (6+ months remaining)',
+            labelKey: 'valid_6plus_months',
           },
           {
             value: 'valid_less_6_months',
-            label: 'Valid (less than 6 months)',
+            labelKey: 'valid_less_6_months',
           },
-          {value: 'no_passport', label: 'No passport'},
+          {value: 'no_passport', labelKey: 'no_passport'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -482,7 +520,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             onPress={() =>
               updateFormData('personal', {passportStatus: opt.value as any})
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step1.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -492,20 +532,22 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 2: Status & Education
   const renderStep2_StatusAndEducation = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Current Status & Education</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step2.title')}</Text>
       <Text style={styles.stepDescription}>
-        Your current employment and education level
+        {t('questionnaireV2.step2.description')}
       </Text>
 
-      <Text style={styles.fieldLabel}>Current Status *</Text>
+      <Text style={styles.fieldLabel}>
+        {t('questionnaireV2.step2.currentStatus')}
+      </Text>
       <View style={styles.optionsColumn}>
         {[
-          {value: 'student', label: 'Student'},
-          {value: 'employed', label: 'Employed'},
-          {value: 'self_employed', label: 'Self-Employed'},
-          {value: 'unemployed', label: 'Unemployed'},
-          {value: 'business_owner', label: 'Business Owner'},
-          {value: 'school_child', label: 'School Child'},
+          {value: 'student', labelKey: 'status_student'},
+          {value: 'employed', labelKey: 'status_employed'},
+          {value: 'self_employed', labelKey: 'status_self_employed'},
+          {value: 'unemployed', labelKey: 'status_unemployed'},
+          {value: 'business_owner', labelKey: 'status_business_owner'},
+          {value: 'school_child', labelKey: 'status_school_child'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -517,22 +559,24 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             onPress={() =>
               updateFormData('status', {currentStatus: opt.value as any})
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step2.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-        Highest Education *
+        {t('questionnaireV2.step2.highestEducation')}
       </Text>
       <View style={styles.optionsColumn}>
         {[
-          {value: 'school', label: 'School'},
-          {value: 'college', label: 'College'},
-          {value: 'bachelor', label: "Bachelor's"},
-          {value: 'master', label: "Master's"},
-          {value: 'phd', label: 'PhD'},
-          {value: 'other', label: 'Other'},
+          {value: 'school', labelKey: 'education_school'},
+          {value: 'college', labelKey: 'education_college'},
+          {value: 'bachelor', labelKey: 'education_bachelor'},
+          {value: 'master', labelKey: 'education_master'},
+          {value: 'phd', labelKey: 'education_phd'},
+          {value: 'other', labelKey: 'education_other'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -544,7 +588,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             onPress={() =>
               updateFormData('status', {highestEducation: opt.value as any})
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step2.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -554,28 +600,30 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 3: Travel Profile
   const renderStep3_TravelProfile = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Travel Plans</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step3.title')}</Text>
       <Text style={styles.stepDescription}>
-        When and how long do you plan to travel?
+        {t('questionnaireV2.step3.description')}
       </Text>
 
       {formData.visaType === 'student' && (
         <View style={styles.infoBox}>
           <Icon name="information-circle" size={20} color="#4A9EFF" />
           <Text style={styles.infoText}>
-            Student visas typically require stays longer than 90 days
+            {t('questionnaireV2.step3.studentDurationInfo')}
           </Text>
         </View>
       )}
 
       {formData.visaType === 'tourist' && (
         <>
-          <Text style={styles.fieldLabel}>Duration *</Text>
+          <Text style={styles.fieldLabel}>
+            {t('questionnaireV2.step3.duration')}
+          </Text>
           <View style={styles.optionsColumn}>
             {[
-              {value: 'up_to_30_days', label: 'Up to 30 days'},
-              {value: '31_90_days', label: '31-90 days'},
-              {value: 'more_than_90_days', label: 'More than 90 days'},
+              {value: 'up_to_30_days', labelKey: 'up_to_30_days'},
+              {value: '31_90_days', labelKey: '31_90_days'},
+              {value: 'more_than_90_days', labelKey: 'more_than_90_days'},
             ].map(opt => (
               <TouchableOpacity
                 key={opt.value}
@@ -587,7 +635,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                 onPress={() =>
                   updateFormData('travel', {durationCategory: opt.value as any})
                 }>
-                <Text style={styles.optionText}>{opt.label}</Text>
+                <Text style={styles.optionText}>
+                  {t(`questionnaireV2.step3.${opt.labelKey}`)}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -596,19 +646,23 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 
       {formData.visaType === 'student' && (
         <View style={styles.readOnlyField}>
-          <Text style={styles.fieldLabel}>Duration</Text>
-          <Text style={styles.readOnlyText}>More than 90 days (required)</Text>
+          <Text style={styles.fieldLabel}>
+            {t('questionnaireV2.step3.durationReadOnly')}
+          </Text>
+          <Text style={styles.readOnlyText}>
+            {t('questionnaireV2.step3.durationRequired')}
+          </Text>
         </View>
       )}
 
       <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-        Planned Travel Time *
+        {t('questionnaireV2.step3.plannedWhen')}
       </Text>
       <View style={styles.optionsColumn}>
         {[
-          {value: 'within_3_months', label: 'Within 3 months'},
-          {value: '3_to_12_months', label: '3 to 12 months'},
-          {value: 'not_sure', label: 'Not sure yet'},
+          {value: 'within_3_months', labelKey: 'within_3_months'},
+          {value: '3_to_12_months', labelKey: '3_to_12_months'},
+          {value: 'not_sure', labelKey: 'not_sure'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -620,13 +674,17 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             onPress={() =>
               updateFormData('travel', {plannedWhen: opt.value as any})
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step3.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Exact dates known?</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step3.exactDatesKnown')}
+        </Text>
         <Switch
           value={formData.travel?.isExactDatesKnown || false}
           onValueChange={value =>
@@ -640,20 +698,20 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 4: Financial
   const renderStep4_Financial = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Financial Situation</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step4.title')}</Text>
       <Text style={styles.stepDescription}>
-        Who will pay for your trip and studies?
+        {t('questionnaireV2.step4.description')}
       </Text>
 
-      <Text style={styles.fieldLabel}>Who is paying? *</Text>
+      <Text style={styles.fieldLabel}>{t('questionnaireV2.step4.payer')}</Text>
       <View style={styles.optionsColumn}>
         {[
-          {value: 'self', label: 'Myself'},
-          {value: 'parents', label: 'Parents'},
-          {value: 'other_family', label: 'Other Family'},
-          {value: 'employer', label: 'Employer'},
-          {value: 'scholarship', label: 'Scholarship'},
-          {value: 'other_sponsor', label: 'Other Sponsor'},
+          {value: 'self', labelKey: 'payer_self'},
+          {value: 'parents', labelKey: 'payer_parents'},
+          {value: 'other_family', labelKey: 'payer_other_family'},
+          {value: 'employer', labelKey: 'payer_employer'},
+          {value: 'scholarship', labelKey: 'payer_scholarship'},
+          {value: 'other_sponsor', labelKey: 'payer_other_sponsor'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -665,21 +723,23 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             onPress={() =>
               updateFormData('finance', {payer: opt.value as any})
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step4.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-        Approximate Monthly Income *
+        {t('questionnaireV2.step4.incomeRange')}
       </Text>
       <View style={styles.optionsColumn}>
         {[
-          {value: 'less_500', label: 'Less than $500'},
-          {value: '500_1000', label: '$500 - $1,000'},
-          {value: '1000_3000', label: '$1,000 - $3,000'},
-          {value: '3000_plus', label: '$3,000+'},
-          {value: 'not_applicable', label: 'Not Applicable'},
+          {value: 'less_500', labelKey: 'income_less_500'},
+          {value: '500_1000', labelKey: 'income_500_1000'},
+          {value: '1000_3000', labelKey: 'income_1000_3000'},
+          {value: '3000_plus', labelKey: 'income_3000_plus'},
+          {value: 'not_applicable', labelKey: 'income_not_applicable'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -693,13 +753,17 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                 approxMonthlyIncomeRange: opt.value as any,
               })
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step4.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Have bank statements?</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step4.hasBankStatement')}
+        </Text>
         <Switch
           value={formData.finance?.hasBankStatement || false}
           onValueChange={value =>
@@ -709,7 +773,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       </View>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Have stable income?</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step4.hasStableIncome')}
+        </Text>
         <Switch
           value={formData.finance?.hasStableIncome || false}
           onValueChange={value =>
@@ -723,13 +789,15 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 5: Invitation
   const renderStep5_Invitation = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Invitation / Admission</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step5.title')}</Text>
       <Text style={styles.stepDescription}>
-        Do you have an invitation or admission letter?
+        {t('questionnaireV2.step5.description')}
       </Text>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Have invitation/admission? *</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step5.hasInvitation')}
+        </Text>
         <Switch
           value={formData.invitation?.hasInvitation || false}
           onValueChange={value =>
@@ -743,16 +811,22 @@ export default function QuestionnaireV2Screen({navigation}: any) {
           {formData.visaType === 'student' && (
             <>
               <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-                Invitation Type *
+                {t('questionnaireV2.step5.invitationType')}
               </Text>
               <View style={styles.optionsColumn}>
                 {[
                   {
                     value: 'university_acceptance',
-                    label: 'University Acceptance Letter',
+                    labelKey: 'student_university_acceptance',
                   },
-                  {value: 'language_course', label: 'Language Course'},
-                  {value: 'exchange_program', label: 'Exchange Program'},
+                  {
+                    value: 'language_course',
+                    labelKey: 'student_language_course',
+                  },
+                  {
+                    value: 'exchange_program',
+                    labelKey: 'student_exchange_program',
+                  },
                 ].map(opt => (
                   <TouchableOpacity
                     key={opt.value}
@@ -766,7 +840,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                         studentInvitationType: opt.value as any,
                       })
                     }>
-                    <Text style={styles.optionText}>{opt.label}</Text>
+                    <Text style={styles.optionText}>
+                      {t(`questionnaireV2.step5.${opt.labelKey}`)}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -776,13 +852,16 @@ export default function QuestionnaireV2Screen({navigation}: any) {
           {formData.visaType === 'tourist' && (
             <>
               <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-                Invitation Type *
+                {t('questionnaireV2.step5.invitationType')}
               </Text>
               <View style={styles.optionsColumn}>
                 {[
-                  {value: 'hotel_booking', label: 'Hotel Booking'},
-                  {value: 'family_or_friends', label: 'Family or Friends'},
-                  {value: 'tour_agency', label: 'Tour Agency'},
+                  {value: 'hotel_booking', labelKey: 'tourist_hotel_booking'},
+                  {
+                    value: 'family_or_friends',
+                    labelKey: 'tourist_family_or_friends',
+                  },
+                  {value: 'tour_agency', labelKey: 'tourist_tour_agency'},
                 ].map(opt => (
                   <TouchableOpacity
                     key={opt.value}
@@ -796,7 +875,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                         touristInvitationType: opt.value as any,
                       })
                     }>
-                    <Text style={styles.optionText}>{opt.label}</Text>
+                    <Text style={styles.optionText}>
+                      {t(`questionnaireV2.step5.${opt.labelKey}`)}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -809,7 +890,7 @@ export default function QuestionnaireV2Screen({navigation}: any) {
         formData.visaType === 'tourist' && (
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              No invitation required for tourist visa
+              {t('questionnaireV2.step5.noInvitationRequired')}
             </Text>
           </View>
         )}
@@ -819,20 +900,25 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 6: Stay & Tickets
   const renderStep6_StayAndTickets = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Accommodation & Travel</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step6.title')}</Text>
       <Text style={styles.stepDescription}>
-        Where will you stay and have you booked tickets?
+        {t('questionnaireV2.step6.description')}
       </Text>
 
-      <Text style={styles.fieldLabel}>Accommodation Type *</Text>
+      <Text style={styles.fieldLabel}>
+        {t('questionnaireV2.step6.accommodationType')}
+      </Text>
       <View style={styles.optionsColumn}>
         {[
-          {value: 'hotel', label: 'Hotel'},
-          {value: 'host_family', label: 'Host Family'},
-          {value: 'relative', label: 'Relative'},
-          {value: 'rented_apartment', label: 'Rented Apartment'},
-          {value: 'dormitory', label: 'Dormitory'},
-          {value: 'not_decided', label: 'Not Decided'},
+          {value: 'hotel', labelKey: 'accommodation_hotel'},
+          {value: 'host_family', labelKey: 'accommodation_host_family'},
+          {value: 'relative', labelKey: 'accommodation_relative'},
+          {
+            value: 'rented_apartment',
+            labelKey: 'accommodation_rented_apartment',
+          },
+          {value: 'dormitory', labelKey: 'accommodation_dormitory'},
+          {value: 'not_decided', labelKey: 'accommodation_not_decided'},
         ].map(opt => (
           <TouchableOpacity
             key={opt.value}
@@ -844,7 +930,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             onPress={() =>
               updateFormData('stay', {accommodationType: opt.value as any})
             }>
-            <Text style={styles.optionText}>{opt.label}</Text>
+            <Text style={styles.optionText}>
+              {t(`questionnaireV2.step6.${opt.labelKey}`)}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -852,8 +940,8 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>
           {formData.visaType === 'student'
-            ? 'Ticket already booked (one-way or round-trip)?'
-            : 'Have round-trip ticket?'}
+            ? t('questionnaireV2.step6.hasRoundTripTicketStudent')
+            : t('questionnaireV2.step6.hasRoundTripTicket')}
         </Text>
         <Switch
           value={formData.stay?.hasRoundTripTicket || false}
@@ -868,13 +956,15 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 7: Travel History
   const renderStep7_TravelHistory = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Travel History</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step7.title')}</Text>
       <Text style={styles.stepDescription}>
-        Have you traveled internationally before?
+        {t('questionnaireV2.step7.description')}
       </Text>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Traveled before? *</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step7.hasTraveledBefore')}
+        </Text>
         <Switch
           value={formData.history?.hasTraveledBefore || false}
           onValueChange={value =>
@@ -886,15 +976,15 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       {formData.history?.hasTraveledBefore && (
         <>
           <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-            Regions Visited
+            {t('questionnaireV2.step7.regionsVisited')}
           </Text>
           <View style={styles.optionsColumn}>
             {[
-              {value: 'schengen', label: 'Schengen Area'},
-              {value: 'usa_canada', label: 'USA / Canada'},
-              {value: 'uk', label: 'United Kingdom'},
-              {value: 'asia', label: 'Asia'},
-              {value: 'middle_east', label: 'Middle East'},
+              {value: 'schengen', labelKey: 'region_schengen'},
+              {value: 'usa_canada', labelKey: 'region_usa_canada'},
+              {value: 'uk', labelKey: 'region_uk'},
+              {value: 'asia', labelKey: 'region_asia'},
+              {value: 'middle_east', labelKey: 'region_middle_east'},
             ].map(opt => {
               const isSelected =
                 formData.history?.regionsVisited?.includes(opt.value as any) ||
@@ -917,9 +1007,11 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                     <Icon
                       name={isSelected ? 'checkbox' : 'square-outline'}
                       size={24}
-                      color={isSelected ? '#4A9EFF' : '#999'}
+                      color={isSelected ? '#4A9EFF' : '#94A3B8'}
                     />
-                    <Text style={styles.optionText}>{opt.label}</Text>
+                    <Text style={styles.optionText}>
+                      {t(`questionnaireV2.step7.${opt.labelKey}`)}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -929,7 +1021,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       )}
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Have visa refusals? *</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step7.hasVisaRefusals')}
+        </Text>
         <Switch
           value={formData.history?.hasVisaRefusals || false}
           onValueChange={value =>
@@ -943,13 +1037,15 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 8: Ties & Documents
   const renderStep8_TiesAndDocuments = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Ties & Documents</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step8.title')}</Text>
       <Text style={styles.stepDescription}>
-        Property ownership and available documents
+        {t('questionnaireV2.step8.description')}
       </Text>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Have property in Uzbekistan? *</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step8.hasProperty')}
+        </Text>
         <Switch
           value={formData.ties?.hasProperty || false}
           onValueChange={value => updateFormData('ties', {hasProperty: value})}
@@ -959,14 +1055,14 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       {formData.ties?.hasProperty && (
         <>
           <Text style={[styles.fieldLabel, {marginTop: 16}]}>
-            Property Type
+            {t('questionnaireV2.step8.propertyType')}
           </Text>
           <View style={styles.optionsColumn}>
             {[
-              {value: 'apartment', label: 'Apartment'},
-              {value: 'house', label: 'House'},
-              {value: 'land', label: 'Land'},
-              {value: 'business', label: 'Business'},
+              {value: 'apartment', labelKey: 'property_apartment'},
+              {value: 'house', labelKey: 'property_house'},
+              {value: 'land', labelKey: 'property_land'},
+              {value: 'business', labelKey: 'property_business'},
             ].map(opt => {
               const isSelected =
                 formData.ties?.propertyType?.includes(opt.value as any) ||
@@ -989,9 +1085,11 @@ export default function QuestionnaireV2Screen({navigation}: any) {
                     <Icon
                       name={isSelected ? 'checkbox' : 'square-outline'}
                       size={24}
-                      color={isSelected ? '#4A9EFF' : '#999'}
+                      color={isSelected ? '#4A9EFF' : '#94A3B8'}
                     />
-                    <Text style={styles.optionText}>{opt.label}</Text>
+                    <Text style={styles.optionText}>
+                      {t(`questionnaireV2.step8.${opt.labelKey}`)}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -1002,7 +1100,7 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>
-          Have close family in Uzbekistan? *
+          {t('questionnaireV2.step8.hasCloseFamily')}
         </Text>
         <Switch
           value={formData.ties?.hasCloseFamilyInUzbekistan || false}
@@ -1013,20 +1111,22 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       </View>
 
       <Text style={[styles.fieldLabel, {marginTop: 24}]}>
-        Available Documents *
+        {t('questionnaireV2.step8.availableDocuments')}
       </Text>
       {[
         {
           key: 'hasEmploymentOrStudyProof',
-          label: 'Employment/Study Proof',
+          labelKey: 'doc_employment_study',
         },
-        {key: 'hasInsurance', label: 'Insurance'},
-        {key: 'hasPassport', label: 'Passport'},
-        {key: 'hasBirthCertificate', label: 'Birth Certificate'},
-        {key: 'hasPropertyDocs', label: 'Property Documents'},
+        {key: 'hasInsurance', labelKey: 'doc_insurance'},
+        {key: 'hasPassport', labelKey: 'doc_passport'},
+        {key: 'hasBirthCertificate', labelKey: 'doc_birth_certificate'},
+        {key: 'hasPropertyDocs', labelKey: 'doc_property_docs'},
       ].map(doc => (
         <View key={doc.key} style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>{doc.label} *</Text>
+          <Text style={styles.toggleLabel}>
+            {t(`questionnaireV2.step8.${doc.labelKey}`)} *
+          </Text>
           <Switch
             value={
               (formData.documents?.[
@@ -1045,13 +1145,15 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   // Step 9: Special Conditions
   const renderStep9_SpecialConditions = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Special Conditions</Text>
+      <Text style={styles.stepTitle}>{t('questionnaireV2.step9.title')}</Text>
       <Text style={styles.stepDescription}>
-        Any special circumstances we should know about?
+        {t('questionnaireV2.step9.description')}
       </Text>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Traveling with children? *</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step9.travelingWithChildren')}
+        </Text>
         <Switch
           value={formData.special?.travelingWithChildren || false}
           onValueChange={value =>
@@ -1061,7 +1163,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       </View>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Medical reason for trip? *</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step9.hasMedicalReason')}
+        </Text>
         <Switch
           value={formData.special?.hasMedicalReasonForTrip || false}
           onValueChange={value =>
@@ -1071,7 +1175,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       </View>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Have criminal record? *</Text>
+        <Text style={styles.toggleLabel}>
+          {t('questionnaireV2.step9.hasCriminalRecord')}
+        </Text>
         <Switch
           value={formData.special?.hasCriminalRecord || false}
           onValueChange={value =>
@@ -1082,10 +1188,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 
       {formData.special?.hasCriminalRecord && (
         <View style={styles.warningBox}>
-          <Icon name="warning" size={20} color="#FF6B6B" />
+          <Icon name="warning" size={20} color="#EF4444" />
           <Text style={styles.warningText}>
-            Having a criminal record may affect your visa application. Please
-            provide accurate information.
+            {t('questionnaireV2.step9.criminalRecordWarning')}
           </Text>
         </View>
       )}
@@ -1098,10 +1203,13 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="#333" />
+          <Icon name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          Step {currentStep + 1} of {TOTAL_STEPS}
+          {t('questionnaireV2.stepOf', {
+            current: currentStep + 1,
+            total: TOTAL_STEPS,
+          })}
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -1127,7 +1235,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
           style={[styles.button, styles.buttonSecondary]}
           onPress={handleBack}
           disabled={loading}>
-          <Text style={styles.buttonTextSecondary}>Back</Text>
+          <Text style={styles.buttonTextSecondary}>
+            {t('questionnaireV2.back')}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
@@ -1141,7 +1251,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
             <ActivityIndicator color="#FFF" />
           ) : (
             <Text style={styles.buttonTextPrimary}>
-              {currentStep === TOTAL_STEPS - 1 ? 'Submit' : 'Next'}
+              {currentStep === TOTAL_STEPS - 1
+                ? t('questionnaireV2.submit')
+                : t('questionnaireV2.next')}
             </Text>
           )}
         </TouchableOpacity>
@@ -1153,7 +1265,7 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#0A1929',
   },
   header: {
     flexDirection: 'row',
@@ -1162,9 +1274,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 50 : 20,
     paddingBottom: 16,
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: 'rgba(74, 158, 255, 0.2)',
   },
   backButton: {
     padding: 8,
@@ -1172,14 +1284,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#FFFFFF',
   },
   placeholder: {
     width: 40,
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: 'rgba(74, 158, 255, 0.2)',
   },
   progressFill: {
     height: '100%',
@@ -1197,18 +1309,18 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#333',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   stepDescription: {
     fontSize: 16,
-    color: '#666',
+    color: '#94A3B8',
     marginBottom: 24,
   },
   fieldLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#FFFFFF',
     marginBottom: 12,
   },
   optionsGrid: {
@@ -1225,11 +1337,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   optionCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: 'rgba(74, 158, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 100,
@@ -1238,7 +1350,7 @@ const styles = StyleSheet.create({
   },
   optionCardSelected: {
     borderColor: '#4A9EFF',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: 'rgba(74, 158, 255, 0.15)',
   },
   optionEmoji: {
     fontSize: 32,
@@ -1247,27 +1359,27 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   optionButton: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: 'rgba(74, 158, 255, 0.2)',
     flex: 1,
     minWidth: 80,
   },
   optionButtonSelected: {
     borderColor: '#4A9EFF',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: 'rgba(74, 158, 255, 0.15)',
   },
   optionButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666',
+    color: '#94A3B8',
     textAlign: 'center',
   },
   optionButtonTextSelected: {
@@ -1278,14 +1390,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
   },
   toggleLabel: {
     fontSize: 16,
-    color: '#333',
+    color: '#FFFFFF',
     flex: 1,
   },
   checkboxRow: {
@@ -1296,49 +1410,55 @@ const styles = StyleSheet.create({
   infoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: 'rgba(74, 158, 255, 0.15)',
     padding: 12,
     borderRadius: 8,
     marginTop: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.3)',
   },
   infoText: {
     fontSize: 14,
-    color: '#1976D2',
+    color: '#4A9EFF',
     flex: 1,
   },
   warningBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFEBEE',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     padding: 12,
     borderRadius: 8,
     marginTop: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
   warningText: {
     fontSize: 14,
-    color: '#C62828',
+    color: '#EF4444',
     flex: 1,
   },
   readOnlyField: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     padding: 16,
     borderRadius: 12,
     marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
   },
   readOnlyText: {
     fontSize: 16,
-    color: '#666',
+    color: '#94A3B8',
     fontStyle: 'italic',
   },
   footer: {
     flexDirection: 'row',
     padding: 20,
     gap: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: 'rgba(74, 158, 255, 0.2)',
   },
   button: {
     flex: 1,
@@ -1351,12 +1471,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#4A9EFF',
   },
   buttonSecondary: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: 'rgba(74, 158, 255, 0.2)',
   },
   buttonDisabled: {
-    backgroundColor: '#CCC',
+    backgroundColor: 'rgba(148, 163, 184, 0.3)',
     opacity: 0.6,
   },
   buttonTextPrimary: {
@@ -1367,6 +1487,6 @@ const styles = StyleSheet.create({
   buttonTextSecondary: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#FFFFFF',
   },
 });

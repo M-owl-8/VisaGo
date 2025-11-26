@@ -13,7 +13,12 @@
     "metro": "metro start --reset-cache",
     "test": "jest",
     "build:android": "cd android && ./gradlew.bat assembleRelease",
-    "build:ios": "cd ios && xcodebuild -workspace frontend_new.xcworkspace -scheme frontend_new -configuration Release"
+    "build:ios": "cd ios && xcodebuild -workspace frontend_new.xcworkspace -scheme frontend_new -configuration Release",
+    "build:ios:eas": "eas build --platform ios --profile production",
+    "build:ios:eas:dev": "eas build --platform ios --profile development",
+    "icons:android": "node scripts/generate-android-icons.js",
+    "icons:ios": "node scripts/generate-ios-icons.js",
+    "icons:all": "node scripts/generate-android-icons.js && node scripts/generate-ios-icons.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.4",

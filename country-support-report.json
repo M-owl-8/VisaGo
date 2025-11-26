@@ -1,0 +1,228 @@
+{
+  "countries": [
+    {
+      "name": "United States",
+      "code": "US",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["B1/B2 Visitor Visa", "F-1 Student Visa", "H-1B Work Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "AI checklist supports tourist and student only. Work visa (H-1B) exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "United Kingdom",
+      "code": "GB",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["Standard Visitor Visa", "Student Visa", "Skilled Worker Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "AI checklist supports tourist and student only. Work visa exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "Spain",
+      "code": "ES",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["Schengen Tourist Visa", "Student Visa", "Work Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "Schengen country. AI checklist supports tourist and student only. Work visa exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "Germany",
+      "code": "DE",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["Schengen Tourist Visa", "Study Permit", "Work Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "Schengen country. AI checklist supports tourist and student only. Work visa exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "Japan",
+      "code": "JP",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["Temporary Visitor", "Student Visa", "Work Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "AI checklist supports tourist and student only. Work visa exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "United Arab Emirates",
+      "code": "AE",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["Tourist Visa", "Student Visa", "Work Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": false,
+      "knowledgeBaseVisaTypes": [],
+      "notes": "UAE is in database but has NO knowledge base entries. AI checklist will use generic fallback. Work visa exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "Canada",
+      "code": "CA",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["Visitor Visa", "Study Permit", "Express Entry Work Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "AI checklist supports tourist and student only. Uses LOA terminology (not I-20). Work visa exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "Australia",
+      "code": "AU",
+      "id": "seeded_in_database",
+      "visaTypesSupported": ["tourist", "student", "work"],
+      "visaTypesInDatabase": ["Visitor Visa", "Student Visa", "Skilled Migration Visa"],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": true,
+      "hasAIChecklist": true,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "AI checklist supports tourist and student only. Work visa exists in DB but no AI/knowledge base support."
+    },
+    {
+      "name": "New Zealand",
+      "code": "NZ",
+      "id": "not_in_database",
+      "visaTypesSupported": ["tourist", "student"],
+      "visaTypesInDatabase": [],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": false,
+      "hasAIChecklist": false,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "Knowledge base exists but country NOT seeded in database. Cannot create applications for this country."
+    },
+    {
+      "name": "South Korea",
+      "code": "KR",
+      "id": "not_in_database",
+      "visaTypesSupported": ["tourist", "student"],
+      "visaTypesInDatabase": [],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": false,
+      "hasAIChecklist": false,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "Knowledge base exists but country NOT seeded in database. Cannot create applications for this country."
+    },
+    {
+      "name": "Poland",
+      "code": "PL",
+      "id": "not_in_database",
+      "visaTypesSupported": ["tourist", "student"],
+      "visaTypesInDatabase": [],
+      "hasDocumentGuides": true,
+      "hasStaticChecklist": false,
+      "hasAIChecklist": false,
+      "hasKnowledgeBase": true,
+      "knowledgeBaseVisaTypes": ["tourist", "student"],
+      "notes": "Knowledge base exists but country NOT seeded in database. Cannot create applications for this country. Schengen country."
+    }
+  ],
+  "summary": {
+    "totalCountries": 11,
+    "countriesInDatabase": 8,
+    "countriesWithKnowledgeBase": 10,
+    "countriesWithFullSupport": 7,
+    "touristSupportCount": 8,
+    "studentSupportCount": 8,
+    "workSupportCount": 8,
+    "aiChecklistSupport": {
+      "tourist": 8,
+      "student": 8,
+      "work": 0
+    },
+    "missingCountries": [
+      {
+        "name": "New Zealand",
+        "code": "NZ",
+        "issue": "Has knowledge base but not in database seed"
+      },
+      {
+        "name": "South Korea",
+        "code": "KR",
+        "issue": "Has knowledge base but not in database seed"
+      },
+      {
+        "name": "Poland",
+        "code": "PL",
+        "issue": "Has knowledge base but not in database seed"
+      }
+    ],
+    "incompleteCountries": [
+      {
+        "name": "United Arab Emirates",
+        "code": "AE",
+        "issue": "In database but missing knowledge base entries. Will use generic AI fallback."
+      }
+    ],
+    "unsupportedVisaTypes": [
+      {
+        "visaType": "work",
+        "issue": "Work visas exist in database for all 8 countries, but AI checklist generation only supports 'tourist' and 'student'. Work visa applications will not get AI-generated checklists."
+      }
+    ],
+    "documentGuides": {
+      "type": "generic",
+      "coverage": "all_countries",
+      "documents": [
+        "passport",
+        "bank_statement",
+        "police_clearance",
+        "property_certificate",
+        "employment_letter",
+        "student_status_letter",
+        "travel_insurance",
+        "marriage_certificate",
+        "sponsor_letter",
+        "flight_booking",
+        "accommodation_proof"
+      ],
+      "notes": "Document guides are generic (Uzbekistan-specific) and not country-specific. They are used for all countries."
+    },
+    "staticChecklist": {
+      "exists": true,
+      "coverage": "all_countries_with_tourist_or_student",
+      "fallbackMode": true,
+      "countrySpecificLogic": {
+        "Canada": "Uses LOA terminology",
+        "United States": "Uses I-20 terminology",
+        "Schengen": "Includes travel insurance requirement"
+      }
+    },
+    "aiChecklist": {
+      "exists": true,
+      "model": "gpt-4o-mini",
+      "supportedVisaTypes": ["tourist", "student"],
+      "minItems": 8,
+      "maxItems": 15,
+      "fallbackToStatic": true,
+      "knowledgeBaseIntegration": true
+    }
+  }
+}

@@ -239,8 +239,8 @@ User's Current Visa Application:
         const { deepseekVisaChat } = await import('./deepseek');
         type DeepSeekMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
-        // Trim conversation history to last 8-10 messages (max ~2000-2500 tokens)
-        const trimmedHistory = this.trimConversationHistory(history, 10);
+        // Trim conversation history to last 20 messages (max ~1500 tokens)
+        const trimmedHistory = this.trimConversationHistory(history, 20, 1500);
 
         // Build messages array for DeepSeek
         const messages: DeepSeekMessage[] = [
@@ -664,8 +664,8 @@ User's Current Visa Application:
    */
   private trimConversationHistory(
     history: any[],
-    maxMessages: number = 10,
-    maxTokens: number = 2000
+    maxMessages: number = 20,
+    maxTokens: number = 1500
   ): any[] {
     if (!history || history.length === 0) {
       return [];

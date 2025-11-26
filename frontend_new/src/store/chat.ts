@@ -736,8 +736,10 @@ export const useChatStore = create<ChatStore>()(
     }),
     {
       name: '@visabuddy_chat',
+      // TODO: Include userId in the storage key to avoid leaking conversations across accounts.
       storage: createJSONStorage(() => AsyncStorage),
       partialize: state => ({
+        // TODO: This cache must never be treated as source of truth—always refresh from backend on login.
         conversations: state.conversations,
         // CRITICAL FIX: Also persist current conversation to ensure messages are saved
         currentConversation: state.currentConversation,

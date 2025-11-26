@@ -192,7 +192,25 @@ router.post('/ai-generate', async (req: Request, res: Response, next: NextFuncti
   try {
     const { questionnaireData } = req.body;
 
+    logInfo('[AI Application Generation] Request received', {
+      userId: req.userId,
+      hasQuestionnaireData: !!questionnaireData,
+      version: questionnaireData?.version,
+      purpose: questionnaireData?.purpose,
+      visaType: questionnaireData?.visaType,
+      country: questionnaireData?.country,
+      targetCountry: questionnaireData?.targetCountry,
+      requestBodyKeys: questionnaireData ? Object.keys(questionnaireData) : [],
+    });
+
     if (!questionnaireData) {
+      logError(
+        '[AI Application Generation] Missing questionnaire data',
+        new Error('QUESTIONNAIRE_DATA_REQUIRED'),
+        {
+          userId: req.userId,
+        }
+      );
       return res.status(400).json({
         success: false,
         error: {
@@ -204,6 +222,12 @@ router.post('/ai-generate', async (req: Request, res: Response, next: NextFuncti
 
     // Validate that purpose is provided
     if (!questionnaireData.purpose) {
+      logError('[AI Application Generation] Missing purpose field', new Error('PURPOSE_REQUIRED'), {
+        userId: req.userId,
+        version: questionnaireData.version,
+        visaType: questionnaireData.visaType,
+        receivedKeys: Object.keys(questionnaireData),
+      });
       return res.status(400).json({
         success: false,
         error: {
@@ -215,6 +239,15 @@ router.post('/ai-generate', async (req: Request, res: Response, next: NextFuncti
 
     // Validate that country is provided (unless it's "not_sure")
     if (!questionnaireData.country || questionnaireData.country === 'not_sure') {
+      logError(
+        '[AI Application Generation] Missing or invalid country',
+        new Error('COUNTRY_REQUIRED'),
+        {
+          userId: req.userId,
+          country: questionnaireData.country,
+          targetCountry: questionnaireData.targetCountry,
+        }
+      );
       return res.status(400).json({
         success: false,
         error: {
@@ -224,10 +257,24 @@ router.post('/ai-generate', async (req: Request, res: Response, next: NextFuncti
       });
     }
 
+    logInfo('[AI Application Generation] Validation passed, generating application', {
+      userId: req.userId,
+      purpose: questionnaireData.purpose,
+      country: questionnaireData.country,
+      version: questionnaireData.version,
+    });
+
     const result = await AIApplicationService.generateApplicationFromQuestionnaire(
       req.userId!,
       questionnaireData
     );
+
+    logInfo('[AI Application Generation] Application created successfully', {
+      userId: req.userId,
+      applicationId: result.application?.id,
+      country: result.application?.country?.name,
+      visaType: result.application?.visaType?.name,
+    });
 
     res.status(201).json({
       success: true,

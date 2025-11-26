@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {useTranslation} from 'react-i18next';
 import {useAuthStore} from '../../store/auth';
 import {signInWithGoogle} from '../../services/google-oauth';
 
@@ -92,14 +93,15 @@ export default function RegisterScreen({navigation}: any) {
   const handleGoogleSignUp = async () => {
     try {
       setLoading(true);
+      // Get Google ID token from Google Sign-In SDK
       const googleUserInfo = await signInWithGoogle();
-      await loginWithGoogle(
-        googleUserInfo.googleId,
-        googleUserInfo.email,
-        googleUserInfo.firstName,
-        googleUserInfo.lastName,
-        googleUserInfo.avatar,
-      );
+
+      // SECURE: Send idToken to backend for server-side verification
+      if (!googleUserInfo.token) {
+        throw new Error('No ID token returned from Google Sign-In');
+      }
+
+      await loginWithGoogle(googleUserInfo.token);
     } catch (error: any) {
       if (!error.message?.includes('cancelled')) {
         // LOW PRIORITY FIX: Use translation system for error messages
