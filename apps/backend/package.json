@@ -24,7 +24,8 @@
     "predb:seed": "node prisma/schema-selector.js",
     "db:seed": "ts-node --project prisma/tsconfig.seed.json prisma/seed.ts",
     "predb:reset": "node prisma/schema-selector.js",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "make-super-admin": "ts-node --project tsconfig.json scripts/make-super-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.21.1",

@@ -96,6 +96,9 @@ function AuthStack() {
 // ============================================================================
 function AppTabs() {
   const {t} = useTranslation();
+  const user = useAuthStore(state => state.user);
+  // DEBUG: Log user role to verify it's being read correctly
+  console.log('DEBUG_USER_ROLE', user?.email, user?.role);
   const isAdmin = useIsAdmin();
 
   return (

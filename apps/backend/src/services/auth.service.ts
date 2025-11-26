@@ -46,6 +46,7 @@ export interface AuthResponse {
     firstName?: string;
     lastName?: string;
     emailVerified: boolean;
+    role: string; // 'user' | 'admin' | 'super_admin'
   };
 }
 
@@ -169,7 +170,7 @@ export class AuthService {
       }
 
       // Generate token
-      const token = generateToken(user.id, user.email);
+      const token = generateToken(user.id, user.email, user.role);
 
       return {
         token,
@@ -179,6 +180,7 @@ export class AuthService {
           firstName: user.firstName || undefined,
           lastName: user.lastName || undefined,
           emailVerified: user.emailVerified,
+          role: user.role || 'user',
         },
       };
     } catch (error) {
@@ -292,6 +294,7 @@ export class AuthService {
           firstName: user.firstName || undefined,
           lastName: user.lastName || undefined,
           emailVerified: user.emailVerified,
+          role: user.role || 'user',
         },
       };
     } catch (error) {
@@ -339,6 +342,7 @@ export class AuthService {
       timezone: user.timezone,
       currency: user.currency,
       emailVerified: user.emailVerified,
+      role: user.role || 'user',
       preferences: user.preferences,
       createdAt: user.createdAt,
     };
@@ -579,7 +583,7 @@ export class AuthService {
         }
 
         // Generate JWT token (same format as email/password login)
-        const token = generateToken(user.id, user.email);
+        const token = generateToken(user.id, user.email, user.role);
 
         logInfo('[GoogleAuth] Authentication successful', {
           userId: user.id,
@@ -594,6 +598,7 @@ export class AuthService {
             firstName: user.firstName || undefined,
             lastName: user.lastName || undefined,
             emailVerified: user.emailVerified,
+            role: user.role || 'user',
           },
         };
       } catch (error) {

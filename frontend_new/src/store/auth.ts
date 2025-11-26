@@ -14,6 +14,19 @@ const getApiClient = () => {
 
 export type UserRole = 'user' | 'admin' | 'super_admin';
 
+/**
+ * Normalize role string to match UserRole type
+ * Handles case variations and common formats from backend
+ */
+function normalizeRole(role: string | undefined | null): UserRole {
+  if (!role) return 'user';
+  const lower = role.toLowerCase().trim();
+  // Handle variations: 'super_admin', 'superadmin', 'SUPER_ADMIN', etc.
+  if (lower === 'super_admin' || lower === 'superadmin') return 'super_admin';
+  if (lower === 'admin') return 'admin';
+  return 'user';
+}
+
 interface User {
   id: string;
   email: string;
@@ -161,7 +174,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 emailVerified: user.emailVerified,
                 bio: user.bio,
                 questionnaireCompleted: user.questionnaireCompleted || false,
-                role: user.role || 'user',
+                role: normalizeRole(user.role),
               };
 
               set({
@@ -290,7 +303,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
-        role: user.role || 'user',
+        role: normalizeRole(user.role),
       };
 
       set({
@@ -404,7 +417,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
-        role: user.role || 'user',
+        role: normalizeRole(user.role),
       };
 
       set({
@@ -485,7 +498,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
-        role: user.role || 'user',
+        role: normalizeRole(user.role),
       };
 
       set({
@@ -607,7 +620,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         currency: response.data.currency || 'USD',
         bio: response.data.bio,
         questionnaireCompleted: response.data.questionnaireCompleted,
-        role: response.data.role || 'user',
+        role: normalizeRole(response.data.role),
       };
 
       // Update AsyncStorage

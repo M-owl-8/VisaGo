@@ -30,6 +30,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response, next: N
         emailVerified: true,
         bio: true,
         questionnaireCompleted: true,
+        role: true,
         createdAt: true,
         updatedAt: true,
         preferences: {
