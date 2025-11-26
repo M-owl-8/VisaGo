@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { db as prisma } from '../db';
 
 export interface DashboardMetrics {
   totalUsers: number;
@@ -92,9 +90,14 @@ class AdminService {
    */
   async getDashboardMetrics(): Promise<DashboardMetrics> {
     try {
+      console.log('[AdminService] Fetching dashboard metrics...');
+
       // Get counts
       const totalUsers = await prisma.user.count();
+      console.log('[AdminService] Total users:', totalUsers);
+
       const totalApplications = await prisma.visaApplication.count();
+      console.log('[AdminService] Total applications:', totalApplications);
 
       // Get payment stats
       const payments = await prisma.payment.findMany({
@@ -102,34 +105,34 @@ class AdminService {
       });
 
       const totalRevenue = payments
-        .filter((p: any): boolean => p.status === "completed")
+        .filter((p: any): boolean => p.status === 'completed')
         .reduce((sum: any, p: any): any => sum + p.amount, 0);
 
       // Application breakdown
       const appBreakdown = await prisma.visaApplication.groupBy({
-        by: ["status"],
+        by: ['status'],
         _count: true,
       });
 
       const applicationsBreakdown = {
-        draft: appBreakdown.find((a: any): any => a.status === "draft")?._count || 0,
-        submitted: appBreakdown.find((a: any): any => a.status === "submitted")?._count || 0,
-        approved: appBreakdown.find((a: any): any => a.status === "approved")?._count || 0,
-        rejected: appBreakdown.find((a: any): any => a.status === "rejected")?._count || 0,
-        expired: appBreakdown.find((a: any): any => a.status === "expired")?._count || 0,
+        draft: appBreakdown.find((a: any): any => a.status === 'draft')?._count || 0,
+        submitted: appBreakdown.find((a: any): any => a.status === 'submitted')?._count || 0,
+        approved: appBreakdown.find((a: any): any => a.status === 'approved')?._count || 0,
+        rejected: appBreakdown.find((a: any): any => a.status === 'rejected')?._count || 0,
+        expired: appBreakdown.find((a: any): any => a.status === 'expired')?._count || 0,
       };
 
       // Payment breakdown
       const paymentBreakdown = {
-        pending: payments.filter((p: any): any => p.status === "pending").length,
-        completed: payments.filter((p: any): any => p.status === "completed").length,
-        failed: payments.filter((p: any): any => p.status === "failed").length,
-        refunded: payments.filter((p: any): any => p.status === "refunded").length,
+        pending: payments.filter((p: any): any => p.status === 'pending').length,
+        completed: payments.filter((p: any): any => p.status === 'completed').length,
+        failed: payments.filter((p: any): any => p.status === 'failed').length,
+        refunded: payments.filter((p: any): any => p.status === 'refunded').length,
       };
 
       // Revenue by country
       const revenueByCountry = await prisma.visaApplication.groupBy({
-        by: ["countryId"],
+        by: ['countryId'],
         _count: true,
       });
 
@@ -146,11 +149,11 @@ class AdminService {
           });
 
           const countryRevenue = applications
-            .filter((a: any): any => a.payment?.status === "completed")
+            .filter((a: any): any => a.payment?.status === 'completed')
             .reduce((sum: any, a: any): any => sum + (a.payment?.amount || 0), 0);
 
           return {
-            country: country?.name || "Unknown",
+            country: country?.name || 'Unknown',
             revenue: countryRevenue,
             applicationCount: item._count,
           };
@@ -160,15 +163,14 @@ class AdminService {
       // Document stats
       const totalDocuments = await prisma.userDocument.count();
       const verifiedDocuments = await prisma.userDocument.count({
-        where: { status: "verified" },
+        where: { status: 'verified' },
       });
 
       const pendingVerification = await prisma.userDocument.count({
-        where: { status: "pending" },
+        where: { status: 'pending' },
       });
 
-      const verificationRate =
-        totalDocuments > 0 ? (verifiedDocuments / totalDocuments) * 100 : 0;
+      const verificationRate = totalDocuments > 0 ? (verifiedDocuments / totalDocuments) * 100 : 0;
 
       const documentStats = {
         pendingVerification,
@@ -178,7 +180,7 @@ class AdminService {
 
       const totalDocumentsVerified = verifiedDocuments;
 
-      return {
+      const result = {
         totalUsers,
         totalApplications,
         totalRevenue,
@@ -188,8 +190,15 @@ class AdminService {
         revenueByCountry: enrichedRevenue.sort((a, b) => b.revenue - a.revenue).slice(0, 10),
         documentStats,
       };
+
+      console.log('[AdminService] Dashboard metrics result:', JSON.stringify(result, null, 2));
+      return result;
     } catch (error) {
-      console.error("Error getting dashboard metrics:", error);
+      console.error('[AdminService] Error getting dashboard metrics:', error);
+      if (error instanceof Error) {
+        console.error('[AdminService] Error message:', error.message);
+        console.error('[AdminService] Error stack:', error.stack);
+      }
       throw error;
     }
   }
@@ -197,8 +206,13 @@ class AdminService {
   /**
    * Get all users with pagination
    */
-  async getUsers(skip: number = 0, take: number = 20): Promise<{ data: UserData[]; total: number }> {
+  async getUsers(
+    skip: number = 0,
+    take: number = 20
+  ): Promise<{ data: UserData[]; total: number }> {
     try {
+      console.log(`[AdminService] Fetching users - skip: ${skip}, take: ${take}`);
+
       const [users, total] = await Promise.all([
         prisma.user.findMany({
           select: {
@@ -214,10 +228,12 @@ class AdminService {
           },
           skip,
           take,
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
         }),
         prisma.user.count(),
       ]);
+
+      console.log(`[AdminService] Found ${users.length} users (total: ${total})`);
 
       const data = users.map((user: any): any => ({
         id: user.id,
@@ -227,13 +243,21 @@ class AdminService {
         role: user.role,
         applicationCount: user.visaApplications.length,
         documentCount: user.documents.length,
-        totalSpent: user.payments.reduce((sum: any, p: any): any => sum + (p.status === "completed" ? p.amount : 0), 0),
+        totalSpent: user.payments.reduce(
+          (sum: any, p: any): any => sum + (p.status === 'completed' ? p.amount : 0),
+          0
+        ),
         createdAt: user.createdAt,
       }));
 
+      console.log(`[AdminService] Returning ${data.length} users`);
       return { data, total };
     } catch (error) {
-      console.error("Error getting users:", error);
+      console.error('[AdminService] Error getting users:', error);
+      if (error instanceof Error) {
+        console.error('[AdminService] Error message:', error.message);
+        console.error('[AdminService] Error stack:', error.stack);
+      }
       throw error;
     }
   }
@@ -268,10 +292,13 @@ class AdminService {
         ...user,
         password: undefined, // Never return password
         applicationCount: user.visaApplications.length,
-        totalSpent: user.payments.reduce((sum: any, p: any): any => sum + (p.status === "completed" ? p.amount : 0), 0),
+        totalSpent: user.payments.reduce(
+          (sum: any, p: any): any => sum + (p.status === 'completed' ? p.amount : 0),
+          0
+        ),
       };
     } catch (error) {
-      console.error("Error getting user details:", error);
+      console.error('Error getting user details:', error);
       throw error;
     }
   }
@@ -279,8 +306,13 @@ class AdminService {
   /**
    * Get all applications with details
    */
-  async getApplications(skip: number = 0, take: number = 20): Promise<{ data: ApplicationData[]; total: number }> {
+  async getApplications(
+    skip: number = 0,
+    take: number = 20
+  ): Promise<{ data: ApplicationData[]; total: number }> {
     try {
+      console.log(`[AdminService] Fetching applications - skip: ${skip}, take: ${take}`);
+
       const [applications, total] = await Promise.all([
         prisma.visaApplication.findMany({
           include: {
@@ -292,31 +324,38 @@ class AdminService {
           },
           skip,
           take,
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
         }),
         prisma.visaApplication.count(),
       ]);
+
+      console.log(`[AdminService] Found ${applications.length} applications (total: ${total})`);
 
       const data = applications.map((app: any): any => ({
         id: app.id,
         userId: app.userId,
         userEmail: app.user.email,
-        userName: `${app.user.firstName || ""} ${app.user.lastName || ""}`.trim() || "Unknown",
+        userName: `${app.user.firstName || ''} ${app.user.lastName || ''}`.trim() || 'Unknown',
         countryName: app.country.name,
         visaTypeName: app.visaType.name,
         status: app.status,
         progressPercentage: app.progressPercentage,
         documentCount: app.documents.length,
-        verifiedDocuments: app.documents.filter((d: any): any => d.status === "verified").length,
-        paymentStatus: app.payment?.status || "no_payment",
+        verifiedDocuments: app.documents.filter((d: any): any => d.status === 'verified').length,
+        paymentStatus: app.payment?.status || 'no_payment',
         paymentAmount: app.payment?.amount || 0,
         submissionDate: app.submissionDate,
         createdAt: app.createdAt,
       }));
 
+      console.log(`[AdminService] Returning ${data.length} applications`);
       return { data, total };
     } catch (error) {
-      console.error("Error getting applications:", error);
+      console.error('[AdminService] Error getting applications:', error);
+      if (error instanceof Error) {
+        console.error('[AdminService] Error message:', error.message);
+        console.error('[AdminService] Error stack:', error.stack);
+      }
       throw error;
     }
   }
@@ -324,7 +363,10 @@ class AdminService {
   /**
    * Get all payments with details
    */
-  async getPayments(skip: number = 0, take: number = 20): Promise<{ data: PaymentData[]; total: number }> {
+  async getPayments(
+    skip: number = 0,
+    take: number = 20
+  ): Promise<{ data: PaymentData[]; total: number }> {
     try {
       const [payments, total] = await Promise.all([
         prisma.payment.findMany({
@@ -336,7 +378,7 @@ class AdminService {
           },
           skip,
           take,
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
         }),
         prisma.payment.count(),
       ]);
@@ -356,7 +398,7 @@ class AdminService {
 
       return { data, total };
     } catch (error) {
-      console.error("Error getting payments:", error);
+      console.error('Error getting payments:', error);
       throw error;
     }
   }
@@ -374,19 +416,19 @@ class AdminService {
               include: { country: true },
             },
           },
-          where: { status: "pending" },
+          where: { status: 'pending' },
           skip,
           take,
-          orderBy: { uploadedAt: "asc" },
+          orderBy: { uploadedAt: 'asc' },
         }),
-        prisma.userDocument.count({ where: { status: "pending" } }),
+        prisma.userDocument.count({ where: { status: 'pending' } }),
       ]);
 
       const data = documents.map((doc: any): any => ({
         id: doc.id,
         userId: doc.userId,
         userEmail: doc.user.email,
-        userName: `${doc.user.firstName || ""} ${doc.user.lastName || ""}`.trim() || "Unknown",
+        userName: `${doc.user.firstName || ''} ${doc.user.lastName || ''}`.trim() || 'Unknown',
         documentName: doc.documentName,
         documentType: doc.documentType,
         applicationCountry: doc.application.country.name,
@@ -396,7 +438,7 @@ class AdminService {
 
       return { data, total };
     } catch (error) {
-      console.error("Error getting document verification queue:", error);
+      console.error('Error getting document verification queue:', error);
       throw error;
     }
   }
@@ -410,7 +452,7 @@ class AdminService {
         where: { id: applicationId },
         data: {
           status,
-          approvalDate: status === "approved" ? new Date() : undefined,
+          approvalDate: status === 'approved' ? new Date() : undefined,
         },
         include: {
           user: true,
@@ -421,7 +463,7 @@ class AdminService {
 
       return application;
     } catch (error) {
-      console.error("Error updating application status:", error);
+      console.error('Error updating application status:', error);
       throw error;
     }
   }
@@ -429,7 +471,7 @@ class AdminService {
   /**
    * Verify or reject document
    */
-  async updateDocumentStatus(documentId: string, status: "verified" | "rejected", notes?: string) {
+  async updateDocumentStatus(documentId: string, status: 'verified' | 'rejected', notes?: string) {
     try {
       const document = await prisma.userDocument.update({
         where: { id: documentId },
@@ -445,7 +487,7 @@ class AdminService {
 
       return document;
     } catch (error) {
-      console.error("Error updating document status:", error);
+      console.error('Error updating document status:', error);
       throw error;
     }
   }
@@ -455,8 +497,8 @@ class AdminService {
    */
   async updateUserRole(userId: string, role: string) {
     try {
-      if (!["user", "admin", "super_admin"].includes(role)) {
-        throw new Error("Invalid role");
+      if (!['user', 'admin', 'super_admin'].includes(role)) {
+        throw new Error('Invalid role');
       }
 
       const user = await prisma.user.update({
@@ -466,7 +508,7 @@ class AdminService {
 
       return user;
     } catch (error) {
-      console.error("Error updating user role:", error);
+      console.error('Error updating user role:', error);
       throw error;
     }
   }
@@ -494,18 +536,21 @@ class AdminService {
       const paymentsLast30Days = await prisma.payment.findMany({
         where: {
           createdAt: { gte: thirtyDaysAgo },
-          status: "completed",
+          status: 'completed',
         },
         select: { amount: true },
       });
 
-      const revenueLastMonth = paymentsLast30Days.reduce((sum: any, p: any): any => sum + p.amount, 0);
+      const revenueLastMonth = paymentsLast30Days.reduce(
+        (sum: any, p: any): any => sum + p.amount,
+        0
+      );
 
       // Get top countries
       const topCountries = await prisma.visaApplication.groupBy({
-        by: ["countryId"],
+        by: ['countryId'],
         _count: true,
-        orderBy: { _count: { id: "desc" } },
+        orderBy: { _count: { id: 'desc' } },
         take: 5,
       });
 
@@ -516,8 +561,8 @@ class AdminService {
             select: { name: true, flagEmoji: true },
           });
           return {
-            name: country?.name || "Unknown",
-            flagEmoji: country?.flagEmoji || "",
+            name: country?.name || 'Unknown',
+            flagEmoji: country?.flagEmoji || '',
             applications: item._count,
           };
         })
@@ -531,7 +576,7 @@ class AdminService {
         topCountries: topCountriesData,
       };
     } catch (error) {
-      console.error("Error getting analytics summary:", error);
+      console.error('Error getting analytics summary:', error);
       throw error;
     }
   }
