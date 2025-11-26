@@ -25,9 +25,23 @@ buildscript {
 
 // Fix Kotlin JVM target to match Java 17 for all subprojects
 subprojects {
+    // Set compileSdkVersion before evaluation for react-native-svg
+    project.ext.compileSdkVersion = rootProject.ext.compileSdkVersion
+    project.ext.minSdkVersion = rootProject.ext.minSdkVersion
+    project.ext.targetSdkVersion = rootProject.ext.targetSdkVersion
+    
     afterEvaluate { project ->
         if (project.hasProperty("android")) {
             project.android {
+                if (!project.android.hasProperty("compileSdkVersion") || project.android.compileSdkVersion == null) {
+                    compileSdkVersion rootProject.ext.compileSdkVersion
+                }
+                if (!project.android.hasProperty("minSdkVersion") || project.android.minSdkVersion == null) {
+                    minSdkVersion rootProject.ext.minSdkVersion
+                }
+                if (!project.android.hasProperty("targetSdkVersion") || project.android.targetSdkVersion == null) {
+                    targetSdkVersion rootProject.ext.targetSdkVersion
+                }
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_17
                     targetCompatibility JavaVersion.VERSION_17
