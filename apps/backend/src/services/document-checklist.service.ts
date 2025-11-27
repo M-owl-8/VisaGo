@@ -828,7 +828,7 @@ Only return the JSON object, no other text.`;
             name: parsed.name || this.formatDocumentName(documentType),
             description: parsed.description || `Required ${documentType} document`,
             required: parsed.required !== false,
-            priority: parsed.priority || 'high',
+            priority: normalizePriority(parsed.priority) || 'high',
             instructions: parsed.instructions,
             exampleUrl: parsed.exampleUrl,
           };
