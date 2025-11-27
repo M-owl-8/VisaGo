@@ -108,7 +108,7 @@ These tasks require your action and cannot be automated by code.
 
 **Decision Required:**
 
-- [ ] Choose platform: ********\_\_\_********
+- [ ] Choose platform: **\*\*\*\***\_\_\_**\*\*\*\***
 - [ ] Create account (if new platform)
 - [ ] Verify payment method (if needed for production)
 
@@ -620,6 +620,15 @@ After deployment, verify:
 2. **I complete Phase 2 tasks** (all automated preparation)
 3. **Deploy** (push to Git or use platform's deploy button)
 4. **Verify** (run through checklist above)
+
+---
+
+## Docker Dependency Notes
+
+- Docker builds copy `apps/web/package.json` and `apps/web/package-lock.json`.
+- We run `npm ci` when the lockfile exists to guarantee reproducible installs.
+- If the lockfile is missing, the Dockerfile automatically falls back to `npm install` so builds don’t block.
+- After changing dependencies, run `npm install` inside `apps/web/` and commit the updated `package-lock.json` so CI continues to use `npm ci`.
 
 ---
 

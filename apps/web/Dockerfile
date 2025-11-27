@@ -8,7 +8,7 @@ WORKDIR /app
 # Copy package files (apps/web context)
 COPY package.json package-lock.json* ./
 
-# Install dependencies (prefer lockfile, fallback to npm install)
+# Install deps (lockfile ensures reproducible builds; fallback keeps devs unblocked)
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Build stage
