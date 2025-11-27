@@ -37,6 +37,8 @@ interface DocumentChecklistItem {
   descriptionUz?: string;
   descriptionRu?: string;
   required: boolean;
+  priority?: string; // Runtime normalized to "high" | "medium" | "low"
+  category?: 'required' | 'highly_recommended' | 'optional'; // May be missing, defaults to "highly_recommended"
   status: 'missing' | 'pending' | 'verified' | 'rejected';
   userDocumentId?: string;
   fileUrl?: string;
@@ -45,6 +47,10 @@ interface DocumentChecklistItem {
   verificationNotes?: string;
   aiVerified?: boolean;
   aiConfidence?: number;
+  whereToObtain?: string;
+  whereToObtainUz?: string;
+  whereToObtainRu?: string;
+  aiSource?: 'gpt4' | 'fallback' | string;
 }
 
 interface ChecklistSummary {
@@ -268,14 +274,23 @@ export default function ApplicationDetailScreen({
   };
 
   // Derive category from item (for backward compatibility)
+  // Default to "highly_recommended" if category is missing
   const getItemCategory = (
     item: DocumentChecklistItem,
   ): 'required' | 'highly_recommended' | 'optional' => {
-    if (item.category) return item.category;
+    if (
+      item.category === 'required' ||
+      item.category === 'highly_recommended' ||
+      item.category === 'optional'
+    ) {
+      return item.category;
+    }
+    // Fallback logic: if category is missing, derive from required/priority
     if (item.required) return 'required';
     if (item.priority === 'high' || item.priority === 'medium')
       return 'highly_recommended';
-    return 'optional';
+    // Default fallback: treat as "highly_recommended" if category is missing
+    return 'highly_recommended';
   };
 
   // Get category label
@@ -506,134 +521,186 @@ export default function ApplicationDetailScreen({
 
         {/* Document List - Grouped by Category */}
         <View style={styles.documentListContainer}>
-          {(['required', 'highly_recommended', 'optional'] as const).map(
-            category => {
-              const categoryItems = checklistItems.filter(item => {
-                const itemCategory = getItemCategory(item);
-                return itemCategory === category;
-              });
+          {checklistItems.length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Icon name="document-text-outline" size={48} color="#94A3B8" />
+              <Text style={styles.emptyStateText}>
+                {language === 'uz'
+                  ? "Hujjatlar ro'yxatini yaratishda xatolik yuz berdi. Iltimos, qayta urining."
+                  : language === 'ru'
+                    ? 'Произошла ошибка при создании списка документов. Пожалуйста, попробуйте еще раз.'
+                    : 'Error creating document list. Please try again.'}
+              </Text>
+            </View>
+          ) : (
+            (['required', 'highly_recommended', 'optional'] as const).map(
+              category => {
+                const categoryItems = checklistItems.filter(item => {
+                  const itemCategory = getItemCategory(item);
+                  return itemCategory === category;
+                });
 
-              if (categoryItems.length === 0) return null;
+                if (categoryItems.length === 0) return null;
 
-              return (
-                <View key={category} style={styles.categorySection}>
-                  <View style={styles.categoryHeader}>
-                    <View
-                      style={[
-                        styles.categoryBadge,
-                        {
-                          backgroundColor:
-                            getCategoryBadgeColor(category) + '20',
-                        },
-                      ]}>
-                      <Text
+                return (
+                  <View key={category} style={styles.categorySection}>
+                    <View style={styles.categoryHeader}>
+                      <View
                         style={[
-                          styles.categoryBadgeText,
-                          {color: getCategoryBadgeColor(category)},
+                          styles.categoryBadge,
+                          {
+                            backgroundColor:
+                              getCategoryBadgeColor(category) + '20',
+                          },
                         ]}>
-                        {getCategoryLabel(category)}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.categoryBadgeText,
+                            {color: getCategoryBadgeColor(category)},
+                          ]}>
+                          {getCategoryLabel(category)}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  {categoryItems.map((item, index) => {
-                    const statusConfig = getStatusConfig(item.status);
-                    const isUploaded =
-                      item.status === 'verified' || item.status === 'pending';
+                    {categoryItems.map((item, index) => {
+                      const statusConfig = getStatusConfig(item.status);
+                      const isUploaded =
+                        item.status === 'verified' || item.status === 'pending';
 
-                    return (
-                      <View key={item.id} style={styles.documentItem}>
-                        {/* Number */}
-                        <View style={styles.documentNumber}>
-                          <Text style={styles.documentNumberText}>
-                            {index + 1}
-                          </Text>
-                        </View>
-
-                        {/* Document Info */}
-                        <View style={styles.documentInfo}>
-                          <View style={styles.documentHeader}>
-                            <Text style={styles.documentName}>
-                              {getLocalizedText(item, 'name')}
+                      return (
+                        <View key={item.id} style={styles.documentItem}>
+                          {/* Number */}
+                          <View style={styles.documentNumber}>
+                            <Text style={styles.documentNumberText}>
+                              {index + 1}
                             </Text>
-                            {/* AI Verification Badge */}
-                            {item.aiVerified && item.status === 'verified' && (
-                              <View style={styles.aiVerifiedBadge}>
-                                <Icon
-                                  name="sparkles"
-                                  size={12}
-                                  color="#10B981"
-                                />
-                                <Text style={styles.aiVerifiedText}>
-                                  {language === 'uz'
-                                    ? 'AI tasdiqladi'
-                                    : language === 'ru'
-                                      ? 'Проверено ИИ'
-                                      : 'Verified by AI'}
-                                </Text>
-                              </View>
-                            )}
                           </View>
-                          <Text style={styles.documentDescription}>
-                            {getLocalizedText(item, 'description')}
-                          </Text>
-                          {/* AI Verification Notes */}
-                          {item.verificationNotes && (
-                            <Text style={styles.verificationNotesText}>
-                              {item.verificationNotes}
+
+                          {/* Document Info */}
+                          <View style={styles.documentInfo}>
+                            <View style={styles.documentHeader}>
+                              <Text style={styles.documentName}>
+                                {getLocalizedText(item, 'name')}
+                              </Text>
+                              <View style={styles.documentHeaderBadges}>
+                                {/* Priority Badge */}
+                                {item.priority && (
+                                  <View style={styles.priorityBadge}>
+                                    <Text style={styles.priorityBadgeText}>
+                                      {item.priority === 'high'
+                                        ? language === 'uz'
+                                          ? 'Yuqori'
+                                          : language === 'ru'
+                                            ? 'Высокий'
+                                            : 'High'
+                                        : item.priority === 'medium'
+                                          ? language === 'uz'
+                                            ? "O'rtacha"
+                                            : language === 'ru'
+                                              ? 'Средний'
+                                              : 'Medium'
+                                          : language === 'uz'
+                                            ? 'Past'
+                                            : language === 'ru'
+                                              ? 'Низкий'
+                                              : 'Low'}
+                                    </Text>
+                                  </View>
+                                )}
+                                {/* AI Source Badge */}
+                                {item.aiSource === 'fallback' && (
+                                  <View style={styles.fallbackBadge}>
+                                    <Text style={styles.fallbackBadgeText}>
+                                      {language === 'uz'
+                                        ? "Standart ro'yxat"
+                                        : language === 'ru'
+                                          ? 'Стандартный список'
+                                          : 'Standard list'}
+                                    </Text>
+                                  </View>
+                                )}
+                                {/* AI Verification Badge */}
+                                {item.aiVerified &&
+                                  item.status === 'verified' && (
+                                    <View style={styles.aiVerifiedBadge}>
+                                      <Icon
+                                        name="sparkles"
+                                        size={12}
+                                        color="#10B981"
+                                      />
+                                      <Text style={styles.aiVerifiedText}>
+                                        {language === 'uz'
+                                          ? 'AI tasdiqladi'
+                                          : language === 'ru'
+                                            ? 'Проверено ИИ'
+                                            : 'Verified by AI'}
+                                      </Text>
+                                    </View>
+                                  )}
+                              </View>
+                            </View>
+                            <Text style={styles.documentDescription}>
+                              {getLocalizedText(item, 'description')}
                             </Text>
-                          )}
-                          {/* Rejected Status with Notes */}
-                          {item.status === 'rejected' &&
-                            item.verificationNotes && (
-                              <Text style={styles.rejectedNotesText}>
+                            {/* AI Verification Notes */}
+                            {item.verificationNotes && (
+                              <Text style={styles.verificationNotesText}>
                                 {item.verificationNotes}
                               </Text>
                             )}
-                        </View>
+                            {/* Rejected Status with Notes */}
+                            {item.status === 'rejected' &&
+                              item.verificationNotes && (
+                                <Text style={styles.rejectedNotesText}>
+                                  {item.verificationNotes}
+                                </Text>
+                              )}
+                          </View>
 
-                        {/* Upload Button */}
-                        <TouchableOpacity
-                          style={[
-                            styles.uploadButton,
-                            isUploaded && styles.uploadButtonSuccess,
-                          ]}
-                          onPress={() => {
-                            if (
-                              item.status === 'missing' ||
-                              item.status === 'rejected'
-                            ) {
-                              // Use documentType for internal logic, localized name for display
-                              handleUploadDocument(
-                                item.documentType || item.id,
-                                getLocalizedText(item, 'name'),
-                              );
-                            } else if (item.userDocumentId && item.fileUrl) {
-                              handleViewDocument(
-                                item.userDocumentId,
-                                item.fileUrl,
-                              );
-                            }
-                          }}>
-                          {isUploaded ? (
-                            <Icon
-                              name="checkmark-circle"
-                              size={24}
-                              color="#10B981"
-                            />
-                          ) : (
-                            <Icon
-                              name="cloud-upload-outline"
-                              size={24}
-                              color="#4A9EFF"
-                            />
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </View>
-              );
-            },
+                          {/* Upload Button */}
+                          <TouchableOpacity
+                            style={[
+                              styles.uploadButton,
+                              isUploaded && styles.uploadButtonSuccess,
+                            ]}
+                            onPress={() => {
+                              if (
+                                item.status === 'missing' ||
+                                item.status === 'rejected'
+                              ) {
+                                // Use documentType for internal logic, localized name for display
+                                handleUploadDocument(
+                                  item.documentType || item.id,
+                                  getLocalizedText(item, 'name'),
+                                );
+                              } else if (item.userDocumentId && item.fileUrl) {
+                                handleViewDocument(
+                                  item.userDocumentId,
+                                  item.fileUrl,
+                                );
+                              }
+                            }}>
+                            {isUploaded ? (
+                              <Icon
+                                name="checkmark-circle"
+                                size={24}
+                                color="#10B981"
+                              />
+                            ) : (
+                              <Icon
+                                name="cloud-upload-outline"
+                                size={24}
+                                color="#4A9EFF"
+                              />
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              },
+            )
           )}
         </View>
 
@@ -932,6 +999,51 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
     gap: 8,
+  },
+  documentHeaderBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  priorityBadge: {
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  priorityBadgeText: {
+    fontSize: 10,
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  fallbackBadge: {
+    backgroundColor: 'rgba(107, 114, 128, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(107, 114, 128, 0.3)',
+  },
+  fallbackBadgeText: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 20,
   },
   documentName: {
     fontSize: 15,
