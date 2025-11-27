@@ -11,7 +11,7 @@ import { logError, logInfo, logWarn } from '../middleware/logger';
 import AIOpenAIService from './ai-openai.service';
 import { getDocumentTranslation } from '../data/document-translations';
 import { buildAIUserContext } from './ai-context.service';
-import { inferCategory } from '../utils/checklist-helpers';
+import { inferCategory, normalizePriority } from '../utils/checklist-helpers';
 
 const prisma = new PrismaClient();
 
@@ -668,7 +668,7 @@ export class DocumentChecklistService {
         descriptionUz: translation.descriptionUz,
         descriptionRu: translation.descriptionRu,
         required: details.required,
-        priority: details.priority,
+        priority: normalizePriority(details.priority),
         status: existingDoc ? (existingDoc.status as any) : 'missing',
         userDocumentId: existingDoc?.id,
         fileUrl: existingDoc?.fileUrl,

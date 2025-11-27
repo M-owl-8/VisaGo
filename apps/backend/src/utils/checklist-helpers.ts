@@ -3,6 +3,21 @@
  * Utilities for managing category, required, and priority consistency
  */
 
+export type ChecklistPriority = 'high' | 'medium' | 'low';
+
+/**
+ * Normalize priority value to valid ChecklistPriority
+ */
+export function normalizePriority(
+  value: string | ChecklistPriority | null | undefined
+): ChecklistPriority {
+  if (value === 'high' || value === 'medium' || value === 'low') {
+    return value;
+  }
+  // default fallback
+  return 'medium';
+}
+
 /**
  * Derive required boolean from category
  */
