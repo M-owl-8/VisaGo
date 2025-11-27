@@ -48,12 +48,16 @@ router.get('/:applicationId', async (req: Request, res: Response, next: NextFunc
         });
       }
       if (result.status === 'failed') {
-        return errorResponse(
-          res,
-          HTTP_STATUS.INTERNAL_SERVER_ERROR,
-          result.errorMessage || 'Failed to generate AI checklist',
-          'CHECKLIST_GENERATION_FAILED'
-        );
+        // Should not happen anymore since service generates fallback, but handle gracefully
+        logWarn('[Checklist][Route] Received failed status, this should not happen', {
+          applicationId,
+        });
+        // Return processing status to trigger retry with fallback
+        return res.status(200).json({
+          success: true,
+          status: 'processing',
+          message: 'Checklist generation in progress. Please check again in a moment.',
+        });
       }
     }
 

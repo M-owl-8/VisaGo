@@ -446,7 +446,190 @@ const FALLBACK_CHECKLISTS: Record<CountryCode, Record<VisaType, FallbackChecklis
   },
   JP: {
     student: [],
-    tourist: [],
+    tourist: [
+      {
+        document: 'passport',
+        name: 'Valid Passport',
+        nameUz: 'Yaroqli Pasport',
+        nameRu: 'Действительный Паспорт',
+        category: 'required',
+        description:
+          'Uzbek biometric passport valid at least 6 months after your planned return date from Japan.',
+        descriptionUz:
+          "Yaponiyadan rejalashtirilgan qaytish sanasidan keyin kamida 6 oy muddati qolgan O'zbekiston biometrik pasporti.",
+        descriptionRu:
+          'Биометрический паспорт Узбекистана, действительный не менее 6 месяцев после запланированной даты возвращения из Японии.',
+        required: true,
+        priority: 'high',
+        whereToObtain:
+          'Apply at your local migration service or internal affairs office in Uzbekistan.',
+        whereToObtainUz:
+          "O'zbekistondagi mahalliy migratsiya xizmatiga yoki ichki ishlar organlariga murojaat qiling.",
+        whereToObtainRu:
+          'Обратитесь в местную службу миграции или органы внутренних дел в Узбекистане.',
+      },
+      {
+        document: 'passport_photo',
+        name: 'Passport Photo',
+        nameUz: 'Pasport Fotosi',
+        nameRu: 'Фото на Паспорт',
+        category: 'required',
+        description: '2x2 inch photo with white background, taken within last 6 months.',
+        descriptionUz: 'Oq fonda 2x2 dyuymli foto, oxirgi 6 oy ichida olingan.',
+        descriptionRu: 'Фото 2x2 дюйма на белом фоне, сделанное в течение последних 6 месяцев.',
+        required: true,
+        priority: 'high',
+        whereToObtain: 'Take at photo studio in Uzbekistan.',
+        whereToObtainUz: "O'zbekistondagi foto studiyada oling.",
+        whereToObtainRu: 'Сделайте в фотостудии в Узбекистане.',
+      },
+      {
+        document: 'visa_application_form',
+        name: 'Japan Visa Application Form',
+        nameUz: 'Yaponiya Viza Ariza Formasi',
+        nameRu: 'Форма Заявления на Визу в Японию',
+        category: 'required',
+        description: 'Completed visa application form for Japan temporary visitor visa.',
+        descriptionUz:
+          "Yaponiya vaqtinchalik tashrif buyuruvchi vizasi uchun to'ldirilgan ariza formasi.",
+        descriptionRu: 'Заполненная форма заявления на визу временного посетителя в Японию.',
+        required: true,
+        priority: 'high',
+        whereToObtain:
+          'Download from Japan embassy website or obtain from visa application center.',
+        whereToObtainUz:
+          'Yaponiya elchixonasi veb-saytidan yuklab oling yoki viza ariza markazidan oling.',
+        whereToObtainRu:
+          'Скачайте с веб-сайта посольства Японии или получите в центре подачи заявлений на визу.',
+      },
+      {
+        document: 'bank_statement',
+        name: 'Bank Statement',
+        nameUz: 'Bank Hisoboti',
+        nameRu: 'Выписка из Банка',
+        category: 'required',
+        description:
+          'Recent bank statement (within last 3 months) showing sufficient funds for travel to Japan.',
+        descriptionUz:
+          "Yaponiya sayohati uchun yetarli mablag'ni ko'rsatadigan so'nggi bank hisoboti (oxirgi 3 oy ichida).",
+        descriptionRu:
+          'Недавняя выписка из банка (в течение последних 3 месяцев), показывающая достаточные средства для поездки в Японию.',
+        required: true,
+        priority: 'high',
+        whereToObtain: 'Request from your bank in Uzbekistan or download from online banking.',
+        whereToObtainUz:
+          "O'zbekistondagi bankingizdan so'rang yoki onlayn bank xizmatidan yuklab oling.",
+        whereToObtainRu: 'Запросите в вашем банке в Узбекистане или скачайте из онлайн-банкинга.',
+      },
+      {
+        document: 'travel_itinerary',
+        name: 'Travel Itinerary',
+        nameUz: 'Sayohat Rejasi',
+        nameRu: 'Маршрут Поездки',
+        category: 'highly_recommended',
+        description: 'Detailed itinerary showing planned activities and places to visit in Japan.',
+        descriptionUz:
+          "Yaponiyada rejalashtirilgan faoliyatlar va tashrif buyuradigan joylarni ko'rsatadigan batafsil sayohat rejasi.",
+        descriptionRu:
+          'Подробный маршрут, показывающий запланированные мероприятия и места для посещения в Японии.',
+        required: false,
+        priority: 'high',
+        whereToObtain: 'Create your own itinerary or use travel planning websites.',
+        whereToObtainUz:
+          "O'zingizning rejangizni yarating yoki sayohat rejalashtirish veb-saytlaridan foydalaning.",
+        whereToObtainRu:
+          'Создайте свой маршрут или используйте веб-сайты для планирования поездок.',
+      },
+      {
+        document: 'hotel_reservations',
+        name: 'Hotel Reservations',
+        nameUz: 'Mehmonxona Rezervatsiyalari',
+        nameRu: 'Бронирование Отелей',
+        category: 'highly_recommended',
+        description: 'Confirmed hotel reservations for your stay in Japan.',
+        descriptionUz: 'Yaponiyada qolish uchun tasdiqlangan mehmonxona rezervatsiyalari.',
+        descriptionRu: 'Подтвержденные бронирования отелей для вашего пребывания в Японии.',
+        required: false,
+        priority: 'high',
+        whereToObtain: 'Book through hotel websites or booking platforms.',
+        whereToObtainUz:
+          'Mehmonxona veb-saytlari yoki bron qilish platformalari orqali bron qiling.',
+        whereToObtainRu: 'Забронируйте через веб-сайты отелей или платформы бронирования.',
+      },
+      {
+        document: 'employment_letter',
+        name: 'Employment Certificate',
+        nameUz: 'Ish Beruvchi Xati',
+        nameRu: 'Справка с Места Работы',
+        category: 'highly_recommended',
+        description: 'Letter from employer confirming employment and approved leave for travel.',
+        descriptionUz:
+          "Ish beruvchidan ish joyi va sayohat uchun ruxsat olingan ta'tilni tasdiqlovchi xat.",
+        descriptionRu:
+          'Письмо от работодателя, подтверждающее место работы и одобренный отпуск для поездки.',
+        required: false,
+        priority: 'medium',
+        whereToObtain: "Request from your employer's HR department in Uzbekistan.",
+        whereToObtainUz: "O'zbekistondagi ish beruvchingizning kadrlar bo'limidan so'rang.",
+        whereToObtainRu: 'Запросите в отделе кадров вашего работодателя в Узбекистане.',
+      },
+      {
+        document: 'income_certificate',
+        name: 'Income Certificate',
+        nameUz: 'Daromad Sertifikati',
+        nameRu: 'Справка о Доходах',
+        category: 'highly_recommended',
+        description: 'Official certificate showing your income from employer or government portal.',
+        descriptionUz:
+          "Ish beruvchi yoki rasmiy davlat portalidan olingan daromadingizni ko'rsatadigan rasmiy sertifikat.",
+        descriptionRu:
+          'Официальная справка, показывающая ваш доход от работодателя или государственного портала.',
+        required: false,
+        priority: 'medium',
+        whereToObtain:
+          'Request from your employer or obtain through official e-government portal in Uzbekistan.',
+        whereToObtainUz:
+          "Ish beruvchingizdan so'rang yoki O'zbekistondagi rasmiy elektron hukumat portali orqali oling.",
+        whereToObtainRu:
+          'Запросите у вашего работодателя или получите через официальный портал электронного правительства в Узбекистане.',
+      },
+      {
+        document: 'invitation_letter',
+        name: 'Invitation Letter (if applicable)',
+        nameUz: "Taklif Xati (agar mavjud bo'lsa)",
+        nameRu: 'Пригласительное Письмо (если применимо)',
+        category: 'optional',
+        description: 'If visiting friends or family in Japan, include invitation letter from host.',
+        descriptionUz:
+          "Agar Yaponiyada do'stlar yoki oila a'zolarini tashrif buyurmoqchi bo'lsangiz, mezbon tomonidan taklif xatini qo'shing.",
+        descriptionRu:
+          'Если вы посещаете друзей или семью в Японии, приложите пригласительное письмо от принимающей стороны.',
+        required: false,
+        priority: 'low',
+        whereToObtain: 'Request from your host in Japan.',
+        whereToObtainUz: "Yaponiyadagi mezboningizdan so'rang.",
+        whereToObtainRu: 'Запросите у вашего принимающего лица в Японии.',
+      },
+      {
+        document: 'property_document',
+        name: 'Property Ownership Document',
+        nameUz: 'Mulk Hujjati',
+        nameRu: 'Документ о Праве Собственности',
+        category: 'optional',
+        description:
+          'Document proving property ownership in Uzbekistan (shows ties to home country).',
+        descriptionUz:
+          "O'zbekistondagi mulk egaligini tasdiqlovchi hujjat (vatan bilan bog'liqlikni ko'rsatadi).",
+        descriptionRu:
+          'Документ, подтверждающий право собственности на недвижимость в Узбекистане (показывает связи с родиной).',
+        required: false,
+        priority: 'low',
+        whereToObtain: 'Obtain from cadastral office or property registry in Uzbekistan.',
+        whereToObtainUz: "O'zbekistondagi kadastr idorasidan yoki mulk reestridan oling.",
+        whereToObtainRu:
+          'Получите в кадастровом управлении или реестре недвижимости в Узбекистане.',
+      },
+    ],
   },
   AE: {
     student: [],

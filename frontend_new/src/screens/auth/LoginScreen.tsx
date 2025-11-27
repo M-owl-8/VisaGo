@@ -268,9 +268,12 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   logo: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
     marginBottom: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 36,

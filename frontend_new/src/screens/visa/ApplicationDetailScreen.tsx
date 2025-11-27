@@ -161,31 +161,35 @@ export default function ApplicationDetailScreen({
         }
 
         if (checklistResponse.success && checklistResponse.data) {
-          setChecklistItems(checklistResponse.data.items || []);
-          setSummary(checklistResponse.data.summary);
-        } else if (checklistResponse.error) {
-          const errorMessage = checklistResponse.error.message || '';
-          const errorCode = checklistResponse.error.code || '';
-          const isAIError =
-            errorMessage.toLowerCase().includes('openai') ||
-            errorCode.includes('OPENAI') ||
-            errorMessage.toLowerCase().includes('ai service');
-
-          if (isAIError) {
-            const aiErrorMessage =
-              language === 'uz'
-                ? "Hozircha AI asosida hujjatlar ro'yxatini yaratishda xatolik yuz berdi. Server tomoni bu muammoni hal qiladi. Siz mavjud hujjatlarni yuklashda davom etishingiz mumkin."
-                : language === 'ru'
-                  ? 'При создании списка документов с помощью ИИ произошла ошибка. Команда уже работает над этим. Вы можете продолжать загружать документы.'
-                  : 'There was an error generating the document list with AI. Our team is working on it. You can still upload your documents.';
-
-            Alert.alert(t('common.error'), aiErrorMessage);
+          // Handle processing status
+          if (checklistResponse.data.status === 'processing') {
+            // Checklist is being generated, show loading state
+            setChecklistItems([]);
+            setSummary(null);
+            // Don't show error, just wait for next refresh
+          } else if (
+            checklistResponse.data.items &&
+            checklistResponse.data.items.length > 0
+          ) {
+            // Valid checklist with items
+            setChecklistItems(checklistResponse.data.items);
+            setSummary(checklistResponse.data.summary);
           } else {
-            Alert.alert(
-              t('common.error'),
-              errorMessage || t('errors.loadFailed'),
-            );
+            // Empty items but successful response - should not happen with our backend fix
+            // But handle gracefully by showing empty state
+            setChecklistItems([]);
+            setSummary(null);
           }
+        } else if (checklistResponse.error) {
+          // API returned error - but backend should always return items now
+          // Log for debugging but don't show error to user
+          console.warn(
+            '[Checklist] API error (should not happen):',
+            checklistResponse.error,
+          );
+          // Set empty items to show empty state instead of error
+          setChecklistItems([]);
+          setSummary(null);
         }
       } catch (error: any) {
         console.error('Error loading application:', error);

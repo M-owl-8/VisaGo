@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Dimensions,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useTranslation} from 'react-i18next';
@@ -133,9 +134,11 @@ export default function RegisterScreen({navigation}: any) {
           keyboardShouldPersistTaps="handled">
           {/* Logo and Header */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Icon name="globe-outline" size={48} color="#4A9EFF" />
-            </View>
+            <Image
+              source={require('../../assets/ketdik-icon.png.jpg')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>
               Start your visa application journey.
@@ -351,16 +354,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logoContainer: {
+  logo: {
     width: 80,
     height: 80,
+    marginBottom: 12,
     borderRadius: 20,
-    backgroundColor: 'rgba(74, 158, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 158, 255, 0.3)',
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 36,

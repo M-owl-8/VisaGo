@@ -136,16 +136,98 @@ export class DocumentChecklistService {
           return { status: 'processing' };
         }
 
-        // If checklist failed, return error
+        // If checklist failed, generate fallback on-the-fly instead of returning error
         if (storedChecklist.status === 'failed') {
-          logWarn('[Checklist][Status] Checklist generation failed', {
+          logWarn('[Checklist][Status] Stored checklist failed, generating fallback on-the-fly', {
             applicationId,
             errorMessage: storedChecklist.errorMessage,
           });
-          return {
-            status: 'failed',
-            errorMessage: storedChecklist.errorMessage || 'Failed to generate AI checklist',
-          };
+
+          try {
+            // Generate fallback checklist immediately
+            const fallbackItems = await this.generateRobustFallbackChecklist(
+              application.country,
+              application.visaType,
+              application.documents.map((doc: any) => ({
+                type: doc.documentType,
+                status: doc.status,
+                id: doc.id,
+                fileUrl: doc.fileUrl,
+                fileName: doc.fileName,
+                fileSize: doc.fileSize,
+                uploadedAt: doc.uploadedAt,
+                verificationNotes: doc.verificationNotes,
+                verifiedByAI: doc.verifiedByAI ?? false,
+                aiConfidence: doc.aiConfidence ?? null,
+                aiNotesUz: doc.aiNotesUz ?? null,
+                aiNotesRu: doc.aiNotesRu ?? null,
+                aiNotesEn: doc.aiNotesEn ?? null,
+              }))
+            );
+
+            const existingDocumentsMap = new Map(
+              application.documents.map((doc: any) => [
+                doc.documentType,
+                {
+                  type: doc.documentType,
+                  status: doc.status,
+                  id: doc.id,
+                  fileUrl: doc.fileUrl,
+                  fileName: doc.fileName,
+                  fileSize: doc.fileSize,
+                  uploadedAt: doc.uploadedAt,
+                  verificationNotes: doc.verificationNotes,
+                  verifiedByAI: doc.verifiedByAI ?? false,
+                  aiConfidence: doc.aiConfidence ?? null,
+                  aiNotesUz: doc.aiNotesUz ?? null,
+                  aiNotesRu: doc.aiNotesRu ?? null,
+                  aiNotesEn: doc.aiNotesEn ?? null,
+                },
+              ])
+            );
+
+            const enrichedItems = this.mergeChecklistItemsWithDocuments(
+              fallbackItems,
+              existingDocumentsMap as Map<string, any>,
+              applicationId
+            );
+            const sanitizedItems = this.applyCountryTerminology(
+              enrichedItems,
+              application.country,
+              application.visaType.name
+            );
+
+            // Update stored checklist to 'ready' with fallback data
+            await (prisma as any).documentChecklist?.update({
+              where: { applicationId },
+              data: {
+                status: 'ready',
+                checklistData: JSON.stringify(sanitizedItems),
+                aiGenerated: false,
+                generatedAt: new Date(),
+                errorMessage: null,
+              },
+            });
+
+            return this.buildChecklistResponse(
+              applicationId,
+              application.countryId,
+              application.visaTypeId,
+              sanitizedItems,
+              application.documents,
+              false // aiGenerated = false for fallback
+            );
+          } catch (fallbackError: any) {
+            logError(
+              '[Checklist] Fallback generation failed in generateChecklist',
+              fallbackError as Error,
+              {
+                applicationId,
+              }
+            );
+            // If even fallback fails, return processing status to trigger retry
+            return { status: 'processing' };
+          }
         }
       }
 
@@ -397,22 +479,96 @@ export class DocumentChecklistService {
         aiGenerated,
       });
     } catch (error: any) {
-      // Mark checklist as failed
-      await (prisma as any).documentChecklist
-        ?.update({
+      // CRITICAL: Even if everything fails, generate a basic fallback checklist
+      // Never leave the checklist empty or in 'failed' status
+      logError(
+        '[Checklist][Async] Failed to generate checklist, using emergency fallback',
+        error as Error,
+        {
+          applicationId,
+        }
+      );
+
+      try {
+        // Generate emergency fallback checklist
+        const emergencyItems = await this.generateRobustFallbackChecklist(
+          application.country,
+          application.visaType,
+          Array.from(
+            (application.documents || []).map((doc: any) => ({
+              type: doc.documentType,
+              status: doc.status,
+              id: doc.id,
+              fileUrl: doc.fileUrl,
+              fileName: doc.fileName,
+              fileSize: doc.fileSize,
+              uploadedAt: doc.uploadedAt,
+              verificationNotes: doc.verificationNotes,
+              verifiedByAI: doc.verifiedByAI ?? false,
+              aiConfidence: doc.aiConfidence ?? null,
+              aiNotesUz: doc.aiNotesUz ?? null,
+              aiNotesRu: doc.aiNotesRu ?? null,
+              aiNotesEn: doc.aiNotesEn ?? null,
+            }))
+          )
+        );
+
+        // Merge with documents
+        const existingDocumentsMap = new Map(
+          (application.documents || []).map((doc: any) => [
+            doc.documentType,
+            {
+              type: doc.documentType,
+              status: doc.status,
+              id: doc.id,
+              fileUrl: doc.fileUrl,
+              fileName: doc.fileName,
+              fileSize: doc.fileSize,
+              uploadedAt: doc.uploadedAt,
+              verificationNotes: doc.verificationNotes,
+              verifiedByAI: doc.verifiedByAI ?? false,
+              aiConfidence: doc.aiConfidence ?? null,
+              aiNotesUz: doc.aiNotesUz ?? null,
+              aiNotesRu: doc.aiNotesRu ?? null,
+              aiNotesEn: doc.aiNotesEn ?? null,
+            },
+          ])
+        );
+
+        const enrichedItems = this.mergeChecklistItemsWithDocuments(
+          emergencyItems,
+          existingDocumentsMap as Map<string, any>,
+          applicationId
+        );
+        const sanitizedItems = this.applyCountryTerminology(
+          enrichedItems,
+          application.country,
+          application.visaType.name
+        );
+
+        // Store checklist with status 'ready' (not 'failed')
+        await (prisma as any).documentChecklist?.update({
           where: { applicationId },
           data: {
-            status: 'failed',
-            errorMessage: error.message || 'Failed to generate checklist',
+            status: 'ready',
+            checklistData: JSON.stringify(sanitizedItems),
+            aiGenerated: false,
+            generatedAt: new Date(),
+            errorMessage: null, // Clear error message since we have a fallback
           },
-        })
-        .catch(() => {
-          // Ignore update errors
         });
 
-      logError('[Checklist][Async] Failed to generate checklist', error as Error, {
-        applicationId,
-      });
+        logInfo('[Checklist][Async] Emergency fallback checklist generated and stored', {
+          applicationId,
+          itemCount: sanitizedItems.length,
+        });
+      } catch (fallbackError: any) {
+        // If even fallback fails, log but don't set status to 'failed'
+        // The route handler will generate fallback on-the-fly
+        logError('[Checklist][Async] Even fallback generation failed', fallbackError as Error, {
+          applicationId,
+        });
+      }
     }
   }
 
