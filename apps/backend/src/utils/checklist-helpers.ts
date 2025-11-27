@@ -25,6 +25,19 @@ export function deriveCategoryFromRequiredAndPriority(
 }
 
 /**
+ * Infer category from item (for backward compatibility)
+ * Used when category is missing from checklist items
+ */
+export function inferCategory(item: {
+  category?: 'required' | 'highly_recommended' | 'optional';
+  required?: boolean;
+  priority?: 'high' | 'medium' | 'low';
+}): 'required' | 'highly_recommended' | 'optional' {
+  if (item.category) return item.category;
+  return deriveCategoryFromRequiredAndPriority(item.required, item.priority);
+}
+
+/**
  * Normalize category value
  */
 export function normalizeCategory(

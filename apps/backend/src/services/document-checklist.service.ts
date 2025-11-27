@@ -11,6 +11,7 @@ import { logError, logInfo, logWarn } from '../middleware/logger';
 import AIOpenAIService from './ai-openai.service';
 import { getDocumentTranslation } from '../data/document-translations';
 import { buildAIUserContext } from './ai-context.service';
+import { inferCategory } from '../utils/checklist-helpers';
 
 const prisma = new PrismaClient();
 
@@ -26,7 +27,7 @@ export interface ChecklistItem {
   description: string;
   descriptionUz: string;
   descriptionRu: string;
-  category: 'required' | 'highly_recommended' | 'optional'; // NEW: Explicit categorization
+  category?: 'required' | 'highly_recommended' | 'optional'; // Optional for backward compatibility
   required: boolean; // Kept for backward compatibility
   priority: 'high' | 'medium' | 'low';
   status: 'missing' | 'pending' | 'verified' | 'rejected';
@@ -573,7 +574,7 @@ export class DocumentChecklistService {
         continue;
       }
 
-      items.push({
+      const item = {
         id: `checklist-item-${i}`,
         documentType: docType,
         name: translation.nameEn,
@@ -593,6 +594,10 @@ export class DocumentChecklistService {
         verificationNotes: existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
         aiVerified: existingDoc?.verifiedByAI === true,
         aiConfidence: existingDoc?.aiConfidence || undefined,
+      };
+      items.push({
+        ...item,
+        category: inferCategory(item),
       });
     }
 
@@ -649,7 +654,7 @@ export class DocumentChecklistService {
       // Get translations
       const translation = getDocumentTranslation(docType);
 
-      items.push({
+      const item = {
         id: `checklist-item-${i}`,
         documentType: docType,
         name: translation.nameEn,
@@ -669,6 +674,10 @@ export class DocumentChecklistService {
         verificationNotes: existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
         aiVerified: existingDoc?.verifiedByAI === true,
         aiConfidence: existingDoc?.aiConfidence || undefined,
+      };
+      items.push({
+        ...item,
+        category: inferCategory(item),
       });
     }
 
@@ -683,7 +692,7 @@ export class DocumentChecklistService {
 
         const existingDoc = existingDocuments.find((d) => d.type === docType);
 
-        items.push({
+        const item = {
           id: `checklist-item-${items.length}`,
           documentType: docType,
           name: translation.nameEn,
@@ -703,6 +712,10 @@ export class DocumentChecklistService {
           verificationNotes: existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
           aiVerified: existingDoc?.verifiedByAI === true,
           aiConfidence: existingDoc?.aiConfidence || undefined,
+        };
+        items.push({
+          ...item,
+          category: inferCategory(item),
         });
       }
     }
@@ -984,7 +997,7 @@ Only return the JSON object, no other text.`;
               `document_${index}`;
             const existingDoc = existingDocumentsMap.get(docType);
 
-            return {
+            const item = {
               id: `checklist-item-${index}`,
               documentType: docType,
               name: aiItem.name || aiItem.document || 'Unknown Document',
@@ -1008,6 +1021,10 @@ Only return the JSON object, no other text.`;
                 existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
               aiVerified: existingDoc?.verifiedByAI === true,
               aiConfidence: existingDoc?.aiConfidence || undefined,
+            };
+            return {
+              ...item,
+              category: aiItem.category ?? inferCategory(item),
             };
           });
 

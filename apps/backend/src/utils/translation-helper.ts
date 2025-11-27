@@ -33,9 +33,9 @@ Rules:
       systemPrompt
     );
 
-    if (response.success && response.content) {
+    if (response && response.message) {
       // Clean up response (remove quotes if present)
-      let translation = response.content.trim();
+      let translation = response.message.trim();
       if (
         (translation.startsWith('"') && translation.endsWith('"')) ||
         (translation.startsWith("'") && translation.endsWith("'"))
