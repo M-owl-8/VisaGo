@@ -628,6 +628,7 @@ After deployment, verify:
 - Docker builds copy `apps/web/package.json` only and run `npm install` inside the container.
 - The lockfile is maintained outside Docker (local dev / CI). Keep `apps/web/package-lock.json` up to date locally, but the container no longer depends on it.
 - This avoids build failures on Cloud Run when the lockfile is unavailable yet still lets developers use the lockfile locally for reproducible installs.
+- When deploying to Railway, no custom start command is needed; the container’s `CMD ["node","server.js"]` is used automatically.
 
 ---
 
