@@ -76,6 +76,7 @@ export default function ApplicationDetailScreen({
   );
   const [summary, setSummary] = useState<ChecklistSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false); // Track processing state separately
   const [refreshing, setRefreshing] = useState(false);
   const [showSlowChecklistMessage, setShowSlowChecklistMessage] =
     useState(false);
@@ -164,21 +165,39 @@ export default function ApplicationDetailScreen({
           // Handle processing status
           if (checklistResponse.data.status === 'processing') {
             // Checklist is being generated, show loading state
+            setIsProcessing(true);
             setChecklistItems([]);
             setSummary(null);
             // Don't show error, just wait for next refresh
+            // Set a timeout to retry after a few seconds
+            setTimeout(() => {
+              if (isProcessing) {
+                loadApplicationData(true); // Force refresh
+              }
+            }, 3000);
           } else if (
             checklistResponse.data.items &&
             checklistResponse.data.items.length > 0
           ) {
-            // Valid checklist with items
+            // Valid checklist with items - always show it, even if fallback was used
+            // aiFallbackUsed is just metadata, not an error condition
+            setIsProcessing(false); // Clear processing state
             setChecklistItems(checklistResponse.data.items);
             setSummary(checklistResponse.data.summary);
+
+            // Log for debugging
+            console.log('[Checklist] Loaded successfully:', {
+              itemCount: checklistResponse.data.items.length,
+              aiFallbackUsed: checklistResponse.data.aiFallbackUsed,
+              aiErrorOccurred: checklistResponse.data.aiErrorOccurred,
+            });
           } else {
             // Empty items but successful response - should not happen with our backend fix
             // But handle gracefully by showing empty state
+            setIsProcessing(false);
             setChecklistItems([]);
             setSummary(null);
+            console.warn('[Checklist] Received empty items array from backend');
           }
         } else if (checklistResponse.error) {
           // API returned error - but backend should always return items now
@@ -187,7 +206,17 @@ export default function ApplicationDetailScreen({
             '[Checklist] API error (should not happen):',
             checklistResponse.error,
           );
+          setIsProcessing(false);
           // Set empty items to show empty state instead of error
+          setChecklistItems([]);
+          setSummary(null);
+        } else {
+          // Response structure unexpected - log for debugging
+          console.warn(
+            '[Checklist] Unexpected response structure:',
+            checklistResponse,
+          );
+          setIsProcessing(false);
           setChecklistItems([]);
           setSummary(null);
         }
@@ -223,6 +252,17 @@ export default function ApplicationDetailScreen({
         setIsLoading(false);
         isFetchingRef.current = false;
         hasLoadedOnceRef.current = true;
+
+        // If we're still processing and have no items, schedule a retry
+        if (isProcessing && checklistItems.length === 0) {
+          // Retry after 5 seconds if still processing
+          setTimeout(() => {
+            if (isProcessing && checklistItems.length === 0) {
+              console.log('[Checklist] Retrying after processing delay...');
+              loadApplicationData(true);
+            }
+          }, 5000);
+        }
       }
     },
     [applicationId, language, t],
@@ -525,7 +565,18 @@ export default function ApplicationDetailScreen({
 
         {/* Document List - Grouped by Category */}
         <View style={styles.documentListContainer}>
-          {checklistItems.length === 0 ? (
+          {isProcessing ? (
+            <View style={styles.emptyStateContainer}>
+              <ActivityIndicator size="large" color="#4A9EFF" />
+              <Text style={styles.emptyStateText}>
+                {language === 'uz'
+                  ? "AI hujjatlar ro'yxatini tayyorlamoqda..."
+                  : language === 'ru'
+                    ? 'ИИ создает список документов...'
+                    : 'AI is generating document list...'}
+              </Text>
+            </View>
+          ) : checklistItems.length === 0 && !isLoading ? (
             <View style={styles.emptyStateContainer}>
               <Icon name="document-text-outline" size={48} color="#94A3B8" />
               <Text style={styles.emptyStateText}>
@@ -536,7 +587,7 @@ export default function ApplicationDetailScreen({
                     : 'Error creating document list. Please try again.'}
               </Text>
             </View>
-          ) : (
+          ) : checklistItems.length > 0 ? (
             (['required', 'highly_recommended', 'optional'] as const).map(
               category => {
                 const categoryItems = checklistItems.filter(item => {
@@ -705,7 +756,7 @@ export default function ApplicationDetailScreen({
                 );
               },
             )
-          )}
+          ) : null}
         </View>
 
         {/* Help Section */}

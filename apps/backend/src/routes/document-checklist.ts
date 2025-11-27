@@ -41,11 +41,15 @@ router.get('/:applicationId', async (req: Request, res: Response, next: NextFunc
     // Handle different return types: checklist or status object
     if ('status' in result && !('items' in result)) {
       // This is a status object, not a checklist
+      // CRITICAL FIX: Return consistent structure with data field for mobile app compatibility
       if (result.status === 'processing') {
         return res.status(200).json({
           success: true,
-          status: 'processing',
-          message: 'Checklist generation in progress. Please check again in a moment.',
+          data: {
+            status: 'processing',
+            message: 'Checklist generation in progress. Please check again in a moment.',
+            items: [], // Empty items array to prevent error state
+          },
         });
       }
       if (result.status === 'failed') {
@@ -56,8 +60,11 @@ router.get('/:applicationId', async (req: Request, res: Response, next: NextFunc
         // Return processing status to trigger retry with fallback
         return res.status(200).json({
           success: true,
-          status: 'processing',
-          message: 'Checklist generation in progress. Please check again in a moment.',
+          data: {
+            status: 'processing',
+            message: 'Checklist generation in progress. Please check again in a moment.',
+            items: [], // Empty items array to prevent error state
+          },
         });
       }
     }
@@ -87,6 +94,8 @@ router.get('/:applicationId', async (req: Request, res: Response, next: NextFunc
         rejected: checklist.items.filter((i) => i.status === 'rejected').length,
       },
       progress: checklist.progress,
+      aiFallbackUsed: checklist.aiFallbackUsed || false,
+      aiErrorOccurred: checklist.aiErrorOccurred || false,
     };
 
     successResponse(res, response);
@@ -134,17 +143,26 @@ router.put(
         if (checklistResult.status === 'processing') {
           return res.status(200).json({
             success: true,
-            status: 'processing',
-            message: 'Checklist generation in progress.',
+            data: {
+              status: 'processing',
+              message: 'Checklist generation in progress.',
+              items: [], // Empty items array to prevent error state
+            },
           });
         }
         if (checklistResult.status === 'failed') {
-          return errorResponse(
-            res,
-            HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            checklistResult.errorMessage || 'Failed to generate checklist',
-            'CHECKLIST_GENERATION_FAILED'
-          );
+          // Should not happen anymore, but handle gracefully
+          logWarn('[Checklist][Route] Received failed status in PUT handler', {
+            applicationId,
+          });
+          return res.status(200).json({
+            success: true,
+            data: {
+              status: 'processing',
+              message: 'Checklist generation in progress.',
+              items: [], // Empty items array to prevent error state
+            },
+          });
         }
       }
 

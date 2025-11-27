@@ -57,6 +57,8 @@ export interface DocumentChecklist {
   progress: number; // 0-100
   generatedAt: string;
   aiGenerated: boolean;
+  aiFallbackUsed?: boolean;
+  aiErrorOccurred?: boolean;
 }
 
 /**
@@ -118,13 +120,19 @@ export class DocumentChecklistService {
           });
 
           const checklistData = JSON.parse(storedChecklist.checklistData);
+          // Handle both old format (array) and new format (object with items and metadata)
+          const items = Array.isArray(checklistData) ? checklistData : checklistData.items || [];
+          const aiFallbackUsed = checklistData.aiFallbackUsed || false;
+          const aiErrorOccurred = checklistData.aiErrorOccurred || false;
           return this.buildChecklistResponse(
             applicationId,
             application.countryId,
             application.visaTypeId,
-            checklistData,
+            items,
             application.documents,
-            storedChecklist.aiGenerated
+            storedChecklist.aiGenerated,
+            aiFallbackUsed,
+            aiErrorOccurred
           );
         }
 
@@ -298,6 +306,8 @@ export class DocumentChecklistService {
 
       let items: ChecklistItem[] = [];
       let aiGenerated = false;
+      let aiFallbackUsed = false;
+      let aiErrorOccurred = false;
 
       try {
         // Build AI user context with questionnaire summary
@@ -311,23 +321,44 @@ export class DocumentChecklistService {
         const aiStart = Date.now();
 
         // Call AI to generate checklist as primary source
-        const aiChecklist = await AIOpenAIService.generateChecklist(
-          userContext,
-          application.country.name,
-          application.visaType.name
-        );
-        const aiDurationMs = Date.now() - aiStart;
-        if (aiDurationMs > 30000) {
-          logWarn('[Checklist][AI] Slow checklist generation', {
+        let aiChecklist: any = null;
+        let aiError: Error | null = null;
+
+        try {
+          aiChecklist = await AIOpenAIService.generateChecklist(
+            userContext,
+            application.country.name,
+            application.visaType.name
+          );
+          const aiDurationMs = Date.now() - aiStart;
+          if (aiDurationMs > 30000) {
+            logWarn('[Checklist][AI] Slow checklist generation', {
+              applicationId,
+              country: application.country.name,
+              visaType: application.visaType.name,
+              durationMs: aiDurationMs,
+            });
+          }
+        } catch (aiServiceError: any) {
+          // Catch any error from AI service (timeout, API error, etc.)
+          aiError =
+            aiServiceError instanceof Error ? aiServiceError : new Error(String(aiServiceError));
+          logWarn('[Checklist][AI] AI service error caught, will use fallback', {
             applicationId,
             country: application.country.name,
             visaType: application.visaType.name,
-            durationMs: aiDurationMs,
+            errorMessage: aiError.message,
+            errorType: aiServiceError?.type || 'unknown',
           });
+          // Set aiChecklist to null so we use fallback
+          aiChecklist = null;
+          aiFallbackUsed = true;
+          aiErrorOccurred = true;
         }
 
-        // Parse AI response into ChecklistItem[]
+        // Parse AI response into ChecklistItem[] if we got a valid response
         if (
+          aiChecklist &&
           aiChecklist.checklist &&
           Array.isArray(aiChecklist.checklist) &&
           aiChecklist.checklist.length > 0
@@ -404,6 +435,7 @@ export class DocumentChecklistService {
               }))
             );
             aiGenerated = false;
+            aiFallbackUsed = true;
           } else {
             aiGenerated = true;
             logInfo('[Checklist][AI] Using AI-generated checklist', {
@@ -414,39 +446,80 @@ export class DocumentChecklistService {
             });
           }
         } else {
-          throw new Error('AI returned empty checklist');
+          // AI returned empty or invalid checklist - use fallback
+          logWarn('[Checklist][AI] AI returned empty or invalid checklist, using fallback', {
+            applicationId,
+            country: application.country.name,
+            visaType: application.visaType.name,
+            hasChecklist: !!aiChecklist,
+            checklistLength: aiChecklist?.checklist?.length || 0,
+          });
+          items = await this.generateRobustFallbackChecklist(
+            application.country,
+            application.visaType,
+            Array.from(existingDocumentsMap.values()).map((doc: any) => ({
+              type: doc.type,
+              status: doc.status,
+              id: doc.id,
+              fileUrl: doc.fileUrl,
+              fileName: doc.fileName,
+              fileSize: doc.fileSize,
+              uploadedAt: doc.uploadedAt,
+              verificationNotes: doc.verificationNotes,
+              verifiedByAI: doc.verifiedByAI,
+              aiConfidence: doc.aiConfidence,
+              aiNotesUz: doc.aiNotesUz,
+              aiNotesRu: doc.aiNotesRu,
+              aiNotesEn: doc.aiNotesEn,
+            }))
+          );
+          aiGenerated = false;
         }
-      } catch (aiError: any) {
-        // Fallback to robust checklist if AI fails
-        logWarn('[Checklist][AI] Failed, falling back to robust checklist', {
-          applicationId,
-          country: application.country.name,
-          visaType: application.visaType.name,
-          reason: 'ai_error',
-          errorMessage: aiError?.message || String(aiError),
-          errorType: aiError?.type || 'unknown',
-        });
-
-        items = await this.generateRobustFallbackChecklist(
-          application.country,
-          application.visaType,
-          Array.from(existingDocumentsMap.values()).map((doc: any) => ({
-            type: doc.type,
-            status: doc.status,
-            id: doc.id,
-            fileUrl: doc.fileUrl,
-            fileName: doc.fileName,
-            fileSize: doc.fileSize,
-            uploadedAt: doc.uploadedAt,
-            verificationNotes: doc.verificationNotes,
-            verifiedByAI: doc.verifiedByAI,
-            aiConfidence: doc.aiConfidence,
-            aiNotesUz: doc.aiNotesUz,
-            aiNotesRu: doc.aiNotesRu,
-            aiNotesEn: doc.aiNotesEn,
-          }))
+      } catch (unexpectedError: any) {
+        // Catch any unexpected errors (e.g., from buildAIUserContext or generateRobustFallbackChecklist)
+        logError(
+          '[Checklist][AI] Unexpected error in checklist generation',
+          unexpectedError as Error,
+          {
+            applicationId,
+            country: application.country.name,
+            visaType: application.visaType.name,
+            errorMessage: unexpectedError?.message || String(unexpectedError),
+          }
         );
-        aiGenerated = false;
+
+        // Still try to generate fallback even if there was an unexpected error
+        try {
+          items = await this.generateRobustFallbackChecklist(
+            application.country,
+            application.visaType,
+            Array.from(existingDocumentsMap.values()).map((doc: any) => ({
+              type: doc.type,
+              status: doc.status,
+              id: doc.id,
+              fileUrl: doc.fileUrl,
+              fileName: doc.fileName,
+              fileSize: doc.fileSize,
+              uploadedAt: doc.uploadedAt,
+              verificationNotes: doc.verificationNotes,
+              verifiedByAI: doc.verifiedByAI,
+              aiConfidence: doc.aiConfidence,
+              aiNotesUz: doc.aiNotesUz,
+              aiNotesRu: doc.aiNotesRu,
+              aiNotesEn: doc.aiNotesEn,
+            }))
+          );
+          aiGenerated = false;
+          aiFallbackUsed = true;
+          aiErrorOccurred = true;
+        } catch (fallbackError: any) {
+          // If even fallback fails, log but don't throw - let the outer catch handle it
+          logError('[Checklist][AI] Even fallback generation failed', fallbackError as Error, {
+            applicationId,
+          });
+          // Re-throw to be handled by outer catch which will use emergency fallback
+          throw fallbackError;
+        }
       }
 
       // Merge full document data including AI verification
@@ -462,11 +535,20 @@ export class DocumentChecklistService {
       );
 
       // Store checklist in database with status 'ready'
+      // Include metadata about AI fallback usage
+      const checklistMetadata = {
+        aiGenerated,
+        aiFallbackUsed,
+        aiErrorOccurred,
+      };
       await (prisma as any).documentChecklist?.update({
         where: { applicationId },
         data: {
           status: 'ready',
-          checklistData: JSON.stringify(sanitizedItems),
+          checklistData: JSON.stringify({
+            items: sanitizedItems,
+            ...checklistMetadata,
+          }),
           aiGenerated,
           generatedAt: new Date(),
           errorMessage: null,
@@ -547,11 +629,17 @@ export class DocumentChecklistService {
         );
 
         // Store checklist with status 'ready' (not 'failed')
+        // Include metadata about emergency fallback usage
         await (prisma as any).documentChecklist?.update({
           where: { applicationId },
           data: {
             status: 'ready',
-            checklistData: JSON.stringify(sanitizedItems),
+            checklistData: JSON.stringify({
+              items: sanitizedItems,
+              aiGenerated: false,
+              aiFallbackUsed: true,
+              aiErrorOccurred: true,
+            }),
             aiGenerated: false,
             generatedAt: new Date(),
             errorMessage: null, // Clear error message since we have a fallback
@@ -581,7 +669,9 @@ export class DocumentChecklistService {
     visaTypeId: string,
     items: ChecklistItem[],
     documents: any[],
-    aiGenerated: boolean
+    aiGenerated: boolean,
+    aiFallbackUsed: boolean = false,
+    aiErrorOccurred: boolean = false
   ): DocumentChecklist {
     // Merge with current document status
     const existingDocumentsMap = new Map(
@@ -627,6 +717,8 @@ export class DocumentChecklistService {
       progress,
       generatedAt: new Date().toISOString(),
       aiGenerated,
+      aiFallbackUsed,
+      aiErrorOccurred,
     };
   }
 

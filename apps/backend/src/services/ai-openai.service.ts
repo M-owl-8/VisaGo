@@ -818,16 +818,37 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
         hasDocumentGuides: !!documentGuidesText && documentGuidesText.length > 0,
       });
 
-      const response = await AIOpenAIService.openai.chat.completions.create({
-        model: this.MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.5, // Increased from 0.1 to 0.5 for more creative but still controlled responses
-        max_completion_tokens: 2000, // Increased from 1200 to 2000 to allow for 8-15 items with full multilingual fields
-        response_format: { type: 'json_object' },
-      });
+      let response;
+      try {
+        response = await AIOpenAIService.openai.chat.completions.create({
+          model: this.MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.5, // Increased from 0.1 to 0.5 for more creative but still controlled responses
+          max_completion_tokens: 2000, // Increased from 1200 to 2000 to allow for 8-15 items with full multilingual fields
+          response_format: { type: 'json_object' },
+        });
+      } catch (openaiError: any) {
+        // Catch timeout and other OpenAI API errors early
+        const errorMessage = openaiError?.message || String(openaiError);
+        if (
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNABORTED') ||
+          errorMessage.includes('Request timed out')
+        ) {
+          logWarn('[OpenAI][Checklist] Request timed out, will use fallback', {
+            country,
+            visaType,
+            errorMessage,
+          });
+          // Throw a specific timeout error that will be caught by outer catch
+          throw new Error('Request timed out.');
+        }
+        // Re-throw other errors to be handled by outer catch
+        throw openaiError;
+      }
 
       const responseTime = Date.now() - startTime;
       const inputTokens = response.usage?.prompt_tokens || 0;
