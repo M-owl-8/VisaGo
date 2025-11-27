@@ -1,33 +1,6 @@
 import type { Config } from 'tailwindcss';
 import defaultTheme from 'tailwindcss/defaultTheme';
 
-const ketdikPalette = {
-  ink: {
-    50: '#f5f5f5',
-    100: '#e7e7e7',
-    200: '#cccccc',
-    300: '#a3a3a3',
-    400: '#707070',
-    500: '#4d4d4d',
-    600: '#2d2d2d',
-    700: '#1f1f1f',
-    800: '#111111',
-    900: '#050505',
-  },
-  cream: {
-    50: '#fdfcf9',
-    100: '#fbf8f1',
-    200: '#f7f1e3',
-    300: '#efe3c7',
-    400: '#e1c799',
-    500: '#c79a52',
-    600: '#a77332',
-    700: '#875426',
-    800: '#6a4120',
-    900: '#56351d',
-  },
-};
-
 const config: Config = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -37,32 +10,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#f8f6f2',
-        surface: '#ffffff',
+        background: '#040816',
+        surface: '#0E1A2C',
+        midnight: '#0B1220',
         primary: {
-          DEFAULT: '#0f172a',
-          soft: '#1f1f1f',
-          contrast: '#ffffff',
-          ...ketdikPalette.ink,
+          DEFAULT: '#3EA6FF',
+          light: '#4A9EFF',
+          dark: '#1D5DFF',
+          contrast: '#F8FBFF',
         },
         accent: {
-          DEFAULT: '#c79a52',
-          ...ketdikPalette.cream,
+          DEFAULT: '#4A9EFF',
+          subtle: '#1A2A40',
         },
-        success: '#10b981',
-        warning: '#f59e0b',
-        danger: '#ef4444',
+        success: '#34D399',
+        warning: '#FACC15',
+        danger: '#F87171',
         neutral: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5f5',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
+          50: '#F8FBFF',
+          100: '#E2E8F0',
+          200: '#CBD5F5',
+          300: '#94A3B8',
+          400: '#64748B',
+          500: '#475569',
+          600: '#334155',
+          700: '#1F2937',
+          800: '#111827',
+          900: '#0B1220',
         },
       },
       fontFamily: {

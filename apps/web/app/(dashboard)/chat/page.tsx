@@ -59,13 +59,13 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-4xl flex-col px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-4 text-2xl font-bold text-gray-900">{t('chat.aiAssistant')}</h1>
+    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-4xl flex-col px-4 py-8 text-white sm:px-6 lg:px-8">
+      <h1 className="mb-4 text-2xl font-bold">{t('chat.aiAssistant')}</h1>
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-lg bg-white shadow">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] shadow-[0_25px_55px_rgba(1,7,17,0.65)]">
         <div className="flex-1 overflow-y-auto p-4">
           {messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-gray-500">
+            <div className="flex h-full items-center justify-center text-white/50">
               {t('chat.noMessages')}
             </div>
           ) : (
@@ -76,10 +76,10 @@ export default function ChatPage() {
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    className={`max-w-[80%] rounded-2xl px-4 py-2 ${
                       msg.role === 'user'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
+                        ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-[0_10px_25px_rgba(62,166,255,0.35)]'
+                        : 'bg-white/10 text-white'
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -88,8 +88,8 @@ export default function ChatPage() {
               ))}
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="rounded-lg bg-gray-100 px-4 py-2">
-                    <p className="text-gray-600">{t('chat.sending')}</p>
+                  <div className="rounded-2xl bg-white/10 px-4 py-2 text-white/70">
+                    <p>{t('chat.sending')}</p>
                   </div>
                 </div>
               )}
@@ -99,13 +99,13 @@ export default function ChatPage() {
         </div>
 
         {error && (
-          <div className="border-t border-gray-200 bg-red-50 p-4">
+          <div className="border-t border-white/10 bg-rose-500/10 p-4 text-rose-100">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-red-800">{error}</p>
+              <p className="text-sm">{error}</p>
               {lastFailedMessage && (
                 <button
                   onClick={handleRetry}
-                  className="ml-4 rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                  className="ml-4 rounded-md bg-rose-500 px-3 py-1 text-xs font-medium text-white hover:bg-rose-600"
                 >
                   {t('errors.tryAgain')}
                 </button>
@@ -114,20 +114,20 @@ export default function ChatPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="border-t border-gray-200 p-4">
+        <form onSubmit={handleSubmit} className="border-t border-white/10 p-4">
           <div className="flex space-x-2">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t('chat.messagePlaceholder')}
-              className="flex-1 rounded-md border-gray-300 px-4 py-2 focus:border-primary-500 focus:ring-primary-500"
+              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder:text-white/40 focus:border-primary focus:ring-primary"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="rounded-md bg-primary-600 px-6 py-2 text-white hover:bg-primary-700 disabled:opacity-50"
+              className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-2 text-white shadow-[0_10px_25px_rgba(62,166,255,0.35)] disabled:opacity-50"
             >
               {t('chat.send')}
             </button>

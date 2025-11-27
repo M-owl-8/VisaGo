@@ -54,14 +54,14 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">{t('documents.title')}</h1>
+    <div className="mx-auto max-w-3xl px-4 py-8 text-white sm:px-6 lg:px-8">
+      <h1 className="mb-6 text-2xl font-bold">{t('documents.title')}</h1>
 
       {error && <ErrorBanner message={error} onClose={() => setError('')} />}
       {success && <SuccessBanner message={success} />}
 
-      <div className="rounded-lg bg-white p-6 shadow">
-        <label className="block text-sm font-medium text-gray-700">
+      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_25px_55px_rgba(1,7,17,0.65)]">
+        <label className="block text-sm font-medium text-white/80">
           {t('documents.selectDocument')}
         </label>
         <input
@@ -69,9 +69,9 @@ export default function DocumentsPage() {
           accept=".pdf,.jpg,.jpeg,.png"
           onChange={handleFileUpload}
           disabled={uploading}
-          className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-100"
+          className="mt-2 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 file:mr-4 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-primary file:to-primary-dark file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:brightness-110"
         />
-        {uploading && <p className="mt-2 text-sm text-gray-600">{t('common.loading')}</p>}
+        {uploading && <p className="mt-2 text-sm text-white/60">{t('common.loading')}</p>}
       </div>
     </div>
   );

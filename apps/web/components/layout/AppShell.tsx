@@ -64,18 +64,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase();
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-80">
-        <div className="bg-gradient-to-br from-primary-50 via-transparent to-accent-50 absolute inset-0" />
-        <div className="blur-3xl opacity-30 absolute right-[-10%] top-[-5%] h-72 w-72 rounded-full bg-accent-200 animate-blob" />
-        <div className="blur-3xl opacity-30 absolute left-[-5%] bottom-[-10%] h-72 w-72 rounded-full bg-primary-200 animate-blob" />
+    <div className="relative min-h-screen overflow-x-hidden bg-background text-white">
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-70">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(62,166,255,0.15),transparent_60%),radial-gradient(circle_at_80%_0%,rgba(13,25,56,0.7),transparent_40%)]" />
+        <div className="blur-[180px] opacity-40 absolute right-[-10%] top-[-5%] h-72 w-72 rounded-full bg-primary animate-blob" />
+        <div className="blur-[200px] opacity-30 absolute left-[-5%] bottom-[-10%] h-72 w-72 rounded-full bg-primary-dark animate-blob" />
       </div>
 
       <nav className="sticky top-0 z-40 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="glass-panel relative flex items-center justify-between px-6 py-4">
+        <div className="glass-panel relative flex items-center justify-between border border-white/10 bg-midnight/80 px-6 py-4 text-white">
           <div className="flex items-center gap-3">
             <Link href="/applications" className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black shadow-card-soft">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.45)]">
                 <Image
                   src="/images/ketdik-icon.jpg"
                   alt="Ketdik icon"
@@ -86,16 +86,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 />
               </div>
               <div>
-                <p className="font-display text-lg font-semibold tracking-tight text-primary-900">
+                <p className="font-display text-lg font-semibold tracking-tight text-white">
                   Ketdik
                 </p>
-                <span className="text-xs uppercase tracking-[0.3em] text-neutral-500">
+                <span className="text-xs uppercase tracking-[0.3em] text-white/40">
                   Visa Workspace
                 </span>
               </div>
             </Link>
-            <div className="hidden items-center gap-2 rounded-full border border-transparent bg-white/60 px-4 py-1 text-xs font-medium text-primary-600 shadow-card-soft sm:flex">
-              <ShieldCheck size={14} />
+            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium text-white/70 shadow-inner sm:flex">
+              <ShieldCheck size={14} className="text-primary" />
               <span>{t('applications.status')}</span>
             </div>
           </div>
@@ -111,8 +111,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   className={cn(
                     'rounded-full px-5 py-2 text-sm font-semibold transition',
                     isActive
-                      ? 'bg-black text-white shadow-[0_15px_35px_rgba(15,15,20,0.25)]'
-                      : 'text-neutral-500 hover:bg-white hover:text-primary-900',
+                      ? 'bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)]'
+                      : 'text-white/50 hover:bg-white/10 hover:text-white',
                   )}
                   onClick={() => router.push(link.href)}
                 >
@@ -123,12 +123,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-transparent bg-white/70 px-3 py-1 text-xs font-semibold tracking-wide text-primary-800 shadow-inner shadow-white/50 transition hover:bg-white md:flex">
+            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-white shadow-inner shadow-black/20 transition hover:bg-white/10 md:flex">
               <Languages size={16} />
               <select
                 value={currentLang}
                 onChange={(e) => changeLanguage(e.target.value)}
-                className="bg-transparent text-xs font-semibold uppercase tracking-[0.2em] focus:outline-none"
+                className="bg-transparent text-xs font-semibold uppercase tracking-[0.2em] text-white focus:outline-none"
               >
                 <option value="en">EN</option>
                 <option value="ru">RU</option>
@@ -137,13 +137,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="hidden items-center gap-3 md:flex">
-              <div className="rounded-full bg-primary-900/10 px-4 py-2 text-sm text-primary-900">
+              <div className="rounded-full bg-white/10 px-4 py-2 text-sm text-white">
                 {user?.firstName} {user?.lastName}
               </div>
               <Button
                 variant="secondary"
                 size="sm"
-                className="rounded-full border border-primary-900/10 !bg-white text-primary-900 shadow-card-soft"
+                className="rounded-full border border-white/10 !bg-transparent text-white shadow-[0_20px_40px_rgba(0,0,0,0.45)]"
                 onClick={handleLogout}
               >
                 <LogOut size={16} />
@@ -168,15 +168,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="glass-panel mt-4 flex flex-col gap-3 px-4 py-4 md:hidden"
+              className="glass-panel mt-4 flex flex-col gap-3 border border-white/10 bg-white/5 px-4 py-4 text-white md:hidden"
             >
               {navLinks.map((link) => {
                 const isActive = pathname.startsWith(link.href);
                 return (
                   <Button
                     key={link.href}
-                    variant={isActive ? 'primary' : 'ghost'}
-                    className="justify-start rounded-2xl"
+                    variant="ghost"
+                    className={cn(
+                      'justify-start rounded-2xl text-left',
+                      isActive ? 'bg-primary text-white' : 'text-white/70 hover:bg-white/10',
+                    )}
                     onClick={() => {
                       router.push(link.href);
                       setIsNavOpen(false);
@@ -187,27 +190,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
 
-              <div className="flex flex-col gap-2 rounded-2xl border border-white/50 bg-white/70 p-4">
-                <p className="text-sm font-semibold text-primary-900">
+              <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm font-semibold text-white">
                   {user?.firstName} {user?.lastName}
                 </p>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-900/10 text-sm font-semibold text-primary-900">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
                     {initials || 'U'}
                   </div>
-                  <Button variant="secondary" className="flex-1" onClick={handleLogout}>
+                  <Button variant="secondary" className="flex-1 border border-white/10 text-white" onClick={handleLogout}>
                     <LogOut size={16} />
                     <span className="ml-2">{t('profile.logout')}</span>
                   </Button>
                 </div>
 
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
                   {t('profile.language')}
                 </label>
                 <select
                   value={currentLang}
                   onChange={(e) => changeLanguage(e.target.value)}
-                  className="rounded-2xl border border-neutral-200 px-3 py-2 text-sm"
+                  className="rounded-2xl border border-white/10 bg-transparent px-3 py-2 text-sm text-white"
                 >
                   <option value="en">English</option>
                   <option value="ru">Русский</option>
@@ -223,23 +226,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <footer className="relative z-10 border-t border-white/40 px-4 pb-8 pt-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm text-neutral-600 sm:flex-row sm:items-center sm:justify-between">
+      <footer className="relative z-10 border-t border-white/10 px-4 pb-8 pt-6 text-white/60 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             © {new Date().getFullYear()} Ketdik.{' '}
             {t('common.allRightsReserved', 'All rights reserved.')}
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <Link href="/privacy" className="transition hover:text-primary-900">
+            <Link href="/privacy" className="transition hover:text-white">
               Privacy
             </Link>
-            <Link href="/terms" className="transition hover:text-primary-900">
+            <Link href="/terms" className="transition hover:text-white">
               Terms
             </Link>
             <button
               type="button"
               onClick={() => router.push('/chat')}
-              className="inline-flex items-center gap-1 text-primary-900 transition hover:opacity-80"
+              className="inline-flex items-center gap-1 text-primary transition hover:opacity-80"
             >
               <MessageCircle size={16} />
               {t('chat.aiAssistant')}

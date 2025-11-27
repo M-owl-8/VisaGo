@@ -98,28 +98,28 @@ export default function ApplicationsPage() {
   > = {
     draft: {
       label: t('applications.statusDraft', 'Draft'),
-      classes: 'bg-neutral-100 text-neutral-700',
-      chip: 'bg-white text-neutral-600 border border-neutral-200',
+      classes: 'bg-white/10 text-white',
+      chip: 'bg-white/5 text-white border border-white/10',
     },
     submitted: {
       label: t('applications.statusSubmitted', 'Submitted'),
-      classes: 'bg-blue-50 text-blue-700',
-      chip: 'bg-blue-50 text-blue-700 border border-blue-100',
+      classes: 'bg-primary/20 text-primary',
+      chip: 'bg-primary/10 text-primary border border-primary/30',
     },
     approved: {
       label: t('applications.statusApproved', 'Approved'),
-      classes: 'bg-emerald-50 text-emerald-700',
-      chip: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
+      classes: 'bg-emerald-500/20 text-emerald-300',
+      chip: 'bg-emerald-500/10 text-emerald-300 border border-emerald-400/30',
     },
     rejected: {
       label: t('applications.statusRejected', 'Rejected'),
-      classes: 'bg-rose-50 text-rose-700',
-      chip: 'bg-rose-50 text-rose-700 border border-rose-100',
+      classes: 'bg-rose-500/20 text-rose-300',
+      chip: 'bg-rose-500/10 text-rose-300 border border-rose-400/30',
     },
     in_progress: {
       label: t('applications.statusInProgress', 'In progress'),
-      classes: 'bg-amber-50 text-amber-700',
-      chip: 'bg-amber-50 text-amber-700 border border-amber-100',
+      classes: 'bg-amber-500/20 text-amber-200',
+      chip: 'bg-amber-500/10 text-amber-200 border border-amber-300/30',
     },
   };
 
@@ -131,15 +131,15 @@ export default function ApplicationsPage() {
 
   const renderSkeleton = () => (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <div className="glass-panel h-48 animate-pulse bg-white/50" />
+      <div className="glass-panel h-48 animate-pulse bg-white/5" />
       <div className="grid gap-4 md:grid-cols-3">
         {[...Array(3)].map((_, idx) => (
-          <div key={`metric-${idx}`} className="glass-panel h-32 animate-pulse bg-white/50" />
+          <div key={`metric-${idx}`} className="glass-panel h-32 animate-pulse bg-white/5" />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-        <div className="glass-panel h-72 animate-pulse bg-white/50" />
-        <div className="glass-panel h-72 animate-pulse bg-white/50" />
+        <div className="glass-panel h-72 animate-pulse bg-white/5" />
+        <div className="glass-panel h-72 animate-pulse bg-white/5" />
       </div>
     </div>
   );
@@ -149,7 +149,7 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8 text-white">
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
 
       <section className="grid gap-6 lg:grid-cols-[2fr,1fr]">
@@ -157,26 +157,26 @@ export default function ApplicationsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="glass-panel relative overflow-hidden px-8 py-10"
+          className="glass-panel relative overflow-hidden border border-white/10 bg-gradient-to-br from-[#0C1525] to-[#060a18] px-8 py-10 text-white"
         >
-          <div className="absolute right-[-5%] top-[-5%] h-48 w-48 rounded-full bg-primary-200/30 blur-3xl" />
-          <div className="absolute bottom-0 right-0 h-36 w-36 rounded-full bg-accent-200/30 blur-3xl" />
+          <div className="absolute right-[-10%] top-[-20%] h-60 w-60 rounded-full bg-primary/20 blur-[140px]" />
+          <div className="absolute left-[-15%] bottom-[-20%] h-72 w-72 rounded-full bg-[#1D4ED8]/15 blur-[160px]" />
           <div className="relative space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-neutral-500">
-              <Sparkles size={14} />
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
+              <Sparkles size={14} className="text-primary" />
               {t('applications.heroBadge', 'Premium workspace')}
             </div>
 
             <div>
-              <p className="text-sm uppercase tracking-[0.4em] text-neutral-500">
+              <p className="text-sm uppercase tracking-[0.4em] text-white/50">
                 {t('applications.heroEyebrow', 'Dashboard')}
               </p>
-              <h1 className="mt-2 font-display text-3xl font-semibold text-primary-900 sm:text-4xl">
+              <h1 className="mt-2 font-display text-3xl font-semibold text-white sm:text-4xl">
                 {t('applications.heroTitle', {
                   name: user?.firstName || t('applications.heroDefaultName', 'Traveler'),
                 })}
               </h1>
-              <p className="mt-3 max-w-2xl text-base text-neutral-600">
+              <p className="mt-3 max-w-2xl text-base text-white/70">
                 {t(
                   'applications.heroSubtitle',
                   'Keep every visa document, AI chat, and payment status perfectly synced with your mobile app.',
@@ -186,7 +186,7 @@ export default function ApplicationsPage() {
 
             <div className="flex flex-wrap gap-3">
               <Link href="/questionnaire">
-                <Button className="rounded-2xl px-6 py-3 text-base shadow-card">
+                <Button className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 text-base shadow-[0_20px_45px_rgba(62,166,255,0.45)]">
                   <Plus size={18} />
                   <span className="ml-2">{t('applications.startNewApplication')}</span>
                 </Button>
@@ -194,7 +194,7 @@ export default function ApplicationsPage() {
               <Link href="/chat">
                 <Button
                   variant="secondary"
-                  className="rounded-2xl border border-primary-900/10 !bg-white px-6 py-3 text-base text-primary-900 shadow-card-soft"
+                  className="rounded-2xl border border-white/10 !bg-transparent px-6 py-3 text-base text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)]"
                 >
                   <MessageCircle size={18} />
                   <span className="ml-2">{t('applications.heroAiCta', 'Open AI assistant')}</span>
@@ -202,7 +202,7 @@ export default function ApplicationsPage() {
               </Link>
               <Button
                 variant="ghost"
-                className="rounded-2xl border border-transparent px-4 text-neutral-600 hover:border-neutral-200"
+                className="rounded-2xl border border-white/10 px-4 text-white/70 hover:bg-white/5"
                 onClick={loadApplications}
               >
                 <RefreshCcw size={16} className={isRefreshing ? 'animate-spin' : ''} />
@@ -216,7 +216,7 @@ export default function ApplicationsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="glass-panel grid gap-4 px-6 py-6"
+          className="glass-panel grid gap-4 border border-white/10 bg-white/[0.04] px-6 py-6 text-white"
         >
           <Metric
             label={t('applications.metrics.active', 'Active applications')}
@@ -244,18 +244,18 @@ export default function ApplicationsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="glass-panel px-6 py-6"
+            className="glass-panel border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
           >
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h2 className="font-display text-xl text-primary-900">
+                <h2 className="font-display text-xl text-white">
                   {t('applications.activeSectionTitle', 'Active journeys')}
                 </h2>
-                <p className="text-sm text-neutral-500">
+                <p className="text-sm text-white/60">
                   {t('applications.activeSectionSubtitle', 'Continue where you left off')}
                 </p>
               </div>
-              <Link href="/questionnaire" className="text-sm text-primary-700 hover:underline">
+              <Link href="/questionnaire" className="text-sm text-primary hover:underline">
                 {t('applications.startNewApplication')}
               </Link>
             </div>
@@ -266,38 +266,38 @@ export default function ApplicationsPage() {
                 return (
                   <Card
                     key={app.id}
-                    className="group relative overflow-hidden border-white/70 bg-white/90 p-5 transition hover:-translate-y-1 hover:shadow-card"
+                    className="group relative overflow-hidden border-white/5 bg-white/[0.04] p-5 transition hover:-translate-y-1 hover:shadow-[0_30px_60px_rgba(7,12,30,0.6)]"
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm text-neutral-500">
+                        <p className="text-sm text-white/60">
                           {app.country?.name || t('applications.unknownCountry', 'Unknown country')}
                         </p>
-                        <p className="font-medium text-primary-900">{app.visaType?.name}</p>
+                        <p className="font-medium text-white">{app.visaType?.name}</p>
                       </div>
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusVariant.chip}`}>
                         {statusVariant.label}
                       </span>
                     </div>
                     <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-neutral-500">
+                      <div className="flex items-center justify-between text-xs text-white/60">
                         <span>{t('applications.progress')}</span>
                         <span>{app.progressPercentage ?? 0}%</span>
                       </div>
-                      <div className="h-2 w-full rounded-full bg-neutral-100">
+                      <div className="h-2 w-full rounded-full bg-white/10">
                         <div
-                          className="h-full rounded-full bg-primary-900 transition-[width]"
+                          className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width]"
                           style={{ width: `${app.progressPercentage || 0}%` }}
                         />
                       </div>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-primary-700">
-                      <Link href={`/applications/${app.id}`} className="inline-flex items-center gap-2">
+                    <div className="mt-4 flex items-center justify-between text-sm text-primary">
+                      <Link href={`/applications/${app.id}`} className="inline-flex items-center gap-2 text-white">
                         {t('applications.viewDetails', 'View details')}
                         <ArrowUpRight size={16} />
                       </Link>
-                      <Link href={`/applications/${app.id}/documents`} className="text-neutral-500">
+                      <Link href={`/applications/${app.id}/documents`} className="text-white/50">
                         {t('applications.uploadDocuments')}
                       </Link>
                     </div>
@@ -312,33 +312,33 @@ export default function ApplicationsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="glass-panel px-6 py-6"
+              className="glass-panel border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
             >
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display text-lg text-primary-900">
+                <h2 className="font-display text-lg text-white">
                   {t('applications.recentActivity', 'Recent activity')}
                 </h2>
-                <span className="text-xs uppercase tracking-[0.3em] text-neutral-400">
+                <span className="text-xs uppercase tracking-[0.3em] text-white/40">
                   {t('applications.synced', 'Synced')}
                 </span>
               </div>
               <div className="space-y-4">
                 {recentActivities.length === 0 ? (
-                  <p className="text-sm text-neutral-500">
+                  <p className="text-sm text-white/60">
                     {t('applications.noRecentActivity', 'We will surface highlights here as you progress.')}
                   </p>
                 ) : (
                   recentActivities.map((activity) => {
                     const variant = getStatusVariant(activity.status);
                     return (
-                      <div key={activity.id} className="rounded-2xl border border-white/60 bg-white/70 p-4">
+                      <div key={activity.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-primary-900">{activity.description}</p>
+                          <p className="text-sm font-medium text-white">{activity.description}</p>
                           <span className={`rounded-full px-2 py-1 text-xs ${variant.classes}`}>
                             {variant.label}
                           </span>
                         </div>
-                        <p className="mt-2 text-xs text-neutral-500">
+                        <p className="mt-2 text-xs text-white/60">
                           {formatRelativeTime(activity.timestamp)}
                         </p>
                       </div>
@@ -352,9 +352,9 @@ export default function ApplicationsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
-              className="glass-panel space-y-4 px-6 py-6"
+              className="glass-panel space-y-4 border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
             >
-              <h2 className="font-display text-lg text-primary-900">
+              <h2 className="font-display text-lg text-white">
                 {t('applications.quickActions', 'Quick actions')}
               </h2>
               <div className="space-y-3">
@@ -392,10 +392,10 @@ export default function ApplicationsPage() {
 }
 
 const Metric = ({ label, value, helper }: { label: string; value: string | number; helper: string }) => (
-  <div className="rounded-3xl border border-white/60 bg-white/90 p-4 shadow-card-soft">
-    <p className="text-xs uppercase tracking-[0.3em] text-neutral-400">{label}</p>
-    <p className="mt-3 text-3xl font-semibold text-primary-900">{value}</p>
-    <p className="text-sm text-neutral-500">{helper}</p>
+  <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4 text-white shadow-[0_25px_55px_rgba(1,7,17,0.65)]">
+    <p className="text-xs uppercase tracking-[0.3em] text-white/50">{label}</p>
+    <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+    <p className="text-sm text-white/60">{helper}</p>
   </div>
 );
 
@@ -413,30 +413,30 @@ const QuickAction = ({
   <button
     type="button"
     onClick={onClick}
-    className="flex w-full items-center justify-between rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-left shadow-card-soft transition hover:-translate-y-0.5 hover:shadow-card"
+    className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-white shadow-[0_20px_45px_rgba(0,0,0,0.45)] transition hover:-translate-y-0.5 hover:bg-white/[0.08]"
   >
     <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-900/10 text-primary-900">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white">
         {icon}
       </div>
       <div>
-        <p className="text-sm font-semibold text-primary-900">{title}</p>
-        <p className="text-xs text-neutral-500">{description}</p>
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="text-xs text-white/60">{description}</p>
       </div>
     </div>
-    <ArrowUpRight size={16} className="text-neutral-400" />
+    <ArrowUpRight size={16} className="text-white/40" />
   </button>
 );
 
 const EmptyState = () => {
   const { t } = useTranslation();
   return (
-    <Card className="glass-panel flex flex-col items-center justify-center border-dashed border-white/60 bg-white/50 px-8 py-16 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary-900/10 text-primary-900">
+    <Card className="glass-panel flex flex-col items-center justify-center border-dashed border-white/10 bg-white/[0.03] px-8 py-16 text-center text-white">
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white">
         <Plus size={28} />
       </div>
-      <h3 className="font-display text-2xl text-primary-900">{t('applications.noApplicationsYet')}</h3>
-      <p className="mt-3 max-w-xl text-sm text-neutral-500">
+      <h3 className="font-display text-2xl">{t('applications.noApplicationsYet')}</h3>
+      <p className="mt-3 max-w-xl text-sm text-white/60">
         {t(
           'applications.emptySubtitle',
           'Start your first application to unlock personalized timelines, AI planning, and shared mobile progress.',
@@ -444,12 +444,14 @@ const EmptyState = () => {
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <Link href="/questionnaire">
-          <Button className="rounded-2xl px-6 py-3">{t('applications.startNewApplication')}</Button>
+          <Button className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 shadow-[0_20px_45px_rgba(62,166,255,0.45)]">
+            {t('applications.startNewApplication')}
+          </Button>
         </Link>
         <Link href="/chat">
           <Button
             variant="secondary"
-            className="rounded-2xl border border-primary-900/10 !bg-white text-primary-900 shadow-card-soft"
+            className="rounded-2xl border border-white/10 !bg-transparent text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)]"
           >
             {t('applications.heroAiCta', 'Open AI assistant')}
           </Button>

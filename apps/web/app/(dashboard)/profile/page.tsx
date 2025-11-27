@@ -27,40 +27,40 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">{t('profile.myProfile')}</h1>
+    <div className="mx-auto max-w-3xl px-4 py-8 text-white sm:px-6 lg:px-8">
+      <h1 className="mb-6 text-2xl font-bold">{t('profile.myProfile')}</h1>
 
-      <div className="rounded-lg bg-white p-6 shadow">
+      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_25px_55px_rgba(1,7,17,0.65)]">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-white/70">
               {t('profile.firstName')}
             </label>
-            <p className="mt-1 text-sm text-gray-900">{user.firstName || '-'}</p>
+            <p className="mt-1 text-sm">{user.firstName || '-'}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-white/70">
               {t('profile.lastName')}
             </label>
-            <p className="mt-1 text-sm text-gray-900">{user.lastName || '-'}</p>
+            <p className="mt-1 text-sm">{user.lastName || '-'}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-white/70">
               {t('profile.email')}
             </label>
-            <p className="mt-1 text-sm text-gray-900">{user.email}</p>
+            <p className="mt-1 text-sm">{user.email}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-white/70">
               {t('profile.phone')}
             </label>
-            <p className="mt-1 text-sm text-gray-900">{user.phone || '-'}</p>
+            <p className="mt-1 text-sm">{user.phone || '-'}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-white/70">
               {t('profile.language')}
             </label>
-            <p className="mt-1 text-sm text-gray-900">{user.language || 'en'}</p>
+            <p className="mt-1 text-sm uppercase">{user.language || 'en'}</p>
           </div>
         </div>
       </div>
