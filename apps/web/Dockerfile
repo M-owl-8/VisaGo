@@ -8,8 +8,8 @@ WORKDIR /app
 # Copy package files (apps/web context)
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (prefer lockfile, fallback to npm install)
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Build stage
 FROM base AS builder
