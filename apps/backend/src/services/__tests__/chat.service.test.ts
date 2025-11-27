@@ -1,4 +1,10 @@
-import { mockChatSession, mockChatMessage, mockUser, mockApplication, createMockPrisma } from '../../__tests__/test-utils';
+import {
+  mockChatSession,
+  mockChatMessage,
+  mockUser,
+  mockApplication,
+  createMockPrisma,
+} from '../../__tests__/test-utils';
 
 jest.mock('axios');
 jest.mock('@prisma/client', () => ({
@@ -285,9 +291,7 @@ describe('ChatService', () => {
 
   describe('session statistics', () => {
     it('should track message count', async () => {
-      mockPrisma.chatMessage.findMany.mockResolvedValueOnce(
-        Array(15).fill(mockChatMessage)
-      );
+      mockPrisma.chatMessage.findMany.mockResolvedValueOnce(Array(15).fill(mockChatMessage));
 
       const messages = await mockPrisma.chatMessage.findMany({
         where: { sessionId: 'session-123' },
@@ -316,8 +320,8 @@ describe('ChatService', () => {
         where: { sessionId: 'session-123' },
       });
 
-      const userMessages = messages.filter(m => m.role === 'user');
-      const assistantMessages = messages.filter(m => m.role === 'assistant');
+      const userMessages = messages.filter((m) => m.role === 'user');
+      const assistantMessages = messages.filter((m) => m.role === 'assistant');
 
       expect(userMessages.length).toBe(2);
       expect(assistantMessages.length).toBe(1);

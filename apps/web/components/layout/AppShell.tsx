@@ -6,14 +6,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  Menu,
-  X,
-  LogOut,
-  Languages,
-  MessageCircle,
-  ShieldCheck,
-} from 'lucide-react';
+import { Menu, X, LogOut, Languages, MessageCircle, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
@@ -40,7 +33,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       { href: '/profile', label: t('profile.profile') },
       { href: '/support', label: t('helpSupport.title') },
     ],
-    [t],
+    [t]
   );
 
   const handleLogout = async () => {
@@ -112,7 +105,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     'rounded-full px-5 py-2 text-sm font-semibold transition',
                     isActive
                       ? 'bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)]'
-                      : 'text-white/50 hover:bg-white/10 hover:text-white',
+                      : 'text-white/50 hover:bg-white/10 hover:text-white'
                   )}
                   onClick={() => router.push(link.href)}
                 >
@@ -131,9 +124,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 className="bg-transparent text-xs font-semibold uppercase tracking-[0.2em] text-white focus:outline-none [&>option]:bg-[#0E1A2C] [&>option]:text-white [&>option]:text-white"
                 style={{ color: 'white' }}
               >
-                <option value="en" className="bg-[#0E1A2C] text-white">EN</option>
-                <option value="ru" className="bg-[#0E1A2C] text-white">RU</option>
-                <option value="uz" className="bg-[#0E1A2C] text-white">UZ</option>
+                <option value="en" className="bg-[#0E1A2C] text-white">
+                  EN
+                </option>
+                <option value="ru" className="bg-[#0E1A2C] text-white">
+                  RU
+                </option>
+                <option value="uz" className="bg-[#0E1A2C] text-white">
+                  UZ
+                </option>
               </select>
             </div>
 
@@ -179,7 +178,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     className={cn(
                       'justify-start rounded-2xl text-left',
-                      isActive ? 'bg-primary text-white' : 'text-white/70 hover:bg-white/10',
+                      isActive ? 'bg-primary text-white' : 'text-white/70 hover:bg-white/10'
                     )}
                     onClick={() => {
                       router.push(link.href);
@@ -199,7 +198,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
                     {initials || 'U'}
                   </div>
-                  <Button variant="secondary" className="flex-1 border border-white/10 text-white" onClick={handleLogout}>
+                  <Button
+                    variant="secondary"
+                    className="flex-1 border border-white/10 text-white"
+                    onClick={handleLogout}
+                  >
                     <LogOut size={16} />
                     <span className="ml-2">{t('profile.logout')}</span>
                   </Button>
@@ -214,9 +217,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white [&>option]:bg-[#0E1A2C] [&>option]:text-white"
                   style={{ color: 'white' }}
                 >
-                  <option value="en" className="bg-[#0E1A2C] text-white">English</option>
-                  <option value="ru" className="bg-[#0E1A2C] text-white">Русский</option>
-                  <option value="uz" className="bg-[#0E1A2C] text-white">O&apos;zbekcha</option>
+                  <option value="en" className="bg-[#0E1A2C] text-white">
+                    English
+                  </option>
+                  <option value="ru" className="bg-[#0E1A2C] text-white">
+                    Русский
+                  </option>
+                  <option value="uz" className="bg-[#0E1A2C] text-white">
+                    O&apos;zbekcha
+                  </option>
                 </select>
               </div>
             </motion.div>
@@ -224,15 +233,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </nav>
 
-      <main className="relative z-10 px-4 pb-16 pt-4 sm:px-6 lg:px-8">
-        {children}
-      </main>
+      <main className="relative z-10 px-4 pb-16 pt-4 sm:px-6 lg:px-8">{children}</main>
 
       <footer className="relative z-10 border-t border-white/10 px-4 pb-8 pt-6 text-white/60 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            © {new Date().getFullYear()} Ketdik.{' '}
-            {t('common.allRightsReserved')}
+            © {new Date().getFullYear()} Ketdik. {t('common.allRightsReserved')}
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <Link href="/privacy" className="transition hover:text-white">
@@ -255,4 +261,3 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

@@ -363,12 +363,16 @@ export class EmailTemplatesService {
           <span class="detail-label">Amount:</span>
           <span class="detail-value">${params.currency} ${(params.amount / 100).toFixed(2)}</span>
         </div>
-        ${params.transactionId ? `
+        ${
+          params.transactionId
+            ? `
         <div class="detail-row">
           <span class="detail-label">Transaction ID:</span>
           <span class="detail-value">${params.transactionId}</span>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
       
       <p class="message">
@@ -389,11 +393,15 @@ export class EmailTemplatesService {
         </ul>
       </div>
       
-      ${params.supportEmail ? `
+      ${
+        params.supportEmail
+          ? `
       <div class="message">
         If you continue to experience issues, please contact our support team at ${params.supportEmail}
       </div>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
     
     <div class="footer">
@@ -551,11 +559,15 @@ export class EmailTemplatesService {
         <a href="${params.dashboardUrl}" class="view-button">View Full Application</a>
       </div>
       
-      ${params.supportEmail ? `
+      ${
+        params.supportEmail
+          ? `
       <p class="message" style="font-size: 12px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
         Questions? Contact us at ${params.supportEmail}
       </p>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
     
     <div class="footer">
@@ -570,11 +582,7 @@ export class EmailTemplatesService {
   /**
    * Welcome Email
    */
-  static welcome(params: {
-    userName: string;
-    email: string;
-    supportEmail?: string;
-  }): string {
+  static welcome(params: { userName: string; email: string; supportEmail?: string }): string {
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -684,11 +692,15 @@ export class EmailTemplatesService {
         <a href="https://visabuddy.com/dashboard" class="button">Start Now</a>
       </div>
       
-      ${params.supportEmail ? `
+      ${
+        params.supportEmail
+          ? `
       <p class="message" style="font-size: 12px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
         If you have any questions, our support team is here to help: ${params.supportEmail}
       </p>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
     
     <div class="footer">
@@ -750,7 +762,9 @@ export class EmailTemplatesService {
       applicationId: params.applicationId || '',
       visaType: params.visaType || 'Visa',
       reason: params.reason || 'An error occurred processing your payment',
-      retryUrl: params.retryUrl || `${process.env.SERVER_URL || 'https://visabuddy.com'}/payment/${params.applicationId}`,
+      retryUrl:
+        params.retryUrl ||
+        `${process.env.SERVER_URL || 'https://visabuddy.com'}/payment/${params.applicationId}`,
       supportEmail: process.env.SMTP_REPLY_TO,
     });
   }
@@ -769,10 +783,15 @@ export class EmailTemplatesService {
   }): string {
     // Map status to valid enum values
     const validStatuses = ['submitted', 'processing', 'approved', 'rejected', 'on_hold'];
-    const normalizedStatus = validStatuses.includes(params.status.toLowerCase()) 
-      ? (params.status.toLowerCase() as 'submitted' | 'processing' | 'approved' | 'rejected' | 'on_hold')
+    const normalizedStatus = validStatuses.includes(params.status.toLowerCase())
+      ? (params.status.toLowerCase() as
+          | 'submitted'
+          | 'processing'
+          | 'approved'
+          | 'rejected'
+          | 'on_hold')
       : 'processing';
-    
+
     return EmailTemplatesService.visaStatusUpdate({
       userName: params.userName,
       applicationId: params.applicationId,
@@ -787,10 +806,7 @@ export class EmailTemplatesService {
   /**
    * Instance method wrapper for welcome template
    */
-  welcomeTemplate(params: {
-    userName: string;
-    email: string;
-  }): string {
+  welcomeTemplate(params: { userName: string; email: string }): string {
     return EmailTemplatesService.welcome({
       userName: params.userName,
       email: params.email,

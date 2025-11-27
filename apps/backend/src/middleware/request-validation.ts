@@ -3,10 +3,10 @@
  * Validates and sanitizes request data before processing
  */
 
-import { Request, Response, NextFunction } from "express";
-import { sanitizeString, validatePagination } from "../utils/validation";
-import { errors } from "../utils/errors";
-import { HTTP_STATUS } from "../config/constants";
+import { Request, Response, NextFunction } from 'express';
+import { sanitizeString, validatePagination } from '../utils/validation';
+import { errors } from '../utils/errors';
+import { HTTP_STATUS } from '../config/constants';
 
 /**
  * Request validation options
@@ -34,10 +34,10 @@ export interface ValidationOptions {
 
 /**
  * Creates a request validation middleware
- * 
+ *
  * @param options - Validation options
  * @returns Express middleware function
- * 
+ *
  * @example
  * ```typescript
  * router.post('/users',
@@ -60,19 +60,19 @@ export function validateRequest(options: ValidationOptions) {
     try {
       // Validate body
       if (options.body) {
-        validateObject(req.body, options.body, "body");
+        validateObject(req.body, options.body, 'body');
         sanitizeObject(req.body, options.body.sanitize || []);
       }
 
       // Validate query
       if (options.query) {
-        validateObject(req.query, options.query, "query");
+        validateObject(req.query, options.query, 'query');
         sanitizeObject(req.query, options.query.sanitize || []);
       }
 
       // Validate params
       if (options.params) {
-        validateObject(req.params, options.params, "params");
+        validateObject(req.params, options.params, 'params');
         sanitizeObject(req.params, options.params.sanitize || []);
       }
 
@@ -84,7 +84,7 @@ export function validateRequest(options: ValidationOptions) {
           error: {
             status: HTTP_STATUS.BAD_REQUEST,
             message: error.message,
-            code: "VALIDATION_ERROR",
+            code: 'VALIDATION_ERROR',
           },
         });
       } else {
@@ -99,7 +99,7 @@ export function validateRequest(options: ValidationOptions) {
  */
 function validateObject(
   obj: Record<string, any>,
-  options: ValidationOptions["body"],
+  options: ValidationOptions['body'],
   source: string
 ): void {
   if (!options) return;
@@ -114,7 +114,7 @@ function validateObject(
         throw errors.badRequest(`Missing required ${source} field: ${field}`);
       }
       // For non-password fields, also check for empty strings
-      if (field !== 'password' && value === "") {
+      if (field !== 'password' && value === '') {
         throw errors.badRequest(`Missing required ${source} field: ${field}`);
       }
     }
@@ -135,12 +135,9 @@ function validateObject(
 /**
  * Sanitizes object fields
  */
-function sanitizeObject(
-  obj: Record<string, any>,
-  fieldsToSanitize: string[]
-): void {
+function sanitizeObject(obj: Record<string, any>, fieldsToSanitize: string[]): void {
   for (const field of fieldsToSanitize) {
-    if (obj[field] && typeof obj[field] === "string") {
+    if (obj[field] && typeof obj[field] === 'string') {
       obj[field] = sanitizeString(obj[field]);
     }
   }
@@ -150,11 +147,7 @@ function sanitizeObject(
  * Validates pagination parameters
  * Normalizes page and limit values
  */
-export function validatePaginationParams(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+export function validatePaginationParams(req: Request, res: Response, next: NextFunction): void {
   try {
     const { page, limit } = validatePagination(
       req.query.page as string | number | undefined,
@@ -170,18 +163,9 @@ export function validatePaginationParams(
       success: false,
       error: {
         status: HTTP_STATUS.BAD_REQUEST,
-        message: "Invalid pagination parameters",
-        code: "VALIDATION_ERROR",
+        message: 'Invalid pagination parameters',
+        code: 'VALIDATION_ERROR',
       },
     });
   }
 }
-
-
-
-
-
-
-
-
-

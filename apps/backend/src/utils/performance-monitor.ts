@@ -49,21 +49,14 @@ export class PerformanceMonitor {
 
     // Log slow operations
     if (metric.duration > 1000) {
-      console.warn(
-        `Slow operation: ${metric.name} took ${metric.duration}ms`,
-        metric.tags
-      );
+      console.warn(`Slow operation: ${metric.name} took ${metric.duration}ms`, metric.tags);
     }
   }
 
   /**
    * Measure function execution time
    */
-  async measure<T>(
-    name: string,
-    fn: () => Promise<T>,
-    tags?: Record<string, string>
-  ): Promise<T> {
+  async measure<T>(name: string, fn: () => Promise<T>, tags?: Record<string, string>): Promise<T> {
     const startTime = Date.now();
     let success = false;
 
@@ -86,11 +79,7 @@ export class PerformanceMonitor {
   /**
    * Measure synchronous function execution time
    */
-  measureSync<T>(
-    name: string,
-    fn: () => T,
-    tags?: Record<string, string>
-  ): T {
+  measureSync<T>(name: string, fn: () => T, tags?: Record<string, string>): T {
     const startTime = Date.now();
     let success = false;
 
@@ -153,10 +142,7 @@ export class PerformanceMonitor {
   /**
    * Get metrics for a specific time window (milliseconds)
    */
-  getRecentMetrics(
-    name: string,
-    windowMs: number = 60000
-  ): PerformanceMetric[] {
+  getRecentMetrics(name: string, windowMs: number = 60000): PerformanceMetric[] {
     const metricList = this.metrics.get(name) || [];
     const now = Date.now();
 
@@ -248,16 +234,9 @@ export class ConnectionPoolMonitor {
 export class QueryPerformanceTracker {
   private queryMetrics: Map<string, PerformanceMetric[]> = new Map();
 
-  trackQuery(
-    query: string,
-    duration: number,
-    success: boolean,
-    rowsAffected?: number
-  ): void {
+  trackQuery(query: string, duration: number, success: boolean, rowsAffected?: number): void {
     // Normalize query for grouping (remove values)
-    const normalizedQuery = query
-      .replace(/\b\d+\b/g, '?')
-      .replace(/'.+?'/g, "'?'");
+    const normalizedQuery = query.replace(/\b\d+\b/g, '?').replace(/'.+?'/g, "'?'");
 
     if (!this.queryMetrics.has(normalizedQuery)) {
       this.queryMetrics.set(normalizedQuery, []);
@@ -276,16 +255,15 @@ export class QueryPerformanceTracker {
     const slowQueries: string[] = [];
 
     for (const [query, metrics] of this.queryMetrics) {
-      const avgDuration =
-        metrics.reduce((sum, m) => sum + m.duration, 0) / metrics.length;
+      const avgDuration = metrics.reduce((sum, m) => sum + m.duration, 0) / metrics.length;
       if (avgDuration > thresholdMs) {
         slowQueries.push(`${query} (avg: ${avgDuration.toFixed(2)}ms)`);
       }
     }
 
     return slowQueries.sort(
-      (a, b) => parseFloat(b.match(/\d+\.\d+/)?.[0] || '0') -
-        parseFloat(a.match(/\d+\.\d+/)?.[0] || '0')
+      (a, b) =>
+        parseFloat(b.match(/\d+\.\d+/)?.[0] || '0') - parseFloat(a.match(/\d+\.\d+/)?.[0] || '0')
     );
   }
 

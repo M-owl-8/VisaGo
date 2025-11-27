@@ -38,10 +38,7 @@ export function validatePaginationParams(
   pageSize?: number
 ): { page: number; pageSize: number } {
   const normalizedPage = Math.max(1, page || 1);
-  const normalizedPageSize = Math.min(
-    MAX_PAGE_SIZE,
-    Math.max(1, pageSize || DEFAULT_PAGE_SIZE)
-  );
+  const normalizedPageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, pageSize || DEFAULT_PAGE_SIZE));
 
   return {
     page: normalizedPage,

@@ -18,12 +18,14 @@
 ## 🎯 Next: Setup Firebase (1 hour)
 
 ### Why Firebase?
+
 - **File Storage:** Store user-uploaded documents
 - **Push Notifications:** Notify users about application updates
 
 ### Step-by-Step:
 
 #### 1. Create Firebase Project (10 min)
+
 1. Go to: https://console.firebase.google.com
 2. Click **"Add project"**
 3. Project name: **"VisaBuddy"**
@@ -32,6 +34,7 @@
 6. Wait for project creation (30 seconds)
 
 #### 2. Enable Firebase Storage (15 min)
+
 1. In Firebase Console, click **"Storage"** in left menu
 2. Click **"Get started"**
 3. Choose **"Start in test mode"** (we'll secure it later)
@@ -39,11 +42,13 @@
 5. Click **"Done"**
 
 #### 3. Enable Cloud Messaging (10 min)
+
 1. In Firebase Console, click **"Cloud Messaging"** in left menu
 2. If prompted, click **"Enable"**
 3. Note the **Server key** (we'll use this later for notifications)
 
 #### 4. Get Service Account (15 min)
+
 1. Click the **gear icon** ⚙️ next to "Project Overview"
 2. Click **"Project settings"**
 3. Go to **"Service accounts"** tab
@@ -53,7 +58,9 @@
 7. **IMPORTANT:** Keep this file safe - it contains admin credentials
 
 #### 5. Extract Credentials from JSON
+
 Open the downloaded JSON file. You'll need:
+
 - `project_id` → `FIREBASE_PROJECT_ID`
 - `private_key` → `FIREBASE_PRIVATE_KEY` (keep the quotes and newlines)
 - `client_email` → `FIREBASE_CLIENT_EMAIL`
@@ -65,12 +72,14 @@ Open the downloaded JSON file. You'll need:
 ## 🔐 After Firebase: Setup Google OAuth (1 hour)
 
 ### Why Google OAuth?
+
 - **Google Sign-In:** Let users sign in with their Google account
 - **Better UX:** Faster registration/login
 
 ### Step-by-Step:
 
 #### 1. Create Google Cloud Project (10 min)
+
 1. Go to: https://console.cloud.google.com
 2. Click **"Select a project"** → **"New Project"**
 3. Project name: **"VisaBuddy"**
@@ -78,11 +87,13 @@ Open the downloaded JSON file. You'll need:
 5. Wait for project creation
 
 #### 2. Enable APIs (10 min)
+
 1. Go to: **APIs & Services** → **Library**
 2. Search **"Google+ API"** → Click → **Enable**
 3. Search **"People API"** → Click → **Enable**
 
 #### 3. Configure OAuth Consent Screen (20 min)
+
 1. Go to: **APIs & Services** → **OAuth consent screen**
 2. User Type: **External** → Click **"Create"**
 3. Fill in:
@@ -97,6 +108,7 @@ Open the downloaded JSON file. You'll need:
 #### 4. Create OAuth Credentials (20 min)
 
 **Web Client:**
+
 1. Go to: **APIs & Services** → **Credentials**
 2. Click **"Create Credentials"** → **"OAuth client ID"**
 3. Application type: **Web application**
@@ -106,6 +118,7 @@ Open the downloaded JSON file. You'll need:
 7. **Copy Client ID and Client Secret**
 
 **iOS Client:**
+
 1. Create another OAuth client ID
 2. Type: **iOS**
 3. Bundle ID: `com.visabuddy.app` (or your bundle ID)
@@ -113,6 +126,7 @@ Open the downloaded JSON file. You'll need:
 5. **Copy Client ID**
 
 **Android Client:**
+
 1. Create another OAuth client ID
 2. Type: **Android**
 3. Package name: `com.visabuddy.app` (or your package name)
@@ -127,6 +141,7 @@ Open the downloaded JSON file. You'll need:
 ## 🗄️ After OAuth: Setup Railway Database (1 hour)
 
 ### Why Railway?
+
 - **PostgreSQL Database:** Production-ready database
 - **Redis Cache:** For better performance
 - **Easy Deployment:** Simple backend deployment
@@ -134,11 +149,13 @@ Open the downloaded JSON file. You'll need:
 ### Step-by-Step:
 
 #### 1. Create Railway Account (5 min)
+
 1. Go to: https://railway.app
 2. Click **"Start a New Project"**
 3. Sign up with **GitHub** (recommended)
 
 #### 2. Create PostgreSQL Database (15 min)
+
 1. In Railway dashboard, click **"New"**
 2. Click **"Database"**
 3. Select **"Add PostgreSQL"**
@@ -148,6 +165,7 @@ Open the downloaded JSON file. You'll need:
 7. **Copy the DATABASE_URL** (postgresql://...)
 
 #### 3. Add Redis (Optional but Recommended) (10 min)
+
 1. Click **"New"** → **"Database"**
 2. Select **"Add Redis"**
 3. Wait for Redis to provision
@@ -161,6 +179,7 @@ Open the downloaded JSON file. You'll need:
 ## 📋 Quick Checklist
 
 **Firebase:**
+
 - [ ] Project created
 - [ ] Storage enabled
 - [ ] Cloud Messaging enabled
@@ -168,6 +187,7 @@ Open the downloaded JSON file. You'll need:
 - [ ] Credentials extracted
 
 **Google OAuth:**
+
 - [ ] Google Cloud project created
 - [ ] APIs enabled
 - [ ] OAuth consent screen configured
@@ -176,6 +196,7 @@ Open the downloaded JSON file. You'll need:
 - [ ] Android client created
 
 **Railway:**
+
 - [ ] Account created
 - [ ] PostgreSQL database created
 - [ ] Redis added (optional)
@@ -207,4 +228,3 @@ Open the downloaded JSON file. You'll need:
 **Begin with Firebase setup above!** Once you have the credentials, share them and I'll configure everything automatically.
 
 **Let's continue Phase 2! 🎉**
-

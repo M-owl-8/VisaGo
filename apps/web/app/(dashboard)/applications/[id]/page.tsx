@@ -66,10 +66,7 @@ export default function ApplicationDetailPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {error && <ErrorBanner message={error} />}
         <div className="mt-4">
-          <Link
-            href="/applications"
-            className="text-sm text-primary-600 hover:text-primary-500"
-          >
+          <Link href="/applications" className="text-sm text-primary-600 hover:text-primary-500">
             {t('applications.backToApplications')}
           </Link>
         </div>
@@ -86,10 +83,7 @@ export default function ApplicationDetailPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 text-white sm:px-6 lg:px-8">
       {error && <ErrorBanner message={error} onClose={() => setError('')} />}
 
-      <Link
-        href="/applications"
-        className="mb-4 text-sm text-primary hover:text-white"
-      >
+      <Link href="/applications" className="mb-4 text-sm text-primary hover:text-white">
         ← {t('applications.backToApplications')}
       </Link>
 
@@ -125,7 +119,11 @@ export default function ApplicationDetailPage() {
                 <ul className="space-y-2">
                   {checklist.items.map((item: any, index: number) => (
                     <li key={index} className="flex items-center justify-between text-white/80">
-                      <span className={item.status === 'verified' ? 'text-emerald-300' : 'text-white/80'}>
+                      <span
+                        className={
+                          item.status === 'verified' ? 'text-emerald-300' : 'text-white/80'
+                        }
+                      >
                         {item.name}
                       </span>
                       <span className="text-sm text-white/50 capitalize">{item.status}</span>
@@ -160,5 +158,3 @@ export default function ApplicationDetailPage() {
     </div>
   );
 }
-
-

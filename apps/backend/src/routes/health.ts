@@ -3,12 +3,12 @@
  * Provides endpoints for monitoring application health
  */
 
-import express, { Request, Response } from "express";
-import { getEnvConfig } from "../config/env";
-import { successResponse } from "../utils/response";
-import { HTTP_STATUS } from "../config/constants";
-import db from "../db";
-import { OptimizedCacheService } from "../services/cache.service.optimized";
+import express, { Request, Response } from 'express';
+import { getEnvConfig } from '../config/env';
+import { successResponse } from '../utils/response';
+import { HTTP_STATUS } from '../config/constants';
+import db from '../db';
+import { OptimizedCacheService } from '../services/cache.service.optimized';
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ const router = express.Router();
  * System health status interface
  */
 interface HealthStatus {
-  status: "healthy" | "degraded" | "unhealthy";
+  status: 'healthy' | 'degraded' | 'unhealthy';
   timestamp: string;
   uptime: number;
   version: string;
@@ -33,7 +33,7 @@ interface HealthStatus {
  * Service status interface
  */
 interface ServiceStatus {
-  status: "up" | "down" | "degraded";
+  status: 'up' | 'down' | 'degraded';
   message?: string;
   responseTime?: number;
 }
@@ -41,27 +41,27 @@ interface ServiceStatus {
 /**
  * GET /api/health
  * Basic health check endpoint
- * 
+ *
  * @route GET /api/health
  * @access Public
  * @returns {object} Health status
  */
-router.get("/", async (_req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   const startTime = Date.now();
-  
+
   try {
     // Quick database check
     await db.$queryRaw`SELECT 1`;
     const dbResponseTime = Date.now() - startTime;
 
     successResponse(res, {
-      status: "healthy",
+      status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      version: "1.0.0",
+      version: '1.0.0',
       environment: getEnvConfig().NODE_ENV,
       database: {
-        status: "up" as const,
+        status: 'up' as const,
         responseTime: dbResponseTime,
       },
     });
@@ -70,8 +70,8 @@ router.get("/", async (_req: Request, res: Response) => {
       success: false,
       error: {
         status: HTTP_STATUS.SERVICE_UNAVAILABLE,
-        message: "Service unhealthy",
-        code: "SERVICE_UNAVAILABLE",
+        message: 'Service unhealthy',
+        code: 'SERVICE_UNAVAILABLE',
       },
     });
   }
@@ -80,19 +80,19 @@ router.get("/", async (_req: Request, res: Response) => {
 /**
  * GET /api/health/detailed
  * Detailed health check with all services
- * 
+ *
  * @route GET /api/health/detailed
  * @access Public
  * @returns {object} Detailed health status
  */
-router.get("/detailed", async (_req: Request, res: Response) => {
+router.get('/detailed', async (_req: Request, res: Response) => {
   const startTime = Date.now();
   const envConfig = getEnvConfig();
   const healthStatus: HealthStatus = {
-    status: "healthy",
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    version: "1.0.0",
+    version: '1.0.0',
     environment: envConfig.NODE_ENV,
     services: {
       database: await checkDatabase(),
@@ -104,24 +104,24 @@ router.get("/detailed", async (_req: Request, res: Response) => {
 
   // Determine overall status
   const serviceStatuses = Object.values(healthStatus.services);
-  const downServices = serviceStatuses.filter((s) => s.status === "down");
-  const degradedServices = serviceStatuses.filter((s) => s.status === "degraded");
+  const downServices = serviceStatuses.filter((s) => s.status === 'down');
+  const degradedServices = serviceStatuses.filter((s) => s.status === 'degraded');
 
   if (downServices.length > 0) {
-    healthStatus.status = "unhealthy";
+    healthStatus.status = 'unhealthy';
   } else if (degradedServices.length > 0) {
-    healthStatus.status = "degraded";
+    healthStatus.status = 'degraded';
   }
 
   const statusCode =
-    healthStatus.status === "healthy"
+    healthStatus.status === 'healthy'
       ? HTTP_STATUS.OK
-      : healthStatus.status === "degraded"
-      ? HTTP_STATUS.OK // Still return 200 but indicate degraded
-      : HTTP_STATUS.SERVICE_UNAVAILABLE;
+      : healthStatus.status === 'degraded'
+        ? HTTP_STATUS.OK // Still return 200 but indicate degraded
+        : HTTP_STATUS.SERVICE_UNAVAILABLE;
 
   res.status(statusCode).json({
-    success: healthStatus.status !== "unhealthy",
+    success: healthStatus.status !== 'unhealthy',
     data: healthStatus,
   });
 });
@@ -129,12 +129,12 @@ router.get("/detailed", async (_req: Request, res: Response) => {
 /**
  * GET /api/health/ready
  * Readiness probe for Kubernetes/Docker
- * 
+ *
  * @route GET /api/health/ready
  * @access Public
  * @returns {object} Readiness status
  */
-router.get("/ready", async (_req: Request, res: Response) => {
+router.get('/ready', async (_req: Request, res: Response) => {
   try {
     // Check critical services
     await db.$queryRaw`SELECT 1`;
@@ -149,8 +149,8 @@ router.get("/ready", async (_req: Request, res: Response) => {
       ready: false,
       error: {
         status: HTTP_STATUS.SERVICE_UNAVAILABLE,
-        message: "Service not ready",
-        code: "NOT_READY",
+        message: 'Service not ready',
+        code: 'NOT_READY',
       },
     });
   }
@@ -159,12 +159,12 @@ router.get("/ready", async (_req: Request, res: Response) => {
 /**
  * GET /api/health/live
  * Liveness probe for Kubernetes/Docker
- * 
+ *
  * @route GET /api/health/live
  * @access Public
  * @returns {object} Liveness status
  */
-router.get("/live", (_req: Request, res: Response) => {
+router.get('/live', (_req: Request, res: Response) => {
   successResponse(res, {
     alive: true,
     timestamp: new Date().toISOString(),
@@ -180,13 +180,13 @@ async function checkDatabase(): Promise<ServiceStatus> {
   try {
     await db.$queryRaw`SELECT 1`;
     return {
-      status: "up",
+      status: 'up',
       responseTime: Date.now() - startTime,
     };
   } catch (error) {
     return {
-      status: "down",
-      message: error instanceof Error ? error.message : "Database connection failed",
+      status: 'down',
+      message: error instanceof Error ? error.message : 'Database connection failed',
     };
   }
 }
@@ -201,19 +201,19 @@ async function checkCache(): Promise<ServiceStatus> {
 
     if (stats?.redisConnected) {
       return {
-        status: "up",
-        message: "Redis connected",
+        status: 'up',
+        message: 'Redis connected',
       };
     }
 
     return {
-      status: "degraded",
-      message: "Using local cache (Redis not available)",
+      status: 'degraded',
+      message: 'Using local cache (Redis not available)',
     };
   } catch (error) {
     return {
-      status: "degraded",
-      message: "Cache service unavailable, using fallback",
+      status: 'degraded',
+      message: 'Cache service unavailable, using fallback',
     };
   }
 }
@@ -223,21 +223,21 @@ async function checkCache(): Promise<ServiceStatus> {
  */
 async function checkStorage(envConfig: ReturnType<typeof getEnvConfig>): Promise<ServiceStatus> {
   try {
-    if (envConfig.STORAGE_TYPE === "firebase" && envConfig.FIREBASE_PROJECT_ID) {
+    if (envConfig.STORAGE_TYPE === 'firebase' && envConfig.FIREBASE_PROJECT_ID) {
       return {
-        status: "up",
-        message: "Firebase Storage configured",
+        status: 'up',
+        message: 'Firebase Storage configured',
       };
     }
 
     return {
-      status: "up",
-      message: "Local storage configured",
+      status: 'up',
+      message: 'Local storage configured',
     };
   } catch (error) {
     return {
-      status: "degraded",
-      message: "Storage service check failed",
+      status: 'degraded',
+      message: 'Storage service check failed',
     };
   }
 }
@@ -248,32 +248,23 @@ async function checkStorage(envConfig: ReturnType<typeof getEnvConfig>): Promise
 async function checkAIService(envConfig: ReturnType<typeof getEnvConfig>): Promise<ServiceStatus> {
   if (!envConfig.OPENAI_API_KEY) {
     return {
-      status: "degraded",
-      message: "OpenAI API key not configured",
+      status: 'degraded',
+      message: 'OpenAI API key not configured',
     };
   }
 
   try {
     // Could add actual API check here
     return {
-      status: "up",
-      message: "OpenAI service configured",
+      status: 'up',
+      message: 'OpenAI service configured',
     };
   } catch (error) {
     return {
-      status: "degraded",
-      message: "AI service check failed",
+      status: 'degraded',
+      message: 'AI service check failed',
     };
   }
 }
 
 export default router;
-
-
-
-
-
-
-
-
-

@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { 
-  detectSQLInjection, 
-  detectXSS, 
+import {
+  detectSQLInjection,
+  detectXSS,
   detectCommandInjection,
   validateAndSanitize,
-  sanitizeObject 
+  sanitizeObject,
 } from '../utils/input-sanitization';
 
 /**
@@ -59,7 +59,9 @@ export const sanitizePromptInput = (input: string): string => {
 /**
  * Validate RAG query input
  */
-export const validateRAGQuery = (query: string): { valid: boolean; error?: string; sanitized?: string } => {
+export const validateRAGQuery = (
+  query: string
+): { valid: boolean; error?: string; sanitized?: string } => {
   if (!query || typeof query !== 'string') {
     return {
       valid: false,
@@ -278,7 +280,7 @@ export const validateCommonInputs = (req: Request, res: Response, next: NextFunc
 export const preventSQLInjection = (req: Request, res: Response, next: NextFunction) => {
   const checkObject = (obj: any, path: string = ''): string[] => {
     const issues: string[] = [];
-    
+
     if (typeof obj === 'string') {
       if (detectSQLInjection(obj)) {
         issues.push(`${path}: Potential SQL injection detected`);
@@ -293,7 +295,7 @@ export const preventSQLInjection = (req: Request, res: Response, next: NextFunct
         issues.push(...checkObject(value, newPath));
       }
     }
-    
+
     return issues;
   };
 
@@ -309,7 +311,7 @@ export const preventSQLInjection = (req: Request, res: Response, next: NextFunct
       path: req.path,
       issues: allIssues,
     });
-    
+
     return res.status(400).json({
       success: false,
       error: {
@@ -328,7 +330,7 @@ export const preventSQLInjection = (req: Request, res: Response, next: NextFunct
 export const preventXSS = (req: Request, res: Response, next: NextFunction) => {
   const checkObject = (obj: any, path: string = ''): string[] => {
     const issues: string[] = [];
-    
+
     if (typeof obj === 'string') {
       if (detectXSS(obj)) {
         issues.push(`${path}: Potential XSS detected`);
@@ -343,7 +345,7 @@ export const preventXSS = (req: Request, res: Response, next: NextFunction) => {
         issues.push(...checkObject(value, newPath));
       }
     }
-    
+
     return issues;
   };
 
@@ -358,7 +360,7 @@ export const preventXSS = (req: Request, res: Response, next: NextFunction) => {
       path: req.path,
       issues: allIssues,
     });
-    
+
     return res.status(400).json({
       success: false,
       error: {

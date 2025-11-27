@@ -83,4 +83,3 @@ export const getStatusMeta = (status?: string) => {
   const normalized = status.toLowerCase().replace(/_/g, ' ').trim();
   return STATUS_META[normalized] ?? STATUS_META['in progress'];
 };
-

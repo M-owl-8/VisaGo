@@ -35,4 +35,3 @@ export function useAutosave<T>({ key, data, delay = 800, onSave }: AutosaveOptio
     };
   }, [key, data, delay, onSave]);
 }
-

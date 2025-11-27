@@ -1,4 +1,4 @@
-import { HTTP_STATUS, API_MESSAGES, ERROR_CODES } from "../config/constants";
+import { HTTP_STATUS, API_MESSAGES, ERROR_CODES } from '../config/constants';
 
 /**
  * Custom API Error class
@@ -18,9 +18,9 @@ export class ApiError extends Error {
     details?: unknown
   ) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
     this.status = status;
-    this.code = code || "UNKNOWN_ERROR";
+    this.code = code || 'UNKNOWN_ERROR';
     this.isOperational = isOperational;
     this.details = details;
 
@@ -84,42 +84,25 @@ export const errors = {
    * 403 Forbidden - Access denied
    */
   forbidden: (message?: string) =>
-    createError(
-      HTTP_STATUS.FORBIDDEN,
-      message || API_MESSAGES.FORBIDDEN,
-      ERROR_CODES.FORBIDDEN
-    ),
+    createError(HTTP_STATUS.FORBIDDEN, message || API_MESSAGES.FORBIDDEN, ERROR_CODES.FORBIDDEN),
 
   /**
    * 404 Not Found - Resource not found
    */
   notFound: (resource: string) =>
-    createError(
-      HTTP_STATUS.NOT_FOUND,
-      `${resource} not found`,
-      ERROR_CODES.NOT_FOUND
-    ),
+    createError(HTTP_STATUS.NOT_FOUND, `${resource} not found`, ERROR_CODES.NOT_FOUND),
 
   /**
    * 409 Conflict - Resource already exists
    */
   conflict: (field: string) =>
-    createError(
-      HTTP_STATUS.CONFLICT,
-      `${field} already exists`,
-      ERROR_CODES.VALIDATION_ERROR
-    ),
+    createError(HTTP_STATUS.CONFLICT, `${field} already exists`, ERROR_CODES.VALIDATION_ERROR),
 
   /**
    * 400 Bad Request - Invalid request
    */
   badRequest: (message: string, details?: unknown) =>
-    createError(
-      HTTP_STATUS.BAD_REQUEST,
-      message,
-      ERROR_CODES.VALIDATION_ERROR,
-      details
-    ),
+    createError(HTTP_STATUS.BAD_REQUEST, message, ERROR_CODES.VALIDATION_ERROR, details),
 
   /**
    * 500 Internal Server Error
@@ -136,23 +119,13 @@ export const errors = {
    * 422 Validation Error - Unprocessable entity
    */
   validationError: (message: string, details?: unknown) =>
-    createError(
-      HTTP_STATUS.UNPROCESSABLE_ENTITY,
-      message,
-      ERROR_CODES.VALIDATION_ERROR,
-      details
-    ),
+    createError(HTTP_STATUS.UNPROCESSABLE_ENTITY, message, ERROR_CODES.VALIDATION_ERROR, details),
 
   /**
    * 422 Unprocessable Entity - Same as validationError
    */
   unprocessable: (message: string, details?: unknown) =>
-    createError(
-      HTTP_STATUS.UNPROCESSABLE_ENTITY,
-      message,
-      ERROR_CODES.VALIDATION_ERROR,
-      details
-    ),
+    createError(HTTP_STATUS.UNPROCESSABLE_ENTITY, message, ERROR_CODES.VALIDATION_ERROR, details),
 
   /**
    * 429 Too Many Requests - Rate limit exceeded

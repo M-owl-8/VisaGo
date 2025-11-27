@@ -30,11 +30,7 @@ export default function DocumentsPage() {
     setSuccess('');
 
     try {
-      const response = await apiClient.uploadDocument(
-        params.id as string,
-        'document',
-        file,
-      );
+      const response = await apiClient.uploadDocument(params.id as string, 'document', file);
 
       if (response.success) {
         setSuccess(t('documents.uploadSuccess'));
@@ -76,5 +72,3 @@ export default function DocumentsPage() {
     </div>
   );
 }
-
-

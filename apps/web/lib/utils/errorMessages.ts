@@ -6,7 +6,7 @@
 export const getErrorMessage = (
   error: any,
   t: (key: string) => string,
-  language: string = 'en',
+  language: string = 'en'
 ): string => {
   // If error already has a user-friendly message, use it
   if (error.message && !error.message.startsWith('errors.')) {
@@ -23,7 +23,7 @@ export const getErrorMessage = (
     if (translated && translated !== 'errors.timeoutError') {
       return translated;
     }
-    
+
     const fallbacks: Record<string, string> = {
       en: 'Request timed out. The file may be too large or the connection is slow. Please try again.',
       ru: 'Превышено время ожидания. Файл может быть слишком большим или соединение медленное. Пожалуйста, попробуйте снова.',
@@ -38,7 +38,7 @@ export const getErrorMessage = (
     if (translated && translated !== 'errors.networkErrorDetail') {
       return translated;
     }
-    
+
     // Fallback messages by language
     const fallbacks: Record<string, string> = {
       en: 'Cannot connect to server. Please check your internet connection and try again.',
@@ -54,7 +54,7 @@ export const getErrorMessage = (
     if (translated && translated !== 'errors.invalidCredentials') {
       return translated;
     }
-    
+
     const fallbacks: Record<string, string> = {
       en: 'Invalid email or password. Please try again.',
       ru: 'Неверный email или пароль. Пожалуйста, попробуйте снова.',
@@ -69,7 +69,7 @@ export const getErrorMessage = (
     if (translated && translated !== 'errors.emailExists') {
       return translated;
     }
-    
+
     const fallbacks: Record<string, string> = {
       en: 'This email is already registered. Please use a different email or try logging in.',
       ru: 'Этот email уже зарегистрирован. Пожалуйста, используйте другой email или попробуйте войти.',
@@ -81,6 +81,3 @@ export const getErrorMessage = (
   // Generic error
   return error.message || t('errors.genericError') || 'An error occurred';
 };
-
-
-

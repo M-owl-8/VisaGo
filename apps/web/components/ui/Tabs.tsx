@@ -14,7 +14,7 @@ export function Tabs<T extends string>({ value, options, onChange, className }: 
     <div
       className={cn(
         'flex items-center gap-2 rounded-2xl border border-white/60 bg-white/70 p-1 shadow-inner shadow-white/60',
-        className,
+        className
       )}
     >
       {options.map((option) => {
@@ -28,7 +28,7 @@ export function Tabs<T extends string>({ value, options, onChange, className }: 
               'flex-1 rounded-2xl px-4 py-2 text-sm font-semibold transition',
               isActive
                 ? 'bg-primary-900 text-white shadow-card'
-                : 'text-neutral-500 hover:text-primary-900',
+                : 'text-neutral-500 hover:text-primary-900'
             )}
           >
             {option.label}
@@ -38,4 +38,3 @@ export function Tabs<T extends string>({ value, options, onChange, className }: 
     </div>
   );
 }
-

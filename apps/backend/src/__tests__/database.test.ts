@@ -1,4 +1,10 @@
-import { mockUser, mockApplication, mockPayment, mockDocument, createMockPrisma } from './test-utils';
+import {
+  mockUser,
+  mockApplication,
+  mockPayment,
+  mockDocument,
+  createMockPrisma,
+} from './test-utils';
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn(() => createMockPrisma()),

@@ -25,22 +25,24 @@
 ### This Week (Days 11-12):
 
 **Morning (2 hours):**
+
 ```
 1. OpenAI: https://platform.openai.com
    → Create account → Add payment → Get API key
-   
+
 2. Firebase: https://console.firebase.google.com
    → Create project → Enable Storage + FCM → Get credentials
-   
+
 3. Google OAuth: https://console.cloud.google.com
    → Create project → Enable APIs → Get OAuth credentials
 ```
 
 **Afternoon (2 hours):**
+
 ```
 4. Railway: https://railway.app
    → Create project → Add PostgreSQL + Redis → Get connection strings
-   
+
 5. Configure .env files:
    → apps/backend/.env (see ENV_EXAMPLE.md)
    → apps/ai-service/.env
@@ -48,11 +50,13 @@
 ```
 
 ### Next Week (Days 13-15):
+
 - Test on real iOS device
 - Test on real Android device
 - Fix any bugs found
 
 ### Week After (Days 16-24):
+
 - Create app assets (icon, screenshots)
 - Deploy backend to Railway
 - Build mobile apps with EAS
@@ -71,7 +75,7 @@
 ✅ Multilingual support (UZ, RU, EN)  
 ✅ Security hardening  
 ✅ Production build configuration  
-✅ Complete documentation  
+✅ Complete documentation
 
 **Everything is coded. You just need to configure external services and deploy!**
 
@@ -90,12 +94,14 @@
 ## 💰 Costs
 
 **Monthly:**
+
 - Railway (Backend + DB): $20-30
 - OpenAI API: $20-50
 - Firebase: $5-15
 - **Total: ~$50-100/month**
 
 **One-Time:**
+
 - Apple Developer: $99/year
 - Google Play: $25 one-time
 - Domain: $10-20/year
@@ -116,5 +122,3 @@
 Follow the guides step-by-step and your app will be live in 3-4 weeks!
 
 **Let's launch VisaBuddy! 🚀**
-
-

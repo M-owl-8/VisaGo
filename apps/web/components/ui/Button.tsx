@@ -22,8 +22,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     'bg-primary-600 text-white shadow-lg shadow-primary-500/30 hover:bg-primary-500 active:scale-[0.99]',
   secondary:
     'bg-white text-primary-700 shadow-inner shadow-primary-600/10 border border-primary-100 hover:border-primary-200',
-  ghost:
-    'bg-transparent text-gray-600 hover:bg-gray-100 border border-transparent',
+  ghost: 'bg-transparent text-gray-600 hover:bg-gray-100 border border-transparent',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -59,6 +58,3 @@ export function Button({
     </button>
   );
 }
-
-
-

@@ -21,7 +21,10 @@ const router: Router = express.Router();
  * Middleware: Check if request is from admin/development
  */
 const isDevelopmentOrAdmin = (req: Request, res: Response, next: Function) => {
-  if (process.env.NODE_ENV === 'development' || req.headers['x-admin-key'] === process.env.ADMIN_KEY) {
+  if (
+    process.env.NODE_ENV === 'development' ||
+    req.headers['x-admin-key'] === process.env.ADMIN_KEY
+  ) {
     next();
   } else {
     res.status(403).json({ error: 'Forbidden - Admin access required' });
@@ -153,9 +156,12 @@ router.get('/database/pool', (req: Request, res: Response) => {
       data: {
         timestamp: new Date().toISOString(),
         pool: poolStats,
-        connectionUsagePercentage: (
-          ((poolStats.totalConnections - poolStats.idleConnections) / poolStats.totalConnections) * 100
-        ).toFixed(1) + '%',
+        connectionUsagePercentage:
+          (
+            ((poolStats.totalConnections - poolStats.idleConnections) /
+              poolStats.totalConnections) *
+            100
+          ).toFixed(1) + '%',
       },
     });
   } catch (error: any) {
@@ -398,11 +404,13 @@ router.get('/status', async (req: Request, res: Response) => {
             idle: poolStats.idleConnections,
             queries: poolStats.totalQueries,
           },
-          prisma: prismaHealth ? {
-            state: prismaHealth.state,
-            healthy: prismaHealth.healthy,
-            latency: prismaHealth.latency ? `${prismaHealth.latency}ms` : null,
-          } : null,
+          prisma: prismaHealth
+            ? {
+                state: prismaHealth.state,
+                healthy: prismaHealth.healthy,
+                latency: prismaHealth.latency ? `${prismaHealth.latency}ms` : null,
+              }
+            : null,
         },
       },
       performance: {
@@ -427,7 +435,7 @@ router.get('/status', async (req: Request, res: Response) => {
 router.get('/rate-limit/status', (req: Request, res: Response) => {
   try {
     const status = getRateLimitRedisStatus();
-    
+
     res.json({
       success: true,
       data: {
@@ -437,8 +445,8 @@ router.get('/rate-limit/status', (req: Request, res: Response) => {
           redisConnected: status.connected,
           store: status.store,
           status: status.connected ? 'Redis (Distributed)' : 'Memory (Local)',
-          recommendation: status.connected 
-            ? 'Using Redis - optimal for production' 
+          recommendation: status.connected
+            ? 'Using Redis - optimal for production'
             : 'Using memory - not recommended for production. Set REDIS_URL to enable distributed rate limiting.',
         },
         limits: {
@@ -468,7 +476,7 @@ router.get('/logging/status', (req: Request, res: Response) => {
     const logWriter = getLogWriter();
     const logStats = logWriter.getStats();
     const integrationStatus = getIntegrationStatus();
-    
+
     res.json({
       success: true,
       data: {
@@ -486,9 +494,10 @@ router.get('/logging/status', (req: Request, res: Response) => {
         },
         integrations: {
           ...integrationStatus,
-          recommendations: integrationStatus.totalEnabled === 0
-            ? 'Consider configuring external logging services (Sentry, DataDog, Logz.io) for production monitoring'
-            : `${integrationStatus.totalEnabled} integration(s) configured`,
+          recommendations:
+            integrationStatus.totalEnabled === 0
+              ? 'Consider configuring external logging services (Sentry, DataDog, Logz.io) for production monitoring'
+              : `${integrationStatus.totalEnabled} integration(s) configured`,
         },
       },
     });

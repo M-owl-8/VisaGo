@@ -1,17 +1,17 @@
-import { PrismaClient } from "@prisma/client";
-import fs from "fs";
-import path from "path";
+import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 
 // Supported file formats and max sizes (in MB)
 const SUPPORTED_FORMATS = {
-  passport: ["pdf", "jpg", "png"],
-  birth_certificate: ["pdf", "jpg", "png"],
-  bank_statement: ["pdf", "jpg", "png"],
-  proof_of_residence: ["pdf", "jpg", "png"],
-  employment_letter: ["pdf", "docx"],
-  financial_proof: ["pdf", "jpg", "png"],
+  passport: ['pdf', 'jpg', 'png'],
+  birth_certificate: ['pdf', 'jpg', 'png'],
+  bank_statement: ['pdf', 'jpg', 'png'],
+  proof_of_residence: ['pdf', 'jpg', 'png'],
+  employment_letter: ['pdf', 'docx'],
+  financial_proof: ['pdf', 'jpg', 'png'],
 };
 
 const MAX_FILE_SIZE = {
@@ -41,14 +41,12 @@ export class DocumentService {
 
     // Validate file exists and get size
     if (!fs.existsSync(filePath)) {
-      throw new Error("File not found");
+      throw new Error('File not found');
     }
 
     const fileSize = fs.statSync(filePath).size;
     const maxSizeBytes =
-      (MAX_FILE_SIZE[documentType as keyof typeof MAX_FILE_SIZE] || 10) *
-      1024 *
-      1024;
+      (MAX_FILE_SIZE[documentType as keyof typeof MAX_FILE_SIZE] || 10) * 1024 * 1024;
 
     if (fileSize > maxSizeBytes) {
       throw new Error(
@@ -58,13 +56,10 @@ export class DocumentService {
 
     // Validate file extension
     const fileExt = path.extname(fileName).toLowerCase().slice(1);
-    const allowedFormats =
-      SUPPORTED_FORMATS[documentType as keyof typeof SUPPORTED_FORMATS];
+    const allowedFormats = SUPPORTED_FORMATS[documentType as keyof typeof SUPPORTED_FORMATS];
 
     if (!allowedFormats.includes(fileExt)) {
-      throw new Error(
-        `File format not supported. Allowed formats: ${allowedFormats.join(", ")}`
-      );
+      throw new Error(`File format not supported. Allowed formats: ${allowedFormats.join(', ')}`);
     }
 
     // Verify user owns the application
@@ -73,7 +68,7 @@ export class DocumentService {
     });
 
     if (!application) {
-      throw new Error("Application not found or access denied");
+      throw new Error('Application not found or access denied');
     }
 
     // Generate file URL (in production, upload to Firebase/S3)
@@ -89,7 +84,7 @@ export class DocumentService {
         fileUrl,
         fileName,
         fileSize,
-        status: "pending",
+        status: 'pending',
       },
     });
 
@@ -102,7 +97,7 @@ export class DocumentService {
   async getUserDocuments(userId: string) {
     const documents = await prisma.userDocument.findMany({
       where: { userId },
-      orderBy: { uploadedAt: "desc" },
+      orderBy: { uploadedAt: 'desc' },
     });
 
     return documents;
@@ -118,12 +113,12 @@ export class DocumentService {
     });
 
     if (!application) {
-      throw new Error("Application not found or access denied");
+      throw new Error('Application not found or access denied');
     }
 
     const documents = await prisma.userDocument.findMany({
       where: { applicationId },
-      orderBy: { uploadedAt: "desc" },
+      orderBy: { uploadedAt: 'desc' },
     });
 
     return documents;
@@ -138,7 +133,7 @@ export class DocumentService {
     });
 
     if (!document) {
-      throw new Error("Document not found or access denied");
+      throw new Error('Document not found or access denied');
     }
 
     return document;
@@ -153,7 +148,7 @@ export class DocumentService {
     });
 
     if (!document) {
-      throw new Error("Document not found or access denied");
+      throw new Error('Document not found or access denied');
     }
 
     // Delete file from storage (if using local files)
@@ -163,7 +158,7 @@ export class DocumentService {
       where: { id: documentId },
     });
 
-    return { message: "Document deleted successfully" };
+    return { message: 'Document deleted successfully' };
   }
 
   /**
@@ -171,7 +166,7 @@ export class DocumentService {
    */
   async updateDocumentStatus(
     documentId: string,
-    status: "pending" | "verified" | "rejected",
+    status: 'pending' | 'verified' | 'rejected',
     verificationNotes?: string
   ) {
     const document = await prisma.userDocument.update({
@@ -196,9 +191,9 @@ export class DocumentService {
     const stats = {
       total: documents.length,
       byStatus: {
-        pending: documents.filter((d: any): boolean => d.status === "pending").length,
-        verified: documents.filter((d: any): boolean => d.status === "verified").length,
-        rejected: documents.filter((d: any): boolean => d.status === "rejected").length,
+        pending: documents.filter((d: any): boolean => d.status === 'pending').length,
+        verified: documents.filter((d: any): boolean => d.status === 'verified').length,
+        rejected: documents.filter((d: any): boolean => d.status === 'rejected').length,
       },
       totalSize: documents.reduce((sum: number, d: any): number => sum + d.fileSize, 0),
     };

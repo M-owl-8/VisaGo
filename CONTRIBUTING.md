@@ -40,6 +40,7 @@ git checkout -b fix/your-bug-fix
 ```
 
 Branch naming conventions:
+
 - `feat/` - New features
 - `fix/` - Bug fixes
 - `docs/` - Documentation changes
@@ -70,6 +71,7 @@ Examples:
 ```
 
 Types:
+
 - `feat` - New feature
 - `fix` - Bug fix
 - `docs` - Documentation
@@ -108,6 +110,7 @@ git push origin your-branch-name
 ```
 
 Then create a Pull Request on GitHub:
+
 - Use the PR template
 - Provide a clear description
 - Link related issues
@@ -126,6 +129,7 @@ Then create a Pull Request on GitHub:
 - Keep functions small and focused
 
 Example:
+
 ```typescript
 /**
  * Generates a document checklist for a visa application
@@ -150,15 +154,16 @@ async function generateChecklist(
 - Use `flake8` for linting
 
 Example:
+
 ```python
 def search_documents(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     """
     Search documents using RAG
-    
+
     Args:
         query: Search query
         limit: Maximum number of results
-        
+
     Returns:
         List of matching documents
     """
@@ -177,6 +182,7 @@ npm test
 ```
 
 Write tests for:
+
 - All new API endpoints
 - Service layer functions
 - Utility functions
@@ -192,6 +198,7 @@ npm test
 ```
 
 Write tests for:
+
 - Critical user flows
 - Components with complex logic
 - API integration
@@ -208,10 +215,10 @@ describe('Feature Name', () => {
   it('should do something specific', async () => {
     // Arrange
     const input = 'test';
-    
+
     // Act
     const result = await functionToTest(input);
-    
+
     // Assert
     expect(result).toBe('expected');
   });
@@ -233,6 +240,7 @@ describe('Feature Name', () => {
 ## Reporting Issues
 
 Use GitHub Issues with appropriate templates:
+
 - **Bug Report** - For bugs and errors
 - **Feature Request** - For new features
 - **Question** - For questions and discussions
@@ -240,6 +248,7 @@ Use GitHub Issues with appropriate templates:
 ## Code Review Guidelines
 
 When reviewing PRs:
+
 - Be respectful and constructive
 - Focus on code quality and correctness
 - Suggest improvements, don't demand
@@ -260,4 +269,3 @@ By contributing, you agree that your contributions will be licensed under the sa
 ---
 
 Thank you for contributing to VisaBuddy! 🎉
-

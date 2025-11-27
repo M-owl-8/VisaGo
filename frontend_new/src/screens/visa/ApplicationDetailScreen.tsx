@@ -267,6 +267,62 @@ export default function ApplicationDetailScreen({
     return item[field];
   };
 
+  // Derive category from item (for backward compatibility)
+  const getItemCategory = (
+    item: DocumentChecklistItem,
+  ): 'required' | 'highly_recommended' | 'optional' => {
+    if (item.category) return item.category;
+    if (item.required) return 'required';
+    if (item.priority === 'high' || item.priority === 'medium')
+      return 'highly_recommended';
+    return 'optional';
+  };
+
+  // Get category label
+  const getCategoryLabel = (
+    category: 'required' | 'highly_recommended' | 'optional',
+  ): string => {
+    const labels: Record<
+      'required' | 'highly_recommended' | 'optional',
+      Record<'en' | 'uz' | 'ru', string>
+    > = {
+      required: {
+        en: 'Required',
+        uz: 'Majburiy',
+        ru: 'Обязательно',
+      },
+      highly_recommended: {
+        en: 'Highly Recommended',
+        uz: 'Tavsiya etiladi',
+        ru: 'Настоятельно рекомендуется',
+      },
+      optional: {
+        en: 'Optional',
+        uz: 'Ixtiyoriy',
+        ru: 'Необязательно',
+      },
+    };
+    return (
+      labels[category]?.[language as 'en' | 'uz' | 'ru'] || labels[category].en
+    );
+  };
+
+  // Get category badge color
+  const getCategoryBadgeColor = (
+    category: 'required' | 'highly_recommended' | 'optional',
+  ): string => {
+    switch (category) {
+      case 'required':
+        return '#EF4444'; // red
+      case 'highly_recommended':
+        return '#F59E0B'; // yellow
+      case 'optional':
+        return '#3B82F6'; // blue
+      default:
+        return '#9CA3AF'; // gray
+    }
+  };
+
   const getStatusConfig = (status: string) => {
     const configs = {
       missing: {
@@ -448,90 +504,137 @@ export default function ApplicationDetailScreen({
           </View>
         </View>
 
-        {/* Document List */}
+        {/* Document List - Grouped by Category */}
         <View style={styles.documentListContainer}>
-          {checklistItems.map((item, index) => {
-            const statusConfig = getStatusConfig(item.status);
-            const isUploaded =
-              item.status === 'verified' || item.status === 'pending';
+          {(['required', 'highly_recommended', 'optional'] as const).map(
+            category => {
+              const categoryItems = checklistItems.filter(item => {
+                const itemCategory = getItemCategory(item);
+                return itemCategory === category;
+              });
 
-            return (
-              <View key={item.id} style={styles.documentItem}>
-                {/* Number */}
-                <View style={styles.documentNumber}>
-                  <Text style={styles.documentNumberText}>{index + 1}</Text>
-                </View>
+              if (categoryItems.length === 0) return null;
 
-                {/* Document Info */}
-                <View style={styles.documentInfo}>
-                  <View style={styles.documentHeader}>
-                    <Text style={styles.documentName}>
-                      {getLocalizedText(item, 'name')}
-                    </Text>
-                    {/* AI Verification Badge */}
-                    {item.aiVerified && item.status === 'verified' && (
-                      <View style={styles.aiVerifiedBadge}>
-                        <Icon name="sparkles" size={12} color="#10B981" />
-                        <Text style={styles.aiVerifiedText}>
-                          {language === 'uz'
-                            ? 'AI tasdiqladi'
-                            : language === 'ru'
-                              ? 'Проверено ИИ'
-                              : 'Verified by AI'}
-                        </Text>
-                      </View>
-                    )}
+              return (
+                <View key={category} style={styles.categorySection}>
+                  <View style={styles.categoryHeader}>
+                    <View
+                      style={[
+                        styles.categoryBadge,
+                        {
+                          backgroundColor:
+                            getCategoryBadgeColor(category) + '20',
+                        },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.categoryBadgeText,
+                          {color: getCategoryBadgeColor(category)},
+                        ]}>
+                        {getCategoryLabel(category)}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={styles.documentDescription}>
-                    {getLocalizedText(item, 'description')}
-                  </Text>
-                  {/* AI Verification Notes */}
-                  {item.verificationNotes && (
-                    <Text style={styles.verificationNotesText}>
-                      {item.verificationNotes}
-                    </Text>
-                  )}
-                  {/* Rejected Status with Notes */}
-                  {item.status === 'rejected' && item.verificationNotes && (
-                    <Text style={styles.rejectedNotesText}>
-                      {item.verificationNotes}
-                    </Text>
-                  )}
-                </View>
+                  {categoryItems.map((item, index) => {
+                    const statusConfig = getStatusConfig(item.status);
+                    const isUploaded =
+                      item.status === 'verified' || item.status === 'pending';
 
-                {/* Upload Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.uploadButton,
-                    isUploaded && styles.uploadButtonSuccess,
-                  ]}
-                  onPress={() => {
-                    if (
-                      item.status === 'missing' ||
-                      item.status === 'rejected'
-                    ) {
-                      // Use documentType for internal logic, localized name for display
-                      handleUploadDocument(
-                        item.documentType || item.id,
-                        getLocalizedText(item, 'name'),
-                      );
-                    } else if (item.userDocumentId && item.fileUrl) {
-                      handleViewDocument(item.userDocumentId, item.fileUrl);
-                    }
-                  }}>
-                  {isUploaded ? (
-                    <Icon name="checkmark-circle" size={24} color="#10B981" />
-                  ) : (
-                    <Icon
-                      name="cloud-upload-outline"
-                      size={24}
-                      color="#4A9EFF"
-                    />
-                  )}
-                </TouchableOpacity>
-              </View>
-            );
-          })}
+                    return (
+                      <View key={item.id} style={styles.documentItem}>
+                        {/* Number */}
+                        <View style={styles.documentNumber}>
+                          <Text style={styles.documentNumberText}>
+                            {index + 1}
+                          </Text>
+                        </View>
+
+                        {/* Document Info */}
+                        <View style={styles.documentInfo}>
+                          <View style={styles.documentHeader}>
+                            <Text style={styles.documentName}>
+                              {getLocalizedText(item, 'name')}
+                            </Text>
+                            {/* AI Verification Badge */}
+                            {item.aiVerified && item.status === 'verified' && (
+                              <View style={styles.aiVerifiedBadge}>
+                                <Icon
+                                  name="sparkles"
+                                  size={12}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.aiVerifiedText}>
+                                  {language === 'uz'
+                                    ? 'AI tasdiqladi'
+                                    : language === 'ru'
+                                      ? 'Проверено ИИ'
+                                      : 'Verified by AI'}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.documentDescription}>
+                            {getLocalizedText(item, 'description')}
+                          </Text>
+                          {/* AI Verification Notes */}
+                          {item.verificationNotes && (
+                            <Text style={styles.verificationNotesText}>
+                              {item.verificationNotes}
+                            </Text>
+                          )}
+                          {/* Rejected Status with Notes */}
+                          {item.status === 'rejected' &&
+                            item.verificationNotes && (
+                              <Text style={styles.rejectedNotesText}>
+                                {item.verificationNotes}
+                              </Text>
+                            )}
+                        </View>
+
+                        {/* Upload Button */}
+                        <TouchableOpacity
+                          style={[
+                            styles.uploadButton,
+                            isUploaded && styles.uploadButtonSuccess,
+                          ]}
+                          onPress={() => {
+                            if (
+                              item.status === 'missing' ||
+                              item.status === 'rejected'
+                            ) {
+                              // Use documentType for internal logic, localized name for display
+                              handleUploadDocument(
+                                item.documentType || item.id,
+                                getLocalizedText(item, 'name'),
+                              );
+                            } else if (item.userDocumentId && item.fileUrl) {
+                              handleViewDocument(
+                                item.userDocumentId,
+                                item.fileUrl,
+                              );
+                            }
+                          }}>
+                          {isUploaded ? (
+                            <Icon
+                              name="checkmark-circle"
+                              size={24}
+                              color="#10B981"
+                            />
+                          ) : (
+                            <Icon
+                              name="cloud-upload-outline"
+                              size={24}
+                              color="#4A9EFF"
+                            />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            },
+          )}
         </View>
 
         {/* Help Section */}

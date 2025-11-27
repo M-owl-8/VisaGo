@@ -3,9 +3,9 @@
  * Handles writing logs to files with rotation support
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { getEnvConfig } from "../config/env";
+import * as fs from 'fs';
+import * as path from 'path';
+import { getEnvConfig } from '../config/env';
 
 export interface LogWriterConfig {
   enabled: boolean;
@@ -23,7 +23,7 @@ class LogWriter {
     const envConfig = getEnvConfig();
     this.config = {
       enabled: envConfig.LOG_FILE_ENABLED || false,
-      logDir: envConfig.LOG_FILE_PATH || "logs",
+      logDir: envConfig.LOG_FILE_PATH || 'logs',
       maxFileSize: envConfig.LOG_FILE_MAX_SIZE || 10 * 1024 * 1024, // 10MB
       maxFiles: envConfig.LOG_FILE_MAX_FILES || 5,
     };
@@ -42,7 +42,7 @@ class LogWriter {
         fs.mkdirSync(this.config.logDir, { recursive: true });
       }
     } catch (error) {
-      console.error("Failed to create log directory:", error);
+      console.error('Failed to create log directory:', error);
       this.config.enabled = false;
     }
   }
@@ -51,7 +51,7 @@ class LogWriter {
    * Get current log file path
    */
   private getCurrentLogFile(): string {
-    const date = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     return path.join(this.config.logDir, `app-${date}.log`);
   }
 
@@ -60,8 +60,9 @@ class LogWriter {
    */
   private rotateLogs(): void {
     try {
-      const files = fs.readdirSync(this.config.logDir)
-        .filter((file) => file.startsWith("app-") && file.endsWith(".log"))
+      const files = fs
+        .readdirSync(this.config.logDir)
+        .filter((file) => file.startsWith('app-') && file.endsWith('.log'))
         .map((file) => ({
           name: file,
           path: path.join(this.config.logDir, file),
@@ -81,7 +82,7 @@ class LogWriter {
         });
       }
     } catch (error) {
-      console.error("Failed to rotate log files:", error);
+      console.error('Failed to rotate log files:', error);
     }
   }
 
@@ -105,10 +106,10 @@ class LogWriter {
       // Check if file size exceeds limit
       if (this.currentFileSize >= this.config.maxFileSize) {
         // Rotate to new file with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const rotatedFile = path.join(
           this.config.logDir,
-          `app-${new Date().toISOString().split("T")[0]}-${timestamp}.log`
+          `app-${new Date().toISOString().split('T')[0]}-${timestamp}.log`
         );
         if (fs.existsSync(logFile)) {
           fs.renameSync(logFile, rotatedFile);
@@ -118,11 +119,11 @@ class LogWriter {
       }
 
       // Append log entry
-      fs.appendFileSync(logFile, entry + "\n", "utf8");
-      this.currentFileSize += Buffer.byteLength(entry + "\n", "utf8");
+      fs.appendFileSync(logFile, entry + '\n', 'utf8');
+      this.currentFileSize += Buffer.byteLength(entry + '\n', 'utf8');
     } catch (error) {
       // Don't throw - logging should not break the application
-      console.error("Failed to write log to file:", error);
+      console.error('Failed to write log to file:', error);
     }
   }
 
@@ -157,11 +158,3 @@ export function getLogWriter(): LogWriter {
   }
   return logWriterInstance;
 }
-
-
-
-
-
-
-
-

@@ -42,12 +42,7 @@ export default function RegisterPage() {
     }
 
     try {
-      await register(
-        formData.email,
-        formData.password,
-        formData.firstName,
-        formData.lastName,
-      );
+      await register(formData.email, formData.password, formData.firstName, formData.lastName);
       router.push('/applications');
     } catch (err: any) {
       const errorMessage = getErrorMessage(err, t, i18n.language);
@@ -148,4 +143,3 @@ export default function RegisterPage() {
     </AuthLayout>
   );
 }
-

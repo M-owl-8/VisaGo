@@ -1,6 +1,6 @@
-import { PrismaClient } from "@prisma/client";
-import { emailService } from "./email.service";
-import { fcmService } from "./fcm.service";
+import { PrismaClient } from '@prisma/client';
+import { emailService } from './email.service';
+import { fcmService } from './fcm.service';
 
 interface PaymentNotificationData {
   userId: string;
@@ -40,9 +40,9 @@ export class PaymentNotificationService {
       await this.sendPaymentSuccessPushNotification(data);
 
       // Log notification
-      await this.logNotification(data.userId, "payment.success", data);
+      await this.logNotification(data.userId, 'payment.success', data);
     } catch (error) {
-      console.error("Error sending payment success notification:", error);
+      console.error('Error sending payment success notification:', error);
       // Don't throw - notifications shouldn't block payment flow
     }
   }
@@ -50,10 +50,7 @@ export class PaymentNotificationService {
   /**
    * Send payment failure notification
    */
-  async notifyPaymentFailure(
-    data: PaymentNotificationData,
-    error: string
-  ): Promise<void> {
+  async notifyPaymentFailure(data: PaymentNotificationData, error: string): Promise<void> {
     try {
       // Send email
       await this.sendPaymentFailureEmail(data, error);
@@ -62,12 +59,12 @@ export class PaymentNotificationService {
       await this.sendPaymentFailurePushNotification(data, error);
 
       // Log notification
-      await this.logNotification(data.userId, "payment.failure", {
+      await this.logNotification(data.userId, 'payment.failure', {
         ...data,
         error,
       });
     } catch (error) {
-      console.error("Error sending payment failure notification:", error);
+      console.error('Error sending payment failure notification:', error);
     }
   }
 
@@ -83,9 +80,9 @@ export class PaymentNotificationService {
       await this.sendRefundInitiatedPushNotification(data);
 
       // Log notification
-      await this.logNotification(data.userId, "refund.initiated", data);
+      await this.logNotification(data.userId, 'refund.initiated', data);
     } catch (error) {
-      console.error("Error sending refund notification:", error);
+      console.error('Error sending refund notification:', error);
     }
   }
 
@@ -101,24 +98,18 @@ export class PaymentNotificationService {
       await this.sendRefundCompletedPushNotification(data);
 
       // Log notification
-      await this.logNotification(data.userId, "refund.completed", data);
+      await this.logNotification(data.userId, 'refund.completed', data);
     } catch (error) {
-      console.error("Error sending refund completed notification:", error);
+      console.error('Error sending refund completed notification:', error);
     }
   }
 
   /**
    * Send receipt/invoice email
    */
-  async sendReceipt(
-    data: PaymentNotificationData,
-    receiptUrl?: string
-  ): Promise<void> {
+  async sendReceipt(data: PaymentNotificationData, receiptUrl?: string): Promise<void> {
     try {
-      const emailContent = this.generateReceiptEmailHTML(
-        data,
-        receiptUrl
-      );
+      const emailContent = this.generateReceiptEmailHTML(data, receiptUrl);
 
       await emailService.send({
         to: data.userEmail,
@@ -127,7 +118,7 @@ export class PaymentNotificationService {
         text: `Payment Receipt\n\nTransaction ID: ${data.transactionId}\nAmount: ${data.currency} ${data.amount}\nVisa: ${data.visaType} for ${data.visaCountry}\nDate: ${data.timestamp.toISOString()}`,
       });
     } catch (error) {
-      console.error("Error sending receipt:", error);
+      console.error('Error sending receipt:', error);
     }
   }
 
@@ -173,10 +164,7 @@ export class PaymentNotificationService {
     });
   }
 
-  private async sendPaymentFailureEmail(
-    data: PaymentNotificationData,
-    error: string
-  ) {
+  private async sendPaymentFailureEmail(data: PaymentNotificationData, error: string) {
     const html = `
       <h2>Payment Failed ❌</h2>
       <p>Dear ${data.userName},</p>
@@ -285,25 +273,22 @@ export class PaymentNotificationService {
 
       for (const token of deviceTokens) {
         await fcmService.sendToDevice(token.token, {
-          title: "Payment Successful ✅",
+          title: 'Payment Successful ✅',
           body: `Your ${data.visaType} visa fee has been received.`,
           data: {
-            type: "payment.success",
+            type: 'payment.success',
             transactionId: data.transactionId,
             amount: String(data.amount),
           },
-          sound: "default",
+          sound: 'default',
         });
       }
     } catch (error) {
-      console.error("Error sending push notification:", error);
+      console.error('Error sending push notification:', error);
     }
   }
 
-  private async sendPaymentFailurePushNotification(
-    data: PaymentNotificationData,
-    error: string
-  ) {
+  private async sendPaymentFailurePushNotification(data: PaymentNotificationData, error: string) {
     try {
       const deviceTokens = await this.prisma.deviceToken.findMany({
         where: { userId: data.userId },
@@ -311,18 +296,18 @@ export class PaymentNotificationService {
 
       for (const token of deviceTokens) {
         await fcmService.sendToDevice(token.token, {
-          title: "Payment Failed ❌",
+          title: 'Payment Failed ❌',
           body: `Unable to process payment for ${data.visaType} visa.`,
           data: {
-            type: "payment.failure",
+            type: 'payment.failure',
             error,
             transactionId: data.transactionId,
           },
-          sound: "default",
+          sound: 'default',
         });
       }
     } catch (error) {
-      console.error("Error sending push notification:", error);
+      console.error('Error sending push notification:', error);
     }
   }
 
@@ -334,18 +319,18 @@ export class PaymentNotificationService {
 
       for (const token of deviceTokens) {
         await fcmService.sendToDevice(token.token, {
-          title: "Refund Initiated ⏳",
+          title: 'Refund Initiated ⏳',
           body: `Refund of ${data.currency} ${data.refundAmount.toFixed(2)} is being processed.`,
           data: {
-            type: "refund.initiated",
+            type: 'refund.initiated',
             refundId: data.refundId,
             amount: String(data.refundAmount),
           },
-          sound: "default",
+          sound: 'default',
         });
       }
     } catch (error) {
-      console.error("Error sending push notification:", error);
+      console.error('Error sending push notification:', error);
     }
   }
 
@@ -357,18 +342,18 @@ export class PaymentNotificationService {
 
       for (const token of deviceTokens) {
         await fcmService.sendToDevice(token.token, {
-          title: "Refund Completed ✅",
+          title: 'Refund Completed ✅',
           body: `${data.currency} ${data.refundAmount.toFixed(2)} has been refunded.`,
           data: {
-            type: "refund.completed",
+            type: 'refund.completed',
             refundId: data.refundId,
             amount: String(data.refundAmount),
           },
-          sound: "default",
+          sound: 'default',
         });
       }
     } catch (error) {
-      console.error("Error sending push notification:", error);
+      console.error('Error sending push notification:', error);
     }
   }
 
@@ -376,10 +361,7 @@ export class PaymentNotificationService {
   // HELPER METHODS
   // ============================================================================
 
-  private generateReceiptEmailHTML(
-    data: PaymentNotificationData,
-    receiptUrl?: string
-  ): string {
+  private generateReceiptEmailHTML(data: PaymentNotificationData, receiptUrl?: string): string {
     return `
       <h2>Payment Receipt 📄</h2>
       <p>Dear ${data.userName},</p>
@@ -414,11 +396,7 @@ export class PaymentNotificationService {
     `;
   }
 
-  private async logNotification(
-    userId: string,
-    type: string,
-    data: any
-  ): Promise<void> {
+  private async logNotification(userId: string, type: string, data: any): Promise<void> {
     try {
       await this.prisma.notificationLog.create({
         data: {
@@ -427,12 +405,12 @@ export class PaymentNotificationService {
           title: `Payment Notification - ${type}`,
           body: `Payment event: ${type}`,
           metadata: JSON.stringify(data),
-          status: "sent",
+          status: 'sent',
           sentAt: new Date(),
         },
       });
     } catch (error) {
-      console.error("Error logging notification:", error);
+      console.error('Error logging notification:', error);
     }
   }
 }

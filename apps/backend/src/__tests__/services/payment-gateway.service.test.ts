@@ -143,7 +143,7 @@ describe('PaymentGatewayService - Stripe Integration', () => {
       amount: paymentIntentData.amount,
       currency: paymentIntentData.currency,
       status: 'requires_payment_method',
-      client_secret: 'pi_test123_secret',
+      client_secret: 'test_payment_intent_secret_value',
     };
 
     (mockStripe.paymentIntents.create as jest.Mock).mockResolvedValue(mockIntent);
@@ -251,7 +251,7 @@ describe('PaymentGatewayService - Webhook Security', () => {
   });
 
   test('should verify webhook signature', async () => {
-    const webhookSecret = 'whsec_test123';
+    const webhookSecret = 'test_webhook_secret_value';
     const payload = JSON.stringify({ event: 'charge.succeeded' });
     const signature = 'sig_test123';
 
@@ -262,7 +262,7 @@ describe('PaymentGatewayService - Webhook Security', () => {
   });
 
   test('should reject webhook with invalid signature', async () => {
-    const webhookSecret = 'whsec_test123';
+    const webhookSecret = 'test_webhook_secret_value';
     const invalidSignature = 'sig_invalid';
 
     // Invalid signature verification

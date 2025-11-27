@@ -49,7 +49,7 @@ export class SlowQueryLogger {
     // Configure Prisma logging with query event handler
     // Note: Prisma query events are only available in certain versions
     // This initializes the service structure for query monitoring
-    
+
     try {
       // Use any available Prisma event listeners if enabled
       if ((this.prisma as any).$on) {
@@ -120,11 +120,12 @@ export class SlowQueryLogger {
 
     // Log with appropriate severity
     const logLevel = query.durationCategory === 'critical' ? '🔴' : '⚠️ ';
-    const threshold = query.durationCategory === 'critical' ? this.CRITICAL_THRESHOLD : this.WARNING_THRESHOLD;
+    const threshold =
+      query.durationCategory === 'critical' ? this.CRITICAL_THRESHOLD : this.WARNING_THRESHOLD;
 
     console.warn(
       `${logLevel} SLOW QUERY [${query.durationCategory.toUpperCase()}] ` +
-      `${query.model}/${query.action} - ${query.duration}ms (threshold: ${threshold}ms)`
+        `${query.model}/${query.action} - ${query.duration}ms (threshold: ${threshold}ms)`
     );
 
     // Log query details in development
@@ -173,7 +174,7 @@ export class SlowQueryLogger {
    */
   private extractModel(query: string): string {
     const match = query.match(/FROM\s+"(\w+)"|INTO\s+"(\w+)|UPDATE\s+"(\w+)/i);
-    return match ? (match[1] || match[2] || match[3]) : 'unknown';
+    return match ? match[1] || match[2] || match[3] : 'unknown';
   }
 
   /**
@@ -196,8 +197,9 @@ export class SlowQueryLogger {
       byAction[query.action || 'unknown'] = (byAction[query.action || 'unknown'] || 0) + 1;
     }
 
-    const durations = this.allQueries.map(q => q.duration).sort((a, b) => a - b);
-    const average = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+    const durations = this.allQueries.map((q) => q.duration).sort((a, b) => a - b);
+    const average =
+      durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
     const p95 = this.getPercentile(durations, 95);
     const p99 = this.getPercentile(durations, 99);
 
@@ -223,14 +225,14 @@ export class SlowQueryLogger {
    * Get slow queries for a specific model
    */
   getSlowQueriesByModel(model: string): SlowQuery[] {
-    return this.slowQueries.filter(q => q.model === model);
+    return this.slowQueries.filter((q) => q.model === model);
   }
 
   /**
    * Get slow queries for a specific action
    */
   getSlowQueriesByAction(action: string): SlowQuery[] {
-    return this.slowQueries.filter(q => q.action === action);
+    return this.slowQueries.filter((q) => q.action === action);
   }
 
   /**
@@ -238,8 +240,8 @@ export class SlowQueryLogger {
    */
   getPerformanceReport() {
     const stats = this.getStats();
-    const criticalCount = this.slowQueries.filter(q => q.durationCategory === 'critical').length;
-    const warningCount = this.slowQueries.filter(q => q.durationCategory === 'warning').length;
+    const criticalCount = this.slowQueries.filter((q) => q.durationCategory === 'critical').length;
+    const warningCount = this.slowQueries.filter((q) => q.durationCategory === 'warning').length;
 
     return {
       timestamp: new Date().toISOString(),

@@ -3,6 +3,7 @@
 ## 🔍 Current Situation
 
 ### Directory Structure
+
 - **Original Project**: `C:\work\VisaBuddy` (may exist)
 - **Active Project**: `C:\work\VisaGo-clean` (cloned from GitHub: `M-owl-8/VisaGo`)
 - **GitHub Repo**: `https://github.com/M-owl-8/VisaGo.git`
@@ -11,10 +12,12 @@
 ### Service Name Mismatch ⚠️
 
 **railway.json defines:**
+
 - `"VisaBuddy Backend"` (service key: `backend`)
 - `"VisaBuddy AI Service"` (service key: `ai-service`)
 
 **Actual Railway Services:**
+
 - `VisaGo` (backend service)
 - `zippy-perfection` (AI service)
 
@@ -103,28 +106,30 @@
 ### Option A: Update railway.json to Match Actual Services
 
 **Current railway.json:**
+
 ```json
 {
   "services": {
     "backend": {
-      "name": "VisaBuddy Backend",  // ❌ Doesn't match "VisaGo"
+      "name": "VisaBuddy Backend" // ❌ Doesn't match "VisaGo"
     },
     "ai-service": {
-      "name": "VisaBuddy AI Service",  // ❌ Doesn't match "zippy-perfection"
+      "name": "VisaBuddy AI Service" // ❌ Doesn't match "zippy-perfection"
     }
   }
 }
 ```
 
 **Should be:**
+
 ```json
 {
   "services": {
     "backend": {
-      "name": "VisaGo",  // ✅ Matches actual service
+      "name": "VisaGo" // ✅ Matches actual service
     },
     "ai-service": {
-      "name": "zippy-perfection",  // ✅ Matches actual service
+      "name": "zippy-perfection" // ✅ Matches actual service
     }
   }
 }
@@ -250,6 +255,7 @@ railway status
 ## 🆘 Troubleshooting
 
 ### Service Not Found Error:
+
 ```powershell
 # List all services in project
 railway service list
@@ -259,12 +265,14 @@ railway service VisaGo  # Not "visago" or "VisaGo Backend"
 ```
 
 ### Deployment Fails:
+
 1. Check Railway logs for specific errors
 2. Verify environment variables are set
 3. Check Dockerfile paths are correct
 4. Verify root directory settings
 
 ### Services Can't Communicate:
+
 1. Check they're in the same Railway project
 2. Use service names for internal URLs: `http://zippy-perfection:8001`
 3. Or use public URLs if in different projects
@@ -273,4 +281,3 @@ railway service VisaGo  # Not "visago" or "VisaGo Backend"
 
 **Last Updated**: 2025-11-20
 **Status**: Ready for verification
-

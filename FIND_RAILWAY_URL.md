@@ -20,11 +20,13 @@
 ## ✅ Step 2: Verify the URL Works
 
 Test the URL in your browser:
+
 ```
 https://your-railway-url.up.railway.app/api/health
 ```
 
 You should see a JSON response like:
+
 ```json
 {
   "status": "healthy",
@@ -54,11 +56,13 @@ Update these files with your actual Railway URL:
 3. **`frontend_new/src/services/streaming-api.ts`** (line 15, 18, 28)
 
 Replace:
+
 ```
 https://visabuddy-backend-production.up.railway.app
 ```
 
 With your actual URL:
+
 ```
 https://your-actual-railway-url.up.railway.app
 ```
@@ -103,4 +107,3 @@ If you still get 404 after updating:
    - Look for incoming requests
    - See if requests are reaching the server
    - Check for any routing errors
-

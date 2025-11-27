@@ -79,12 +79,7 @@ interface AuthState {
   // Actions
   initializeApp: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-  ) => Promise<void>;
+  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
@@ -136,12 +131,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           });
 
           // Fetch fresh data in background (don't block initialization)
-          get().fetchUserProfile().catch((error) => {
-            console.warn('Failed to fetch fresh profile on init:', error);
-          });
-          get().fetchUserApplications().catch((error) => {
-            console.warn('Failed to fetch applications on init:', error);
-          });
+          get()
+            .fetchUserProfile()
+            .catch((error) => {
+              console.warn('Failed to fetch fresh profile on init:', error);
+            });
+          get()
+            .fetchUserApplications()
+            .catch((error) => {
+              console.warn('Failed to fetch applications on init:', error);
+            });
         } catch (parseError) {
           console.error('Failed to parse user data:', parseError);
           localStorage.removeItem('auth_token');
@@ -167,7 +166,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!response.success || !response.data) {
         // Provide user-friendly error messages
         let errorMessage = response.error?.message || 'Login failed';
-        
+
         // Translate common error codes to user-friendly messages
         if (response.error?.code === 'NETWORK_ERROR' || response.error?.status === 0) {
           errorMessage = 'Network error. Please check your internet connection and try again.';
@@ -176,7 +175,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         } else if (response.error?.status === 400) {
           errorMessage = response.error?.message || 'Invalid request. Please check your input.';
         }
-        
+
         const error = new Error(errorMessage) as any;
         error.code = response.error?.code;
         error.status = response.error?.status;
@@ -219,10 +218,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Load user applications in background (non-blocking)
-      get().fetchUserApplications().catch((error) => {
-        console.warn('Failed to fetch applications after login:', error);
-      });
-      
+      get()
+        .fetchUserApplications()
+        .catch((error) => {
+          console.warn('Failed to fetch applications after login:', error);
+        });
+
       // Set loading to false immediately after successful login
       set({ isLoading: false });
     } catch (error: any) {
@@ -232,35 +233,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  register: async (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-  ) => {
+  register: async (email: string, password: string, firstName: string, lastName: string) => {
     try {
       set({ isLoading: true });
 
-      const response = await apiClient.register(
-        email,
-        password,
-        firstName,
-        lastName,
-      );
+      const response = await apiClient.register(email, password, firstName, lastName);
 
       if (!response.success || !response.data) {
         // Provide user-friendly error messages
         let errorMessage = response.error?.message || 'Registration failed';
-        
+
         // Translate common error codes to user-friendly messages
         if (response.error?.code === 'NETWORK_ERROR' || response.error?.status === 0) {
           errorMessage = 'Network error. Please check your internet connection and try again.';
         } else if (response.error?.status === 409) {
-          errorMessage = 'This email is already registered. Please use a different email or try logging in.';
+          errorMessage =
+            'This email is already registered. Please use a different email or try logging in.';
         } else if (response.error?.status === 400) {
           errorMessage = response.error?.message || 'Invalid input. Please check your information.';
         }
-        
+
         const error = new Error(errorMessage) as any;
         error.code = response.error?.code || 'UNKNOWN_ERROR';
         error.status = response.error?.status;
@@ -303,10 +295,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Load user applications in background (non-blocking)
-      get().fetchUserApplications().catch((error) => {
-        console.warn('Failed to fetch applications after registration:', error);
-      });
-      
+      get()
+        .fetchUserApplications()
+        .catch((error) => {
+          console.warn('Failed to fetch applications after registration:', error);
+        });
+
       // Set loading to false immediately after successful registration
       set({ isLoading: false });
     } catch (error: any) {
@@ -432,9 +426,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const response = await apiClient.getUserApplications(user.id);
 
       if (!response.success || !response.data) {
-        throw new Error(
-          response.error?.message || 'Failed to fetch applications',
-        );
+        throw new Error(response.error?.message || 'Failed to fetch applications');
       }
 
       set({ userApplications: response.data });
@@ -444,4 +436,3 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 }));
-

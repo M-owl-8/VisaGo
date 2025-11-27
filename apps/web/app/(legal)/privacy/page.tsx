@@ -5,8 +5,18 @@ import { useTranslation } from 'react-i18next';
 
 const sections = [
   { key: 'introduction', defaultTitle: 'Introduction', bodyKey: 'introText' },
-  { key: 'dataCollection', defaultTitle: 'Data Collection', bodyKey: 'dataCollectionText', listKeys: ['dataItem1', 'dataItem2', 'dataItem3', 'dataItem4'] },
-  { key: 'dataUsage', defaultTitle: 'How We Use Your Data', bodyKey: 'dataUsageText', listKeys: ['usageItem1', 'usageItem2', 'usageItem3', 'usageItem4'] },
+  {
+    key: 'dataCollection',
+    defaultTitle: 'Data Collection',
+    bodyKey: 'dataCollectionText',
+    listKeys: ['dataItem1', 'dataItem2', 'dataItem3', 'dataItem4'],
+  },
+  {
+    key: 'dataUsage',
+    defaultTitle: 'How We Use Your Data',
+    bodyKey: 'dataUsageText',
+    listKeys: ['usageItem1', 'usageItem2', 'usageItem3', 'usageItem4'],
+  },
   { key: 'dataProtection', defaultTitle: 'Data Protection', bodyKey: 'dataProtectionText' },
   { key: 'contact', defaultTitle: 'Contact Us', bodyKey: 'contactText' },
 ];
@@ -21,7 +31,7 @@ export default function PrivacyPage() {
         body: t(`privacy.${section.bodyKey}`, ''),
         list: section.listKeys?.map((key) => t(`privacy.${key}`)),
       })),
-    [t],
+    [t]
   );
 
   return (
@@ -51,7 +61,7 @@ export default function PrivacyPage() {
             <strong>{t('privacy.note', 'Note:')}</strong>{' '}
             {t(
               'privacy.noteText',
-              'This is a template privacy policy. Please replace this content with your actual privacy policy text that complies with applicable laws (GDPR, CCPA, etc.).',
+              'This is a template privacy policy. Please replace this content with your actual privacy policy text that complies with applicable laws (GDPR, CCPA, etc.).'
             )}
           </p>
         </div>

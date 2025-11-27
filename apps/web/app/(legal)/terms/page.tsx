@@ -5,9 +5,21 @@ import { useTranslation } from 'react-i18next';
 
 const termsSections = [
   { key: 'acceptance', defaultTitle: 'Acceptance of Terms', bodyKey: 'acceptanceText' },
-  { key: 'serviceDescription', defaultTitle: 'Service Description', bodyKey: 'serviceDescriptionText' },
-  { key: 'userResponsibilities', defaultTitle: 'User Responsibilities', listKeys: ['responsibility1', 'responsibility2', 'responsibility3', 'responsibility4'] },
-  { key: 'limitationOfLiability', defaultTitle: 'Limitation of Liability', bodyKey: 'limitationText' },
+  {
+    key: 'serviceDescription',
+    defaultTitle: 'Service Description',
+    bodyKey: 'serviceDescriptionText',
+  },
+  {
+    key: 'userResponsibilities',
+    defaultTitle: 'User Responsibilities',
+    listKeys: ['responsibility1', 'responsibility2', 'responsibility3', 'responsibility4'],
+  },
+  {
+    key: 'limitationOfLiability',
+    defaultTitle: 'Limitation of Liability',
+    bodyKey: 'limitationText',
+  },
   { key: 'contact', defaultTitle: 'Contact Us', bodyKey: 'contactText' },
 ];
 
@@ -21,7 +33,7 @@ export default function TermsPage() {
         body: section.bodyKey ? t(`terms.${section.bodyKey}`, '') : '',
         list: section.listKeys?.map((key) => t(`terms.${key}`)),
       })),
-    [t],
+    [t]
   );
 
   return (
@@ -63,7 +75,7 @@ export default function TermsPage() {
             <strong>{t('terms.note', 'Note:')}</strong>{' '}
             {t(
               'terms.noteText',
-              'This is a template terms of service. Please replace this content with your actual terms that comply with applicable laws. The disclaimer section is critical and should be reviewed by legal counsel.',
+              'This is a template terms of service. Please replace this content with your actual terms that comply with applicable laws. The disclaimer section is critical and should be reviewed by legal counsel.'
             )}
           </p>
         </div>

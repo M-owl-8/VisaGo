@@ -95,15 +95,16 @@ export class PaymentRefundService {
 
       return result;
     } catch (error) {
-      const paymentError = error instanceof PaymentError
-        ? error
-        : new PaymentError(
-            PaymentErrorCode.UNKNOWN_ERROR,
-            `Refund initiation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            PaymentErrorSeverity.MEDIUM,
-            500,
-            false
-          );
+      const paymentError =
+        error instanceof PaymentError
+          ? error
+          : new PaymentError(
+              PaymentErrorCode.UNKNOWN_ERROR,
+              `Refund initiation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              PaymentErrorSeverity.MEDIUM,
+              500,
+              false
+            );
 
       // Log error
       await this.auditLogger.logPaymentError(
@@ -123,11 +124,7 @@ export class PaymentRefundService {
   /**
    * Process refund through appropriate gateway
    */
-  private async processRefund(
-    payment: any,
-    refund: any,
-    traceId: string
-  ): Promise<RefundResult> {
+  private async processRefund(payment: any, refund: any, traceId: string): Promise<RefundResult> {
     try {
       let gatewayRefundId: string | undefined;
       let status: 'completed' | 'processing' | 'failed' = 'processing';
@@ -198,7 +195,10 @@ export class PaymentRefundService {
       // Update refund to failed
       await this.prisma.refund.update({
         where: { id: refund.id },
-        data: { status: 'failed', failureReason: error instanceof Error ? error.message : 'Unknown error' },
+        data: {
+          status: 'failed',
+          failureReason: error instanceof Error ? error.message : 'Unknown error',
+        },
       });
 
       throw error;
@@ -412,9 +412,7 @@ export class PaymentRefundService {
 
     // Check if payment is older than 180 days (typical refund window)
     const paymentDate = new Date(payment.completedAt || payment.createdAt);
-    const daysSince = Math.floor(
-      (Date.now() - paymentDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    const daysSince = Math.floor((Date.now() - paymentDate.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysSince > 180) {
       throw new PaymentError(

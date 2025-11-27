@@ -9,6 +9,7 @@
 ### Day 11: External Services (4-5 hours)
 
 **Morning:**
+
 ```bash
 # 1. OpenAI (30 min)
 → https://platform.openai.com
@@ -31,6 +32,7 @@
 ```
 
 **Afternoon:**
+
 ```bash
 # 4. Railway Database (1 hour)
 → https://railway.app
@@ -77,6 +79,7 @@ curl https://api.visabuddy.uz/api/countries
 ### Day 13-15: Device Testing (3 days)
 
 **iOS (Day 13):**
+
 ```bash
 cd frontend_new
 eas build --platform ios --profile production
@@ -88,6 +91,7 @@ eas build --platform ios --profile production
 ```
 
 **Android (Day 14):**
+
 ```bash
 eas build --platform android --profile production
 # Wait 30-60 min for build
@@ -98,6 +102,7 @@ eas build --platform android --profile production
 ```
 
 **Bug Fixes (Day 15):**
+
 - Fix critical bugs
 - Rebuild if needed
 - Retest
@@ -105,6 +110,7 @@ eas build --platform android --profile production
 ### Day 16-17: Assets & Content (2 days)
 
 **Create:**
+
 - App icon (1024x1024)
 - Splash screen
 - Screenshots (6-10 images)
@@ -142,6 +148,7 @@ eas build --platform android --profile production-aab
 ### Day 22-24: App Store Submission (8-12 hours + review time)
 
 **iOS App Store:**
+
 1. App Store Connect → Upload build
 2. Fill app information
 3. Add screenshots
@@ -151,6 +158,7 @@ eas build --platform android --profile production-aab
 7. Release!
 
 **Google Play Store:**
+
 1. Play Console → Upload AAB
 2. Fill store listing
 3. Add screenshots
@@ -204,6 +212,7 @@ Print this and check off as you go:
 ## 🆘 Emergency Contacts
 
 **If stuck:**
+
 1. Check `PRODUCTION_SETUP_GUIDE.md`
 2. Check Railway logs
 3. Check EAS build logs
@@ -226,12 +235,14 @@ Print this and check off as you go:
 ## 🎯 Success Metrics
 
 **Week 1:**
+
 - 100+ downloads
 - 50+ active users
 - 20+ applications created
 - < 5% crash rate
 
 **Month 1:**
+
 - 1,000+ downloads
 - 500+ active users
 - 200+ applications created
@@ -242,6 +253,7 @@ Print this and check off as you go:
 ## 📞 Support
 
 **Need help with Phase 2?**
+
 - Review the guides carefully
 - Test each step independently
 - Check logs for errors
@@ -250,5 +262,3 @@ Print this and check off as you go:
 ---
 
 **You've got this! Phase 1 is done, Phase 2 is straightforward. See you at launch! 🚀**
-
-

@@ -45,15 +45,11 @@ export default function ProfilePage() {
             <p className="mt-1 text-sm">{user.lastName || '-'}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-white/70">
-              {t('profile.email')}
-            </label>
+            <label className="block text-sm font-medium text-white/70">{t('profile.email')}</label>
             <p className="mt-1 text-sm">{user.email}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-white/70">
-              {t('profile.phone')}
-            </label>
+            <label className="block text-sm font-medium text-white/70">{t('profile.phone')}</label>
             <p className="mt-1 text-sm">{user.phone || '-'}</p>
           </div>
           <div>
@@ -67,6 +63,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-
-

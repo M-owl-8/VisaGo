@@ -442,7 +442,11 @@ export class RAGService {
 
     return this.knowledgeBase.filter((entry: KnowledgeEntry) => {
       // Filter by country if provided
-      if (country && entry.country !== 'General' && !entry.country.toLowerCase().includes(country.toLowerCase())) {
+      if (
+        country &&
+        entry.country !== 'General' &&
+        !entry.country.toLowerCase().includes(country.toLowerCase())
+      ) {
         return false;
       }
 
@@ -452,10 +456,19 @@ export class RAGService {
       }
 
       // Search in content and keywords
-      const contentLower = (entry.content + ' ' + entry.topic + ' ' + entry.keywords.join(' ')).toLowerCase();
+      const contentLower = (
+        entry.content +
+        ' ' +
+        entry.topic +
+        ' ' +
+        entry.keywords.join(' ')
+      ).toLowerCase();
 
       // Check if query terms exist in content
-      return queryTerms.some((term: string) => contentLower.includes(term)) || contentLower.includes(queryLower);
+      return (
+        queryTerms.some((term: string) => contentLower.includes(term)) ||
+        contentLower.includes(queryLower)
+      );
     });
   }
 
@@ -483,7 +496,14 @@ export class RAGService {
       return { document: doc, score };
     });
 
-    return scored.sort((a: { document: KnowledgeEntry; score: number }, b: { document: KnowledgeEntry; score: number }) => b.score - a.score).map((item: { document: KnowledgeEntry; score: number }) => item.document);
+    return scored
+      .sort(
+        (
+          a: { document: KnowledgeEntry; score: number },
+          b: { document: KnowledgeEntry; score: number }
+        ) => b.score - a.score
+      )
+      .map((item: { document: KnowledgeEntry; score: number }) => item.document);
   }
 
   /**

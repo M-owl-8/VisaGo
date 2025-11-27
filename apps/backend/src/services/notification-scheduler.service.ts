@@ -50,7 +50,7 @@ export class NotificationSchedulerService {
         if (deviceToken) {
           await fcmService.sendToDevice(
             deviceToken,
-            FCMService.paymentConfirmationNotification(country, visaType),
+            FCMService.paymentConfirmationNotification(country, visaType)
           );
         }
 
@@ -84,7 +84,7 @@ export class NotificationSchedulerService {
         if (deviceToken) {
           await fcmService.sendToDevice(
             deviceToken,
-            FCMService.documentVerifiedNotification(documentType, status),
+            FCMService.documentVerifiedNotification(documentType, status)
           );
         }
 
@@ -117,7 +117,7 @@ export class NotificationSchedulerService {
         if (deviceToken) {
           await fcmService.sendToDevice(
             deviceToken,
-            FCMService.missingDocumentsReminderNotification(country),
+            FCMService.missingDocumentsReminderNotification(country)
           );
         }
 
@@ -151,7 +151,7 @@ export class NotificationSchedulerService {
         if (deviceToken) {
           await fcmService.sendToDevice(
             deviceToken,
-            FCMService.visaStatusUpdateNotification(country, status),
+            FCMService.visaStatusUpdateNotification(country, status)
           );
         }
 
@@ -175,7 +175,7 @@ export class NotificationSchedulerService {
         if (deviceToken) {
           await fcmService.sendToDevice(
             deviceToken,
-            FCMService.deadlineApproachingNotification(country, daysLeft),
+            FCMService.deadlineApproachingNotification(country, daysLeft)
           );
         }
 
@@ -194,7 +194,7 @@ export class NotificationSchedulerService {
         // Send to all users via FCM topic
         await fcmService.sendToTopic(
           'visa_news',
-          FCMService.newsUpdateNotification(title, summary),
+          FCMService.newsUpdateNotification(title, summary)
         );
 
         console.log(`✅ News update broadcast sent`);
@@ -314,10 +314,7 @@ export class NotificationSchedulerService {
     });
   }
 
-  async broadcastNewsUpdate(data: {
-    title: string;
-    summary: string;
-  }): Promise<void> {
+  async broadcastNewsUpdate(data: { title: string; summary: string }): Promise<void> {
     await this.newsUpdateQueue.add(data, {
       removeOnComplete: true,
     });
@@ -394,7 +391,7 @@ export class NotificationSchedulerService {
       } catch {
         requiredDocs = [];
       }
-      
+
       const uploadedDocs = app.documents.map((d: any) => d.documentType);
       const missing = requiredDocs.filter((doc) => !uploadedDocs.includes(doc));
 

@@ -3,11 +3,11 @@
  * AI-powered form pre-filling for visa applications
  */
 
-import { PrismaClient } from "@prisma/client";
-import { getEnvConfig } from "../config/env";
-import { errors } from "../utils/errors";
-import { logError, logInfo } from "../middleware/logger";
-import AIOpenAIService from "./ai-openai.service";
+import { PrismaClient } from '@prisma/client';
+import { getEnvConfig } from '../config/env';
+import { errors } from '../utils/errors';
+import { logError, logInfo } from '../middleware/logger';
+import AIOpenAIService from './ai-openai.service';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 export interface FormField {
   name: string;
   label: string;
-  type: "text" | "email" | "date" | "number" | "select" | "textarea";
+  type: 'text' | 'email' | 'date' | 'number' | 'select' | 'textarea';
   value?: string | number | null;
   required: boolean;
   options?: string[];
@@ -59,15 +59,12 @@ export interface PreFilledForm {
 export class FormFillingService {
   /**
    * Get form template for a visa type
-   * 
+   *
    * @param countryId - Country ID
    * @param visaTypeId - Visa type ID
    * @returns Form template
    */
-  static async getFormTemplate(
-    countryId: string,
-    visaTypeId: string
-  ): Promise<FormTemplate> {
+  static async getFormTemplate(countryId: string, visaTypeId: string): Promise<FormTemplate> {
     const country = await prisma.country.findUnique({
       where: { id: countryId },
     });
@@ -78,7 +75,7 @@ export class FormFillingService {
     });
 
     if (!country || !visaType) {
-      throw errors.notFound("Country or Visa Type");
+      throw errors.notFound('Country or Visa Type');
     }
 
     // Generate form template based on visa type and country
@@ -96,7 +93,7 @@ export class FormFillingService {
 
   /**
    * Pre-fill form with user data using AI
-   * 
+   *
    * @param userId - User ID
    * @param countryId - Country ID
    * @param visaTypeId - Visa type ID
@@ -117,7 +114,7 @@ export class FormFillingService {
       });
 
       if (!user) {
-        throw errors.notFound("User");
+        throw errors.notFound('User');
       }
 
       // Get form template
@@ -134,7 +131,7 @@ export class FormFillingService {
       });
 
       if (!country || !visaType) {
-        throw errors.notFound("Country or Visa Type");
+        throw errors.notFound('Country or Visa Type');
       }
 
       // Pre-fill with user data
@@ -144,18 +141,13 @@ export class FormFillingService {
 
       for (const field of template.fields) {
         const value = this.extractFieldValue(field, user);
-        
+
         if (value !== null && value !== undefined) {
           preFilledData[field.name] = value;
         } else if (field.required) {
           missingFields.push(field.name);
           // Generate AI suggestion for missing required fields
-          const suggestion = await this.generateFieldSuggestion(
-            field,
-            user,
-            country,
-            visaType
-          );
+          const suggestion = await this.generateFieldSuggestion(field, user, country, visaType);
           if (suggestion) {
             suggestions[field.name] = suggestion;
           }
@@ -167,7 +159,7 @@ export class FormFillingService {
       const filledFields = Object.keys(preFilledData).length;
       const confidence = totalFields > 0 ? filledFields / totalFields : 0;
 
-      logInfo("Form pre-filled successfully", {
+      logInfo('Form pre-filled successfully', {
         userId,
         countryId,
         visaTypeId,
@@ -184,7 +176,7 @@ export class FormFillingService {
         suggestions,
       };
     } catch (error) {
-      logError("Error pre-filling form", error as Error, {
+      logError('Error pre-filling form', error as Error, {
         userId,
         countryId,
         visaTypeId,
@@ -199,125 +191,125 @@ export class FormFillingService {
   private static generateFormFields(country: any, visaType: any): FormField[] {
     const baseFields: FormField[] = [
       {
-        name: "firstName",
-        label: "First Name",
-        type: "text",
+        name: 'firstName',
+        label: 'First Name',
+        type: 'text',
         required: true,
-        placeholder: "Enter your first name",
+        placeholder: 'Enter your first name',
       },
       {
-        name: "lastName",
-        label: "Last Name",
-        type: "text",
+        name: 'lastName',
+        label: 'Last Name',
+        type: 'text',
         required: true,
-        placeholder: "Enter your last name",
+        placeholder: 'Enter your last name',
       },
       {
-        name: "email",
-        label: "Email Address",
-        type: "email",
+        name: 'email',
+        label: 'Email Address',
+        type: 'email',
         required: true,
-        placeholder: "your.email@example.com",
+        placeholder: 'your.email@example.com',
       },
       {
-        name: "phone",
-        label: "Phone Number",
-        type: "text",
+        name: 'phone',
+        label: 'Phone Number',
+        type: 'text',
         required: true,
-        placeholder: "+1 234 567 8900",
+        placeholder: '+1 234 567 8900',
       },
       {
-        name: "dateOfBirth",
-        label: "Date of Birth",
-        type: "date",
-        required: true,
-      },
-      {
-        name: "nationality",
-        label: "Nationality",
-        type: "select",
-        required: true,
-        placeholder: "Select your nationality",
-      },
-      {
-        name: "passportNumber",
-        label: "Passport Number",
-        type: "text",
-        required: true,
-        placeholder: "Enter passport number",
-      },
-      {
-        name: "passportIssueDate",
-        label: "Passport Issue Date",
-        type: "date",
+        name: 'dateOfBirth',
+        label: 'Date of Birth',
+        type: 'date',
         required: true,
       },
       {
-        name: "passportExpiryDate",
-        label: "Passport Expiry Date",
-        type: "date",
+        name: 'nationality',
+        label: 'Nationality',
+        type: 'select',
+        required: true,
+        placeholder: 'Select your nationality',
+      },
+      {
+        name: 'passportNumber',
+        label: 'Passport Number',
+        type: 'text',
+        required: true,
+        placeholder: 'Enter passport number',
+      },
+      {
+        name: 'passportIssueDate',
+        label: 'Passport Issue Date',
+        type: 'date',
         required: true,
       },
       {
-        name: "purposeOfVisit",
-        label: "Purpose of Visit",
-        type: "textarea",
-        required: true,
-        placeholder: "Describe the purpose of your visit",
-      },
-      {
-        name: "intendedArrivalDate",
-        label: "Intended Arrival Date",
-        type: "date",
+        name: 'passportExpiryDate',
+        label: 'Passport Expiry Date',
+        type: 'date',
         required: true,
       },
       {
-        name: "intendedDepartureDate",
-        label: "Intended Departure Date",
-        type: "date",
+        name: 'purposeOfVisit',
+        label: 'Purpose of Visit',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Describe the purpose of your visit',
+      },
+      {
+        name: 'intendedArrivalDate',
+        label: 'Intended Arrival Date',
+        type: 'date',
         required: true,
       },
       {
-        name: "addressInDestination",
-        label: "Address in Destination Country",
-        type: "textarea",
+        name: 'intendedDepartureDate',
+        label: 'Intended Departure Date',
+        type: 'date',
+        required: true,
+      },
+      {
+        name: 'addressInDestination',
+        label: 'Address in Destination Country',
+        type: 'textarea',
         required: false,
-        placeholder: "Enter your address in the destination country",
+        placeholder: 'Enter your address in the destination country',
       },
     ];
 
     // Add visa-type specific fields
-    if (visaType.name.toLowerCase().includes("work")) {
+    if (visaType.name.toLowerCase().includes('work')) {
       baseFields.push({
-        name: "employerName",
-        label: "Employer Name",
-        type: "text",
+        name: 'employerName',
+        label: 'Employer Name',
+        type: 'text',
         required: true,
-        placeholder: "Enter employer name",
+        placeholder: 'Enter employer name',
       });
       baseFields.push({
-        name: "jobTitle",
-        label: "Job Title",
-        type: "text",
+        name: 'jobTitle',
+        label: 'Job Title',
+        type: 'text',
         required: true,
-        placeholder: "Enter job title",
+        placeholder: 'Enter job title',
       });
     }
 
-    if (visaType.name.toLowerCase().includes("student")) {
+    if (visaType.name.toLowerCase().includes('student')) {
       baseFields.push({
-        name: "schoolName",
-        label: "School/University Name",
-        type: "text",
+        name: 'schoolName',
+        label: 'School/University Name',
+        type: 'text',
         required: true,
-        placeholder: "Enter school name",
+        placeholder: 'Enter school name',
       });
       baseFields.push({
-        name: "courseOfStudy",
-        label: "Course of Study",
-        type: "text",
+        name: 'courseOfStudy',
+        label: 'Course of Study',
+        type: 'text',
         required: true,
-        placeholder: "Enter course name",
+        placeholder: 'Enter course name',
       });
     }
 
@@ -329,15 +321,15 @@ export class FormFillingService {
    */
   private static extractFieldValue(field: FormField, user: any): any {
     switch (field.name) {
-      case "firstName":
+      case 'firstName':
         return user.firstName || null;
-      case "lastName":
+      case 'lastName':
         return user.lastName || null;
-      case "email":
+      case 'email':
         return user.email || null;
-      case "phone":
+      case 'phone':
         return user.phone || null;
-      case "nationality":
+      case 'nationality':
         // TODO: Add nationality to User model
         return null;
       default:
@@ -363,31 +355,31 @@ export class FormFillingService {
       const prompt = `You are helping a user fill out a visa application form for ${visaType.name} to ${country.name}.
 
 User information:
-- Name: ${user.firstName || ""} ${user.lastName || ""}
+- Name: ${user.firstName || ''} ${user.lastName || ''}
 - Email: ${user.email}
 
 Field that needs to be filled:
 - Label: ${field.label}
 - Type: ${field.type}
-${field.placeholder ? `- Placeholder: ${field.placeholder}` : ""}
+${field.placeholder ? `- Placeholder: ${field.placeholder}` : ''}
 
 Provide a helpful suggestion or example for this field. Keep it brief (1-2 sentences).`;
 
       const response = await AIOpenAIService.chat(
-        [{ role: "user", content: prompt }],
-        "You are a helpful visa application assistant."
+        [{ role: 'user', content: prompt }],
+        'You are a helpful visa application assistant.'
       );
 
       return response.message || null;
     } catch (error) {
-      logError("Error generating field suggestion", error as Error);
+      logError('Error generating field suggestion', error as Error);
       return null;
     }
   }
 
   /**
    * Validate form data
-   * 
+   *
    * @param template - Form template
    * @param data - Form data to validate
    * @returns Validation result
@@ -402,30 +394,30 @@ Provide a helpful suggestion or example for this field. Keep it brief (1-2 sente
       const value = data[field.name];
 
       // Check required fields
-      if (field.required && (value === null || value === undefined || value === "")) {
+      if (field.required && (value === null || value === undefined || value === '')) {
         errors[field.name] = `${field.label} is required`;
         continue;
       }
 
       // Type validation
-      if (value !== null && value !== undefined && value !== "") {
+      if (value !== null && value !== undefined && value !== '') {
         switch (field.type) {
-          case "email":
+          case 'email':
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(value)) {
-              errors[field.name] = "Invalid email format";
+              errors[field.name] = 'Invalid email format';
             }
             break;
 
-          case "date":
+          case 'date':
             if (isNaN(Date.parse(value))) {
-              errors[field.name] = "Invalid date format";
+              errors[field.name] = 'Invalid date format';
             }
             break;
 
-          case "number":
+          case 'number':
             if (isNaN(Number(value))) {
-              errors[field.name] = "Must be a number";
+              errors[field.name] = 'Must be a number';
             } else {
               if (field.validation?.min && Number(value) < field.validation.min) {
                 errors[field.name] = `Must be at least ${field.validation.min}`;
@@ -447,20 +439,17 @@ Provide a helpful suggestion or example for this field. Keep it brief (1-2 sente
 
   /**
    * Save form data to application
-   * 
+   *
    * @param applicationId - Application ID
    * @param formData - Form data
    */
-  static async saveFormData(
-    applicationId: string,
-    formData: Record<string, any>
-  ): Promise<void> {
+  static async saveFormData(applicationId: string, formData: Record<string, any>): Promise<void> {
     const application = await prisma.visaApplication.findUnique({
       where: { id: applicationId },
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     // Store form data in notes or create a separate form data field
@@ -481,4 +470,3 @@ Provide a helpful suggestion or example for this field. Keep it brief (1-2 sente
     });
   }
 }
-

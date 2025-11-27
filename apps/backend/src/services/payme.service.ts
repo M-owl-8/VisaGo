@@ -1,6 +1,6 @@
-import crypto from "crypto";
-import axios from "axios";
-import { PrismaClient } from "@prisma/client";
+import crypto from 'crypto';
+import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
 
 interface PaymeConfig {
   merchantId: string;
@@ -41,12 +41,12 @@ export class PaymeService {
     // During payment freeze, credentials may not be needed
     if (!config.merchantId || !config.apiKey) {
       // Check if payments are frozen - if so, allow incomplete config
-      const { isPaymentFrozen } = require("../utils/payment-freeze");
-      if (!isPaymentFrozen() && process.env.NODE_ENV === "production") {
-        throw new Error("Payme configuration incomplete: merchantId and apiKey required");
+      const { isPaymentFrozen } = require('../utils/payment-freeze');
+      if (!isPaymentFrozen() && process.env.NODE_ENV === 'production') {
+        throw new Error('Payme configuration incomplete: merchantId and apiKey required');
       }
       // In development or when frozen, allow incomplete config but log warning
-      console.warn("⚠️  Payme configuration incomplete - payments may not work until configured");
+      console.warn('⚠️  Payme configuration incomplete - payments may not work until configured');
     }
   }
 
@@ -75,9 +75,9 @@ export class PaymeService {
           userId: params.userId,
           applicationId: params.applicationId,
           amount: params.amount,
-          currency: "UZS", // Payme works in UZS
-          status: "pending",
-          paymentMethod: "payme",
+          currency: 'UZS', // Payme works in UZS
+          status: 'pending',
+          paymentMethod: 'payme',
           orderId: merchantTransId,
           paymentGatewayData: JSON.stringify({
             merchantTransId,
@@ -94,13 +94,13 @@ export class PaymeService {
             application_id: params.applicationId,
           },
           amount: amountInTiyn,
-          currency: "UZS",
+          currency: 'UZS',
           order_id: merchantTransId,
           merchant_trans_id: merchantTransId,
           return_url: params.returnUrl,
-          description: params.description || "Visa Application Payment",
+          description: params.description || 'Visa Application Payment',
         })
-      ).toString("base64");
+      ).toString('base64');
 
       const signature = this.generateSignature(params_str);
       const paymentUrl = `${this.config.apiUrl}?sign=${signature}&params=${params_str}`;
@@ -111,7 +111,7 @@ export class PaymeService {
         transactionId: payment.id,
       };
     } catch (error) {
-      console.error("Error creating Payme payment:", error);
+      console.error('Error creating Payme payment:', error);
       throw error;
     }
   }
@@ -121,7 +121,7 @@ export class PaymeService {
    */
   private generateSignature(params: string): string {
     const key = `${params};${this.config.apiKey}`;
-    return crypto.createHash("md5").update(key).digest("hex");
+    return crypto.createHash('md5').update(key).digest('hex');
   }
 
   /**
@@ -130,8 +130,8 @@ export class PaymeService {
   async checkTransaction(merchantTransId: string): Promise<any> {
     try {
       const payload = {
-        jsonrpc: "2.0",
-        method: "CheckTransaction",
+        jsonrpc: '2.0',
+        method: 'CheckTransaction',
         params: {
           account: {
             order_id: merchantTransId,
@@ -140,20 +140,16 @@ export class PaymeService {
         id: Date.now().toString(),
       };
 
-      const response = await axios.post(
-        `${this.config.apiUrl}/api`,
-        payload,
-        {
-          headers: {
-            Authorization: `Basic ${Buffer.from(`${this.config.merchantId}:${this.config.apiKey}`).toString("base64")}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await axios.post(`${this.config.apiUrl}/api`, payload, {
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${this.config.merchantId}:${this.config.apiKey}`).toString('base64')}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       return response.data;
     } catch (error: any) {
-      console.error("Error checking Payme transaction:", error.response?.data || error.message);
+      console.error('Error checking Payme transaction:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -167,13 +163,13 @@ export class PaymeService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Verify webhook signature
-      const params = Buffer.from(webhookData.params).toString("utf-8");
+      const params = Buffer.from(webhookData.params).toString('utf-8');
       const expectedSignature = this.generateSignature(webhookData.params);
 
       if (signature !== expectedSignature) {
         return {
           success: false,
-          error: "Invalid signature",
+          error: 'Invalid signature',
         };
       }
 
@@ -190,17 +186,17 @@ export class PaymeService {
       if (!payment) {
         return {
           success: false,
-          error: "Payment not found",
+          error: 'Payment not found',
         };
       }
 
       // Handle different webhook events
-      if (webhookData.event === "PaymentSuccess") {
+      if (webhookData.event === 'PaymentSuccess') {
         // Update payment status to completed
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: "completed",
+            status: 'completed',
             transactionId: decodedParams.transaction_id || decodedParams.order_id,
             paidAt: new Date(),
             paymentGatewayData: JSON.stringify(decodedParams),
@@ -211,7 +207,7 @@ export class PaymeService {
         await this.prisma.visaApplication.update({
           where: { id: payment.applicationId },
           data: {
-            status: "submitted",
+            status: 'submitted',
           },
         });
 
@@ -219,11 +215,11 @@ export class PaymeService {
         return { success: true };
       }
 
-      if (webhookData.event === "PaymentFailed") {
+      if (webhookData.event === 'PaymentFailed') {
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: "failed",
+            status: 'failed',
             paymentGatewayData: JSON.stringify(decodedParams),
           },
         });
@@ -234,7 +230,7 @@ export class PaymeService {
 
       return { success: true };
     } catch (error: any) {
-      console.error("Error processing webhook:", error);
+      console.error('Error processing webhook:', error);
       return {
         success: false,
         error: error.message,
@@ -256,7 +252,7 @@ export class PaymeService {
       }
 
       // If payment is already completed, return true
-      if (payment.status === "completed") {
+      if (payment.status === 'completed') {
         return true;
       }
 
@@ -272,7 +268,7 @@ export class PaymeService {
             await this.prisma.payment.update({
               where: { id: transactionId },
               data: {
-                status: "completed",
+                status: 'completed',
                 transactionId: transaction.id,
                 paidAt: new Date(),
               },
@@ -281,7 +277,7 @@ export class PaymeService {
             await this.prisma.visaApplication.update({
               where: { id: payment.applicationId },
               data: {
-                status: "submitted",
+                status: 'submitted',
               },
             });
 
@@ -292,7 +288,7 @@ export class PaymeService {
 
       return false;
     } catch (error) {
-      console.error("Error verifying payment:", error);
+      console.error('Error verifying payment:', error);
       return false;
     }
   }
@@ -319,7 +315,7 @@ export class PaymeService {
       include: {
         application: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -332,18 +328,18 @@ export class PaymeService {
         where: { id: paymentId },
       });
 
-      if (!payment || payment.status !== "pending") {
+      if (!payment || payment.status !== 'pending') {
         return false;
       }
 
       await this.prisma.payment.update({
         where: { id: paymentId },
-        data: { status: "failed" },
+        data: { status: 'failed' },
       });
 
       return true;
     } catch (error) {
-      console.error("Error canceling payment:", error);
+      console.error('Error canceling payment:', error);
       return false;
     }
   }

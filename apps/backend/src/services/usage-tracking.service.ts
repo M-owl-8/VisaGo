@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 import { startOfDay } from 'date-fns';
 
 const prisma = new PrismaClient();
@@ -13,12 +13,12 @@ export class UsageTrackingService {
   async trackMessageUsage(
     userId: string,
     tokensUsed: number,
-    model: string = "gpt-4",
+    model: string = 'gpt-4',
     responseTimeMs: number = 0
   ): Promise<void> {
     try {
       const today = startOfDay(new Date());
-      
+
       // Get or create today's metrics
       let metrics = await prisma.aIUsageMetrics.findUnique({
         where: {
@@ -28,7 +28,7 @@ export class UsageTrackingService {
           },
         },
       });
-      
+
       if (!metrics) {
         metrics = await prisma.aIUsageMetrics.create({
           data: {
@@ -49,7 +49,7 @@ export class UsageTrackingService {
         const newAvgResponseTime = Math.round(
           (metrics.avgResponseTime * (newTotalRequests - 1) + responseTimeMs) / newTotalRequests
         );
-        
+
         await prisma.aIUsageMetrics.update({
           where: {
             userId_date: {
@@ -77,7 +77,7 @@ export class UsageTrackingService {
   async trackError(userId: string): Promise<void> {
     try {
       const today = startOfDay(new Date());
-      
+
       await prisma.aIUsageMetrics.upsert({
         where: {
           userId_date: {
@@ -110,7 +110,7 @@ export class UsageTrackingService {
   async getDailyUsage(userId: string, date?: Date) {
     try {
       const queryDate = date ? startOfDay(date) : startOfDay(new Date());
-      
+
       const metrics = await prisma.aIUsageMetrics.findUnique({
         where: {
           userId_date: {
@@ -119,16 +119,18 @@ export class UsageTrackingService {
           },
         },
       });
-      
-      return metrics || {
-        userId,
-        date: queryDate,
-        totalRequests: 0,
-        totalTokens: 0,
-        totalCost: 0,
-        avgResponseTime: 0,
-        errorCount: 0,
-      };
+
+      return (
+        metrics || {
+          userId,
+          date: queryDate,
+          totalRequests: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          avgResponseTime: 0,
+          errorCount: 0,
+        }
+      );
     } catch (error) {
       console.error('Error getting daily usage:', error);
       return null;
@@ -143,7 +145,7 @@ export class UsageTrackingService {
       const endDate = new Date();
       const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - (7 * weeksBack - 1));
-      
+
       const metrics = await prisma.aIUsageMetrics.findMany({
         where: {
           userId,
@@ -154,7 +156,7 @@ export class UsageTrackingService {
         },
         orderBy: { date: 'asc' },
       });
-      
+
       // Aggregate totals
       const totals = metrics.reduce(
         (acc, m) => ({
@@ -166,11 +168,10 @@ export class UsageTrackingService {
         }),
         { totalRequests: 0, totalTokens: 0, totalCost: 0, avgResponseTime: 0, errorCount: 0 }
       );
-      
-      const avgResponseTime = metrics.length > 0 
-        ? Math.round(totals.avgResponseTime / metrics.length)
-        : 0;
-      
+
+      const avgResponseTime =
+        metrics.length > 0 ? Math.round(totals.avgResponseTime / metrics.length) : 0;
+
       return {
         period: {
           startDate: startDate,
@@ -197,7 +198,7 @@ export class UsageTrackingService {
       const now = new Date();
       const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const startDate = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1);
-      
+
       const metrics = await prisma.aIUsageMetrics.findMany({
         where: {
           userId,
@@ -208,7 +209,7 @@ export class UsageTrackingService {
         },
         orderBy: { date: 'asc' },
       });
-      
+
       // Aggregate totals
       const totals = metrics.reduce(
         (acc, m) => ({
@@ -220,11 +221,10 @@ export class UsageTrackingService {
         }),
         { totalRequests: 0, totalTokens: 0, totalCost: 0, avgResponseTime: 0, errorCount: 0 }
       );
-      
-      const avgResponseTime = metrics.length > 0 
-        ? Math.round(totals.avgResponseTime / metrics.length)
-        : 0;
-      
+
+      const avgResponseTime =
+        metrics.length > 0 ? Math.round(totals.avgResponseTime / metrics.length) : 0;
+
       return {
         period: {
           startDate,
@@ -252,9 +252,9 @@ export class UsageTrackingService {
     const pricing: Record<string, number> = {
       'gpt-4': 0.03, // $0.03 per 1K tokens
       'gpt-3.5-turbo': 0.0005, // $0.0005 per 1K tokens
-      'fallback': 0, // Free fallback
+      fallback: 0, // Free fallback
     };
-    
+
     const pricePerToken = (pricing[model] || pricing['gpt-3.5-turbo']) / 1000;
     return Math.round(tokensUsed * pricePerToken * 10000) / 10000; // Round to 4 decimals
   }
@@ -267,7 +267,7 @@ export class UsageTrackingService {
       const today = await this.getDailyUsage(userId);
       const weekly = await this.getWeeklyUsage(userId, 1);
       const monthly = await this.getMonthlyUsage(userId, 1);
-      
+
       return {
         today: {
           cost: today?.totalCost || 0,

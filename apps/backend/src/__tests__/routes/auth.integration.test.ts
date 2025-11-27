@@ -141,10 +141,7 @@ describe('Auth Routes - Register', () => {
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
     (mockPrisma.user.create as jest.Mock).mockResolvedValue(mockUser);
 
-    const response = await request(app)
-      .post('/auth/register')
-      .send(userData)
-      .expect(201);
+    const response = await request(app).post('/auth/register').send(userData).expect(201);
 
     expect(response.body).toHaveProperty('token');
     expect(response.body).toHaveProperty('user');
@@ -157,10 +154,7 @@ describe('Auth Routes - Register', () => {
       password: 'SecurePass123!',
     };
 
-    const response = await request(app)
-      .post('/auth/register')
-      .send(userData)
-      .expect(400);
+    const response = await request(app).post('/auth/register').send(userData).expect(400);
 
     expect(response.body).toHaveProperty('error');
   });
@@ -171,10 +165,7 @@ describe('Auth Routes - Register', () => {
       password: '',
     };
 
-    const response = await request(app)
-      .post('/auth/register')
-      .send(userData)
-      .expect(400);
+    const response = await request(app).post('/auth/register').send(userData).expect(400);
 
     expect(response.body).toHaveProperty('error');
   });
@@ -185,10 +176,7 @@ describe('Auth Routes - Register', () => {
       password: 'Short1!',
     };
 
-    const response = await request(app)
-      .post('/auth/register')
-      .send(userData)
-      .expect(400);
+    const response = await request(app).post('/auth/register').send(userData).expect(400);
 
     expect(response.body.error).toContain('Password too short');
   });
@@ -204,10 +192,7 @@ describe('Auth Routes - Register', () => {
       email: userData.email,
     });
 
-    const response = await request(app)
-      .post('/auth/register')
-      .send(userData)
-      .expect(409);
+    const response = await request(app).post('/auth/register').send(userData).expect(409);
 
     expect(response.body.error).toContain('already exists');
   });
@@ -253,10 +238,7 @@ describe('Auth Routes - Login', () => {
 
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
 
-    const response = await request(app)
-      .post('/auth/login')
-      .send(loginData)
-      .expect(200);
+    const response = await request(app).post('/auth/login').send(loginData).expect(200);
 
     expect(response.body).toHaveProperty('token');
     expect(response.body.user.email).toBe(loginData.email);
@@ -268,10 +250,7 @@ describe('Auth Routes - Login', () => {
       password: 'SecurePass123!',
     };
 
-    const response = await request(app)
-      .post('/auth/login')
-      .send(loginData)
-      .expect(400);
+    const response = await request(app).post('/auth/login').send(loginData).expect(400);
 
     expect(response.body).toHaveProperty('error');
   });
@@ -282,10 +261,7 @@ describe('Auth Routes - Login', () => {
       password: '',
     };
 
-    const response = await request(app)
-      .post('/auth/login')
-      .send(loginData)
-      .expect(400);
+    const response = await request(app).post('/auth/login').send(loginData).expect(400);
 
     expect(response.body).toHaveProperty('error');
   });
@@ -298,10 +274,7 @@ describe('Auth Routes - Login', () => {
 
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
-    const response = await request(app)
-      .post('/auth/login')
-      .send(loginData)
-      .expect(401);
+    const response = await request(app).post('/auth/login').send(loginData).expect(401);
 
     expect(response.body.error).toContain('Invalid credentials');
   });
@@ -320,10 +293,7 @@ describe('Auth Routes - Login', () => {
 
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
 
-    const response = await request(app)
-      .post('/auth/login')
-      .send(loginData)
-      .expect(401);
+    const response = await request(app).post('/auth/login').send(loginData).expect(401);
 
     expect(response.body.error).toContain('Invalid credentials');
   });
@@ -348,9 +318,7 @@ describe('Auth Routes - Token Refresh', () => {
   });
 
   test('should return 401 for missing token', async () => {
-    const response = await request(app)
-      .post('/auth/refresh')
-      .expect(401);
+    const response = await request(app).post('/auth/refresh').expect(401);
 
     expect(response.body).toHaveProperty('error');
   });
@@ -374,9 +342,7 @@ describe('Auth Routes - Logout', () => {
   });
 
   test('should logout successfully', async () => {
-    const response = await request(app)
-      .post('/auth/logout')
-      .expect(200);
+    const response = await request(app).post('/auth/logout').expect(200);
 
     expect(response.body).toHaveProperty('message');
   });
@@ -391,12 +357,7 @@ describe('Auth Routes - Input Validation', () => {
   });
 
   test('should validate email format', async () => {
-    const invalidEmails = [
-      'not-an-email',
-      '@example.com',
-      'user@',
-      'user @example.com',
-    ];
+    const invalidEmails = ['not-an-email', '@example.com', 'user@', 'user @example.com'];
 
     for (const email of invalidEmails) {
       const userData = {
@@ -410,11 +371,7 @@ describe('Auth Routes - Input Validation', () => {
   });
 
   test('should accept valid email formats', async () => {
-    const validEmails = [
-      'user@example.com',
-      'user.name@example.com',
-      'user+tag@example.co.uk',
-    ];
+    const validEmails = ['user@example.com', 'user.name@example.com', 'user+tag@example.co.uk'];
 
     for (const email of validEmails) {
       expect(email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
@@ -485,9 +442,7 @@ describe('Auth Routes - Rate Limiting', () => {
     // Simulate multiple attempts
     const attempts = [];
     for (let i = 0; i < 3; i++) {
-      attempts.push(
-        request(app).post('/auth/login').send(loginData)
-      );
+      attempts.push(request(app).post('/auth/login').send(loginData));
     }
 
     const responses = await Promise.all(attempts);

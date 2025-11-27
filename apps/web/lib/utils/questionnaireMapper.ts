@@ -48,8 +48,7 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
     business_owner: 'entrepreneur',
     school_child: 'student',
   };
-  const currentStatus =
-    currentStatusMap[v2.status.currentStatus] || 'unemployed';
+  const currentStatus = currentStatusMap[v2.status.currentStatus] || 'unemployed';
 
   // Map invitation
   const hasInvitation = v2.invitation.hasInvitation;
@@ -63,8 +62,7 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
     scholarship: 'sponsor',
     other_sponsor: 'sponsor',
   };
-  const financialSituation =
-    financialSituationMap[v2.finance.payer] || 'stable_income';
+  const financialSituation = financialSituationMap[v2.finance.payer] || 'stable_income';
 
   // Map marital status (already compatible)
   const maritalStatus = v2.personal.maritalStatus;
@@ -91,5 +89,3 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
     englishLevel,
   };
 }
-
-

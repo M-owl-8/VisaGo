@@ -1,6 +1,6 @@
-import crypto from "crypto";
-import axios from "axios";
-import { PrismaClient } from "@prisma/client";
+import crypto from 'crypto';
+import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
 
 interface UzumConfig {
   serviceId: string;
@@ -30,7 +30,7 @@ export class UzumService {
     this.prisma = prisma;
 
     if (!config.serviceId || !config.apiKey) {
-      throw new Error("Uzum configuration incomplete: serviceId and apiKey required");
+      throw new Error('Uzum configuration incomplete: serviceId and apiKey required');
     }
   }
 
@@ -59,9 +59,9 @@ export class UzumService {
           userId: params.userId,
           applicationId: params.applicationId,
           amount: params.amount,
-          currency: "UZS",
-          status: "pending",
-          paymentMethod: "uzum",
+          currency: 'UZS',
+          status: 'pending',
+          paymentMethod: 'uzum',
           orderId: merchantTransId,
           paymentGatewayData: JSON.stringify({
             merchantTransId,
@@ -77,30 +77,26 @@ export class UzumService {
         amount: amountInTiyn,
         transaction_param: merchantTransId,
         return_url: params.returnUrl,
-        description: params.description || "Visa Application Payment",
-        language: "en",
+        description: params.description || 'Visa Application Payment',
+        language: 'en',
       };
 
       const signature = this.generateSignature(JSON.stringify(payload));
 
-      const response = await axios.post(
-        `${this.config.apiUrl}/create-payment-session`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${this.config.apiKey}`,
-            "X-Sign": signature,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await axios.post(`${this.config.apiUrl}/create-payment-session`, payload, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'X-Sign': signature,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.data.session_id) {
-        throw new Error("Failed to create Uzum payment session");
+        throw new Error('Failed to create Uzum payment session');
       }
 
       // Build payment URL
-      const paymentUrl = `${this.config.apiUrl.replace("/api/merchant", "")}/checkout/${response.data.session_id}`;
+      const paymentUrl = `${this.config.apiUrl.replace('/api/merchant', '')}/checkout/${response.data.session_id}`;
 
       return {
         paymentUrl,
@@ -108,7 +104,7 @@ export class UzumService {
         transactionId: payment.id,
       };
     } catch (error) {
-      console.error("Error creating Uzum payment:", error);
+      console.error('Error creating Uzum payment:', error);
       throw error;
     }
   }
@@ -117,10 +113,7 @@ export class UzumService {
    * Generate signature for Uzum requests
    */
   private generateSignature(data: string): string {
-    return crypto
-      .createHmac("sha256", this.config.apiKey)
-      .update(data)
-      .digest("hex");
+    return crypto.createHmac('sha256', this.config.apiKey).update(data).digest('hex');
   }
 
   /**
@@ -135,21 +128,17 @@ export class UzumService {
 
       const signature = this.generateSignature(JSON.stringify(payload));
 
-      const response = await axios.post(
-        `${this.config.apiUrl}/check-payment-session`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${this.config.apiKey}`,
-            "X-Sign": signature,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await axios.post(`${this.config.apiUrl}/check-payment-session`, payload, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'X-Sign': signature,
+          'Content-Type': 'application/json',
+        },
+      });
 
       return response.data;
     } catch (error: any) {
-      console.error("Error checking Uzum transaction:", error.response?.data || error.message);
+      console.error('Error checking Uzum transaction:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -164,14 +153,14 @@ export class UzumService {
       // Verify signature
       const dataToSign = `${transaction_param}${this.config.apiKey}`;
       const expectedSignature = crypto
-        .createHmac("sha256", this.config.apiKey)
+        .createHmac('sha256', this.config.apiKey)
         .update(dataToSign)
-        .digest("hex");
+        .digest('hex');
 
       if (sign !== expectedSignature) {
         return {
           success: false,
-          error: "Invalid signature",
+          error: 'Invalid signature',
         };
       }
 
@@ -179,24 +168,24 @@ export class UzumService {
       const payment = await this.prisma.payment.findFirst({
         where: {
           orderId: transaction_param,
-          paymentMethod: "uzum",
+          paymentMethod: 'uzum',
         },
       });
 
       if (!payment) {
         return {
           success: false,
-          error: "Payment not found",
+          error: 'Payment not found',
         };
       }
 
       // Uzum status codes: "pending" | "completed" | "failed" | "cancelled"
-      if (status === "completed") {
+      if (status === 'completed') {
         // Payment completed
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: "completed",
+            status: 'completed',
             transactionId: webhookData.uzum_trans_id,
             paidAt: new Date(),
             paymentGatewayData: JSON.stringify(webhookData),
@@ -207,7 +196,7 @@ export class UzumService {
         await this.prisma.visaApplication.update({
           where: { id: payment.applicationId },
           data: {
-            status: "submitted",
+            status: 'submitted',
           },
         });
 
@@ -215,12 +204,12 @@ export class UzumService {
         return { success: true };
       }
 
-      if (status === "failed" || status === "cancelled") {
+      if (status === 'failed' || status === 'cancelled') {
         // Payment failed or cancelled
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: "failed",
+            status: 'failed',
             paymentGatewayData: JSON.stringify(webhookData),
           },
         });
@@ -231,7 +220,7 @@ export class UzumService {
 
       return { success: true };
     } catch (error: any) {
-      console.error("Error processing Uzum webhook:", error);
+      console.error('Error processing Uzum webhook:', error);
       return {
         success: false,
         error: error.message,
@@ -252,7 +241,7 @@ export class UzumService {
         return false;
       }
 
-      if (payment.status === "completed") {
+      if (payment.status === 'completed') {
         return true;
       }
 
@@ -260,11 +249,11 @@ export class UzumService {
       if (payment.orderId) {
         const result = await this.checkTransaction(payment.orderId);
 
-        if (result.success && result.status === "completed") {
+        if (result.success && result.status === 'completed') {
           await this.prisma.payment.update({
             where: { id: transactionId },
             data: {
-              status: "completed",
+              status: 'completed',
               transactionId: result.uzum_trans_id,
               paidAt: new Date(),
             },
@@ -273,7 +262,7 @@ export class UzumService {
           await this.prisma.visaApplication.update({
             where: { id: payment.applicationId },
             data: {
-              status: "submitted",
+              status: 'submitted',
             },
           });
 
@@ -283,7 +272,7 @@ export class UzumService {
 
       return false;
     } catch (error) {
-      console.error("Error verifying Uzum payment:", error);
+      console.error('Error verifying Uzum payment:', error);
       return false;
     }
   }
@@ -310,18 +299,18 @@ export class UzumService {
         where: { id: paymentId },
       });
 
-      if (!payment || payment.status !== "pending") {
+      if (!payment || payment.status !== 'pending') {
         return false;
       }
 
       await this.prisma.payment.update({
         where: { id: paymentId },
-        data: { status: "failed" },
+        data: { status: 'failed' },
       });
 
       return true;
     } catch (error) {
-      console.error("Error canceling Uzum payment:", error);
+      console.error('Error canceling Uzum payment:', error);
       return false;
     }
   }

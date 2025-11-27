@@ -38,16 +38,22 @@ export function getUserFriendlyError(
 
   if (lowerMessage.includes('foreign key') || lowerMessage.includes('constraint')) {
     return {
-      message: 'This operation cannot be completed because it references data that no longer exists.',
+      message:
+        'This operation cannot be completed because it references data that no longer exists.',
       suggestion: 'Please refresh the page and try again.',
       code: 'REFERENCE_ERROR',
     };
   }
 
-  if (lowerMessage.includes('connection') || lowerMessage.includes('timeout') || lowerMessage.includes('econnrefused')) {
+  if (
+    lowerMessage.includes('connection') ||
+    lowerMessage.includes('timeout') ||
+    lowerMessage.includes('econnrefused')
+  ) {
     return {
       message: 'We are having trouble connecting to our servers. Please try again in a moment.',
-      suggestion: 'Check your internet connection and try again. If the problem persists, please contact support.',
+      suggestion:
+        'Check your internet connection and try again. If the problem persists, please contact support.',
       code: 'CONNECTION_ERROR',
     };
   }
@@ -76,16 +82,21 @@ export function getUserFriendlyError(
   if (lowerMessage.includes('invalid') && lowerMessage.includes('password')) {
     return {
       message: 'Password does not meet requirements.',
-      suggestion: 'Password must be at least 12 characters and include uppercase, lowercase, number, and special character.',
+      suggestion:
+        'Password must be at least 12 characters and include uppercase, lowercase, number, and special character.',
       code: 'INVALID_PASSWORD',
       field: 'password',
     };
   }
 
-  if (lowerMessage.includes('password') && (lowerMessage.includes('weak') || lowerMessage.includes('short'))) {
+  if (
+    lowerMessage.includes('password') &&
+    (lowerMessage.includes('weak') || lowerMessage.includes('short'))
+  ) {
     return {
       message: 'Password is too weak.',
-      suggestion: 'Use a stronger password with at least 12 characters, including uppercase, lowercase, numbers, and special characters.',
+      suggestion:
+        'Use a stronger password with at least 12 characters, including uppercase, lowercase, numbers, and special characters.',
       code: 'WEAK_PASSWORD',
       field: 'password',
     };
@@ -108,7 +119,10 @@ export function getUserFriendlyError(
     };
   }
 
-  if (lowerMessage.includes('token') && (lowerMessage.includes('expired') || lowerMessage.includes('invalid'))) {
+  if (
+    lowerMessage.includes('token') &&
+    (lowerMessage.includes('expired') || lowerMessage.includes('invalid'))
+  ) {
     return {
       message: 'Your session has expired. Please sign in again.',
       suggestion: 'Please sign out and sign back in.',
@@ -146,7 +160,10 @@ export function getUserFriendlyError(
     };
   }
 
-  if (lowerMessage.includes('file') && lowerMessage.includes('format') || lowerMessage.includes('type')) {
+  if (
+    (lowerMessage.includes('file') && lowerMessage.includes('format')) ||
+    lowerMessage.includes('type')
+  ) {
     return {
       message: 'This file format is not supported.',
       suggestion: 'Please upload a PDF, JPG, PNG, DOC, or DOCX file.',
@@ -159,7 +176,8 @@ export function getUserFriendlyError(
   if (lowerMessage.includes('payment') && lowerMessage.includes('failed')) {
     return {
       message: 'Payment could not be processed.',
-      suggestion: 'Please check your payment method and try again, or try a different payment method.',
+      suggestion:
+        'Please check your payment method and try again, or try a different payment method.',
       code: 'PAYMENT_FAILED',
     };
   }
@@ -167,16 +185,21 @@ export function getUserFriendlyError(
   if (lowerMessage.includes('payment') && lowerMessage.includes('declined')) {
     return {
       message: 'Your payment was declined.',
-      suggestion: 'Please check your card details or contact your bank. You can also try a different payment method.',
+      suggestion:
+        'Please check your card details or contact your bank. You can also try a different payment method.',
       code: 'PAYMENT_DECLINED',
     };
   }
 
   // Service unavailable
-  if (lowerMessage.includes('service unavailable') || lowerMessage.includes('temporarily unavailable')) {
+  if (
+    lowerMessage.includes('service unavailable') ||
+    lowerMessage.includes('temporarily unavailable')
+  ) {
     return {
       message: 'This service is temporarily unavailable.',
-      suggestion: 'Please try again in a few moments. If the problem persists, please contact support.',
+      suggestion:
+        'Please try again in a few moments. If the problem persists, please contact support.',
       code: 'SERVICE_UNAVAILABLE',
     };
   }
@@ -184,7 +207,8 @@ export function getUserFriendlyError(
   // Generic fallback
   return {
     message: 'Something went wrong. Please try again.',
-    suggestion: 'If the problem continues, please contact support with details about what you were trying to do.',
+    suggestion:
+      'If the problem continues, please contact support with details about what you were trying to do.',
     code: 'UNKNOWN_ERROR',
   };
 }
@@ -192,11 +216,14 @@ export function getUserFriendlyError(
 /**
  * Enhance error response with user-friendly message and suggestion
  */
-export function enhanceErrorResponse(error: any, context?: {
-  field?: string;
-  operation?: string;
-  resource?: string;
-}): {
+export function enhanceErrorResponse(
+  error: any,
+  context?: {
+    field?: string;
+    operation?: string;
+    resource?: string;
+  }
+): {
   message: string;
   suggestion?: string;
   code: string;
@@ -220,9 +247,7 @@ export function enhanceErrorResponse(error: any, context?: {
 /**
  * Format validation errors for multiple fields
  */
-export function formatValidationErrors(
-  errors: Array<{ field: string; message: string }>
-): {
+export function formatValidationErrors(errors: Array<{ field: string; message: string }>): {
   message: string;
   errors: Array<{ field: string; message: string; suggestion?: string }>;
 } {
@@ -245,11 +270,3 @@ export function formatValidationErrors(
     errors: friendlyErrors,
   };
 }
-
-
-
-
-
-
-
-

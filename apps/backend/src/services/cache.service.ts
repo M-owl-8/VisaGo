@@ -1,9 +1,9 @@
-import NodeCache from "node-cache";
+import NodeCache from 'node-cache';
 
 /**
  * Cache Service using node-cache
  * Stores frequently accessed data in memory for faster retrieval
- * 
+ *
  * Cache Keys:
  * - countries:{id} - Individual country data (TTL: 1 day)
  * - countries:all - All countries list (TTL: 1 day)
@@ -93,14 +93,14 @@ export class CacheService {
    * Cache all countries
    */
   static cacheCountries(data: any[]): void {
-    this.set("countries:all", data, this.TTL.LONG);
+    this.set('countries:all', data, this.TTL.LONG);
   }
 
   /**
    * Get cached countries
    */
   static getCountries(): any[] | undefined {
-    return this.get("countries:all");
+    return this.get('countries:all');
   }
 
   /**
@@ -110,7 +110,7 @@ export class CacheService {
     if (countryId) {
       this.del(`countries:${countryId}`);
     }
-    this.del("countries:all");
+    this.del('countries:all');
   }
 
   /**

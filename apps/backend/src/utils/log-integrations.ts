@@ -3,8 +3,8 @@
  * Integration points for external logging services (Sentry, DataDog, Logz.io, etc.)
  */
 
-import { LogEntry, LogLevel } from "../middleware/logger";
-import { getEnvConfig } from "../config/env";
+import { LogEntry, LogLevel } from '../middleware/logger';
+import { getEnvConfig } from '../config/env';
 
 export interface LogIntegration {
   name: string;
@@ -16,7 +16,7 @@ export interface LogIntegration {
  * Sentry Integration
  */
 class SentryIntegration implements LogIntegration {
-  name = "Sentry";
+  name = 'Sentry';
   enabled = false;
   private sentry: any = null;
 
@@ -29,9 +29,11 @@ class SentryIntegration implements LogIntegration {
         // this.sentry = require("@sentry/node");
         // this.sentry.init({ dsn: envConfig.SENTRY_DSN });
         this.enabled = true;
-        console.log("✓ Sentry integration configured (install @sentry/node to enable)");
+        console.log('✓ Sentry integration configured (install @sentry/node to enable)');
       } catch (error) {
-        console.warn("⚠️  Sentry package not installed. Install @sentry/node to enable Sentry logging.");
+        console.warn(
+          '⚠️  Sentry package not installed. Install @sentry/node to enable Sentry logging.'
+        );
       }
     }
   }
@@ -63,7 +65,7 @@ class SentryIntegration implements LogIntegration {
       }
     } catch (error) {
       // Don't throw - external logging should not break the application
-      console.error("Sentry logging failed:", error);
+      console.error('Sentry logging failed:', error);
     }
   }
 }
@@ -72,7 +74,7 @@ class SentryIntegration implements LogIntegration {
  * DataDog Integration
  */
 class DataDogIntegration implements LogIntegration {
-  name = "DataDog";
+  name = 'DataDog';
   enabled = false;
 
   constructor() {
@@ -81,7 +83,7 @@ class DataDogIntegration implements LogIntegration {
       // In production, you would use @datadog/browser-logs or datadog-logs-js
       // For now, we just mark it as configured
       this.enabled = true;
-      console.log("✓ DataDog integration configured (install @datadog/browser-logs to enable)");
+      console.log('✓ DataDog integration configured (install @datadog/browser-logs to enable)');
     }
   }
 
@@ -100,7 +102,7 @@ class DataDogIntegration implements LogIntegration {
       //   ...entry.metadata,
       // });
     } catch (error) {
-      console.error("DataDog logging failed:", error);
+      console.error('DataDog logging failed:', error);
     }
   }
 }
@@ -109,7 +111,7 @@ class DataDogIntegration implements LogIntegration {
  * Logz.io Integration
  */
 class LogzioIntegration implements LogIntegration {
-  name = "Logz.io";
+  name = 'Logz.io';
   enabled = false;
 
   constructor() {
@@ -117,7 +119,7 @@ class LogzioIntegration implements LogIntegration {
     if (envConfig.LOGZIO_TOKEN) {
       // In production, you would use winston-logzio or similar
       this.enabled = true;
-      console.log("✓ Logz.io integration configured (install winston-logzio to enable)");
+      console.log('✓ Logz.io integration configured (install winston-logzio to enable)');
     }
   }
 
@@ -138,7 +140,7 @@ class LogzioIntegration implements LogIntegration {
       //   ...entry.metadata,
       // });
     } catch (error) {
-      console.error("Logz.io logging failed:", error);
+      console.error('Logz.io logging failed:', error);
     }
   }
 }
@@ -161,11 +163,9 @@ export function getLogIntegrations(): LogIntegration[] {
  */
 export async function sendToIntegrations(entry: LogEntry): Promise<void> {
   const integrations = getLogIntegrations();
-  
+
   // Send to all integrations in parallel (don't wait for failures)
-  await Promise.allSettled(
-    integrations.map((integration) => integration.log(entry))
-  );
+  await Promise.allSettled(integrations.map((integration) => integration.log(entry)));
 }
 
 /**
@@ -175,11 +175,7 @@ export function getIntegrationStatus(): {
   integrations: Array<{ name: string; enabled: boolean }>;
   totalEnabled: number;
 } {
-  const integrations = [
-    new SentryIntegration(),
-    new DataDogIntegration(),
-    new LogzioIntegration(),
-  ];
+  const integrations = [new SentryIntegration(), new DataDogIntegration(), new LogzioIntegration()];
 
   return {
     integrations: integrations.map((i) => ({
@@ -189,11 +185,3 @@ export function getIntegrationStatus(): {
     totalEnabled: integrations.filter((i) => i.enabled).length,
   };
 }
-
-
-
-
-
-
-
-

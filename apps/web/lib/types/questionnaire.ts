@@ -6,15 +6,7 @@
 
 export type VisaType = 'tourist' | 'student';
 
-export type TargetCountry =
-  | 'US'
-  | 'GB'
-  | 'ES'
-  | 'DE'
-  | 'JP'
-  | 'AE'
-  | 'CA'
-  | 'AU';
+export type TargetCountry = 'US' | 'GB' | 'ES' | 'DE' | 'JP' | 'AE' | 'CA' | 'AU';
 
 /**
  * Questionnaire V2 - Streamlined structure
@@ -30,10 +22,7 @@ export interface QuestionnaireV2 {
     ageRange: 'under_18' | '18_25' | '26_35' | '36_50' | '51_plus';
     maritalStatus: 'single' | 'married' | 'divorced' | 'widowed';
     nationality: 'UZ' | 'other';
-    passportStatus:
-      | 'valid_6plus_months'
-      | 'valid_less_6_months'
-      | 'no_passport';
+    passportStatus: 'valid_6plus_months' | 'valid_less_6_months' | 'no_passport';
   };
 
   // Q2: Travel purpose & duration
@@ -52,25 +41,13 @@ export interface QuestionnaireV2 {
       | 'unemployed'
       | 'business_owner'
       | 'school_child';
-    highestEducation:
-      | 'school'
-      | 'college'
-      | 'bachelor'
-      | 'master'
-      | 'phd'
-      | 'other';
+    highestEducation: 'school' | 'college' | 'bachelor' | 'master' | 'phd' | 'other';
     isMinor: boolean;
   };
 
   // Q4: Financial situation / sponsor
   finance: {
-    payer:
-      | 'self'
-      | 'parents'
-      | 'other_family'
-      | 'employer'
-      | 'scholarship'
-      | 'other_sponsor';
+    payer: 'self' | 'parents' | 'other_family' | 'employer' | 'scholarship' | 'other_sponsor';
     approxMonthlyIncomeRange:
       | 'less_500'
       | '500_1000'
@@ -85,16 +62,9 @@ export interface QuestionnaireV2 {
   invitation: {
     hasInvitation: boolean;
     // For student visas:
-    studentInvitationType?:
-      | 'university_acceptance'
-      | 'language_course'
-      | 'exchange_program';
+    studentInvitationType?: 'university_acceptance' | 'language_course' | 'exchange_program';
     // For tourist visas:
-    touristInvitationType?:
-      | 'no_invitation'
-      | 'hotel_booking'
-      | 'family_or_friends'
-      | 'tour_agency';
+    touristInvitationType?: 'no_invitation' | 'hotel_booking' | 'family_or_friends' | 'tour_agency';
   };
 
   // Q6: Accommodation & tickets
@@ -112,13 +82,7 @@ export interface QuestionnaireV2 {
   // Q7: Travel history
   history: {
     hasTraveledBefore: boolean;
-    regionsVisited: (
-      | 'schengen'
-      | 'usa_canada'
-      | 'uk'
-      | 'asia'
-      | 'middle_east'
-    )[];
+    regionsVisited: ('schengen' | 'usa_canada' | 'uk' | 'asia' | 'middle_east')[];
     hasVisaRefusals: boolean;
   };
 
@@ -159,5 +123,3 @@ export const COUNTRY_OPTIONS: Array<{ code: TargetCountry; name: string }> = [
   { code: 'JP', name: 'Japan' },
   { code: 'AE', name: 'United Arab Emirates' },
 ];
-
-

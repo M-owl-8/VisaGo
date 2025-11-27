@@ -7,6 +7,7 @@
 ## ✅ Step 1: OpenAI API Setup (30 minutes)
 
 ### Action Items:
+
 1. **Go to:** https://platform.openai.com
 2. **Create account** (if you don't have one)
 3. **Add payment method** (required for API access)
@@ -56,4 +57,3 @@
 ---
 
 **Ready? Start with OpenAI setup above! 🚀**
-

@@ -91,5 +91,3 @@ export default function ForgotPasswordPage() {
     </AuthLayout>
   );
 }
-
-

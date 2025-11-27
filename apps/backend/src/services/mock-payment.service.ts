@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
 interface MockPaymentConfig {
   defaultSuccessRate?: number; // 0-1, default 0.95
@@ -49,9 +49,7 @@ export class MockPaymentService {
    * Simulate payment creation
    * Returns mock payment URL and session ID
    */
-  async createPayment(
-    params: MockPaymentParams
-  ): Promise<{
+  async createPayment(params: MockPaymentParams): Promise<{
     paymentUrl: string;
     sessionId: string;
     transactionId: string;
@@ -77,7 +75,7 @@ export class MockPaymentService {
       ...params,
       transactionId,
       sessionId,
-      status: "pending",
+      status: 'pending',
       willSucceed,
       createdAt: new Date(),
     });
@@ -88,13 +86,13 @@ export class MockPaymentService {
         userId: params.userId,
         applicationId: params.applicationId,
         amount: params.amount,
-        currency: "USD",
-        status: "pending",
-        paymentMethod: "mock",
+        currency: 'USD',
+        status: 'pending',
+        paymentMethod: 'mock',
         transactionId,
         orderId: params.applicationId,
         paymentGatewayData: JSON.stringify({
-          provider: "mock",
+          provider: 'mock',
           sessionId,
           createdAt: new Date().toISOString(),
           description: params.description,
@@ -137,9 +135,9 @@ export class MockPaymentService {
     if (!transaction) {
       return {
         success: false,
-        status: "not_found",
+        status: 'not_found',
         transactionId,
-        message: "Transaction not found",
+        message: 'Transaction not found',
       };
     }
 
@@ -148,8 +146,8 @@ export class MockPaymentService {
       await this.sleep(this.config.delayMs);
     }
 
-    const finalStatus = transaction.willSucceed ? "completed" : "failed";
-    const paymentStatus = transaction.willSucceed ? "completed" : "failed";
+    const finalStatus = transaction.willSucceed ? 'completed' : 'failed';
+    const paymentStatus = transaction.willSucceed ? 'completed' : 'failed';
 
     // Update transaction
     transaction.status = finalStatus;
@@ -173,9 +171,9 @@ export class MockPaymentService {
     if (transaction.willSucceed) {
       this.queueWebhook({
         webhookId: `mock_webhook_${this.generateRandomString()}`,
-        eventType: "payment.success",
+        eventType: 'payment.success',
         transactionId,
-        status: "completed",
+        status: 'completed',
         timestamp: Date.now(),
         signature: this.generateMockSignature(),
         data: {
@@ -188,16 +186,16 @@ export class MockPaymentService {
     } else {
       this.queueWebhook({
         webhookId: `mock_webhook_${this.generateRandomString()}`,
-        eventType: "payment.failed",
+        eventType: 'payment.failed',
         transactionId,
-        status: "failed",
+        status: 'failed',
         timestamp: Date.now(),
         signature: this.generateMockSignature(),
         data: {
           amount: transaction.amount,
           userId: transaction.userId,
           applicationId: transaction.applicationId,
-          failureReason: "mock_simulated_failure",
+          failureReason: 'mock_simulated_failure',
         },
       });
     }
@@ -207,8 +205,8 @@ export class MockPaymentService {
       status: finalStatus,
       transactionId,
       message: transaction.willSucceed
-        ? "Payment confirmed successfully"
-        : "Payment confirmation failed",
+        ? 'Payment confirmed successfully'
+        : 'Payment confirmation failed',
     };
   }
 
@@ -273,7 +271,7 @@ export class MockPaymentService {
    */
   async simulateWebhookCallback(
     transactionId: string,
-    eventType: "payment.success" | "payment.failed" = "payment.success"
+    eventType: 'payment.success' | 'payment.failed' = 'payment.success'
   ): Promise<MockWebhookPayload> {
     const transaction = this.processedTransactions.get(transactionId);
 
@@ -285,7 +283,7 @@ export class MockPaymentService {
       webhookId: `mock_webhook_${this.generateRandomString()}`,
       eventType,
       transactionId,
-      status: eventType === "payment.success" ? "completed" : "failed",
+      status: eventType === 'payment.success' ? 'completed' : 'failed',
       timestamp: Date.now(),
       signature: this.generateMockSignature(),
       data: {
@@ -295,7 +293,7 @@ export class MockPaymentService {
         applicationId: transaction.applicationId,
         timestamp: new Date().toISOString(),
         providerData: {
-          provider: "mock",
+          provider: 'mock',
           sessionId: transaction.sessionId,
         },
       },
@@ -323,7 +321,7 @@ export class MockPaymentService {
       throw new Error(`Transaction ${transactionId} not found`);
     }
 
-    if (transaction.status !== "completed") {
+    if (transaction.status !== 'completed') {
       throw new Error(`Cannot refund a ${transaction.status} payment`);
     }
 
@@ -345,9 +343,9 @@ export class MockPaymentService {
     // Queue webhook
     this.queueWebhook({
       webhookId: `mock_webhook_${this.generateRandomString()}`,
-      eventType: "refund.completed",
+      eventType: 'refund.completed',
       transactionId,
-      status: "refunded",
+      status: 'refunded',
       timestamp: Date.now(),
       signature: this.generateMockSignature(),
       data: {
@@ -369,9 +367,7 @@ export class MockPaymentService {
   /**
    * Check payment status
    */
-  async checkPaymentStatus(
-    transactionId: string
-  ): Promise<{
+  async checkPaymentStatus(transactionId: string): Promise<{
     status: string;
     amount: number;
     paidAt?: Date;
@@ -406,8 +402,8 @@ export class MockPaymentService {
   }
 
   private generateRandomString(length: number = 12): string {
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
     for (let i = 0; i < length; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }

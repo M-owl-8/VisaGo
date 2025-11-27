@@ -19,4 +19,3 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 export function Badge({ className, variant = 'soft', ...props }: BadgeProps) {
   return <span className={cn(baseClasses, variantClasses[variant], className)} {...props} />;
 }
-

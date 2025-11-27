@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import { errors } from "../utils/errors";
+import { PrismaClient } from '@prisma/client';
+import { errors } from '../utils/errors';
 
 const prisma = new PrismaClient();
 
@@ -23,16 +23,16 @@ export class VisaTypesService {
       select: {
         name: true,
       },
-      distinct: ["name"],
+      distinct: ['name'],
       orderBy: {
-        name: "asc",
+        name: 'asc',
       },
     });
 
     // Filter case-insensitively if search term provided (SQLite compatibility)
     if (search) {
       const searchLower = search.toLowerCase();
-      visaTypes = visaTypes.filter(vt => vt.name.toLowerCase().includes(searchLower));
+      visaTypes = visaTypes.filter((vt) => vt.name.toLowerCase().includes(searchLower));
     }
 
     // Get count of countries for each visa type
@@ -84,13 +84,13 @@ export class VisaTypesService {
   static async getPopularVisaTypes() {
     // Get visa types ordered by how many countries offer them
     const visaTypeCounts = await prisma.visaType.groupBy({
-      by: ["name"],
+      by: ['name'],
       _count: {
         name: true,
       },
       orderBy: {
         _count: {
-          name: "desc",
+          name: 'desc',
         },
       },
       take: 10,
@@ -151,19 +151,17 @@ export class VisaTypesService {
       },
       orderBy: {
         country: {
-          name: "asc",
+          name: 'asc',
         },
       },
     });
 
     // Filter case-insensitively
     const visaTypeNameLower = visaTypeName.toLowerCase();
-    const visaTypes = allVisaTypes.filter(vt => 
-      vt.name.toLowerCase() === visaTypeNameLower
-    );
+    const visaTypes = allVisaTypes.filter((vt) => vt.name.toLowerCase() === visaTypeNameLower);
 
     if (visaTypes.length === 0) {
-      throw errors.notFound("Visa Type");
+      throw errors.notFound('Visa Type');
     }
 
     // Group by country and include visa type details
@@ -211,15 +209,12 @@ export class VisaTypesService {
 
     // Filter case-insensitively
     const visaTypeNameLower = visaTypeName.toLowerCase();
-    const visaType = allVisaTypes.find(vt => 
-      vt.name.toLowerCase() === visaTypeNameLower
-    );
+    const visaType = allVisaTypes.find((vt) => vt.name.toLowerCase() === visaTypeNameLower);
 
     if (!visaType) {
-      throw errors.notFound("Visa Type");
+      throw errors.notFound('Visa Type');
     }
 
     return visaType;
   }
 }
-

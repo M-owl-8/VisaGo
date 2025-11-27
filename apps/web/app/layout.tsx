@@ -30,11 +30,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${jakarta.variable} ${grotesk.variable}`}>
       <body className="bg-background font-sans text-primary-900 antialiased">
@@ -43,4 +39,3 @@ export default function RootLayout({
     </html>
   );
 }
-

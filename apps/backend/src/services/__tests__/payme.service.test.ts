@@ -74,7 +74,7 @@ describe('PaymeService', () => {
     it('should convert amount to tiyn correctly', () => {
       const amountInUSD = 50;
       const amountInTiyn = Math.round(amountInUSD * 100);
-      
+
       expect(amountInTiyn).toBe(5000);
     });
 
@@ -114,7 +114,7 @@ describe('PaymeService', () => {
 
     it('should generate unique merchant transaction IDs', () => {
       const ids = new Set();
-      
+
       for (let i = 0; i < 10; i++) {
         const merchantTransId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         ids.add(merchantTransId);
@@ -189,16 +189,16 @@ describe('PaymeService', () => {
   describe('payment amount validation', () => {
     it('should validate positive amounts', () => {
       const validAmounts = [0.01, 1, 100, 999999];
-      
-      validAmounts.forEach(amount => {
+
+      validAmounts.forEach((amount) => {
         expect(amount > 0).toBe(true);
       });
     });
 
     it('should reject zero or negative amounts', () => {
       const invalidAmounts = [0, -1, -100];
-      
-      invalidAmounts.forEach(amount => {
+
+      invalidAmounts.forEach((amount) => {
         expect(amount > 0).toBe(false);
       });
     });
@@ -206,7 +206,7 @@ describe('PaymeService', () => {
     it('should handle decimal amounts correctly', () => {
       const amount = 49.99;
       const amountInTiyn = Math.round(amount * 100);
-      
+
       expect(amountInTiyn).toBe(4999);
     });
   });

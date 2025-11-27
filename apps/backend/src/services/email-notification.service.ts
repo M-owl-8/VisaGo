@@ -414,14 +414,24 @@ export class EmailNotificationService {
   /**
    * Private helper: Map email log
    */
-  private mapEmailLog(log: { id: string; userId: string; recipientEmail: string; subject: string; type: string | null; status: string; error: string | null; sentAt: Date | null; createdAt: Date }): EmailLog {
+  private mapEmailLog(log: {
+    id: string;
+    userId: string;
+    recipientEmail: string;
+    subject: string;
+    type: string | null;
+    status: string;
+    error: string | null;
+    sentAt: Date | null;
+    createdAt: Date;
+  }): EmailLog {
     return {
       id: log.id,
       userId: log.userId,
       recipientEmail: log.recipientEmail,
       subject: log.subject,
       type: log.type || 'general',
-      status: (log.status as 'pending' | 'sent' | 'failed'),
+      status: log.status as 'pending' | 'sent' | 'failed',
       error: log.error || undefined,
       sentAt: log.sentAt || undefined,
       createdAt: log.createdAt,
@@ -434,7 +444,7 @@ export class EmailNotificationService {
   private groupByType(logs: { type: string | null }[]) {
     const grouped: Record<string, number> = {};
 
-    logs.forEach((log: typeof logs[0]) => {
+    logs.forEach((log: (typeof logs)[0]) => {
       const type = log.type || 'general';
       grouped[type] = (grouped[type] || 0) + 1;
     });

@@ -187,7 +187,7 @@ export class CacheInvalidationService {
 
       console.log(
         `✓ Cache invalidation: ${rule.tags.join(', ')} ` +
-        `(${invalidatedCount} keys) - Priority: ${rule.priority}`
+          `(${invalidatedCount} keys) - Priority: ${rule.priority}`
       );
     } catch (error) {
       console.error('Invalidation error:', error);
@@ -209,17 +209,17 @@ export class CacheInvalidationService {
         this.eventQueue = [];
 
         // Group by priority
-        const highPriority = events.filter(e => {
+        const highPriority = events.filter((e) => {
           const rule = this.rules.get(e.type)?.[0];
           return rule?.priority === 'high';
         });
 
-        const normalPriority = events.filter(e => {
+        const normalPriority = events.filter((e) => {
           const rule = this.rules.get(e.type)?.[0];
           return rule?.priority === 'normal';
         });
 
-        const lowPriority = events.filter(e => {
+        const lowPriority = events.filter((e) => {
           const rule = this.rules.get(e.type)?.[0];
           return rule?.priority === 'low';
         });
@@ -295,7 +295,9 @@ export class CacheInvalidationService {
 // Singleton instance
 let invalidationServiceInstance: CacheInvalidationService | null = null;
 
-export function getCacheInvalidationService(cache: OptimizedCacheService): CacheInvalidationService {
+export function getCacheInvalidationService(
+  cache: OptimizedCacheService
+): CacheInvalidationService {
   if (!invalidationServiceInstance) {
     invalidationServiceInstance = new CacheInvalidationService(cache);
   }

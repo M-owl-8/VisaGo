@@ -10,9 +10,11 @@
 ### 1. GitHub Actions Workflows
 
 #### **CI Pipeline** (`.github/workflows/ci.yml`)
+
 Runs on every PR and push to `main`/`develop`:
 
 **Backend Checks:**
+
 - ✅ ESLint linting
 - ✅ TypeScript type checking
 - ✅ Unit & integration tests
@@ -20,18 +22,21 @@ Runs on every PR and push to `main`/`develop`:
 - ✅ Dependency check
 
 **Frontend Checks:**
+
 - ✅ ESLint linting
 - ✅ TypeScript type checking
 - ✅ Unit tests
 - ✅ Build verification
 
 **AI Service Checks:**
+
 - ✅ Flake8 linting
 - ✅ Black formatting check
 - ✅ mypy type checking
 - ✅ pytest tests
 
 #### **Deployment Pipeline** (`.github/workflows/deploy.yml`)
+
 Runs on push to `main` or manual trigger:
 
 - ✅ Pre-deployment checks (tests, build)
@@ -40,6 +45,7 @@ Runs on push to `main` or manual trigger:
 - ✅ Deployment notifications
 
 #### **Security Scan** (`.github/workflows/security.yml`)
+
 Runs weekly + on PRs:
 
 - ✅ Backend dependency audit
@@ -51,11 +57,13 @@ Runs weekly + on PRs:
 ### 2. Pre-commit Hooks (Husky)
 
 **Setup Files:**
+
 - ✅ `.husky/pre-commit` - Runs linting, formatting, secret checks
 - ✅ `.husky/commit-msg` - Validates commit message format
 - ✅ `.lintstagedrc.json` - Configures lint-staged
 
 **What Pre-commit Hooks Do:**
+
 1. Run ESLint and Prettier on staged TypeScript files
 2. Run Black and Flake8 on staged Python files
 3. Check for hardcoded secrets (API keys, passwords, tokens)
@@ -82,18 +90,20 @@ Runs weekly + on PRs:
 ### Setting Up Locally
 
 1. **Install Husky** (first time setup):
+
    ```bash
    npm install
    npm run prepare
    ```
 
 2. **Verify pre-commit hooks**:
+
    ```bash
    # Make a test commit
    git add .
    git commit -m "test: verify pre-commit hooks"
    ```
-   
+
    You should see:
    - ✅ Linting and formatting running
    - ✅ Secret scanning running
@@ -102,6 +112,7 @@ Runs weekly + on PRs:
 ### Using CI/CD
 
 1. **Create a PR**:
+
    ```bash
    git checkout -b feat/my-feature
    # Make changes
@@ -182,6 +193,7 @@ To add Slack/Discord notifications:
 ### CodeQL Analysis
 
 CodeQL is enabled for advanced security scanning. To view results:
+
 1. Go to GitHub → Security → Code scanning
 2. Review any detected issues
 3. Fix issues and push
@@ -216,6 +228,7 @@ git commit --allow-empty -m "test(ci): verify commit format"
 ### 2. Verify CI Pipeline
 
 1. Create a test branch and push:
+
    ```bash
    git checkout -b test/ci-verification
    git push origin test/ci-verification
@@ -295,6 +308,7 @@ After CI/CD is verified:
 ## 🎉 Summary
 
 CI/CD pipeline is now fully configured and ready to use! All commits will now:
+
 - ✅ Be checked for secrets
 - ✅ Be linted and formatted
 - ✅ Be validated for commit message format
@@ -303,4 +317,3 @@ CI/CD pipeline is now fully configured and ready to use! All commits will now:
 - ✅ Be deployed automatically (when merged to main)
 
 **Status**: ✅ Complete and operational
-

@@ -128,13 +128,17 @@ export class EmailService {
     };
   }
 
-  static paymentConfirmationEmail(userName: string, email: string, data: {
-    amount: number;
-    currency: string;
-    transactionId: string;
-    country: string;
-    visaType: string;
-  }): EmailPayload {
+  static paymentConfirmationEmail(
+    userName: string,
+    email: string,
+    data: {
+      amount: number;
+      currency: string;
+      transactionId: string;
+      country: string;
+      visaType: string;
+    }
+  ): EmailPayload {
     return {
       to: email,
       subject: `✅ Payment Confirmed - ${data.country} ${data.visaType} Visa`,
@@ -169,11 +173,15 @@ export class EmailService {
     };
   }
 
-  static documentUploadedEmail(userName: string, email: string, data: {
-    documentType: string;
-    applicationId: string;
-    country: string;
-  }): EmailPayload {
+  static documentUploadedEmail(
+    userName: string,
+    email: string,
+    data: {
+      documentType: string;
+      applicationId: string;
+      country: string;
+    }
+  ): EmailPayload {
     return {
       to: email,
       subject: `📄 Document Uploaded - ${data.documentType}`,
@@ -194,12 +202,16 @@ export class EmailService {
     };
   }
 
-  static documentVerifiedEmail(userName: string, email: string, data: {
-    documentType: string;
-    applicationId: string;
-    country: string;
-    status: 'verified' | 'rejected';
-  }): EmailPayload {
+  static documentVerifiedEmail(
+    userName: string,
+    email: string,
+    data: {
+      documentType: string;
+      applicationId: string;
+      country: string;
+      status: 'verified' | 'rejected';
+    }
+  ): EmailPayload {
     const statusLabel = data.status === 'verified' ? '✅ Verified' : '❌ Rejected';
     const statusColor = data.status === 'verified' ? '#28a745' : '#dc3545';
 
@@ -214,7 +226,7 @@ export class EmailService {
           ${
             data.status === 'rejected'
               ? '<p>Please upload a new document or contact support for details.</p>'
-              : '<p>Thank you for providing this document. We\'ll continue processing your application.</p>'
+              : "<p>Thank you for providing this document. We'll continue processing your application.</p>"
           }
           <a href="${process.env.FRONTEND_URL || 'https://visabuddy.com'}/dashboard/application/${data.applicationId}" style="background: ${statusColor}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
             View Application
@@ -227,12 +239,16 @@ export class EmailService {
     };
   }
 
-  static visaStatusUpdateEmail(userName: string, email: string, data: {
-    country: string;
-    visaType: string;
-    status: 'approved' | 'rejected' | 'pending_review';
-    applicationId: string;
-  }): EmailPayload {
+  static visaStatusUpdateEmail(
+    userName: string,
+    email: string,
+    data: {
+      country: string;
+      visaType: string;
+      status: 'approved' | 'rejected' | 'pending_review';
+      applicationId: string;
+    }
+  ): EmailPayload {
     const statusLabels = {
       approved: { label: '✅ Approved', color: '#28a745' },
       rejected: { label: '❌ Rejected', color: '#dc3545' },
@@ -261,11 +277,15 @@ export class EmailService {
     };
   }
 
-  static missingDocumentsReminderEmail(userName: string, email: string, data: {
-    applicationId: string;
-    country: string;
-    missingDocuments: string[];
-  }): EmailPayload {
+  static missingDocumentsReminderEmail(
+    userName: string,
+    email: string,
+    data: {
+      applicationId: string;
+      country: string;
+      missingDocuments: string[];
+    }
+  ): EmailPayload {
     return {
       to: email,
       subject: `📋 Reminder: Missing Documents for Your ${data.country} Visa`,

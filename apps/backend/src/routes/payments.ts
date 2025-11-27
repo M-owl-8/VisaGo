@@ -1,7 +1,7 @@
-import express, { Router, Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
-import { PaymentGatewayService, PaymentMethod } from "../services/payment-gateway.service";
-import { authenticateToken } from "../middleware/auth";
+import express, { Router, Request, Response, NextFunction } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { PaymentGatewayService, PaymentMethod } from '../services/payment-gateway.service';
+import { authenticateToken } from '../middleware/auth';
 
 const router: Router = express.Router();
 const prisma = new PrismaClient();
@@ -12,29 +12,29 @@ const paymentGatewayService = new PaymentGatewayService(
     payme: process.env.PAYME_MERCHANT_ID
       ? {
           merchantId: process.env.PAYME_MERCHANT_ID,
-          apiKey: process.env.PAYME_API_KEY || "",
-          apiUrl: process.env.PAYME_API_URL || "https://checkout.test.payme.uz",
+          apiKey: process.env.PAYME_API_KEY || '',
+          apiUrl: process.env.PAYME_API_URL || 'https://checkout.test.payme.uz',
         }
       : undefined,
     click: process.env.CLICK_MERCHANT_ID
       ? {
           merchantId: process.env.CLICK_MERCHANT_ID,
-          serviceId: process.env.CLICK_SERVICE_ID || "",
-          apiKey: process.env.CLICK_API_KEY || "",
-          apiUrl: process.env.CLICK_API_URL || "https://api.click.uz/v2",
+          serviceId: process.env.CLICK_SERVICE_ID || '',
+          apiKey: process.env.CLICK_API_KEY || '',
+          apiUrl: process.env.CLICK_API_URL || 'https://api.click.uz/v2',
         }
       : undefined,
     uzum: process.env.UZUM_SERVICE_ID
       ? {
           serviceId: process.env.UZUM_SERVICE_ID,
-          apiKey: process.env.UZUM_API_KEY || "",
-          apiUrl: process.env.UZUM_API_URL || "https://api.uzum.uz/api/merchant",
+          apiKey: process.env.UZUM_API_KEY || '',
+          apiUrl: process.env.UZUM_API_URL || 'https://api.uzum.uz/api/merchant',
         }
       : undefined,
     stripe: process.env.STRIPE_API_KEY
       ? {
           apiKey: process.env.STRIPE_API_KEY,
-          webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+          webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
         }
       : undefined,
   },
@@ -45,7 +45,7 @@ const paymentGatewayService = new PaymentGatewayService(
  * GET /api/payments/methods
  * Get available payment methods
  */
-router.get("/methods", (req: Request, res: Response) => {
+router.get('/methods', (req: Request, res: Response) => {
   try {
     const methods = paymentGatewayService.getAvailableMethods();
     const methodDetails = methods.map((method) => ({
@@ -60,7 +60,7 @@ router.get("/methods", (req: Request, res: Response) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      error: { message: "Failed to fetch payment methods" },
+      error: { message: 'Failed to fetch payment methods' },
     });
   }
 });
@@ -71,18 +71,18 @@ router.get("/methods", (req: Request, res: Response) => {
  * Body: { applicationId, returnUrl, paymentMethod? }
  */
 router.post(
-  "/initiate",
+  '/initiate',
   authenticateToken,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { applicationId, returnUrl, paymentMethod = "payme" } = req.body;
+      const { applicationId, returnUrl, paymentMethod = 'payme' } = req.body;
       const userId = (req as any).userId;
 
       // Validate input
       if (!applicationId || !returnUrl) {
         return res.status(400).json({
           success: false,
-          error: { message: "applicationId and returnUrl are required" },
+          error: { message: 'applicationId and returnUrl are required' },
         });
       }
 
@@ -98,7 +98,7 @@ router.post(
       if (!application) {
         return res.status(404).json({
           success: false,
-          error: { message: "Application not found" },
+          error: { message: 'Application not found' },
         });
       }
 
@@ -106,7 +106,7 @@ router.post(
       if (application.userId !== userId) {
         return res.status(403).json({
           success: false,
-          error: { message: "Unauthorized" },
+          error: { message: 'Unauthorized' },
         });
       }
 
@@ -115,10 +115,10 @@ router.post(
         where: { applicationId },
       });
 
-      if (existingPayment && existingPayment.status === "completed") {
+      if (existingPayment && existingPayment.status === 'completed') {
         return res.status(400).json({
           success: false,
-          error: { message: "Payment already completed for this application" },
+          error: { message: 'Payment already completed for this application' },
         });
       }
 
@@ -162,7 +162,7 @@ router.post(
  * POST /api/payments/webhook/payme
  * Payme webhook for payment notifications
  */
-router.post("/webhook/payme", async (req: Request, res: Response, next: NextFunction) => {
+router.post('/webhook/payme', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { params, sign, event } = req.body;
 
@@ -170,13 +170,13 @@ router.post("/webhook/payme", async (req: Request, res: Response, next: NextFunc
     if (!params || !sign) {
       return res.status(400).json({
         success: false,
-        error: "Invalid webhook structure",
+        error: 'Invalid webhook structure',
       });
     }
 
     // Process webhook
     const result = await paymentGatewayService.processWebhook(
-      "payme",
+      'payme',
       {
         params,
         event,
@@ -185,7 +185,7 @@ router.post("/webhook/payme", async (req: Request, res: Response, next: NextFunc
     );
 
     if (!result.success) {
-      console.warn("Webhook processing failed:", result.error);
+      console.warn('Webhook processing failed:', result.error);
       return res.status(400).json({
         error: result.error,
       });
@@ -195,9 +195,9 @@ router.post("/webhook/payme", async (req: Request, res: Response, next: NextFunc
       success: true,
     });
   } catch (error) {
-    console.error("Payme webhook error:", error);
+    console.error('Payme webhook error:', error);
     return res.status(500).json({
-      error: "Internal server error",
+      error: 'Internal server error',
     });
   }
 });
@@ -206,12 +206,12 @@ router.post("/webhook/payme", async (req: Request, res: Response, next: NextFunc
  * POST /api/payments/webhook/click
  * Click webhook for payment notifications
  */
-router.post("/webhook/click", async (req: Request, res: Response, next: NextFunction) => {
+router.post('/webhook/click', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await paymentGatewayService.processWebhook("click", req.body);
+    const result = await paymentGatewayService.processWebhook('click', req.body);
 
     if (!result.success) {
-      console.warn("Click webhook processing failed:", result.error);
+      console.warn('Click webhook processing failed:', result.error);
       return res.status(400).json({
         error: result.error,
       });
@@ -221,9 +221,9 @@ router.post("/webhook/click", async (req: Request, res: Response, next: NextFunc
       success: true,
     });
   } catch (error) {
-    console.error("Click webhook error:", error);
+    console.error('Click webhook error:', error);
     return res.status(500).json({
-      error: "Internal server error",
+      error: 'Internal server error',
     });
   }
 });
@@ -232,12 +232,12 @@ router.post("/webhook/click", async (req: Request, res: Response, next: NextFunc
  * POST /api/payments/webhook/uzum
  * Uzum webhook for payment notifications
  */
-router.post("/webhook/uzum", async (req: Request, res: Response, next: NextFunction) => {
+router.post('/webhook/uzum', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await paymentGatewayService.processWebhook("uzum", req.body);
+    const result = await paymentGatewayService.processWebhook('uzum', req.body);
 
     if (!result.success) {
-      console.warn("Uzum webhook processing failed:", result.error);
+      console.warn('Uzum webhook processing failed:', result.error);
       return res.status(400).json({
         error: result.error,
       });
@@ -247,9 +247,9 @@ router.post("/webhook/uzum", async (req: Request, res: Response, next: NextFunct
       success: true,
     });
   } catch (error) {
-    console.error("Uzum webhook error:", error);
+    console.error('Uzum webhook error:', error);
     return res.status(500).json({
-      error: "Internal server error",
+      error: 'Internal server error',
     });
   }
 });
@@ -259,28 +259,24 @@ router.post("/webhook/uzum", async (req: Request, res: Response, next: NextFunct
  * Stripe webhook for payment notifications
  */
 router.post(
-  "/webhook/stripe",
-  express.raw({ type: "application/json" }),
+  '/webhook/stripe',
+  express.raw({ type: 'application/json' }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const signature = req.headers["stripe-signature"] as string;
+      const signature = req.headers['stripe-signature'] as string;
 
       if (!signature) {
         return res.status(400).json({
           success: false,
-          error: "Missing Stripe signature",
+          error: 'Missing Stripe signature',
         });
       }
 
       // Process webhook with raw body
-      const result = await paymentGatewayService.processWebhook(
-        "stripe",
-        req.body,
-        signature
-      );
+      const result = await paymentGatewayService.processWebhook('stripe', req.body, signature);
 
       if (!result.success) {
-        console.warn("Stripe webhook processing failed:", result.error);
+        console.warn('Stripe webhook processing failed:', result.error);
         return res.status(400).json({
           error: result.error,
         });
@@ -290,9 +286,9 @@ router.post(
         success: true,
       });
     } catch (error) {
-      console.error("Stripe webhook error:", error);
+      console.error('Stripe webhook error:', error);
       return res.status(500).json({
-        error: "Internal server error",
+        error: 'Internal server error',
       });
     }
   }
@@ -303,7 +299,7 @@ router.post(
  * Get payment details
  */
 router.get(
-  "/:transactionId",
+  '/:transactionId',
   authenticateToken,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -315,14 +311,14 @@ router.get(
       if (!payment) {
         return res.status(404).json({
           success: false,
-          error: { message: "Payment not found" },
+          error: { message: 'Payment not found' },
         });
       }
 
       if (payment.userId !== userId) {
         return res.status(403).json({
           success: false,
-          error: { message: "Unauthorized" },
+          error: { message: 'Unauthorized' },
         });
       }
 
@@ -340,7 +336,7 @@ router.get(
  * GET /api/payments
  * Get user payments
  */
-router.get("/", authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).userId;
 
@@ -360,7 +356,7 @@ router.get("/", authenticateToken, async (req: Request, res: Response, next: Nex
  * Verify payment completion (polling)
  */
 router.post(
-  "/:transactionId/verify",
+  '/:transactionId/verify',
   authenticateToken,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -372,14 +368,14 @@ router.post(
       if (!payment) {
         return res.status(404).json({
           success: false,
-          error: { message: "Payment not found" },
+          error: { message: 'Payment not found' },
         });
       }
 
       if (payment.userId !== userId) {
         return res.status(403).json({
           success: false,
-          error: { message: "Unauthorized" },
+          error: { message: 'Unauthorized' },
         });
       }
 
@@ -392,7 +388,7 @@ router.post(
         success: true,
         data: {
           verified: isVerified,
-          status: isVerified ? "completed" : "pending",
+          status: isVerified ? 'completed' : 'pending',
         },
       });
     } catch (error) {
@@ -406,7 +402,7 @@ router.post(
  * Cancel pending payment
  */
 router.delete(
-  "/:transactionId/cancel",
+  '/:transactionId/cancel',
   authenticateToken,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -418,14 +414,14 @@ router.delete(
       if (!payment) {
         return res.status(404).json({
           success: false,
-          error: { message: "Payment not found" },
+          error: { message: 'Payment not found' },
         });
       }
 
       if (payment.userId !== userId) {
         return res.status(403).json({
           success: false,
-          error: { message: "Unauthorized" },
+          error: { message: 'Unauthorized' },
         });
       }
 
@@ -434,13 +430,13 @@ router.delete(
       if (!cancelled) {
         return res.status(400).json({
           success: false,
-          error: { message: "Cannot cancel non-pending payment" },
+          error: { message: 'Cannot cancel non-pending payment' },
         });
       }
 
       return res.json({
         success: true,
-        data: { message: "Payment cancelled" },
+        data: { message: 'Payment cancelled' },
       });
     } catch (error) {
       next(error);

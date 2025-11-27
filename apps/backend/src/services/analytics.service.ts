@@ -1,11 +1,18 @@
-import { PrismaClient } from "@prisma/client";
-import { CacheService } from "./cache.service";
+import { PrismaClient } from '@prisma/client';
+import { CacheService } from './cache.service';
 
 const prisma = new PrismaClient();
 
 export interface AnalyticsEventPayload {
   userId?: string;
-  eventType: "signup" | "visa_selected" | "payment_completed" | "document_uploaded" | "chat_message" | "login" | "app_opened";
+  eventType:
+    | 'signup'
+    | 'visa_selected'
+    | 'payment_completed'
+    | 'document_uploaded'
+    | 'chat_message'
+    | 'login'
+    | 'app_opened';
   source?: string;
   metadata?: Record<string, any>;
   ipAddress?: string;
@@ -54,10 +61,10 @@ class AnalyticsService {
       });
 
       // Invalidate daily metrics cache for today
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toISOString().split('T')[0];
       CacheService.del(`daily_metrics:${today}`);
     } catch (error) {
-      console.error("Error tracking event:", error);
+      console.error('Error tracking event:', error);
       // Don't throw - analytics errors shouldn't break the app
     }
   }
@@ -97,7 +104,7 @@ class AnalyticsService {
             gte: startDate,
             lte: endDate,
           },
-          status: "completed",
+          status: 'completed',
         },
         include: {
           application: {
@@ -110,14 +117,16 @@ class AnalyticsService {
       });
 
       // Calculate metrics
-      const signups = events.filter((e: any): any => e.eventType === "signup").length;
-      const visaSelections = events.filter((e: any): any => e.eventType === "visa_selected").length;
-      const paymentEvents = events.filter((e: any): any => e.eventType === "payment_completed").length;
-      const documents = events.filter((e: any): any => e.eventType === "document_uploaded").length;
-      const messages = events.filter((e: any): any => e.eventType === "chat_message").length;
+      const signups = events.filter((e: any): any => e.eventType === 'signup').length;
+      const visaSelections = events.filter((e: any): any => e.eventType === 'visa_selected').length;
+      const paymentEvents = events.filter(
+        (e: any): any => e.eventType === 'payment_completed'
+      ).length;
+      const documents = events.filter((e: any): any => e.eventType === 'document_uploaded').length;
+      const messages = events.filter((e: any): any => e.eventType === 'chat_message').length;
       const activeUsers = new Set(events.map((e: any): any => e.userId)).size;
       const uniqueSignupUsers = new Set(
-        events.filter((e: any): any => e.eventType === "signup").map((e: any): any => e.userId)
+        events.filter((e: any): any => e.eventType === 'signup').map((e: any): any => e.userId)
       ).size;
 
       const totalRevenue = payments.reduce((sum: any, p: any): any => sum + p.amount, 0);
@@ -130,7 +139,7 @@ class AnalyticsService {
       const dailyTrends = await this.getDailyTrends(startDate, endDate);
 
       const metrics: AnalyticsMetrics = {
-        period: `${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]}`,
+        period: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
         totalSignups: signups,
         totalVisaSelections: visaSelections,
         totalPayments: paymentEvents,
@@ -150,7 +159,7 @@ class AnalyticsService {
       CacheService.set(cacheKey, metrics, 3600);
       return metrics;
     } catch (error) {
-      console.error("Error getting metrics:", error);
+      console.error('Error getting metrics:', error);
       throw error;
     }
   }
@@ -178,7 +187,10 @@ class AnalyticsService {
 
     return Object.entries(countryMap)
       .map(([name, count]: [string, number]) => ({ name, count }))
-      .sort((a: { name: string; count: number }, b: { name: string; count: number }) => b.count - a.count)
+      .sort(
+        (a: { name: string; count: number }, b: { name: string; count: number }) =>
+          b.count - a.count
+      )
       .slice(0, 10);
   }
 
@@ -219,7 +231,7 @@ class AnalyticsService {
           gte: startDate,
           lte: endDate,
         },
-        status: "completed",
+        status: 'completed',
       },
     });
 
@@ -259,17 +271,17 @@ class AnalyticsService {
             gte: dayStart,
             lte: dayEnd,
           },
-          status: "completed",
+          status: 'completed',
         },
       });
 
-      const signups = dayEvents.filter((e: any): boolean => e.eventType === "signup").length;
+      const signups = dayEvents.filter((e: any): boolean => e.eventType === 'signup').length;
       const payments = dayPayments.length;
       const revenue = dayPayments.reduce((sum: number, p: any): number => sum + p.amount, 0);
       const activeUsers = new Set(dayEvents.map((e: any): string => e.userId)).size;
 
       trends.push({
-        date: dayStart.toISOString().split("T")[0],
+        date: dayStart.toISOString().split('T')[0],
         signups,
         payments,
         revenue: parseFloat(revenue.toFixed(2)),
@@ -294,7 +306,7 @@ class AnalyticsService {
     conversionRates: Record<string, number>;
   }> {
     try {
-      const cacheKey = "conversion_funnel";
+      const cacheKey = 'conversion_funnel';
       const cached = CacheService.get<{
         signups: number;
         visaSelections: number;
@@ -313,14 +325,14 @@ class AnalyticsService {
 
       const signups = await prisma.analyticsEvent.count({
         where: {
-          eventType: "signup",
+          eventType: 'signup',
           createdAt: { gte: startDate },
         },
       });
 
       const visaSelections = await prisma.analyticsEvent.count({
         where: {
-          eventType: "visa_selected",
+          eventType: 'visa_selected',
           createdAt: { gte: startDate },
         },
       });
@@ -331,12 +343,14 @@ class AnalyticsService {
         },
       });
 
-      const paymentsStarted = payments.filter((p: any): boolean => p.status !== "pending").length;
-      const paymentsCompleted = payments.filter((p: any): boolean => p.status === "completed").length;
+      const paymentsStarted = payments.filter((p: any): boolean => p.status !== 'pending').length;
+      const paymentsCompleted = payments.filter(
+        (p: any): boolean => p.status === 'completed'
+      ).length;
 
       const documents = await prisma.analyticsEvent.count({
         where: {
-          eventType: "document_uploaded",
+          eventType: 'document_uploaded',
           createdAt: { gte: startDate },
         },
       });
@@ -349,9 +363,14 @@ class AnalyticsService {
         documentsUploaded: documents,
         conversionRates: {
           signupToVisa: signups > 0 ? parseFloat(((visaSelections / signups) * 100).toFixed(2)) : 0,
-          visaToPayment: visaSelections > 0 ? parseFloat(((paymentsStarted / visaSelections) * 100).toFixed(2)) : 0,
+          visaToPayment:
+            visaSelections > 0
+              ? parseFloat(((paymentsStarted / visaSelections) * 100).toFixed(2))
+              : 0,
           paymentToCompleted:
-            paymentsStarted > 0 ? parseFloat(((paymentsCompleted / paymentsStarted) * 100).toFixed(2)) : 0,
+            paymentsStarted > 0
+              ? parseFloat(((paymentsCompleted / paymentsStarted) * 100).toFixed(2))
+              : 0,
         },
       };
 
@@ -359,7 +378,7 @@ class AnalyticsService {
       CacheService.set(cacheKey, funnel, 7200);
       return funnel;
     } catch (error) {
-      console.error("Error getting conversion funnel:", error);
+      console.error('Error getting conversion funnel:', error);
       throw error;
     }
   }
@@ -369,16 +388,16 @@ class AnalyticsService {
    */
   async getUserAcquisition(): Promise<Record<string, number>> {
     try {
-      const cacheKey = "user_acquisition";
+      const cacheKey = 'user_acquisition';
       const cached = CacheService.get<Record<string, number>>(cacheKey);
       if (cached) {
         return cached;
       }
 
       const sources = await prisma.analyticsEvent.groupBy({
-        by: ["source"],
+        by: ['source'],
         where: {
-          eventType: "signup",
+          eventType: 'signup',
         },
         _count: {
           userId: true,
@@ -396,7 +415,7 @@ class AnalyticsService {
       CacheService.set(cacheKey, breakdown, 21600);
       return breakdown;
     } catch (error) {
-      console.error("Error getting user acquisition:", error);
+      console.error('Error getting user acquisition:', error);
       throw error;
     }
   }
@@ -413,14 +432,14 @@ class AnalyticsService {
 
       const signups = await prisma.analyticsEvent.count({
         where: {
-          eventType: "signup",
+          eventType: 'signup',
           createdAt: { gte: dayStart, lte: dayEnd },
         },
       });
 
       const visaSelections = await prisma.analyticsEvent.count({
         where: {
-          eventType: "visa_selected",
+          eventType: 'visa_selected',
           createdAt: { gte: dayStart, lte: dayEnd },
         },
       });
@@ -428,26 +447,26 @@ class AnalyticsService {
       const payments = await prisma.payment.findMany({
         where: {
           createdAt: { gte: dayStart, lte: dayEnd },
-          status: "completed",
+          status: 'completed',
         },
       });
 
       const documents = await prisma.analyticsEvent.count({
         where: {
-          eventType: "document_uploaded",
+          eventType: 'document_uploaded',
           createdAt: { gte: dayStart, lte: dayEnd },
         },
       });
 
       const messages = await prisma.analyticsEvent.count({
         where: {
-          eventType: "chat_message",
+          eventType: 'chat_message',
           createdAt: { gte: dayStart, lte: dayEnd },
         },
       });
 
       const activeUsers = await prisma.analyticsEvent.findMany({
-        distinct: ["userId"],
+        distinct: ['userId'],
         where: {
           createdAt: { gte: dayStart, lte: dayEnd },
         },
@@ -455,7 +474,7 @@ class AnalyticsService {
 
       const newUsers = await prisma.analyticsEvent.count({
         where: {
-          eventType: "signup",
+          eventType: 'signup',
           createdAt: { gte: dayStart, lte: dayEnd },
         },
       });
@@ -491,7 +510,7 @@ class AnalyticsService {
         },
       });
     } catch (error) {
-      console.error("Error calculating daily metrics:", error);
+      console.error('Error calculating daily metrics:', error);
       throw error;
     }
   }
@@ -505,7 +524,7 @@ class AnalyticsService {
       startDate.setDate(startDate.getDate() - days);
 
       const events = await prisma.analyticsEvent.groupBy({
-        by: ["eventType"],
+        by: ['eventType'],
         where: {
           createdAt: { gte: startDate },
         },
@@ -521,7 +540,7 @@ class AnalyticsService {
 
       return breakdown;
     } catch (error) {
-      console.error("Error getting event breakdown:", error);
+      console.error('Error getting event breakdown:', error);
       throw error;
     }
   }

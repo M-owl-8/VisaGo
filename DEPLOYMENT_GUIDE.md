@@ -10,6 +10,7 @@
 ### 1. Docker Compose (Recommended for Development/Staging)
 
 #### Prerequisites
+
 - Docker >= 20.10
 - Docker Compose >= 2.0
 
@@ -36,6 +37,7 @@ docker-compose logs -f backend
 ```
 
 #### Access Services
+
 - Backend API: http://localhost:3000
 - AI Service: http://localhost:8001
 - PostgreSQL: localhost:5432
@@ -48,12 +50,14 @@ docker-compose logs -f backend
 #### Steps
 
 1. **Install Railway CLI**
+
    ```bash
    npm i -g @railway/cli
    railway login
    ```
 
 2. **Create Project**
+
    ```bash
    railway init
    ```
@@ -65,6 +69,7 @@ docker-compose logs -f backend
    - Deploy AI service
 
 4. **Set Environment Variables**
+
    ```bash
    railway variables set JWT_SECRET=your-secret
    railway variables set DATABASE_URL=${{Postgres.DATABASE_URL}}
@@ -110,12 +115,14 @@ netlify deploy --prod
 #### AWS (ECS/EKS)
 
 1. **Build Docker Images**
+
    ```bash
    docker build -t visabuddy-backend ./apps/backend
    docker build -t visabuddy-ai ./apps/ai-service
    ```
 
 2. **Push to ECR**
+
    ```bash
    aws ecr create-repository --repository-name visabuddy-backend
    docker tag visabuddy-backend:latest <account>.dkr.ecr.<region>.amazonaws.com/visabuddy-backend:latest
@@ -137,18 +144,21 @@ netlify deploy --prod
 ## 📋 Pre-Deployment Checklist
 
 ### Environment Variables
+
 - [ ] All required environment variables set
 - [ ] No secrets in code
 - [ ] Production values configured
 - [ ] CORS origins set correctly
 
 ### Database
+
 - [ ] Database created and accessible
 - [ ] Migrations run successfully
 - [ ] Database backups configured
 - [ ] Connection pooling configured
 
 ### Security
+
 - [ ] JWT_SECRET is strong (32+ characters)
 - [ ] CORS configured for production
 - [ ] Rate limiting enabled
@@ -156,18 +166,21 @@ netlify deploy --prod
 - [ ] Security headers configured
 
 ### Services
+
 - [ ] External services configured (Firebase, OpenAI, etc.)
 - [ ] API keys valid and have proper permissions
 - [ ] Webhook URLs configured
 - [ ] Email service configured
 
 ### Monitoring
+
 - [ ] Health check endpoints working
 - [ ] Logging configured
 - [ ] Error tracking set up (Sentry, etc.)
 - [ ] Performance monitoring enabled
 
 ### Testing
+
 - [ ] All tests passing
 - [ ] Load testing completed
 - [ ] Security testing completed
@@ -266,21 +279,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests
         run: npm test
-      
+
       - name: Build
         run: npm run build
-      
+
       - name: Deploy to Railway
         run: railway up
         env:
@@ -335,12 +348,3 @@ jobs:
 ---
 
 **Last Updated**: January 2025
-
-
-
-
-
-
-
-
-

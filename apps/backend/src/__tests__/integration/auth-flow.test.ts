@@ -23,14 +23,12 @@ describe('Authentication Flow Integration', () => {
 
   describe('POST /api/auth/register', () => {
     it('should register a new user successfully', async () => {
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'newuser@example.com',
-          password: 'SecureP@ssw0rd123',
-          firstName: 'New',
-          lastName: 'User',
-        });
+      const response = await request(app).post('/api/auth/register').send({
+        email: 'newuser@example.com',
+        password: 'SecureP@ssw0rd123',
+        firstName: 'New',
+        lastName: 'User',
+      });
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
@@ -40,20 +38,16 @@ describe('Authentication Flow Integration', () => {
 
     it('should return user-friendly error for duplicate email', async () => {
       // First registration
-      await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'duplicate@example.com',
-          password: 'SecureP@ssw0rd123',
-        });
+      await request(app).post('/api/auth/register').send({
+        email: 'duplicate@example.com',
+        password: 'SecureP@ssw0rd123',
+      });
 
       // Second registration with same email
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'duplicate@example.com',
-          password: 'SecureP@ssw0rd123',
-        });
+      const response = await request(app).post('/api/auth/register').send({
+        email: 'duplicate@example.com',
+        password: 'SecureP@ssw0rd123',
+      });
 
       expect(response.status).toBe(409);
       expect(response.body.success).toBe(false);
@@ -62,12 +56,10 @@ describe('Authentication Flow Integration', () => {
     });
 
     it('should return user-friendly error for weak password', async () => {
-      const response = await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'weakpass@example.com',
-          password: 'weak',
-        });
+      const response = await request(app).post('/api/auth/register').send({
+        email: 'weakpass@example.com',
+        password: 'weak',
+      });
 
       expect(response.status).toBe(422);
       expect(response.body.success).toBe(false);
@@ -79,20 +71,16 @@ describe('Authentication Flow Integration', () => {
   describe('POST /api/auth/login', () => {
     it('should login with valid credentials', async () => {
       // First register
-      await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'login@example.com',
-          password: 'SecureP@ssw0rd123',
-        });
+      await request(app).post('/api/auth/register').send({
+        email: 'login@example.com',
+        password: 'SecureP@ssw0rd123',
+      });
 
       // Then login
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({
-          email: 'login@example.com',
-          password: 'SecureP@ssw0rd123',
-        });
+      const response = await request(app).post('/api/auth/login').send({
+        email: 'login@example.com',
+        password: 'SecureP@ssw0rd123',
+      });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -100,12 +88,10 @@ describe('Authentication Flow Integration', () => {
     });
 
     it('should return user-friendly error for invalid credentials', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({
-          email: 'nonexistent@example.com',
-          password: 'WrongPassword123',
-        });
+      const response = await request(app).post('/api/auth/login').send({
+        email: 'nonexistent@example.com',
+        password: 'WrongPassword123',
+      });
 
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
@@ -115,8 +101,7 @@ describe('Authentication Flow Integration', () => {
 
   describe('GET /api/auth/status', () => {
     it('should return authentication service status', async () => {
-      const response = await request(app)
-        .get('/api/auth/status');
+      const response = await request(app).get('/api/auth/status');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -129,12 +114,10 @@ describe('Authentication Flow Integration', () => {
   describe('POST /api/auth/refresh', () => {
     it('should refresh token with valid token', async () => {
       // Register and get token
-      const registerResponse = await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'refresh@example.com',
-          password: 'SecureP@ssw0rd123',
-        });
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        email: 'refresh@example.com',
+        password: 'SecureP@ssw0rd123',
+      });
 
       const token = registerResponse.body.data.token;
 
@@ -160,11 +143,3 @@ describe('Authentication Flow Integration', () => {
     });
   });
 });
-
-
-
-
-
-
-
-

@@ -78,7 +78,7 @@ export function createMockPrismaClient(): Partial<PrismaClient> {
  * Wait for a specified time (useful for testing timeouts)
  */
 export function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -123,7 +123,7 @@ export function createTestPayment(overrides: any = {}) {
     id: 'test-payment-id',
     userId: 'test-user-id',
     applicationId: 'test-application-id',
-    amount: 100.00,
+    amount: 100.0,
     currency: 'USD',
     status: 'pending',
     paymentMethod: 'stripe',
@@ -171,11 +171,3 @@ export function expectSuccessResponse(res: any, status: number = 200) {
   expect(response.success).toBe(true);
   expect(response.data).toBeDefined();
 }
-
-
-
-
-
-
-
-

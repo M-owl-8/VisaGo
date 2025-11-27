@@ -81,7 +81,9 @@ export class ChatEnhancedService {
         top_p: 0.9,
       });
 
-      const assistantMessage = response.choices[0]?.message?.content || 'I apologize, but I could not generate a response.';
+      const assistantMessage =
+        response.choices[0]?.message?.content ||
+        'I apologize, but I could not generate a response.';
       const tokensUsed = response.usage?.total_tokens || 0;
 
       // Save user message to database
@@ -285,7 +287,11 @@ export class ChatEnhancedService {
   /**
    * Rename conversation
    */
-  async renameConversation(sessionId: string, userId: string, newTitle: string): Promise<ChatConversation> {
+  async renameConversation(
+    sessionId: string,
+    userId: string,
+    newTitle: string
+  ): Promise<ChatConversation> {
     try {
       const session = await this.prisma.chatSession.findFirst({
         where: { id: sessionId, userId },
@@ -354,7 +360,10 @@ export class ChatEnhancedService {
         where: { userId },
       });
 
-      const totalTokens = messages.reduce((sum: number, msg: any): number => sum + (msg.tokensUsed || 0), 0);
+      const totalTokens = messages.reduce(
+        (sum: number, msg: any): number => sum + (msg.tokensUsed || 0),
+        0
+      );
 
       return {
         totalConversations: sessions.length,
@@ -411,5 +420,4 @@ export class ChatEnhancedService {
 
     return messages;
   }
-
 }

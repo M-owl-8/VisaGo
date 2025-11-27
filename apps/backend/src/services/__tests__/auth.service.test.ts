@@ -1,5 +1,10 @@
 import { AuthService } from '../auth.service';
-import { mockUser, mockAdmin, createMockPrisma, generateTestToken } from '../../__tests__/test-utils';
+import {
+  mockUser,
+  mockAdmin,
+  createMockPrisma,
+  generateTestToken,
+} from '../../__tests__/test-utils';
 import { errors } from '../../utils/errors';
 import bcrypt from 'bcryptjs';
 
@@ -43,7 +48,7 @@ describe('AuthService', () => {
         lastName: payload.lastName,
       });
 
-      // Since AuthService uses PrismaClient directly in the module, 
+      // Since AuthService uses PrismaClient directly in the module,
       // we need to test the business logic instead
       const hashedPassword = await bcrypt.hash(payload.password, 10);
       expect(hashedPassword).toBe('hashed-password');
@@ -145,7 +150,7 @@ describe('AuthService', () => {
 
     it('should create token with correct payload', () => {
       const token = generateTestToken(mockUser.id, mockUser.email);
-      
+
       // Token should have 3 parts separated by dots
       const parts = token.split('.');
       expect(parts).toHaveLength(3);
@@ -161,7 +166,7 @@ describe('AuthService', () => {
     it('should create different tokens for different users', () => {
       const token1 = generateTestToken('user-1', 'user1@example.com');
       const token2 = generateTestToken('user-2', 'user2@example.com');
-      
+
       expect(token1).not.toBe(token2);
     });
 
@@ -174,27 +179,18 @@ describe('AuthService', () => {
 
   describe('Email validation', () => {
     it('should accept valid email formats', () => {
-      const validEmails = [
-        'user@example.com',
-        'test.user@example.co.uk',
-        'user+tag@example.com',
-      ];
+      const validEmails = ['user@example.com', 'test.user@example.co.uk', 'user+tag@example.com'];
 
-      validEmails.forEach(email => {
+      validEmails.forEach((email) => {
         const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
         expect(isValid).toBe(true);
       });
     });
 
     it('should reject invalid email formats', () => {
-      const invalidEmails = [
-        'invalid.email',
-        '@example.com',
-        'user@',
-        'user @example.com',
-      ];
+      const invalidEmails = ['invalid.email', '@example.com', 'user@', 'user @example.com'];
 
-      invalidEmails.forEach(email => {
+      invalidEmails.forEach((email) => {
         const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
         expect(isValid).toBe(false);
       });

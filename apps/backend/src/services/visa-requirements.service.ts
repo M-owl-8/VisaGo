@@ -30,15 +30,15 @@ export async function checkVisaRequirement(
 
   // Search in all regions
   const regions = visaRequirementsData.regions;
-  
+
   for (const [regionKey, regionData] of Object.entries(regions)) {
     const region = regionData as any;
     const country = region.countries.find(
-      (c: any) => 
+      (c: any) =>
         c.name.toLowerCase() === countryName.toLowerCase() ||
         c.code.toLowerCase() === countryName.toLowerCase()
     );
-    
+
     if (country) {
       return {
         visaRequired: country.visaRequired,
@@ -74,7 +74,7 @@ export function getAllVisaRequiredCountries(nationalityCode: string = 'UZ'): str
   if (nationalityCode !== 'UZ') {
     return [];
   }
-  
+
   return visaRequirementsData.allVisaRequiredCountries;
 }
 
@@ -85,7 +85,7 @@ export function getVisaRequirementsByRegion(nationalityCode: string = 'UZ') {
   if (nationalityCode !== 'UZ') {
     return null;
   }
-  
+
   return visaRequirementsData.regions;
 }
 
@@ -135,4 +135,3 @@ export async function updateCountryRequirements() {
 
   console.log(`Updated ${allCountries.length} countries with visa requirements`);
 }
-

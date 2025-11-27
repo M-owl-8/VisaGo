@@ -72,8 +72,7 @@ describe('Complete User Flow E2E', () => {
       expect(chatRes.body.success).toBe(true);
 
       // Step 5: Check Auth Status
-      const statusRes = await request(app)
-        .get('/api/auth/status');
+      const statusRes = await request(app).get('/api/auth/status');
 
       expect(statusRes.status).toBe(200);
       expect(statusRes.body.data).toBeDefined();
@@ -92,22 +91,12 @@ describe('Complete User Flow E2E', () => {
       expect(invalidTokenRes.body.error.suggestion).toBeDefined();
 
       // Test with missing required fields
-      const invalidRegisterRes = await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'invalid-email',
-        });
+      const invalidRegisterRes = await request(app).post('/api/auth/register').send({
+        email: 'invalid-email',
+      });
 
       expect(invalidRegisterRes.status).toBe(400);
       expect(invalidRegisterRes.body.error.details).toBeDefined();
     });
   });
 });
-
-
-
-
-
-
-
-

@@ -11,7 +11,14 @@ interface AuthFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   hint?: string;
 }
 
-export function AuthField({ label, icon: Icon, trailing, hint, className, ...props }: AuthFieldProps) {
+export function AuthField({
+  label,
+  icon: Icon,
+  trailing,
+  hint,
+  className,
+  ...props
+}: AuthFieldProps) {
   return (
     <label className="block space-y-2">
       <span className="text-sm font-semibold text-white/90">{label}</span>
@@ -20,7 +27,7 @@ export function AuthField({ label, icon: Icon, trailing, hint, className, ...pro
         <input
           className={cn(
             'flex-1 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none',
-            className,
+            className
           )}
           {...props}
         />
@@ -30,5 +37,3 @@ export function AuthField({ label, icon: Icon, trailing, hint, className, ...pro
     </label>
   );
 }
-
-

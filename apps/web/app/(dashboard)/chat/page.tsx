@@ -11,7 +11,8 @@ export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isSignedIn } = useAuthStore();
-  const { messages, isLoading, error, sendMessage, loadChatHistory, setCurrentApplication } = useChatStore();
+  const { messages, isLoading, error, sendMessage, loadChatHistory, setCurrentApplication } =
+    useChatStore();
   const [input, setInput] = useState('');
   const [lastFailedMessage, setLastFailedMessage] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -137,5 +138,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-

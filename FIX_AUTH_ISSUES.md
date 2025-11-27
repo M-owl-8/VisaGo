@@ -11,6 +11,7 @@
 ### Solution 1: Clear Old Tokens (Quick Fix)
 
 **In your React Native app:**
+
 1. Log out completely
 2. Clear app data (or uninstall/reinstall)
 3. Log back in with fresh credentials
@@ -50,13 +51,14 @@ If tokens still don't work, we might need to regenerate JWT_SECRET.
 ## Verify OpenAI Key Format:
 
 The key should look like:
+
 ```
 OPENAI_API_KEY=sk-proj-...your-actual-key-here...
 ```
 
 **Important:**
+
 - No quotes around the key
 - No spaces
 - All on one line
 - Starts with `sk-proj-`
-

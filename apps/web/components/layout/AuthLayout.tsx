@@ -47,5 +47,3 @@ export function AuthLayout({ children, formTitle, formSubtitle }: AuthLayoutProp
     </div>
   );
 }
-
-

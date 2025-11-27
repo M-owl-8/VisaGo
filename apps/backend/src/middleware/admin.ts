@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
+import { Request, Response, NextFunction } from 'express';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +17,7 @@ declare global {
 export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ error: "Unauthorized", message: "No user ID found" });
+      return res.status(401).json({ error: 'Unauthorized', message: 'No user ID found' });
     }
 
     const user = await prisma.user.findUnique({
@@ -26,18 +26,18 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    if (user.role !== "admin" && user.role !== "super_admin") {
-      return res.status(403).json({ error: "Forbidden", message: "Admin access required" });
+    if (user.role !== 'admin' && user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Forbidden', message: 'Admin access required' });
     }
 
     req.userRole = user.role;
     next();
   } catch (error) {
-    console.error("Admin middleware error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error('Admin middleware error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -47,7 +47,7 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
 export const requireSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ error: "Unauthorized", message: "No user ID found" });
+      return res.status(401).json({ error: 'Unauthorized', message: 'No user ID found' });
     }
 
     const user = await prisma.user.findUnique({
@@ -56,17 +56,17 @@ export const requireSuperAdmin = async (req: Request, res: Response, next: NextF
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    if (user.role !== "super_admin") {
-      return res.status(403).json({ error: "Forbidden", message: "Super admin access required" });
+    if (user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Forbidden', message: 'Super admin access required' });
     }
 
     req.userRole = user.role;
     next();
   } catch (error) {
-    console.error("Super admin middleware error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error('Super admin middleware error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

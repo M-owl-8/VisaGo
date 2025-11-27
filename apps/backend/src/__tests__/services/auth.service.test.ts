@@ -62,10 +62,10 @@ describe('AuthService - User Registration', () => {
 
     // Mock: user doesn't exist yet
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
-    
+
     // Mock: bcrypt.hash returns hashed password
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
-    
+
     // Mock: user creation
     (mockPrisma.user.create as jest.Mock).mockResolvedValue(mockUser);
 
@@ -76,10 +76,10 @@ describe('AuthService - User Registration', () => {
     expect(result).toHaveProperty('user');
     expect(result.user.email).toBe(validPayload.email.toLowerCase());
     expect(result.user.firstName).toBe(validPayload.firstName);
-    
+
     // Verify bcrypt was called with correct rounds
     expect(bcrypt.hash).toHaveBeenCalledWith(validPayload.password, 12);
-    
+
     // Verify user was created
     expect(mockPrisma.user.create).toHaveBeenCalled();
   });
@@ -90,9 +90,9 @@ describe('AuthService - User Registration', () => {
       password: 'SecurePass123!',
     };
 
-    await expect(AuthService.register(invalidPayload as any))
-      .rejects
-      .toThrow('Email and password are required');
+    await expect(AuthService.register(invalidPayload as any)).rejects.toThrow(
+      'Email and password are required'
+    );
   });
 
   test('should reject registration with missing password', async () => {
@@ -101,9 +101,9 @@ describe('AuthService - User Registration', () => {
       password: '',
     };
 
-    await expect(AuthService.register(invalidPayload as any))
-      .rejects
-      .toThrow('Email and password are required');
+    await expect(AuthService.register(invalidPayload as any)).rejects.toThrow(
+      'Email and password are required'
+    );
   });
 
   test('should enforce password minimum length (12 characters)', async () => {
@@ -112,9 +112,9 @@ describe('AuthService - User Registration', () => {
       password: 'Short1!',
     };
 
-    await expect(AuthService.register(payload as any))
-      .rejects
-      .toThrow('Password must be at least 12 characters');
+    await expect(AuthService.register(payload as any)).rejects.toThrow(
+      'Password must be at least 12 characters'
+    );
   });
 
   test('should require uppercase letter in password', async () => {
@@ -123,9 +123,9 @@ describe('AuthService - User Registration', () => {
       password: 'securepass123!',
     };
 
-    await expect(AuthService.register(payload as any))
-      .rejects
-      .toThrow('Password must contain at least one uppercase letter');
+    await expect(AuthService.register(payload as any)).rejects.toThrow(
+      'Password must contain at least one uppercase letter'
+    );
   });
 
   test('should require lowercase letter in password', async () => {
@@ -134,20 +134,20 @@ describe('AuthService - User Registration', () => {
       password: 'SECUREPASS123!',
     };
 
-    await expect(AuthService.register(payload as any))
-      .rejects
-      .toThrow('Password must contain at least one lowercase letter');
+    await expect(AuthService.register(payload as any)).rejects.toThrow(
+      'Password must contain at least one lowercase letter'
+    );
   });
 
   test('should require number in password', async () => {
     const payload = {
       email: 'test@example.com',
-      password: 'SecurePass!Aa',  // 12 chars, uppercase, lowercase, special, but no number
+      password: 'SecurePass!Aa', // 12 chars, uppercase, lowercase, special, but no number
     };
 
-    await expect(AuthService.register(payload as any))
-      .rejects
-      .toThrow('Password must contain at least one number');
+    await expect(AuthService.register(payload as any)).rejects.toThrow(
+      'Password must contain at least one number'
+    );
   });
 
   test('should require special character in password', async () => {
@@ -156,9 +156,9 @@ describe('AuthService - User Registration', () => {
       password: 'SecurePass123',
     };
 
-    await expect(AuthService.register(payload as any))
-      .rejects
-      .toThrow('Password must contain at least one special character');
+    await expect(AuthService.register(payload as any)).rejects.toThrow(
+      'Password must contain at least one special character'
+    );
   });
 
   test('should prevent duplicate email registration', async () => {
@@ -173,9 +173,7 @@ describe('AuthService - User Registration', () => {
       email: 'existing@example.com',
     });
 
-    await expect(AuthService.register(payload as any))
-      .rejects
-      .toThrow('Email');
+    await expect(AuthService.register(payload as any)).rejects.toThrow('Email');
   });
 
   test('should normalize email to lowercase', async () => {
@@ -226,10 +224,7 @@ describe('AuthService - User Login', () => {
 
     expect(result).toHaveProperty('token');
     expect(result.user.email).toBe(loginPayload.email);
-    expect(bcrypt.compare).toHaveBeenCalledWith(
-      loginPayload.password,
-      mockUser.passwordHash
-    );
+    expect(bcrypt.compare).toHaveBeenCalledWith(loginPayload.password, mockUser.passwordHash);
   });
 
   test('should reject login with non-existent user', async () => {
@@ -240,9 +235,7 @@ describe('AuthService - User Login', () => {
 
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
-    await expect(AuthService.login(loginPayload as any))
-      .rejects
-      .toThrow('Unauthorized');
+    await expect(AuthService.login(loginPayload as any)).rejects.toThrow('Unauthorized');
   });
 
   test('should reject login with wrong password', async () => {
@@ -261,9 +254,7 @@ describe('AuthService - User Login', () => {
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-    await expect(AuthService.login(loginPayload as any))
-      .rejects
-      .toThrow('Unauthorized');
+    await expect(AuthService.login(loginPayload as any)).rejects.toThrow('Unauthorized');
   });
 
   test('should normalize email during login', async () => {
@@ -274,9 +265,7 @@ describe('AuthService - User Login', () => {
 
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
-    await expect(AuthService.login(loginPayload as any))
-      .rejects
-      .toThrow();
+    await expect(AuthService.login(loginPayload as any)).rejects.toThrow();
 
     expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
       where: { email: 'test@example.com' },
@@ -291,7 +280,7 @@ describe('AuthService - Password Management', () => {
 
   test('should hash password with 12 rounds', async () => {
     const password = 'SecurePass123!';
-    
+
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
 
     await bcrypt.hash(password, 12);

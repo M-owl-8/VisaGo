@@ -86,7 +86,7 @@ export default function QuestionnairePage() {
       const newData = { ...prev };
       const keys = path.split('.');
       let current: any = newData;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         if (!current[keys[i]]) {
           current[keys[i]] = {};
@@ -94,7 +94,7 @@ export default function QuestionnairePage() {
         current[keys[i]] = { ...current[keys[i]] };
         current = current[keys[i]];
       }
-      
+
       current[keys[keys.length - 1]] = value;
       return newData;
     });
@@ -113,15 +113,12 @@ export default function QuestionnairePage() {
           formData.personal?.passportStatus
         );
       case 2: // Status & Education
-        return !!(
-          formData.status?.currentStatus && formData.status?.highestEducation
-        );
+        return !!(formData.status?.currentStatus && formData.status?.highestEducation);
       case 3: // Travel Profile
         return !!(
           formData.travel?.plannedWhen !== undefined &&
           formData.travel?.isExactDatesKnown !== undefined &&
-          (formData.visaType === 'student' ||
-            formData.travel?.durationCategory !== undefined)
+          (formData.visaType === 'student' || formData.travel?.durationCategory !== undefined)
         );
       case 4: // Financial
         return !!(
@@ -140,8 +137,7 @@ export default function QuestionnairePage() {
         return !!formData.invitation?.touristInvitationType;
       case 6: // Stay & Tickets
         return !!(
-          formData.stay?.accommodationType &&
-          formData.stay?.hasRoundTripTicket !== undefined
+          formData.stay?.accommodationType && formData.stay?.hasRoundTripTicket !== undefined
         );
       case 7: // Travel History
         if (!formData.history?.hasTraveledBefore) {
@@ -199,7 +195,9 @@ export default function QuestionnairePage() {
     try {
       // Validate required fields
       if (!formData.visaType || !formData.targetCountry) {
-        throw new Error(t('questionnaire.selectRequiredFields') || 'Please fill in all required fields');
+        throw new Error(
+          t('questionnaire.selectRequiredFields') || 'Please fill in all required fields'
+        );
       }
 
       // Build complete QuestionnaireV2 object
@@ -250,10 +248,17 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-xl font-semibold text-white">{t('questionnaire.step0Title', 'Travel Purpose & Destination')}</h3>
-              <p className="mt-2 text-sm text-white/60">{t('questionnaire.step1Description', 'Choose your destination country and visa type')}</p>
+              <h3 className="text-xl font-semibold text-white">
+                {t('questionnaire.step0Title', 'Travel Purpose & Destination')}
+              </h3>
+              <p className="mt-2 text-sm text-white/60">
+                {t(
+                  'questionnaire.step1Description',
+                  'Choose your destination country and visa type'
+                )}
+              </p>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.targetCountry')} *
@@ -293,7 +298,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step2Title')}</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.ageRange')} *
@@ -339,8 +344,12 @@ export default function QuestionnairePage() {
                 className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
               >
                 <option value="">{t('questionnaire.selectOption')}</option>
-                <option value="valid_6plus_months">{t('questionnaire.passportStatusValid6Plus')}</option>
-                <option value="valid_less_6_months">{t('questionnaire.passportStatusValidLess6')}</option>
+                <option value="valid_6plus_months">
+                  {t('questionnaire.passportStatusValid6Plus')}
+                </option>
+                <option value="valid_less_6_months">
+                  {t('questionnaire.passportStatusValidLess6')}
+                </option>
                 <option value="no_passport">{t('questionnaire.passportStatusNoPassport')}</option>
               </select>
             </div>
@@ -365,7 +374,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step3Title')}</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.currentStatus')} *
@@ -378,9 +387,13 @@ export default function QuestionnairePage() {
                 <option value="">{t('questionnaire.selectCurrentStatus')}</option>
                 <option value="student">{t('questionnaire.currentStatusStudent')}</option>
                 <option value="employed">{t('questionnaire.currentStatusEmployed')}</option>
-                <option value="self_employed">{t('questionnaire.currentStatusSelfEmployed')}</option>
+                <option value="self_employed">
+                  {t('questionnaire.currentStatusSelfEmployed')}
+                </option>
                 <option value="unemployed">{t('questionnaire.currentStatusUnemployed')}</option>
-                <option value="business_owner">{t('questionnaire.currentStatusBusinessOwner')}</option>
+                <option value="business_owner">
+                  {t('questionnaire.currentStatusBusinessOwner')}
+                </option>
                 <option value="school_child">{t('questionnaire.currentStatusSchoolChild')}</option>
               </select>
             </div>
@@ -423,7 +436,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step3Title')}</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.plannedWhen')} *
@@ -434,7 +447,9 @@ export default function QuestionnairePage() {
                 className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
               >
                 <option value="">{t('questionnaire.selectOption')}</option>
-                <option value="within_3_months">{t('questionnaire.plannedWhenWithin3Months')}</option>
+                <option value="within_3_months">
+                  {t('questionnaire.plannedWhenWithin3Months')}
+                </option>
                 <option value="3_to_12_months">{t('questionnaire.plannedWhen3To12Months')}</option>
                 <option value="not_sure">{t('questionnaire.plannedWhenNotSure')}</option>
               </select>
@@ -453,7 +468,9 @@ export default function QuestionnairePage() {
                   <option value="">{t('questionnaire.selectDuration')}</option>
                   <option value="up_to_30_days">{t('questionnaire.durationUpTo30Days')}</option>
                   <option value="31_90_days">{t('questionnaire.duration31_90Days')}</option>
-                  <option value="more_than_90_days">{t('questionnaire.durationMoreThan90Days')}</option>
+                  <option value="more_than_90_days">
+                    {t('questionnaire.durationMoreThan90Days')}
+                  </option>
                 </select>
               </div>
             )}
@@ -477,7 +494,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step4Title')}</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.payer')} *
@@ -547,7 +564,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step5Title')}</h3>
-            
+
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -572,9 +589,15 @@ export default function QuestionnairePage() {
                   className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
                 >
                   <option value="">{t('questionnaire.selectInvitationType')}</option>
-                  <option value="university_acceptance">{t('questionnaire.studentInvitationUniversity')}</option>
-                  <option value="language_course">{t('questionnaire.studentInvitationLanguage')}</option>
-                  <option value="exchange_program">{t('questionnaire.studentInvitationExchange')}</option>
+                  <option value="university_acceptance">
+                    {t('questionnaire.studentInvitationUniversity')}
+                  </option>
+                  <option value="language_course">
+                    {t('questionnaire.studentInvitationLanguage')}
+                  </option>
+                  <option value="exchange_program">
+                    {t('questionnaire.studentInvitationExchange')}
+                  </option>
                 </select>
               </div>
             )}
@@ -590,14 +613,19 @@ export default function QuestionnairePage() {
                   className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
                 >
                   <option value="">{t('questionnaire.selectInvitationType')}</option>
-                  <option value="no_invitation">{t('questionnaire.touristInvitationNoInvitation')}</option>
+                  <option value="no_invitation">
+                    {t('questionnaire.touristInvitationNoInvitation')}
+                  </option>
                   <option value="hotel_booking">{t('questionnaire.touristInvitationHotel')}</option>
-                  <option value="family_or_friends">{t('questionnaire.touristInvitationFamily')}</option>
-                  <option value="tour_agency">{t('questionnaire.touristInvitationTourAgency')}</option>
+                  <option value="family_or_friends">
+                    {t('questionnaire.touristInvitationFamily')}
+                  </option>
+                  <option value="tour_agency">
+                    {t('questionnaire.touristInvitationTourAgency')}
+                  </option>
                 </select>
               </div>
             )}
-
           </div>
         );
 
@@ -605,7 +633,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step6Title')}</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.accommodationType')} *
@@ -644,7 +672,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step7Title')}</h3>
-            
+
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -677,7 +705,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step8Title')}</h3>
-            
+
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -699,7 +727,10 @@ export default function QuestionnairePage() {
                 onChange={(e) => updateField('ties.hasCloseFamilyInUzbekistan', e.target.checked)}
                 className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
               />
-              <label htmlFor="hasCloseFamilyInUzbekistan" className="ml-2 block text-sm text-white/90">
+              <label
+                htmlFor="hasCloseFamilyInUzbekistan"
+                className="ml-2 block text-sm text-white/90"
+              >
                 {t('questionnaire.hasCloseFamilyInUzbekistan')}
               </label>
             </div>
@@ -710,10 +741,15 @@ export default function QuestionnairePage() {
                   type="checkbox"
                   id="hasEmploymentOrStudyProof"
                   checked={formData.documents?.hasEmploymentOrStudyProof || false}
-                  onChange={(e) => updateField('documents.hasEmploymentOrStudyProof', e.target.checked)}
+                  onChange={(e) =>
+                    updateField('documents.hasEmploymentOrStudyProof', e.target.checked)
+                  }
                   className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
                 />
-                <label htmlFor="hasEmploymentOrStudyProof" className="ml-2 block text-sm text-white/90">
+                <label
+                  htmlFor="hasEmploymentOrStudyProof"
+                  className="ml-2 block text-sm text-white/90"
+                >
                   {t('questionnaire.hasEmploymentOrStudyProof')}
                 </label>
               </div>
@@ -777,7 +813,7 @@ export default function QuestionnairePage() {
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">{t('questionnaire.step9Title')}</h3>
-            
+
             <div className="space-y-2">
               <div className="flex items-center">
                 <input
@@ -800,7 +836,10 @@ export default function QuestionnairePage() {
                   onChange={(e) => updateField('special.hasMedicalReasonForTrip', e.target.checked)}
                   className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
                 />
-                <label htmlFor="hasMedicalReasonForTrip" className="ml-2 block text-sm text-white/90">
+                <label
+                  htmlFor="hasMedicalReasonForTrip"
+                  className="ml-2 block text-sm text-white/90"
+                >
                   {t('questionnaire.hasMedicalReasonForTrip')}
                 </label>
               </div>
@@ -828,14 +867,17 @@ export default function QuestionnairePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8 text-white">
-      <h1 className="mb-6 text-2xl font-bold text-white">{t('questionnaire.title', 'Questionnaire')}</h1>
+      <h1 className="mb-6 text-2xl font-bold text-white">
+        {t('questionnaire.title', 'Questionnaire')}
+      </h1>
 
       {error && <ErrorBanner message={error} onClose={() => setError('')} />}
 
       <div className="mb-6">
         <div className="mb-2 flex justify-between text-sm text-white/70">
           <span>
-            {t('questionnaire.step', 'Step')} {currentStep + 1} {t('questionnaire.of', 'of')} {TOTAL_STEPS}
+            {t('questionnaire.step', 'Step')} {currentStep + 1} {t('questionnaire.of', 'of')}{' '}
+            {TOTAL_STEPS}
           </span>
           <span>{Math.round(((currentStep + 1) / TOTAL_STEPS) * 100)}%</span>
         </div>
@@ -847,7 +889,9 @@ export default function QuestionnairePage() {
         </div>
       </div>
 
-      <div className="glass-panel rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-card">{renderStep()}</div>
+      <div className="glass-panel rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-card">
+        {renderStep()}
+      </div>
 
       <div className="mt-6 flex justify-between">
         <button

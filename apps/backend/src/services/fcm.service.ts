@@ -34,7 +34,7 @@ export class FCMService {
 
   async sendToDevice(
     deviceToken: string,
-    payload: Omit<PushNotificationPayload, 'userId' | 'deviceToken'>,
+    payload: Omit<PushNotificationPayload, 'userId' | 'deviceToken'>
   ): Promise<boolean> {
     if (!this.initialized) {
       console.warn('⚠️ FCM not initialized, skipping push notification');
@@ -87,7 +87,7 @@ export class FCMService {
 
   async sendToTopic(
     topic: string,
-    payload: Omit<PushNotificationPayload, 'userId' | 'deviceToken'>,
+    payload: Omit<PushNotificationPayload, 'userId' | 'deviceToken'>
   ): Promise<boolean> {
     if (!this.initialized) {
       console.warn('⚠️ FCM not initialized, skipping push notification');
@@ -145,7 +145,10 @@ export class FCMService {
 
   // Pre-built notification templates
 
-  static paymentConfirmationNotification(country: string, visaType: string): PushNotificationPayload {
+  static paymentConfirmationNotification(
+    country: string,
+    visaType: string
+  ): PushNotificationPayload {
     return {
       title: '💳 Payment Confirmed',
       body: `Your payment for ${country} ${visaType} visa has been processed`,
@@ -171,7 +174,7 @@ export class FCMService {
 
   static documentVerifiedNotification(
     documentType: string,
-    status: 'verified' | 'rejected',
+    status: 'verified' | 'rejected'
   ): PushNotificationPayload {
     const title = status === 'verified' ? '✅ Document Verified' : '❌ Document Rejected';
     const body =
@@ -217,7 +220,10 @@ export class FCMService {
     };
   }
 
-  static deadlineApproachingNotification(country: string, daysLeft: number): PushNotificationPayload {
+  static deadlineApproachingNotification(
+    country: string,
+    daysLeft: number
+  ): PushNotificationPayload {
     return {
       title: '⏰ Deadline Approaching',
       body: `${daysLeft} days left to submit your ${country} visa application`,

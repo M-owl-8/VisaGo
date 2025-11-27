@@ -38,7 +38,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: async (content: string, applicationId?: string) => {
     // Store user message ID for potential removal on error
     const userMessageId = `user-${Date.now()}`;
-    
+
     try {
       set({ isLoading: true, error: null });
 
@@ -64,7 +64,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await apiClient.sendMessage(
         content,
         applicationId || get().currentApplicationId || undefined,
-        conversationHistory,
+        conversationHistory
       );
 
       if (!response.success || !response.data) {
@@ -104,23 +104,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await apiClient.getChatHistory(applicationId);
 
       if (!response.success || !response.data) {
-        throw new Error(
-          response.error?.message || 'Failed to load chat history',
-        );
+        throw new Error(response.error?.message || 'Failed to load chat history');
       }
 
       // Transform backend messages to ChatMessage format
-      const messages: ChatMessage[] = (response.data.messages || []).map(
-        (msg: any) => ({
-          id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-          role: msg.role || 'user',
-          content: msg.content || msg.message || '',
-          timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
-          sources: msg.sources,
-          tokens_used: msg.tokens_used,
-          model: msg.model,
-        }),
-      );
+      const messages: ChatMessage[] = (response.data.messages || []).map((msg: any) => ({
+        id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+        role: msg.role || 'user',
+        content: msg.content || msg.message || '',
+        timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
+        sources: msg.sources,
+        tokens_used: msg.tokens_used,
+        model: msg.model,
+      }));
 
       set({ messages });
     } catch (error: any) {
@@ -135,5 +131,3 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ messages: [], error: null });
   },
 }));
-
-

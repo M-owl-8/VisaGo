@@ -72,7 +72,7 @@ export async function logSecurityEvent(event: SecurityAuditLog): Promise<void> {
 export async function detectSuspiciousActivity(
   userId: string,
   action: string,
-  timeWindowMinutes: number = 15,
+  timeWindowMinutes: number = 15
 ): Promise<{ suspicious: boolean; reason?: string }> {
   try {
     const since = new Date(Date.now() - timeWindowMinutes * 60 * 1000);
@@ -152,14 +152,7 @@ export function validateJWTSecret(secret: string): {
   }
 
   // Check for common weak secrets
-  const weakSecrets = [
-    'secret',
-    'password',
-    'changeme',
-    'default',
-    '12345678',
-    'test',
-  ];
+  const weakSecrets = ['secret', 'password', 'changeme', 'default', '12345678', 'test'];
 
   for (const weak of weakSecrets) {
     if (secret.toLowerCase().includes(weak)) {
@@ -247,7 +240,7 @@ export function sanitizeFilePath(filePath: string): string {
 export function validateFileUpload(
   filename: string,
   mimetype: string,
-  size: number,
+  size: number
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -293,20 +286,14 @@ export function validateFileUpload(
     'image/png': ['png'],
     'image/webp': ['webp'],
     'application/msword': ['doc'],
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [
-      'docx',
-    ],
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
     'application/vnd.ms-excel': ['xls'],
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [
-      'xlsx',
-    ],
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['xlsx'],
   };
 
   const expectedExtensions = mimeExtensionMap[mimetype] || [];
   if (extension && !expectedExtensions.includes(extension)) {
-    errors.push(
-      `File extension .${extension} does not match MIME type ${mimetype}`,
-    );
+    errors.push(`File extension .${extension} does not match MIME type ${mimetype}`);
   }
 
   return {
@@ -318,10 +305,7 @@ export function validateFileUpload(
 /**
  * Rate limit key generator for user-specific limits
  */
-export function generateRateLimitKey(
-  userId: string,
-  action: string,
-): string {
+export function generateRateLimitKey(userId: string, action: string): string {
   return `ratelimit:${userId}:${action}`;
 }
 
@@ -347,4 +331,3 @@ export function generateSecureToken(length: number = 32): string {
   const crypto = require('crypto');
   return crypto.randomBytes(length).toString('hex');
 }
-

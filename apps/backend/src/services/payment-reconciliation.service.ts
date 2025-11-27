@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-import cron from "node-cron";
+import { PrismaClient } from '@prisma/client';
+import cron from 'node-cron';
 
 interface ReconciliationReport {
   startTime: Date;
@@ -36,7 +36,7 @@ export class PaymentReconciliationService {
    */
   static getInstance(): PaymentReconciliationService {
     if (!PaymentReconciliationService.instance) {
-      const { PrismaClient: PC } = require("@prisma/client");
+      const { PrismaClient: PC } = require('@prisma/client');
       const defaultPrisma = new PC();
       PaymentReconciliationService.instance = new PaymentReconciliationService(defaultPrisma);
     }
@@ -48,25 +48,23 @@ export class PaymentReconciliationService {
    * Runs daily at 2 AM (configurable via RECONCILIATION_CRON)
    */
   startScheduler(): void {
-    const cronExpression = process.env.RECONCILIATION_CRON || "0 2 * * *"; // 2 AM daily
+    const cronExpression = process.env.RECONCILIATION_CRON || '0 2 * * *'; // 2 AM daily
 
     this.reconciliationJob = cron.schedule(cronExpression, async () => {
-      console.log("[Payment Reconciliation] Starting scheduled reconciliation...");
+      console.log('[Payment Reconciliation] Starting scheduled reconciliation...');
       try {
         const report = await this.performReconciliation();
         await this.saveReconciliationReport(report);
         console.log(
-          "[Payment Reconciliation] Completed:",
+          '[Payment Reconciliation] Completed:',
           `${report.discrepanciesFound} discrepancies found`
         );
       } catch (error) {
-        console.error("[Payment Reconciliation] Error:", error);
+        console.error('[Payment Reconciliation] Error:', error);
       }
     });
 
-    console.log(
-      `[Payment Reconciliation] Scheduler started (${cronExpression})`
-    );
+    console.log(`[Payment Reconciliation] Scheduler started (${cronExpression})`);
   }
 
   /**
@@ -82,7 +80,7 @@ export class PaymentReconciliationService {
   stopScheduler(): void {
     if (this.reconciliationJob) {
       this.reconciliationJob.stop();
-      console.log("[Payment Reconciliation] Scheduler stopped");
+      console.log('[Payment Reconciliation] Scheduler stopped');
     }
   }
 
@@ -131,13 +129,11 @@ export class PaymentReconciliationService {
    * Check for payments stuck in pending status
    * These likely timed out or had network issues
    */
-  private async checkStuckPendingPayments(
-    report: ReconciliationReport
-  ): Promise<void> {
+  private async checkStuckPendingPayments(report: ReconciliationReport): Promise<void> {
     try {
       const pendingPayments = await this.prisma.payment.findMany({
         where: {
-          status: "pending",
+          status: 'pending',
           createdAt: {
             lt: new Date(Date.now() - this.PENDING_PAYMENT_TIMEOUT),
           },
@@ -162,10 +158,10 @@ export class PaymentReconciliationService {
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: "failed",
+            status: 'failed',
             paymentGatewayData: JSON.stringify({
-              ...JSON.parse(payment.paymentGatewayData || "{}"),
-              failureReason: "reconciliation_timeout",
+              ...JSON.parse(payment.paymentGatewayData || '{}'),
+              failureReason: 'reconciliation_timeout',
               failedAt: new Date().toISOString(),
             }),
           },
@@ -177,14 +173,10 @@ export class PaymentReconciliationService {
       report.totalPaymentsChecked += pendingPayments.length;
 
       if (pendingPayments.length > 0) {
-        console.log(
-          `[Reconciliation] Found ${pendingPayments.length} stuck pending payments`
-        );
+        console.log(`[Reconciliation] Found ${pendingPayments.length} stuck pending payments`);
       }
     } catch (error: any) {
-      report.errors.push(
-        `Error checking stuck payments: ${error.message}`
-      );
+      report.errors.push(`Error checking stuck payments: ${error.message}`);
     }
   }
 
@@ -192,14 +184,12 @@ export class PaymentReconciliationService {
    * Cleanup orphaned webhooks
    * Remove webhooks that are too old or stuck in processing
    */
-  private async cleanupOrphanedWebhooks(
-    report: ReconciliationReport
-  ): Promise<void> {
+  private async cleanupOrphanedWebhooks(report: ReconciliationReport): Promise<void> {
     try {
       // Find stuck webhooks (processing for > 1 hour)
       const stuckWebhooks = await this.prisma.webhookIdempotency.findMany({
         where: {
-          status: "pending",
+          status: 'pending',
           lastAttemptAt: {
             lt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
           },
@@ -213,9 +203,8 @@ export class PaymentReconciliationService {
           await this.prisma.webhookIdempotency.update({
             where: { id: webhook.id },
             data: {
-              status: "failed",
-              error:
-                "Max retries exceeded - manually review required",
+              status: 'failed',
+              error: 'Max retries exceeded - manually review required',
             },
           });
 
@@ -232,13 +221,11 @@ export class PaymentReconciliationService {
       }
 
       // Remove old processed webhooks (> WEBHOOK_RETENTION_DAYS)
-      const cutoffDate = new Date(
-        Date.now() - this.WEBHOOK_RETENTION_DAYS * 24 * 60 * 60 * 1000
-      );
+      const cutoffDate = new Date(Date.now() - this.WEBHOOK_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
       const deletedCount = await this.prisma.webhookIdempotency.deleteMany({
         where: {
-          status: "processed",
+          status: 'processed',
           processedAt: {
             lt: cutoffDate,
           },
@@ -246,14 +233,10 @@ export class PaymentReconciliationService {
       });
 
       if (deletedCount.count > 0) {
-        console.log(
-          `[Reconciliation] Cleaned up ${deletedCount.count} old webhooks`
-        );
+        console.log(`[Reconciliation] Cleaned up ${deletedCount.count} old webhooks`);
       }
     } catch (error: any) {
-      report.errors.push(
-        `Error cleaning orphaned webhooks: ${error.message}`
-      );
+      report.errors.push(`Error cleaning orphaned webhooks: ${error.message}`);
     }
   }
 
@@ -261,13 +244,11 @@ export class PaymentReconciliationService {
    * Validate payment consistency
    * Check for data anomalies and inconsistencies
    */
-  private async validatePaymentConsistency(
-    report: ReconciliationReport
-  ): Promise<void> {
+  private async validatePaymentConsistency(report: ReconciliationReport): Promise<void> {
     try {
       // Get all completed payments
       const completedPayments = await this.prisma.payment.findMany({
-        where: { status: "completed" },
+        where: { status: 'completed' },
         include: {
           application: true,
         },
@@ -277,9 +258,9 @@ export class PaymentReconciliationService {
         // Check 1: Payment should have a transaction ID
         if (!payment.transactionId) {
           report.details.statusMismatches.push({
-            type: "missing_transaction_id",
+            type: 'missing_transaction_id',
             paymentId: payment.id,
-            reason: "Completed payment missing transaction ID",
+            reason: 'Completed payment missing transaction ID',
           });
           report.discrepanciesFound++;
           continue;
@@ -288,9 +269,9 @@ export class PaymentReconciliationService {
         // Check 2: Payment should have paidAt timestamp
         if (!payment.paidAt) {
           report.details.statusMismatches.push({
-            type: "missing_paid_at",
+            type: 'missing_paid_at',
             paymentId: payment.id,
-            reason: "Completed payment missing paidAt timestamp",
+            reason: 'Completed payment missing paidAt timestamp',
           });
 
           // Auto-fix if created timestamp is available
@@ -305,19 +286,19 @@ export class PaymentReconciliationService {
         }
 
         // Check 3: Application should be in correct status
-        if (payment.application.status === "draft") {
+        if (payment.application.status === 'draft') {
           report.details.statusMismatches.push({
-            type: "application_status_mismatch",
+            type: 'application_status_mismatch',
             paymentId: payment.id,
             applicationId: payment.applicationId,
             currentStatus: payment.application.status,
-            reason: "Application still in draft after payment",
+            reason: 'Application still in draft after payment',
           });
 
           // Auto-fix: move to submitted
           await this.prisma.visaApplication.update({
             where: { id: payment.applicationId },
-            data: { status: "submitted" },
+            data: { status: 'submitted' },
           });
 
           report.discrepanciesFound++;
@@ -326,11 +307,11 @@ export class PaymentReconciliationService {
         // Check 4: Refund amount validation
         if ((payment.refundedAmount || 0) > payment.amount) {
           report.details.statusMismatches.push({
-            type: "invalid_refund_amount",
+            type: 'invalid_refund_amount',
             paymentId: payment.id,
             refundedAmount: payment.refundedAmount,
             originalAmount: payment.amount,
-            reason: "Refunded amount exceeds payment amount",
+            reason: 'Refunded amount exceeds payment amount',
           });
           report.discrepanciesFound++;
         }
@@ -339,14 +320,10 @@ export class PaymentReconciliationService {
       report.totalPaymentsChecked += completedPayments.length;
 
       if (report.discrepanciesFound > 0) {
-        console.log(
-          `[Reconciliation] Found ${report.discrepanciesFound} consistency issues`
-        );
+        console.log(`[Reconciliation] Found ${report.discrepanciesFound} consistency issues`);
       }
     } catch (error: any) {
-      report.errors.push(
-        `Error validating consistency: ${error.message}`
-      );
+      report.errors.push(`Error validating consistency: ${error.message}`);
     }
   }
 
@@ -355,9 +332,7 @@ export class PaymentReconciliationService {
    */
   private async archiveOldWebhooks(): Promise<void> {
     try {
-      const archiveDate = new Date(
-        Date.now() - this.WEBHOOK_RETENTION_DAYS * 24 * 60 * 60 * 1000
-      );
+      const archiveDate = new Date(Date.now() - this.WEBHOOK_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
       // In production, you might export to S3/archive storage here
       // For now, we just log what would be archived
@@ -375,12 +350,10 @@ export class PaymentReconciliationService {
       });
 
       if (oldWebhooks.length > 0) {
-        console.log(
-          `[Reconciliation] ${oldWebhooks.length} webhooks eligible for archival`
-        );
+        console.log(`[Reconciliation] ${oldWebhooks.length} webhooks eligible for archival`);
       }
     } catch (error: any) {
-      console.error("Error archiving webhooks:", error);
+      console.error('Error archiving webhooks:', error);
     }
   }
 
@@ -413,12 +386,12 @@ export class PaymentReconciliationService {
       // Note: In production, you'd call the actual gateway to verify
       // For now, we return DB status as source of truth
       return {
-        verified: payment.status === "completed",
+        verified: payment.status === 'completed',
         dbStatus: payment.status,
         matchesGateway: true, // Assume match if not explicitly checking gateway
       };
     } catch (error: any) {
-      console.error("Error verifying payment status:", error);
+      console.error('Error verifying payment status:', error);
       return {
         verified: false,
         matchesGateway: false,
@@ -434,28 +407,28 @@ export class PaymentReconciliationService {
       const stats = {
         totalPayments: await this.prisma.payment.count(),
         paymentsByStatus: await this.prisma.payment.groupBy({
-          by: ["status"],
+          by: ['status'],
           _count: true,
           _sum: { amount: true },
         }),
         pendingPayments: await this.prisma.payment.count({
-          where: { status: "pending" },
+          where: { status: 'pending' },
         }),
         completedPayments: await this.prisma.payment.count({
-          where: { status: "completed" },
+          where: { status: 'completed' },
         }),
         failedPayments: await this.prisma.payment.count({
-          where: { status: "failed" },
+          where: { status: 'failed' },
         }),
         refundedPayments: await this.prisma.payment.count({
           where: {
             status: {
-              in: ["refunded", "partially_refunded"],
+              in: ['refunded', 'partially_refunded'],
             },
           },
         }),
         totalRevenue: await this.prisma.payment.aggregate({
-          where: { status: "completed" },
+          where: { status: 'completed' },
           _sum: { amount: true },
         }),
         totalRefunded: await this.prisma.payment.aggregate({
@@ -463,20 +436,20 @@ export class PaymentReconciliationService {
         }),
         webhookStats: {
           pending: await this.prisma.webhookIdempotency.count({
-            where: { status: "pending" },
+            where: { status: 'pending' },
           }),
           processed: await this.prisma.webhookIdempotency.count({
-            where: { status: "processed" },
+            where: { status: 'processed' },
           }),
           failed: await this.prisma.webhookIdempotency.count({
-            where: { status: "failed" },
+            where: { status: 'failed' },
           }),
         },
       };
 
       return stats;
     } catch (error: any) {
-      console.error("Error getting reconciliation stats:", error);
+      console.error('Error getting reconciliation stats:', error);
       return null;
     }
   }
@@ -488,12 +461,9 @@ export class PaymentReconciliationService {
     try {
       // Store in database for audit trail
       // You might create a new table: ReconciliationReport
-      console.log(
-        "[Reconciliation] Report saved:",
-        JSON.stringify(report, null, 2)
-      );
+      console.log('[Reconciliation] Report saved:', JSON.stringify(report, null, 2));
     } catch (error: any) {
-      console.error("Error saving reconciliation report:", error);
+      console.error('Error saving reconciliation report:', error);
     }
   }
 
@@ -505,7 +475,7 @@ export class PaymentReconciliationService {
     try {
       const failedWebhooks = await this.prisma.webhookIdempotency.findMany({
         where: {
-          status: "failed",
+          status: 'failed',
           attempts: {
             lt: 5, // Less than max retries
           },
@@ -519,7 +489,7 @@ export class PaymentReconciliationService {
         await this.prisma.webhookIdempotency.update({
           where: { id: webhook.id },
           data: {
-            status: "pending",
+            status: 'pending',
             attempts: webhook.attempts,
             lastAttemptAt: new Date(),
           },
@@ -527,12 +497,10 @@ export class PaymentReconciliationService {
         retried++;
       }
 
-      console.log(
-        `[Reconciliation] Retried ${retried} failed webhooks`
-      );
+      console.log(`[Reconciliation] Retried ${retried} failed webhooks`);
       return retried;
     } catch (error: any) {
-      console.error("Error retrying failed webhooks:", error);
+      console.error('Error retrying failed webhooks:', error);
       return 0;
     }
   }
@@ -549,7 +517,7 @@ export function initializePaymentReconciliation(
 ): PaymentReconciliationService {
   if (!reconciliationService) {
     reconciliationService = new PaymentReconciliationService(prisma);
-    if (process.env.ENABLE_RECONCILIATION !== "false") {
+    if (process.env.ENABLE_RECONCILIATION !== 'false') {
       reconciliationService.startScheduler();
     }
   }

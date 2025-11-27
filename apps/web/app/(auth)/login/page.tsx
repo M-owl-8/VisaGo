@@ -116,7 +116,7 @@ export default function LoginPage() {
             <p>
               {t(
                 'auth.securityNote',
-                'Your credentials are encrypted and synced securely with the Ketdik mobile app.',
+                'Your credentials are encrypted and synced securely with the Ketdik mobile app.'
               )}
             </p>
           </div>
@@ -132,4 +132,3 @@ export default function LoginPage() {
     </AuthLayout>
   );
 }
-

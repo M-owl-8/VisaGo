@@ -6,14 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import {
-  ArrowUpRight,
-  FileUp,
-  MessageCircle,
-  Plus,
-  RefreshCcw,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowUpRight, FileUp, MessageCircle, Plus, RefreshCcw, Sparkles } from 'lucide-react';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -23,13 +16,7 @@ import { getErrorMessage } from '@/lib/utils/errorMessages';
 export default function ApplicationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const {
-    user,
-    userApplications,
-    fetchUserApplications,
-    isSignedIn,
-    isLoading,
-  } = useAuthStore();
+  const { user, userApplications, fetchUserApplications, isSignedIn, isLoading } = useAuthStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
@@ -61,10 +48,7 @@ export default function ApplicationsPage() {
 
   const overallProgress = useMemo(() => {
     if (!totalApplications) return 0;
-    const total = userApplications.reduce(
-      (sum, app) => sum + (app.progressPercentage || 0),
-      0,
-    );
+    const total = userApplications.reduce((sum, app) => sum + (app.progressPercentage || 0), 0);
     return Math.round(total / totalApplications);
   }, [totalApplications, userApplications]);
 
@@ -92,10 +76,7 @@ export default function ApplicationsPage() {
       .slice(0, 4);
   }, [userApplications, t]);
 
-  const statusStyles: Record<
-    string,
-    { label: string; classes: string; chip: string }
-  > = {
+  const statusStyles: Record<string, { label: string; classes: string; chip: string }> = {
     draft: {
       label: t('applications.statusDraft', 'Draft'),
       classes: 'bg-white/10 text-white',
@@ -179,7 +160,7 @@ export default function ApplicationsPage() {
               <p className="mt-3 max-w-2xl text-base text-white/70">
                 {t(
                   'applications.heroSubtitle',
-                  'Keep every visa document, AI chat, and payment status perfectly synced with your mobile app.',
+                  'Keep every visa document, AI chat, and payment status perfectly synced with your mobile app.'
                 )}
               </p>
             </div>
@@ -275,7 +256,9 @@ export default function ApplicationsPage() {
                         </p>
                         <p className="font-medium text-white">{app.visaType?.name}</p>
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusVariant.chip}`}>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${statusVariant.chip}`}
+                      >
                         {statusVariant.label}
                       </span>
                     </div>
@@ -293,7 +276,10 @@ export default function ApplicationsPage() {
                     </div>
 
                     <div className="mt-4 flex items-center justify-between text-sm text-primary">
-                      <Link href={`/applications/${app.id}`} className="inline-flex items-center gap-2 text-white">
+                      <Link
+                        href={`/applications/${app.id}`}
+                        className="inline-flex items-center gap-2 text-white"
+                      >
                         {t('applications.viewDetails', 'View details')}
                         <ArrowUpRight size={16} />
                       </Link>
@@ -325,13 +311,19 @@ export default function ApplicationsPage() {
               <div className="space-y-4">
                 {recentActivities.length === 0 ? (
                   <p className="text-sm text-white/60">
-                    {t('applications.noRecentActivity', 'We will surface highlights here as you progress.')}
+                    {t(
+                      'applications.noRecentActivity',
+                      'We will surface highlights here as you progress.'
+                    )}
                   </p>
                 ) : (
                   recentActivities.map((activity) => {
                     const variant = getStatusVariant(activity.status);
                     return (
-                      <div key={activity.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <div
+                        key={activity.id}
+                        className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                      >
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium text-white">{activity.description}</p>
                           <span className={`rounded-full px-2 py-1 text-xs ${variant.classes}`}>
@@ -367,13 +359,19 @@ export default function ApplicationsPage() {
                 <QuickAction
                   icon={<MessageCircle size={18} />}
                   title={t('chat.aiAssistant')}
-                  description={t('applications.quickAiDescription', 'Get instant answers powered by AI')}
+                  description={t(
+                    'applications.quickAiDescription',
+                    'Get instant answers powered by AI'
+                  )}
                   onClick={() => router.push('/chat')}
                 />
                 <QuickAction
                   icon={<FileUp size={18} />}
                   title={t('applications.uploadDocuments')}
-                  description={t('applications.quickDocsDescription', 'Upload proofs & supporting docs')}
+                  description={t(
+                    'applications.quickDocsDescription',
+                    'Upload proofs & supporting docs'
+                  )}
                   onClick={() => {
                     if (userApplications[0]) {
                       router.push(`/applications/${userApplications[0].id}/documents`);
@@ -391,7 +389,15 @@ export default function ApplicationsPage() {
   );
 }
 
-const Metric = ({ label, value, helper }: { label: string; value: string | number; helper: string }) => (
+const Metric = ({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string | number;
+  helper: string;
+}) => (
   <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4 text-white shadow-[0_25px_55px_rgba(1,7,17,0.65)]">
     <p className="text-xs uppercase tracking-[0.3em] text-white/50">{label}</p>
     <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
@@ -439,7 +445,7 @@ const EmptyState = () => {
       <p className="mt-3 max-w-xl text-sm text-white/60">
         {t(
           'applications.emptySubtitle',
-          'Start your first application to unlock personalized timelines, AI planning, and shared mobile progress.',
+          'Start your first application to unlock personalized timelines, AI planning, and shared mobile progress.'
         )}
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -473,6 +479,3 @@ function formatRelativeTime(timestamp: string) {
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
 }
-
-
-

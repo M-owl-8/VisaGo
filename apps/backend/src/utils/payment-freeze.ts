@@ -4,7 +4,7 @@
  * Payments are frozen but code remains intact for easy re-enabling
  */
 
-import { getEnvConfig } from "../config/env";
+import { getEnvConfig } from '../config/env';
 
 export interface PaymentFreezeStatus {
   isFrozen: boolean;
@@ -20,20 +20,20 @@ export interface PaymentFreezeStatus {
  */
 export function getPaymentFreezeStatus(): PaymentFreezeStatus {
   const envConfig = getEnvConfig();
-  
+
   // Check if freeze is enabled via environment variable
   // Default to true (enabled) if not explicitly set to "false"
-  const freezeEnabled = process.env.PAYMENT_FREEZE_ENABLED !== "false";
+  const freezeEnabled = process.env.PAYMENT_FREEZE_ENABLED !== 'false';
   const freezeStartDateStr = process.env.PAYMENT_FREEZE_START_DATE;
-  const freezeDurationMonths = process.env.PAYMENT_FREEZE_DURATION_MONTHS 
-    ? parseInt(process.env.PAYMENT_FREEZE_DURATION_MONTHS, 10) 
+  const freezeDurationMonths = process.env.PAYMENT_FREEZE_DURATION_MONTHS
+    ? parseInt(process.env.PAYMENT_FREEZE_DURATION_MONTHS, 10)
     : 3; // Default 3 months
 
   // If freeze is explicitly disabled, payments are active
   if (!freezeEnabled) {
     return {
       isFrozen: false,
-      message: "Payments are currently active.",
+      message: 'Payments are currently active.',
     };
   }
 
@@ -42,7 +42,7 @@ export function getPaymentFreezeStatus(): PaymentFreezeStatus {
   if (freezeStartDateStr) {
     freezeStartDate = new Date(freezeStartDateStr);
     if (isNaN(freezeStartDate.getTime())) {
-      console.warn("Invalid PAYMENT_FREEZE_START_DATE format. Using current date.");
+      console.warn('Invalid PAYMENT_FREEZE_START_DATE format. Using current date.');
       freezeStartDate = new Date();
     }
   } else {
@@ -58,7 +58,7 @@ export function getPaymentFreezeStatus(): PaymentFreezeStatus {
   const isFrozen = now >= freezeStartDate && now < freezeEndDate;
 
   // Calculate days remaining
-  const daysRemaining = isFrozen 
+  const daysRemaining = isFrozen
     ? Math.ceil((freezeEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
@@ -78,7 +78,7 @@ export function getPaymentFreezeStatus(): PaymentFreezeStatus {
       isFrozen: false,
       freezeStartDate,
       freezeEndDate,
-      message: "The free period has ended. Payments are now active.",
+      message: 'The free period has ended. Payments are now active.',
     };
   }
 
@@ -104,11 +104,10 @@ export function isPaymentFrozen(): boolean {
  */
 export function getPaymentFreezeMessage(): string {
   const status = getPaymentFreezeStatus();
-  
+
   if (status.isFrozen && status.message) {
     return status.message;
   }
-  
-  return "Payments are currently active.";
-}
 
+  return 'Payments are currently active.';
+}

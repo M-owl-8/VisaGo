@@ -3,9 +3,9 @@
  * Handles form submission, PDF generation, and download
  */
 
-import { PrismaClient } from "@prisma/client";
-import { errors } from "../utils/errors";
-import { logError, logInfo } from "../middleware/logger";
+import { PrismaClient } from '@prisma/client';
+import { errors } from '../utils/errors';
+import { logError, logInfo } from '../middleware/logger';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +17,7 @@ export interface FormSubmissionResult {
   submitted: boolean;
   submittedAt: string;
   pdfUrl?: string;
-  submissionMethod: "download" | "email" | "api";
+  submissionMethod: 'download' | 'email' | 'api';
   trackingNumber?: string;
 }
 
@@ -28,7 +28,7 @@ export interface FormSubmissionResult {
 export class FormSubmissionService {
   /**
    * Submit application form
-   * 
+   *
    * @param applicationId - Application ID
    * @param userId - User ID
    * @param submissionMethod - How to submit (download, email, api)
@@ -37,7 +37,7 @@ export class FormSubmissionService {
   static async submitForm(
     applicationId: string,
     userId: string,
-    submissionMethod: "download" | "email" | "api" = "download"
+    submissionMethod: 'download' | 'email' | 'api' = 'download'
   ): Promise<FormSubmissionResult> {
     try {
       // Get application
@@ -51,7 +51,7 @@ export class FormSubmissionService {
       });
 
       if (!application) {
-        throw errors.notFound("Application");
+        throw errors.notFound('Application');
       }
 
       // Verify ownership
@@ -63,7 +63,7 @@ export class FormSubmissionService {
       const validation = await this.validateApplicationComplete(application);
       if (!validation.isValid) {
         throw errors.validationError(
-          `Application is incomplete: ${validation.missingFields.join(", ")}`
+          `Application is incomplete: ${validation.missingFields.join(', ')}`
         );
       }
 
@@ -74,7 +74,7 @@ export class FormSubmissionService {
       await prisma.visaApplication.update({
         where: { id: applicationId },
         data: {
-          status: "submitted",
+          status: 'submitted',
           submissionDate: new Date(),
           progressPercentage: 75, // Submitted = 75% progress
           notes: JSON.stringify({
@@ -98,7 +98,7 @@ export class FormSubmissionService {
         },
       });
 
-      logInfo("Form submitted successfully", {
+      logInfo('Form submitted successfully', {
         applicationId,
         userId,
         submissionMethod,
@@ -113,7 +113,7 @@ export class FormSubmissionService {
         trackingNumber: `VB-${applicationId.substring(0, 8).toUpperCase()}`,
       };
     } catch (error) {
-      logError("Error submitting form", error as Error, {
+      logError('Error submitting form', error as Error, {
         applicationId,
         userId,
       });
@@ -137,11 +137,11 @@ export class FormSubmissionService {
     // Generate PDF file path
     // Note: Actual PDF generation can be implemented using libraries like pdfkit or puppeteer
     // For now, we return a URL that can be used to generate/download the PDF on-demand
-    logInfo("PDF generation requested", { applicationId: application.id });
+    logInfo('PDF generation requested', { applicationId: application.id });
 
     // Return URL endpoint for PDF generation/download
     // The actual PDF will be generated on-demand when this endpoint is accessed
-    const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || "http://localhost:3000";
+    const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || 'http://localhost:3000';
     return `${baseUrl}/api/applications/${application.id}/form.pdf`;
   }
 
@@ -167,19 +167,19 @@ export class FormSubmissionService {
 
     // Check required fields
     const requiredFields = [
-      "firstName",
-      "lastName",
-      "email",
-      "phone",
-      "dateOfBirth",
-      "nationality",
-      "passportNumber",
-      "passportExpiryDate",
-      "purposeOfVisit",
+      'firstName',
+      'lastName',
+      'email',
+      'phone',
+      'dateOfBirth',
+      'nationality',
+      'passportNumber',
+      'passportExpiryDate',
+      'purposeOfVisit',
     ];
 
     for (const field of requiredFields) {
-      if (!formData[field] || formData[field] === "") {
+      if (!formData[field] || formData[field] === '') {
         missingFields.push(field);
       }
     }
@@ -189,10 +189,10 @@ export class FormSubmissionService {
       where: { applicationId: application.id },
     });
 
-    const requiredDocs = ["passport", "photo"];
+    const requiredDocs = ['passport', 'photo'];
     for (const docType of requiredDocs) {
       const doc = documents.find((d) => d.documentType === docType);
-      if (!doc || doc.status !== "verified") {
+      if (!doc || doc.status !== 'verified') {
         missingFields.push(`document_${docType}`);
       }
     }
@@ -220,7 +220,7 @@ export class FormSubmissionService {
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     if (application.userId !== userId) {
@@ -251,7 +251,7 @@ export class FormSubmissionService {
     });
 
     if (!application) {
-      throw errors.notFound("Application");
+      throw errors.notFound('Application');
     }
 
     if (application.userId !== userId) {
@@ -264,10 +264,10 @@ export class FormSubmissionService {
     // Send email notification with PDF link
     // Note: PDF attachment can be added when PDF generation is fully implemented
     try {
-      const { EmailService } = await import("./email.service");
+      const { EmailService } = await import('./email.service');
       const emailService = new EmailService();
       const userName = `${application.user.firstName} ${application.user.lastName}`;
-      
+
       await emailService.send({
         to: email,
         subject: `Your ${application.visaType.name} Visa Application Form - ${application.country.name}`,
@@ -283,13 +283,13 @@ export class FormSubmissionService {
         `,
         text: `Your Visa Application Form\n\nDear ${userName},\n\nYour visa application form for ${application.country.name} (${application.visaType.name}) is ready.\n\nApplication ID: ${application.id}\n\nDownload your form: ${pdfUrl}\n\nBest regards,\nVisaBuddy Team`,
       });
-      
-      logInfo("Form email sent successfully", {
+
+      logInfo('Form email sent successfully', {
         applicationId,
         recipientEmail: email,
       });
     } catch (error) {
-      logError("Failed to send form email", error as Error, {
+      logError('Failed to send form email', error as Error, {
         applicationId,
         recipientEmail: email,
       });
@@ -297,5 +297,3 @@ export class FormSubmissionService {
     }
   }
 }
-
-

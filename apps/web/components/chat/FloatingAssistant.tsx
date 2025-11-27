@@ -114,11 +114,7 @@ export function FloatingAssistant() {
         animate={{ scale: isOpen ? 0.98 : 1 }}
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={26} />}
-        {!isOpen && (
-          <span className="sr-only">
-            {t('chat.aiAssistant')}
-          </span>
-        )}
+        {!isOpen && <span className="sr-only">{t('chat.aiAssistant')}</span>}
       </motion.button>
 
       {!isOpen && (
@@ -130,4 +126,3 @@ export function FloatingAssistant() {
     </div>
   );
 }
-

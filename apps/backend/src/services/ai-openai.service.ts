@@ -438,7 +438,8 @@ If you don't know something, say so clearly and suggest how to find the informat
       name?: string;
       nameUz?: string;
       nameRu?: string;
-      required: boolean;
+      category: 'required' | 'highly_recommended' | 'optional'; // NEW: Explicit category
+      required: boolean; // Kept for backward compatibility
       description?: string;
       descriptionUz?: string;
       descriptionRu?: string;
@@ -462,12 +463,120 @@ If you don't know something, say so clearly and suggest how to find the informat
       const userQuery = JSON.stringify(userContext);
       const documentGuidesText = getRelevantDocumentGuides(userQuery, 3);
 
-      const systemPrompt = `You are Ketdik's visa document assistant. Generate a comprehensive, country-specific document checklist.
+      const systemPrompt = `You are a STRICT visa document checklist generator specialized for Uzbek applicants.
 
-CRITICAL REQUIREMENTS:
-1. ALWAYS return between 8 and 15 document items (minimum 8, maximum 15).
-2. Each item must include all required fields with proper multilingual support.
-3. Use country-specific terminology correctly - this is critical for accuracy.
+Your task:
+Given:
+- AIUserContext (Uzbekistan-based by default)
+- Questionnaire summary (10-step V2)
+- visaType (student | tourist)
+- target country (one of 8 supported countries)
+- riskScore
+
+Analyze ALL context and produce a COMPLETE, CONSISTENT, ACCURATE 3-category checklist:
+1) required
+2) highly_recommended
+3) optional
+
+GENERAL RULES:
+- ALWAYS output 8–15 total documents.
+- ALWAYS include ALL THREE categories.
+- ALWAYS put every document in exactly one category.
+- EACH ITEM MUST have:
+  - document (slug)
+  - name/nameUz/nameRu
+  - category
+  - required (boolean: true only if category=='required')
+  - priority ('high','medium','low')
+  - description/descriptionUz/descriptionRu
+  - whereToObtain/Uz/Ru
+- NO hallucinations. NO fake document names. NO fake embassies.
+- Uzbekistan context is ALWAYS assumed unless explicitly overwritten:
+  - Passport = Uzbek biometric passport
+  - Bank statements = Uzbek banks
+  - Income certificates = Uzbek employers/government
+  - Documents may be in Uzbek or Russian
+- DO NOT write specific step-by-step my.gov procedures.
+
+CATEGORY LOGIC:
+Provide:
+1. REQUIRED:
+   - Must-have documents for embassy acceptance.
+   - Examples:
+     - Passport valid 6+ months AFTER return
+     - Bank statement (if self-sponsored)
+     - Income certificate (sponsor or applicant)
+     - Acceptance letter / hotel booking / invitation
+     - Photo
+     - Insurance
+     - Application form
+
+2. HIGHLY_RECOMMENDED:
+   - Strongly improves approval chances.
+   - Examples:
+     - Property documents (kadastr)
+     - Employment letter
+     - Sponsor support letter
+     - Previous travel proofs
+     - Academic transcripts (for students)
+
+3. OPTIONAL:
+   - Nice-to-have supporting evidence.
+   - Examples:
+     - Additional financial proof
+     - Extra sponsor documents
+     - Additional travel plans
+     - Extra family relationship documents
+
+RISK INFLUENCE:
+If riskScore is HIGH:
+  - Add more documents to HIGHLY_RECOMMENDED
+  - Add employment ties or stronger financial guarantees
+
+If riskScore is LOW:
+  - MINIMIZE OPTIONAL items
+  - Keep required items clean and standard
+
+OUTPUT RULES (VERY IMPORTANT):
+- OUTPUT MUST BE **VALID JSON ONLY**.
+- NO markdown, no text outside JSON.
+- Every item MUST contain UZ and RU translations.
+- whereToObtain fields MUST be realistic for Uzbekistan.
+
+COUNTRY SPECIALIZATION:
+You MUST adapt documents to the embassy:
+
+USA (student):
+  - I-20, SEVIS fee, bank statements for 1-year tuition/living
+
+USA (tourist):
+  - Strong ties + hotel booking + employer letter
+
+Canada:
+  - LOA (students), financial proof for 1 year
+
+Australia:
+  - OSHC (student insurance)
+  - GTE-related documents (if relevant)
+
+Schengen:
+  - Insurance with €30,000 coverage
+  - Passport photos (biometric)
+
+Japan:
+  - Detailed itinerary + sponsor proof
+
+UAE:
+  - Hotel booking, sponsor letter (if invited)
+
+UK:
+  - CAS (students), bank statements 28 days rule
+
+Spain:
+  - Proof of accommodation
+  - Medical insurance
+
+Anything country-specific must be accurate.
 
 TERMINOLOGY RULES (STRICTLY ENFORCED):
 - CANADA (Study Permit):
@@ -496,17 +605,19 @@ DOCUMENT STRUCTURE:
 Reply ONLY with valid JSON matching this exact schema:
 {
   "type": "${visaType}",
+  "country": "${country}",
   "checklist": [
     {
       "document": "internal_key_underscore_format",
       "name": "Short English name (2-5 words)",
       "nameUz": "Uzbek name",
       "nameRu": "Russian name",
+      "category": "required" | "highly_recommended" | "optional",
       "description": "1-2 sentences in neutral, simple English explaining what this document is and why it's needed",
       "descriptionUz": "Uzbek translation of description",
       "descriptionRu": "Russian translation of description",
       "required": true,
-      "priority": "high"|"medium"|"low",
+      "priority": "high" | "medium" | "low",
       "whereToObtain": "Clear English instructions for obtaining this document in Uzbekistan",
       "whereToObtainUz": "Uzbek translation",
       "whereToObtainRu": "Russian translation"
@@ -514,13 +625,28 @@ Reply ONLY with valid JSON matching this exact schema:
   ]
 }
 
-QUALITY REQUIREMENTS:
-- Think about: travel purpose, duration, sponsor type, travel history, previous refusals
-- Tailor document list to risk level (e.g., add stronger proof of ties when risk is high)
-- Include both required documents and strongly recommended optional documents
-- Ensure all multilingual fields are filled (reuse English if translation unavailable)
-- Keep descriptions concise but informative (1-2 sentences)
-- No markdown, no commentary, only valid JSON`;
+RULES FOR required, priority, AND category:
+- If category = "required":
+  * required = true
+  * priority = "high"
+- If category = "highly_recommended":
+  * required = false
+  * priority = "high" or "medium" (choose based on importance)
+- If category = "optional":
+  * required = false
+  * priority = "low"
+
+FINAL INSTRUCTIONS:
+- ALWAYS return clean JSON in schema EXACTLY as required.
+- If questionnaire data is incomplete or contradictory → resolve logically using Uzbek context.
+- NEVER output fewer than 8 items.
+- NEVER output only "required".
+- NO HALLUCINATIONS: Only use real document types, real embassy requirements, real terminology.
+- NO FAKE DOCUMENTS: Do not invent document names that don't exist.
+- NO FAKE EMBASSIES: Do not invent embassy procedures or requirements.
+- If unsure about a document requirement → mark as "optional" rather than inventing.
+
+Your goal: produce the most reliable, accurate, embassy-ready checklist every time.`;
 
       // Extract risk factors and key information from user context
       const riskFactors: string[] = [];
@@ -608,6 +734,11 @@ QUALITY REQUIREMENTS:
         riskFactors.push(...userContext.riskScore.riskFactors);
       }
 
+      // Extract Uzbekistan context from user profile
+      const homeCountry = userContext.userProfile?.homeCountry || 'Uzbekistan';
+      const citizenship = userContext.userProfile?.citizenship || 'UZ';
+      const isUzbekCitizen = userContext.userProfile?.isUzbekCitizen !== false; // Default to true
+
       const promptPayload = {
         country,
         visaType,
@@ -629,6 +760,13 @@ QUALITY REQUIREMENTS:
             hasProperty: keyInfo.hasProperty,
             hasFamily: keyInfo.hasFamily,
           },
+          // NEW: Explicit Uzbekistan context
+          homeCountry,
+          citizenship,
+          isUzbekCitizen,
+          documentOrigin: isUzbekCitizen
+            ? 'All documents are issued in Uzbekistan (passport, bank statements, income certificates, property documents, etc.)'
+            : `Documents are issued in ${homeCountry}`,
         },
         riskFactors:
           riskFactors.length > 0
@@ -641,13 +779,17 @@ QUALITY REQUIREMENTS:
       const userPrompt = `Generate the document checklist following the schema and rules above.
 
 Key Applicant Information:
-- Country: ${country}
+- Destination Country: ${country}
 - Visa Type: ${visaType}
+- Home Country: ${homeCountry} (${citizenship})
+- Applicant is from Uzbekistan: ${isUzbekCitizen ? 'Yes' : 'No'}
 - Duration: ${keyInfo.duration || 'Not specified'}
 - Sponsor: ${keyInfo.sponsorType || 'Self-funded'}
 - Travel History: ${keyInfo.travelHistory ? 'Has previous travel' : 'No previous international travel'}
 - Previous Refusals: ${keyInfo.previousRefusals ? 'Yes' : 'No'}
 - Financial Capacity: ${keyInfo.bankBalance ? `~$${keyInfo.bankBalance}` : 'Not specified'}
+- Document Origin: ${isUzbekCitizen ? 'All documents are issued in Uzbekistan' : `Documents are issued in ${homeCountry}`}
+- Risk Score: ${userContext.riskScore ? `${userContext.riskScore.probabilityPercent}% (${userContext.riskScore.level})` : 'Not calculated'}
 
 Risk Factors to Consider:
 ${riskFactors.length > 0 ? riskFactors.map((f) => `- ${f}`).join('\n') : '- Standard application profile'}
@@ -657,9 +799,16 @@ ${visaKb || 'No specific knowledge base available - use general requirements for
 
 ${documentGuidesText ? `\nDocument Guides:\n${documentGuidesText}` : ''}
 
-IMPORTANT: Generate exactly 8-15 high-quality, country-specific document items. Use correct terminology for ${country} (e.g., ${country.toLowerCase().includes('canada') ? 'LOA from DLI, NOT I-20' : country.toLowerCase().includes('usa') || country.toLowerCase().includes('united states') ? 'Form I-20 for students' : 'country-specific terms'}).
+CRITICAL REMINDERS:
+- ALWAYS output 8-15 documents total
+- ALWAYS include ALL THREE categories (required, highly_recommended, optional)
+- NEVER output fewer than 8 items
+- NEVER output only "required" items
+- Use correct country-specific terminology (I-20 for USA, LOA for Canada, CAS for UK, etc.)
+- All whereToObtain fields must be realistic for Uzbekistan
+- All items MUST have complete UZ and RU translations
 
-Return ONLY valid JSON matching the schema, no other text.`;
+Return ONLY valid JSON matching the schema, no other text, no markdown, no comments.`;
 
       logInfo('[OpenAI][Checklist] Generating checklist', {
         model: this.MODEL,
@@ -696,30 +845,146 @@ Return ONLY valid JSON matching the schema, no other text.`;
 
       const rawContent = response.choices[0]?.message?.content || '{}';
 
-      // Extract and clean JSON from response
-      let checklistJson: any;
-      try {
-        const jsonString = this.extractJson(rawContent);
-        checklistJson = JSON.parse(jsonString);
-      } catch (err) {
-        // Log enough to debug, but not the entire huge string
-        logError(
-          '[Checklist][JSON] Failed to parse AI JSON',
-          err instanceof Error ? err : new Error(String(err)),
-          {
-            snippet: rawContent.slice(0, 1000),
-            error: (err as Error).message,
-            country,
-            visaType,
-          }
+      logInfo('[OpenAI][Checklist] Raw GPT-4 response received', {
+        country,
+        visaType,
+        responseLength: rawContent.length,
+        responsePreview: rawContent.substring(0, 200),
+      });
+
+      // Use new JSON validator with retry logic
+      const { parseAndValidateChecklistResponse } = await import('../utils/json-validator');
+      const { autoTranslateChecklistItems } = await import('../utils/translation-helper');
+      const { getFallbackChecklist } = await import('../data/fallback-checklists');
+
+      let parsed: any = null;
+      let validationResult: any = null;
+      let attempt = 1;
+      let needsRetry = false;
+
+      // First attempt
+      const firstAttempt = parseAndValidateChecklistResponse(
+        rawContent,
+        country,
+        visaType,
+        attempt
+      );
+
+      parsed = firstAttempt.parsed;
+      validationResult = firstAttempt.validation;
+      needsRetry = firstAttempt.needsRetry;
+
+      // Retry if needed
+      if (needsRetry && attempt < 2) {
+        logWarn('[OpenAI][Checklist] First attempt failed, retrying with stricter instructions', {
+          country,
+          visaType,
+          errors: validationResult.errors,
+        });
+
+        attempt = 2;
+        const retryPrompt = `${userPrompt}\n\nCRITICAL: Your previous response was invalid. You MUST return ONLY valid JSON with:
+- Exactly 8-15 items
+- ALL THREE categories (required, highly_recommended, optional)
+- Complete UZ and RU translations for every field
+- Valid JSON structure with no markdown or extra text`;
+
+        const retryResponse = await AIOpenAIService.openai.chat.completions.create({
+          model: this.MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: retryPrompt },
+          ],
+          temperature: 0.3, // Lower temperature for more consistent output
+          max_completion_tokens: 2000,
+          response_format: { type: 'json_object' },
+        });
+
+        const retryContent = retryResponse.choices[0]?.message?.content || '{}';
+        const retryAttempt = parseAndValidateChecklistResponse(
+          retryContent,
+          country,
+          visaType,
+          attempt
         );
-        throw new Error('Failed to generate AI checklist JSON');
+
+        parsed = retryAttempt.parsed;
+        validationResult = retryAttempt.validation;
+        needsRetry = retryAttempt.needsRetry;
       }
 
-      const parsed = checklistJson;
+      // If still invalid after retry, use fallback
+      if (!parsed || !validationResult.isValid) {
+        logError(
+          '[OpenAI][Checklist] Both attempts failed, using fallback checklist',
+          new Error('GPT-4 validation failed'),
+          {
+            country,
+            visaType,
+            errors: validationResult?.errors || ['Unknown error'],
+            warnings: validationResult?.warnings || [],
+          }
+        );
 
-      // STEP 3: Enhanced logging for checklist generation
-      logInfo('[OpenAI][Checklist] Checklist generated', {
+        // Get country code from country name
+        const countryCodeMap: Record<string, string> = {
+          'united states': 'US',
+          usa: 'US',
+          'united kingdom': 'GB',
+          uk: 'GB',
+          canada: 'CA',
+          australia: 'AU',
+          germany: 'DE',
+          spain: 'ES',
+          japan: 'JP',
+          uae: 'AE',
+          'united arab emirates': 'AE',
+        };
+
+        const countryCode =
+          countryCodeMap[country.toLowerCase()] || country.substring(0, 2).toUpperCase();
+        const normalizedVisaType = visaType.toLowerCase().includes('student')
+          ? 'student'
+          : 'tourist';
+
+        const fallbackItems = getFallbackChecklist(
+          countryCode,
+          normalizedVisaType as 'student' | 'tourist'
+        );
+
+        parsed = {
+          type: visaType,
+          country: country,
+          checklist: fallbackItems,
+          aiFallbackUsed: true,
+        };
+
+        logInfo('[OpenAI][Checklist] Using fallback checklist', {
+          country,
+          visaType,
+          itemCount: fallbackItems.length,
+        });
+      } else {
+        // Auto-translate missing translations
+        if (validationResult.warnings.some((w: string) => w.includes('Missing'))) {
+          logInfo('[OpenAI][Checklist] Auto-translating missing translations');
+          await autoTranslateChecklistItems(parsed.checklist);
+        }
+
+        // Auto-correct any remaining issues
+        const { autoCorrectChecklist } = await import('../utils/json-validator');
+        parsed = autoCorrectChecklist(parsed, country, visaType);
+
+        logInfo('[OpenAI][Checklist] Validation passed after corrections', {
+          country,
+          visaType,
+          itemCount: parsed.checklist.length,
+          warnings: validationResult.warnings.length,
+        });
+      }
+
+      // Final logging for checklist generation
+      logInfo('[OpenAI][Checklist] Checklist generation completed', {
         model: this.MODEL,
         country,
         visaType,
@@ -740,19 +1005,22 @@ Return ONLY valid JSON matching the schema, no other text.`;
         throw new Error('AI returned empty checklist array');
       }
 
-      // STEP 3: Enforce minimum 8 items requirement
+      // STEP 3: Handle "too few items" gracefully - warn but don't fail
       const MIN_ITEMS = 8;
       const MAX_ITEMS = 15;
-      if (parsed.checklist.length < MIN_ITEMS) {
-        logWarn('[OpenAI][Checklist] AI returned too few items, will trigger fallback', {
+      const itemCount = parsed.checklist.length;
+
+      if (itemCount < MIN_ITEMS) {
+        logWarn('[OpenAI][Checklist] AI returned too few items, minimum 8 required', {
           country,
           visaType,
-          itemCount: parsed.checklist.length,
+          itemCount,
           minimumRequired: MIN_ITEMS,
         });
-        throw new Error(
-          `AI returned only ${parsed.checklist.length} items, minimum ${MIN_ITEMS} required`
-        );
+
+        // Instead of throwing, we'll return what we have and let the caller decide
+        // The document-checklist.service can merge with fallback items if needed
+        // This makes the system more resilient to AI inconsistencies
       }
 
       // Warn if too many items (but don't fail)
@@ -772,21 +1040,34 @@ Return ONLY valid JSON matching the schema, no other text.`;
         }
       }
 
-      // Validate and enrich checklist items
-      const enrichedChecklist = parsed.checklist.map((item: any) => ({
-        document: item.document || item.name || 'Unknown',
-        name: item.name || item.document || 'Unknown',
-        nameUz: item.nameUz || item.name || item.document || "Noma'lum",
-        nameRu: item.nameRu || item.name || item.document || 'Неизвестно',
-        required: item.required !== undefined ? item.required : true,
-        description: item.description || '',
-        descriptionUz: item.descriptionUz || item.description || '',
-        descriptionRu: item.descriptionRu || item.description || '',
-        priority: item.priority || (item.required ? 'high' : 'medium'),
-        whereToObtain: item.whereToObtain || '',
-        whereToObtainUz: item.whereToObtainUz || item.whereToObtain || '',
-        whereToObtainRu: item.whereToObtainRu || item.whereToObtain || '',
-      }));
+      // Import helper for category consistency
+      const { ensureCategoryConsistency } = await import('../utils/checklist-helpers');
+
+      // Validate and enrich checklist items with category support
+      const enrichedChecklist = parsed.checklist.map((item: any) => {
+        // Ensure category consistency (handle both new format with category and old format)
+        const { category, required, priority } = ensureCategoryConsistency({
+          category: item.category,
+          required: item.required,
+          priority: item.priority || (item.required ? 'high' : 'medium'),
+        });
+
+        return {
+          document: item.document || item.name || 'Unknown',
+          name: item.name || item.document || 'Unknown',
+          nameUz: item.nameUz || item.name || item.document || "Noma'lum",
+          nameRu: item.nameRu || item.name || item.document || 'Неизвестно',
+          category, // NEW: Explicit category field
+          required, // Derived from category or kept from AI response
+          description: item.description || '',
+          descriptionUz: item.descriptionUz || item.description || '',
+          descriptionRu: item.descriptionRu || item.description || '',
+          priority, // Ensured to match category
+          whereToObtain: item.whereToObtain || '',
+          whereToObtainUz: item.whereToObtainUz || item.whereToObtain || '',
+          whereToObtainRu: item.whereToObtainRu || item.whereToObtain || '',
+        };
+      });
 
       return {
         type: parsed.type || visaType,
@@ -813,9 +1094,12 @@ Return ONLY valid JSON matching the schema, no other text.`;
       // Return a basic fallback checklist with multilingual support
       // Note: This is a minimal fallback for API errors. DocumentChecklistService
       // will use generateRobustFallbackChecklist() for better fallback behavior.
+      const { ensureCategoryConsistency } = await import('../utils/checklist-helpers');
+
       const isStudent =
         visaType.toLowerCase().includes('student') || visaType.toLowerCase().includes('study');
-      const baseChecklist = [
+
+      const baseChecklistItems = [
         {
           document: 'passport',
           name: 'Passport',
@@ -876,7 +1160,7 @@ Return ONLY valid JSON matching the schema, no other text.`;
 
       // Add student-specific documents if applicable
       if (isStudent) {
-        baseChecklist.push({
+        baseChecklistItems.push({
           document: 'acceptance_letter',
           name: 'Acceptance Letter',
           nameUz: 'Qabul Xati',
@@ -891,6 +1175,21 @@ Return ONLY valid JSON matching the schema, no other text.`;
           whereToObtainRu: 'Запросите в вашей школе или университете',
         });
       }
+
+      // Ensure all items have category field
+      const baseChecklist = baseChecklistItems.map((item) => {
+        const { category, required, priority } = ensureCategoryConsistency({
+          category: 'required', // All fallback items are required
+          required: item.required,
+          priority: item.priority,
+        });
+        return {
+          ...item,
+          category,
+          required,
+          priority,
+        };
+      });
 
       return {
         type: visaType,

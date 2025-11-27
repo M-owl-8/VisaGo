@@ -129,12 +129,10 @@ describe('E2E: Complete Authentication Flow', () => {
       new Error('Unique constraint failed')
     );
 
-    const response = await request(app)
-      .post('/auth/register')
-      .send({
-        email: testEmail,
-        password: testPassword,
-      });
+    const response = await request(app).post('/auth/register').send({
+      email: testEmail,
+      password: testPassword,
+    });
 
     expect(response.status).toBe(500);
   });
@@ -173,9 +171,7 @@ describe('E2E: Complete Authentication Flow', () => {
   });
 
   test('Step 5: User should not access protected route without token', async () => {
-    const response = await request(app)
-      .get('/profile')
-      .expect(401);
+    const response = await request(app).get('/profile').expect(401);
 
     expect(response.body).toHaveProperty('error');
   });
@@ -205,9 +201,7 @@ describe('E2E: Complete Authentication Flow', () => {
   });
 
   test('Step 8: User should logout successfully', async () => {
-    const response = await request(app)
-      .post('/auth/logout')
-      .expect(200);
+    const response = await request(app).post('/auth/logout').expect(200);
 
     expect(response.body).toHaveProperty('message');
   });
@@ -217,22 +211,18 @@ describe('E2E: Complete Authentication Flow', () => {
     const password = 'NewPass123!';
 
     // 1. Register
-    const registerResp = await request(app)
-      .post('/auth/register')
-      .send({
-        email: newEmail,
-        password,
-        firstName: 'Flow',
-        lastName: 'Test',
-      });
+    const registerResp = await request(app).post('/auth/register').send({
+      email: newEmail,
+      password,
+      firstName: 'Flow',
+      lastName: 'Test',
+    });
 
     expect(registerResp.status).toBe(201);
     const token1 = registerResp.body.token;
 
     // 2. Access protected route
-    const profileResp = await request(app)
-      .get('/profile')
-      .set('Authorization', `Bearer ${token1}`);
+    const profileResp = await request(app).get('/profile').set('Authorization', `Bearer ${token1}`);
 
     expect(profileResp.status).toBe(200);
 
@@ -252,8 +242,7 @@ describe('E2E: Complete Authentication Flow', () => {
     expect(profile2Resp.status).toBe(200);
 
     // 5. Logout
-    const logoutResp = await request(app)
-      .post('/auth/logout');
+    const logoutResp = await request(app).post('/auth/logout');
 
     expect(logoutResp.status).toBe(200);
   });
@@ -271,12 +260,10 @@ describe('E2E: Authentication Error Scenarios', () => {
       new Error('Database connection failed')
     );
 
-    const response = await request(app)
-      .post('/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'Password123!',
-      });
+    const response = await request(app).post('/auth/login').send({
+      email: 'test@example.com',
+      password: 'Password123!',
+    });
 
     expect(response.status).toBe(500);
     expect(response.body).toHaveProperty('error');
@@ -294,12 +281,8 @@ describe('E2E: Authentication Error Scenarios', () => {
       .mockRejectedValueOnce(new Error('Duplicate key'));
 
     const [resp1, resp2] = await Promise.all([
-      request(app)
-        .post('/auth/register')
-        .send({ email, password: 'Pass123!' }),
-      request(app)
-        .post('/auth/register')
-        .send({ email, password: 'Pass123!' }),
+      request(app).post('/auth/register').send({ email, password: 'Pass123!' }),
+      request(app).post('/auth/register').send({ email, password: 'Pass123!' }),
     ]);
 
     expect(resp1.status).toBe(201);

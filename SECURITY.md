@@ -35,6 +35,7 @@
 All secrets must be stored in environment variables, never hardcoded in code.
 
 **Backend** (`apps/backend/.env`):
+
 - `JWT_SECRET` - Must be 32+ characters
 - `DATABASE_URL` - PostgreSQL connection string
 - `GOOGLE_CLIENT_SECRET` - OAuth secret
@@ -43,10 +44,12 @@ All secrets must be stored in environment variables, never hardcoded in code.
 - All other API keys and secrets
 
 **Frontend** (`apps/frontend/.env`):
+
 - Only public variables with `EXPO_PUBLIC_` prefix
 - Never store secrets in frontend
 
 **AI Service** (`apps/ai-service/.env`):
+
 - `OPENAI_API_KEY` - AI service key
 
 ### Generating Secrets
@@ -62,6 +65,7 @@ Use the provided scripts to generate secure secrets:
 ```
 
 Or manually:
+
 ```bash
 # Using OpenSSL
 openssl rand -base64 32
@@ -84,6 +88,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### Rotation Checklist
 
 1. **Generate New Secrets**
+
    ```bash
    ./scripts/generate-secrets.sh
    ```
@@ -116,12 +121,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 1. Environment Variables
 
 ✅ **DO**:
+
 - Use `.env` files for local development
 - Use platform environment variables for production
 - Validate all required variables on startup
 - Use strong, random secrets (32+ characters)
 
 ❌ **DON'T**:
+
 - Commit `.env` files
 - Use default or weak secrets
 - Share secrets via email or chat
@@ -130,6 +137,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 2. Database Security
 
 ✅ **DO**:
+
 - Use strong database passwords
 - Restrict database access by IP
 - Use SSL/TLS for database connections
@@ -137,6 +145,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - Rotate database passwords
 
 ❌ **DON'T**:
+
 - Expose database credentials
 - Use default database passwords
 - Allow public database access
@@ -145,6 +154,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 3. API Keys
 
 ✅ **DO**:
+
 - Store API keys in environment variables
 - Set usage limits on API keys
 - Monitor API key usage
@@ -152,6 +162,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - Use different keys for dev/staging/production
 
 ❌ **DON'T**:
+
 - Commit API keys to git
 - Share API keys publicly
 - Use same keys across environments
@@ -160,6 +171,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 4. Authentication
 
 ✅ **DO**:
+
 - Use strong JWT secrets (32+ characters)
 - Set appropriate token expiration
 - Implement refresh tokens
@@ -167,6 +179,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - Use HTTPS in production
 
 ❌ **DON'T**:
+
 - Use weak JWT secrets
 - Expose JWT secrets
 - Allow long-lived tokens
@@ -176,12 +189,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 5. CORS Configuration
 
 ✅ **DO**:
+
 - Specify exact allowed origins in production
 - Use HTTPS for production origins
 - Validate CORS on every request
 - Restrict to necessary methods and headers
 
 ❌ **DON'T**:
+
 - Use `*` for CORS in production
 - Allow all origins
 - Skip CORS validation
@@ -287,6 +302,7 @@ git log --all --full-history --source -- "*.env"
 ## 📞 Security Contacts
 
 For security concerns or questions:
+
 - Review this document first
 - Check existing security documentation
 - Contact the development team
@@ -294,11 +310,3 @@ For security concerns or questions:
 ---
 
 **Remember**: Security is everyone's responsibility. When in doubt, ask!
-
-
-
-
-
-
-
-

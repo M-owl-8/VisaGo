@@ -1,6 +1,6 @@
-import { PrismaClient } from "@prisma/client";
-import { MockPaymentService } from "../../services/mock-payment.service";
-import { PaymentGatewayService } from "../../services/payment-gateway.service";
+import { PrismaClient } from '@prisma/client';
+import { MockPaymentService } from '../../services/mock-payment.service';
+import { PaymentGatewayService } from '../../services/payment-gateway.service';
 
 /**
  * Payment System Test Suite
@@ -12,17 +12,17 @@ import { PaymentGatewayService } from "../../services/payment-gateway.service";
  * - Webhook deduplication (idempotency)
  */
 
-describe("Payment System Tests", () => {
+describe('Payment System Tests', () => {
   let prisma: PrismaClient;
   let mockPaymentService: MockPaymentService;
   let paymentGatewayService: PaymentGatewayService;
 
   // Test data
-  const testUserId = "test-user-123";
-  const testApplicationId = "test-app-123";
+  const testUserId = 'test-user-123';
+  const testApplicationId = 'test-app-123';
   const testAmount = 99.99;
-  const testEmail = "test@example.com";
-  const testReturnUrl = "https://example.com/payment-callback";
+  const testEmail = 'test@example.com';
+  const testReturnUrl = 'https://example.com/payment-callback';
 
   beforeAll(() => {
     prisma = new PrismaClient();
@@ -35,8 +35,8 @@ describe("Payment System Tests", () => {
     await prisma.$disconnect();
   });
 
-  describe("Mock Payment Service", () => {
-    it("should create a mock payment", async () => {
+  describe('Mock Payment Service', () => {
+    it('should create a mock payment', async () => {
       const result = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: testApplicationId,
@@ -52,7 +52,7 @@ describe("Payment System Tests", () => {
       expect(result.mockData.willSucceed).toBeDefined();
     });
 
-    it("should simulate payment success", async () => {
+    it('should simulate payment success', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: testApplicationId,
@@ -61,15 +61,13 @@ describe("Payment System Tests", () => {
         userEmail: testEmail,
       });
 
-      const confirmResult = await mockPaymentService.confirmPayment(
-        paymentResult.transactionId
-      );
+      const confirmResult = await mockPaymentService.confirmPayment(paymentResult.transactionId);
 
       expect(confirmResult).toBeDefined();
       expect(confirmResult.transactionId).toBe(paymentResult.transactionId);
     });
 
-    it("should simulate payment failure", async () => {
+    it('should simulate payment failure', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-fail`,
@@ -79,15 +77,13 @@ describe("Payment System Tests", () => {
         simulateFailure: true,
       });
 
-      const confirmResult = await mockPaymentService.confirmPayment(
-        paymentResult.transactionId
-      );
+      const confirmResult = await mockPaymentService.confirmPayment(paymentResult.transactionId);
 
       expect(confirmResult.success).toBe(false);
-      expect(confirmResult.status).toBe("failed");
+      expect(confirmResult.status).toBe('failed');
     });
 
-    it("should queue webhooks on payment confirmation", async () => {
+    it('should queue webhooks on payment confirmation', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-webhook`,
@@ -102,7 +98,7 @@ describe("Payment System Tests", () => {
       expect(webhooks.length).toBeGreaterThan(0);
     });
 
-    it("should process pending webhooks", async () => {
+    it('should process pending webhooks', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-process-webhook`,
@@ -118,7 +114,7 @@ describe("Payment System Tests", () => {
       expect(webhook?.transactionId).toBe(paymentResult.transactionId);
     });
 
-    it("should handle refunds", async () => {
+    it('should handle refunds', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-refund`,
@@ -139,7 +135,7 @@ describe("Payment System Tests", () => {
       expect(refundResult.amount).toBe(testAmount);
     });
 
-    it("should check payment status", async () => {
+    it('should check payment status', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-status`,
@@ -150,16 +146,14 @@ describe("Payment System Tests", () => {
 
       await mockPaymentService.confirmPayment(paymentResult.transactionId);
 
-      const status = await mockPaymentService.checkPaymentStatus(
-        paymentResult.transactionId
-      );
+      const status = await mockPaymentService.checkPaymentStatus(paymentResult.transactionId);
 
       expect(status).toBeDefined();
       expect(status.amount).toBe(testAmount);
       expect(status.status).toBeDefined();
     });
 
-    it("should get service statistics", () => {
+    it('should get service statistics', () => {
       const stats = mockPaymentService.getStats();
 
       expect(stats).toBeDefined();
@@ -169,8 +163,8 @@ describe("Payment System Tests", () => {
     });
   });
 
-  describe("Payment Idempotency", () => {
-    it("should prevent duplicate payments with same transaction ID", async () => {
+  describe('Payment Idempotency', () => {
+    it('should prevent duplicate payments with same transaction ID', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-idempotency-1`,
@@ -189,12 +183,10 @@ describe("Payment System Tests", () => {
       });
 
       // Should get different transaction IDs (mock generates new ones each time)
-      expect(paymentResult.transactionId).not.toBe(
-        duplicateResult.transactionId
-      );
+      expect(paymentResult.transactionId).not.toBe(duplicateResult.transactionId);
     });
 
-    it("should handle concurrent payment confirmations safely", async () => {
+    it('should handle concurrent payment confirmations safely', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-concurrent`,
@@ -215,16 +207,14 @@ describe("Payment System Tests", () => {
     });
   });
 
-  describe("Error Handling", () => {
-    it("should handle missing transaction ID", async () => {
-      const result = await mockPaymentService.getPayment(
-        "non-existent-id"
-      );
+  describe('Error Handling', () => {
+    it('should handle missing transaction ID', async () => {
+      const result = await mockPaymentService.getPayment('non-existent-id');
 
       expect(result).toBeUndefined();
     });
 
-    it("should prevent refund of non-completed payments", async () => {
+    it('should prevent refund of non-completed payments', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-no-refund`,
@@ -239,7 +229,7 @@ describe("Payment System Tests", () => {
       }).rejects.toThrow();
     });
 
-    it("should handle refund amount validation", async () => {
+    it('should handle refund amount validation', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-refund-validation`,
@@ -260,8 +250,8 @@ describe("Payment System Tests", () => {
     });
   });
 
-  describe("Webhook Simulation", () => {
-    it("should simulate successful payment webhook", async () => {
+  describe('Webhook Simulation', () => {
+    it('should simulate successful payment webhook', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-webhook-success`,
@@ -272,16 +262,16 @@ describe("Payment System Tests", () => {
 
       const webhook = await mockPaymentService.simulateWebhookCallback(
         paymentResult.transactionId,
-        "payment.success"
+        'payment.success'
       );
 
       expect(webhook).toBeDefined();
-      expect(webhook.eventType).toBe("payment.success");
+      expect(webhook.eventType).toBe('payment.success');
       expect(webhook.transactionId).toBe(paymentResult.transactionId);
-      expect(webhook.status).toBe("completed");
+      expect(webhook.status).toBe('completed');
     });
 
-    it("should simulate failed payment webhook", async () => {
+    it('should simulate failed payment webhook', async () => {
       const paymentResult = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-webhook-fail`,
@@ -292,15 +282,15 @@ describe("Payment System Tests", () => {
 
       const webhook = await mockPaymentService.simulateWebhookCallback(
         paymentResult.transactionId,
-        "payment.failed"
+        'payment.failed'
       );
 
       expect(webhook).toBeDefined();
-      expect(webhook.eventType).toBe("payment.failed");
-      expect(webhook.status).toBe("failed");
+      expect(webhook.eventType).toBe('payment.failed');
+      expect(webhook.status).toBe('failed');
     });
 
-    it("should queue multiple webhooks", async () => {
+    it('should queue multiple webhooks', async () => {
       mockPaymentService.clearMockData();
 
       // Create and simulate multiple payments
@@ -315,7 +305,7 @@ describe("Payment System Tests", () => {
 
         await mockPaymentService.simulateWebhookCallback(
           paymentResult.transactionId,
-          "payment.success"
+          'payment.success'
         );
       }
 
@@ -323,7 +313,7 @@ describe("Payment System Tests", () => {
       expect(webhooks.length).toBeGreaterThanOrEqual(5);
     });
 
-    it("should process all pending webhooks", async () => {
+    it('should process all pending webhooks', async () => {
       mockPaymentService.clearMockData();
 
       // Create multiple payments with webhooks
@@ -336,9 +326,7 @@ describe("Payment System Tests", () => {
           userEmail: testEmail,
         });
 
-        await mockPaymentService.simulateWebhookCallback(
-          paymentResult.transactionId
-        );
+        await mockPaymentService.simulateWebhookCallback(paymentResult.transactionId);
       }
 
       const processed = await mockPaymentService.processAllWebhooks();
@@ -347,8 +335,8 @@ describe("Payment System Tests", () => {
     });
   });
 
-  describe("Success Metrics", () => {
-    it("should maintain >95% payment success rate in normal conditions", async () => {
+  describe('Success Metrics', () => {
+    it('should maintain >95% payment success rate in normal conditions', async () => {
       mockPaymentService.clearMockData();
 
       const iterations = 100;
@@ -372,7 +360,7 @@ describe("Payment System Tests", () => {
       expect(successRate).toBeGreaterThan(90); // Allow some variance
     });
 
-    it("should handle high-volume concurrent payments", async () => {
+    it('should handle high-volume concurrent payments', async () => {
       mockPaymentService.clearMockData();
 
       const concurrentPayments = 50;
@@ -396,8 +384,8 @@ describe("Payment System Tests", () => {
     });
   });
 
-  describe("Data Validation", () => {
-    it("should require all mandatory payment fields", async () => {
+  describe('Data Validation', () => {
+    it('should require all mandatory payment fields', async () => {
       // Missing amount
       expect(async () => {
         await mockPaymentService.createPayment({
@@ -410,27 +398,27 @@ describe("Payment System Tests", () => {
       }).toBeDefined(); // Mock doesn't validate, but in real service it would
     });
 
-    it("should validate email format for payment", async () => {
+    it('should validate email format for payment', async () => {
       const result = await mockPaymentService.createPayment({
         userId: testUserId,
         applicationId: `${testApplicationId}-invalid-email`,
         amount: testAmount,
         returnUrl: testReturnUrl,
-        userEmail: "invalid-email", // Invalid format
+        userEmail: 'invalid-email', // Invalid format
       });
 
       expect(result.success).toBe(true); // Mock allows it
     });
 
-    it("should validate currency codes", () => {
+    it('should validate currency codes', () => {
       // Most payment systems support USD, EUR, GBP, etc.
-      const supportedCurrencies = ["USD", "EUR", "GBP", "JPY"];
-      expect(supportedCurrencies.includes("USD")).toBe(true);
+      const supportedCurrencies = ['USD', 'EUR', 'GBP', 'JPY'];
+      expect(supportedCurrencies.includes('USD')).toBe(true);
     });
   });
 });
 
-describe("Integration Tests", () => {
+describe('Integration Tests', () => {
   let prisma: PrismaClient;
   let mockPaymentService: MockPaymentService;
 
@@ -444,27 +432,25 @@ describe("Integration Tests", () => {
     await prisma.$disconnect();
   });
 
-  it("should complete full payment flow: create -> confirm -> refund", async () => {
-    const userId = "integration-test-user";
-    const appId = "integration-test-app";
+  it('should complete full payment flow: create -> confirm -> refund', async () => {
+    const userId = 'integration-test-user';
+    const appId = 'integration-test-app';
     const amount = 49.99;
-    const email = "integration@test.com";
+    const email = 'integration@test.com';
 
     // Step 1: Create payment
     const createResult = await mockPaymentService.createPayment({
       userId,
       applicationId: appId,
       amount,
-      returnUrl: "https://example.com/callback",
+      returnUrl: 'https://example.com/callback',
       userEmail: email,
     });
 
     expect(createResult.success).toBe(true);
 
     // Step 2: Confirm payment
-    const confirmResult = await mockPaymentService.confirmPayment(
-      createResult.transactionId
-    );
+    const confirmResult = await mockPaymentService.confirmPayment(createResult.transactionId);
 
     expect(confirmResult.status).toBeDefined();
 
@@ -473,17 +459,13 @@ describe("Integration Tests", () => {
     expect(webhooks.length).toBeGreaterThan(0);
 
     // Step 4: Get payment status
-    const statusResult = await mockPaymentService.checkPaymentStatus(
-      createResult.transactionId
-    );
+    const statusResult = await mockPaymentService.checkPaymentStatus(createResult.transactionId);
 
     expect(statusResult.amount).toBe(amount);
 
     // Step 5: Refund payment (if needed)
-    if (statusResult.status === "completed") {
-      const refundResult = await mockPaymentService.refundPayment(
-        createResult.transactionId
-      );
+    if (statusResult.status === 'completed') {
+      const refundResult = await mockPaymentService.refundPayment(createResult.transactionId);
 
       expect(refundResult.success).toBe(true);
       expect(refundResult.refundId).toBeDefined();

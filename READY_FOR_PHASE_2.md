@@ -17,11 +17,12 @@
 ✅ **AI Chat** - Context-aware, multilingual assistant  
 ✅ **Security** - Rate limiting, input validation, password complexity  
 ✅ **Translations** - Complete UZ, RU, EN support  
-✅ **Build Config** - Production-ready EAS configuration  
+✅ **Build Config** - Production-ready EAS configuration
 
 ### Files Created/Modified
 
 **New Files (15):**
+
 - `frontend_new/src/types/questionnaire.ts`
 - `frontend_new/src/store/onboarding.ts`
 - `frontend_new/src/data/questionnaireQuestions.ts`
@@ -36,6 +37,7 @@
 - `READY_FOR_PHASE_2.md`
 
 **Enhanced Files (12):**
+
 - `frontend_new/src/screens/onboarding/QuestionnaireScreen.tsx` (complete rewrite)
 - `frontend_new/src/App.tsx` (added navigation stack)
 - `frontend_new/src/screens/home/HomeScreen.tsx` (enhanced)
@@ -51,6 +53,7 @@
 - `apps/ai-service/services/prompt.py` (enhanced prompts)
 
 **Deleted Files (4):**
+
 - Old backup files removed
 - Duplicate files removed
 
@@ -63,6 +66,7 @@
 #### Day 11-12: External Services Setup ⚡ CRITICAL
 
 **1. OpenAI API** (30 minutes)
+
 - [ ] Go to https://platform.openai.com
 - [ ] Create account, add payment method
 - [ ] Generate API key
@@ -71,6 +75,7 @@
 - [ ] Add to AI service `.env`: `OPENAI_API_KEY=sk-...`
 
 **2. Firebase** (2 hours)
+
 - [ ] Go to https://console.firebase.google.com
 - [ ] Create project: "VisaBuddy"
 - [ ] Enable Firebase Storage
@@ -81,6 +86,7 @@
 - [ ] Test file upload
 
 **3. Google OAuth** (1 hour)
+
 - [ ] Go to https://console.cloud.google.com
 - [ ] Create project: "VisaBuddy"
 - [ ] Enable Google+ API
@@ -89,6 +95,7 @@
 - [ ] Add to `.env`
 
 **4. Database - Railway** (1 hour)
+
 - [ ] Go to https://railway.app
 - [ ] Create account
 - [ ] Create new project
@@ -99,6 +106,7 @@
 #### Day 13-15: Real Device Testing ⚡ CRITICAL
 
 **iOS Testing** (1 day)
+
 - [ ] Build with EAS: `eas build --platform ios --profile production`
 - [ ] Upload to TestFlight
 - [ ] Install on 2+ real iPhones
@@ -113,6 +121,7 @@
 - [ ] Fix critical bugs
 
 **Android Testing** (1 day)
+
 - [ ] Build with EAS: `eas build --platform android --profile production`
 - [ ] Install APK on 2+ real Android devices
 - [ ] Test all flows (same as iOS)
@@ -123,18 +132,21 @@
 #### Day 16-17: Content & Legal (1 day)
 
 **Privacy Policy**
+
 - [ ] Review template (will provide)
 - [ ] Customize for your data collection
 - [ ] Translate to UZ, RU, EN
 - [ ] Host at: https://visabuddy.uz/privacy
 
 **Terms of Service**
+
 - [ ] Review template (will provide)
 - [ ] Customize for your service
 - [ ] Include 3-month free period terms
 - [ ] Host at: https://visabuddy.uz/terms
 
 **Support Infrastructure**
+
 - [ ] Create email: support@visabuddy.uz
 - [ ] Set up email forwarding
 - [ ] Create support page
@@ -143,6 +155,7 @@
 #### Day 18-19: App Store Assets (2 days)
 
 **Design Assets Needed:**
+
 - [ ] App Icon: 1024x1024 PNG
 - [ ] Splash Screen: 2048x2048 PNG
 - [ ] Screenshots:
@@ -151,6 +164,7 @@
 - [ ] Feature Graphic (Android): 1024x500 PNG
 
 **Screenshot Content:**
+
 1. Home screen with progress
 2. Questionnaire flow
 3. Document checklist
@@ -162,6 +176,7 @@
 #### Day 20: Backend Deployment ⚡ CRITICAL
 
 **Railway Deployment** (4-6 hours)
+
 - [ ] Deploy backend to Railway
 - [ ] Deploy AI service to Railway
 - [ ] Set all environment variables
@@ -171,6 +186,7 @@
 - [ ] Verify health checks pass
 
 **Testing:**
+
 ```bash
 curl https://api.visabuddy.uz/health
 curl https://api.visabuddy.uz/api/countries
@@ -179,6 +195,7 @@ curl https://api.visabuddy.uz/api/countries
 #### Day 21: Mobile App Production Builds ⚡ CRITICAL
 
 **iOS Build** (4-6 hours including build time)
+
 ```bash
 cd frontend_new
 eas build --platform ios --profile production
@@ -186,6 +203,7 @@ eas submit --platform ios --latest
 ```
 
 **Android Build** (4-6 hours including build time)
+
 ```bash
 eas build --platform android --profile production
 eas build --platform android --profile production-aab
@@ -194,6 +212,7 @@ eas build --platform android --profile production-aab
 #### Day 22-24: App Store Submission ⚡ CRITICAL
 
 **iOS App Store** (4-6 hours + 1-3 days review)
+
 - [ ] Upload to App Store Connect
 - [ ] Fill in app information
 - [ ] Add screenshots
@@ -203,6 +222,7 @@ eas build --platform android --profile production-aab
 - [ ] Release app
 
 **Google Play Store** (4-6 hours + 1-3 days review)
+
 - [ ] Upload AAB to Play Console
 - [ ] Fill in store listing
 - [ ] Add screenshots
@@ -216,10 +236,12 @@ eas build --platform android --profile production-aab
 ## 📱 App Store Listing Content
 
 ### App Name
+
 **Primary:** VisaBuddy - Visa Assistant  
 **Alternative:** VisaBuddy: AI Visa Helper
 
 ### Short Description (80 chars)
+
 "AI-powered visa assistant. Free for 3 months. For Uzbek travelers. 🇺🇿"
 
 ### Full Description (Use this for both stores)
@@ -302,15 +324,18 @@ Final submission is done through official embassy channels.
 ```
 
 ### Keywords (100 chars)
+
 ```
 visa,travel,passport,immigration,student visa,work visa,tourism,AI,documents,uzbekistan
 ```
 
 ### Categories
+
 - **Primary:** Travel & Local
 - **Secondary:** Productivity
 
 ### Age Rating
+
 - **iOS:** 4+ (No objectionable content)
 - **Android:** Everyone
 
@@ -321,6 +346,7 @@ visa,travel,passport,immigration,student visa,work visa,tourism,AI,documents,uzb
 Before submitting to app stores, verify:
 
 ### Functional Testing
+
 - [ ] User can register with email/password
 - [ ] User can login with Google
 - [ ] Questionnaire flow completes successfully
@@ -335,6 +361,7 @@ Before submitting to app stores, verify:
 - [ ] Logout works
 
 ### Edge Cases
+
 - [ ] No internet → shows offline message
 - [ ] API error → shows user-friendly message
 - [ ] No applications → shows empty state
@@ -342,6 +369,7 @@ Before submitting to app stores, verify:
 - [ ] Invalid file type → shows error
 
 ### Performance
+
 - [ ] App starts in < 3 seconds
 - [ ] Screens load in < 1 second
 - [ ] Smooth scrolling
@@ -405,6 +433,7 @@ Your app is ready to launch when:
 Phase 1 is complete and the app is production-ready from a code perspective.
 
 The remaining work in Phase 2 is straightforward:
+
 1. Sign up for services (mostly waiting for approvals)
 2. Configure credentials (copy-paste from dashboards)
 3. Test on real devices (follow checklist)
@@ -465,5 +494,3 @@ The remaining work in Phase 2 is straightforward:
 Everything is ready. Follow Phase 2 and your app will be live in 3-4 weeks!
 
 **Good luck! 🎉**
-
-

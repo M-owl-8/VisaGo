@@ -3,8 +3,8 @@
  * Prevents duplicate webhook processing and validates webhook signatures
  */
 
-import crypto from "crypto";
-import { PrismaClient } from "@prisma/client";
+import crypto from 'crypto';
+import { PrismaClient } from '@prisma/client';
 
 export interface WebhookRecord {
   id?: string;
@@ -14,7 +14,7 @@ export interface WebhookRecord {
   eventType: string;
   signature: string;
   body: Record<string, any>;
-  status: "pending" | "processed" | "failed";
+  status: 'pending' | 'processed' | 'failed';
   attempts: number;
   lastAttemptAt?: Date;
   processedAt?: Date;
@@ -42,9 +42,9 @@ export class WebhookSecurityService {
     transactionId: string
   ): string {
     return crypto
-      .createHash("sha256")
+      .createHash('sha256')
       .update(`${paymentMethod}:${webhookId}:${transactionId}`)
-      .digest("hex");
+      .digest('hex');
   }
 
   /**
@@ -55,11 +55,7 @@ export class WebhookSecurityService {
     paymentMethod: string,
     transactionId: string
   ): Promise<boolean> {
-    const fingerprint = this.generateWebhookFingerprint(
-      webhookId,
-      paymentMethod,
-      transactionId
-    );
+    const fingerprint = this.generateWebhookFingerprint(webhookId, paymentMethod, transactionId);
 
     // Check in-memory cache first
     const cached = this.webhookCache.get(fingerprint);
@@ -74,7 +70,7 @@ export class WebhookSecurityService {
         where: { fingerprint },
       });
 
-      if (existing && existing.status === "processed") {
+      if (existing && existing.status === 'processed') {
         // Re-cache it
         this.webhookCache.set(fingerprint, {
           timestamp: Date.now(),
@@ -83,7 +79,7 @@ export class WebhookSecurityService {
         return true;
       }
     } catch (error) {
-      console.error("[Webhook Security] Database lookup failed:", error);
+      console.error('[Webhook Security] Database lookup failed:', error);
       // Don't fail webhook processing due to DB error
     }
 
@@ -103,11 +99,7 @@ export class WebhookSecurityService {
     success: boolean = false,
     error?: string
   ): Promise<void> {
-    const fingerprint = this.generateWebhookFingerprint(
-      webhookId,
-      paymentMethod,
-      transactionId
-    );
+    const fingerprint = this.generateWebhookFingerprint(webhookId, paymentMethod, transactionId);
 
     try {
       // Try to update existing record, create if doesn't exist
@@ -121,7 +113,7 @@ export class WebhookSecurityService {
           eventType,
           signature,
           body: body as any,
-          status: success ? "processed" : "pending",
+          status: success ? 'processed' : 'pending',
           attempts: 1,
           lastAttemptAt: new Date(),
           processedAt: success ? new Date() : undefined,
@@ -130,7 +122,7 @@ export class WebhookSecurityService {
         update: {
           attempts: { increment: 1 },
           lastAttemptAt: new Date(),
-          status: success ? "processed" : "pending",
+          status: success ? 'processed' : 'pending',
           processedAt: success ? new Date() : undefined,
           error: error || undefined,
         },
@@ -142,7 +134,7 @@ export class WebhookSecurityService {
         processed: success,
       });
     } catch (error) {
-      console.error("[Webhook Security] Failed to record webhook attempt:", error);
+      console.error('[Webhook Security] Failed to record webhook attempt:', error);
       // Don't fail webhook processing due to logging error
     }
   }
@@ -158,14 +150,11 @@ export class WebhookSecurityService {
     try {
       // Payme signature: base64(SHA256(params_str + api_key))
       const message = params + apiKey;
-      const expectedSign = crypto
-        .createHash("sha256")
-        .update(message)
-        .digest("base64");
+      const expectedSign = crypto.createHash('sha256').update(message).digest('base64');
 
       return expectedSign === sign;
     } catch (error) {
-      console.error("[Webhook Security] Payme signature verification failed:", error);
+      console.error('[Webhook Security] Payme signature verification failed:', error);
       return false;
     }
   }
@@ -173,35 +162,28 @@ export class WebhookSecurityService {
   /**
    * Verify Click webhook signature
    */
-  verifyClickSignature(
-    data: Record<string, any>,
-    sign: string,
-    merchantKey: string
-  ): boolean {
+  verifyClickSignature(data: Record<string, any>, sign: string, merchantKey: string): boolean {
     try {
       // Click signature: MD5(click_trans_id + sign_string + merchant_key)
       // sign_string format varies, typically numeric fields in order
       const signString = [
         data.click_trans_id,
         data.service_id,
-        data.merchant_trans_id || "",
+        data.merchant_trans_id || '',
         data.amount,
         data.action,
         data.error,
-        data.merchant_prepare_id || "",
+        data.merchant_prepare_id || '',
       ]
-        .map(v => (v !== undefined && v !== null ? v.toString() : ""))
-        .join(";");
+        .map((v) => (v !== undefined && v !== null ? v.toString() : ''))
+        .join(';');
 
       const message = `${data.click_trans_id};${signString};${merchantKey}`;
-      const expectedSign = crypto
-        .createHash("md5")
-        .update(message)
-        .digest("hex");
+      const expectedSign = crypto.createHash('md5').update(message).digest('hex');
 
       return expectedSign === sign;
     } catch (error) {
-      console.error("[Webhook Security] Click signature verification failed:", error);
+      console.error('[Webhook Security] Click signature verification failed:', error);
       return false;
     }
   }
@@ -209,28 +191,17 @@ export class WebhookSecurityService {
   /**
    * Verify Uzum webhook signature
    */
-  verifyUzumSignature(
-    data: Record<string, any>,
-    sign: string,
-    apiKey: string
-  ): boolean {
+  verifyUzumSignature(data: Record<string, any>, sign: string, apiKey: string): boolean {
     try {
       // Uzum signature: SHA256(merchant_id + transaction_id + amount + api_key)
-      const signString = [
-        data.merchant_id,
-        data.transaction_id,
-        data.amount,
-      ].join(";");
+      const signString = [data.merchant_id, data.transaction_id, data.amount].join(';');
 
       const message = signString + apiKey;
-      const expectedSign = crypto
-        .createHash("sha256")
-        .update(message)
-        .digest("hex");
+      const expectedSign = crypto.createHash('sha256').update(message).digest('hex');
 
       return expectedSign.toLowerCase() === sign.toLowerCase();
     } catch (error) {
-      console.error("[Webhook Security] Uzum signature verification failed:", error);
+      console.error('[Webhook Security] Uzum signature verification failed:', error);
       return false;
     }
   }
@@ -245,25 +216,22 @@ export class WebhookSecurityService {
   ): boolean {
     try {
       // Stripe signature format: t=timestamp,v1=signature
-      const parts = signature.split(",");
-      const timestamp = parts[0].split("=")[1];
-      const providedSignature = parts[1].split("=")[1];
+      const parts = signature.split(',');
+      const timestamp = parts[0].split('=')[1];
+      const providedSignature = parts[1].split('=')[1];
 
       // Create signed content: timestamp.body
       const signedContent = `${timestamp}.${body}`;
 
       // Compute expected signature
       const expectedSignature = crypto
-        .createHmac("sha256", webhookSecret)
+        .createHmac('sha256', webhookSecret)
         .update(signedContent)
-        .digest("hex");
+        .digest('hex');
 
-      return crypto.timingSafeEqual(
-        Buffer.from(providedSignature),
-        Buffer.from(expectedSignature)
-      );
+      return crypto.timingSafeEqual(Buffer.from(providedSignature), Buffer.from(expectedSignature));
     } catch (error) {
-      console.error("[Webhook Security] Stripe signature verification failed:", error);
+      console.error('[Webhook Security] Stripe signature verification failed:', error);
       return false;
     }
   }

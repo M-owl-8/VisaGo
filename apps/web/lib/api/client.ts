@@ -35,7 +35,7 @@ class ApiClient {
         }
         return config;
       },
-      (error) => Promise.reject(error),
+      (error) => Promise.reject(error)
     );
 
     // Response interceptor for error handling
@@ -51,7 +51,7 @@ class ApiClient {
           }
         }
         return Promise.reject(error);
-      },
+      }
     );
   }
 
@@ -63,7 +63,7 @@ class ApiClient {
     email: string,
     password: string,
     firstName?: string,
-    lastName?: string,
+    lastName?: string
   ): Promise<ApiResponse> {
     try {
       const response = await this.api.post('/auth/register', {
@@ -80,7 +80,9 @@ class ApiClient {
           success: false,
           error: {
             status: 0,
-            message: error.message || 'Network error. Please check your internet connection and try again.',
+            message:
+              error.message ||
+              'Network error. Please check your internet connection and try again.',
             code: 'NETWORK_ERROR',
           },
         };
@@ -89,9 +91,7 @@ class ApiClient {
 
       // Handle API errors
       const code =
-        error.response?.data?.error?.code ||
-        error.response?.data?.code ||
-        'UNKNOWN_ERROR';
+        error.response?.data?.error?.code || error.response?.data?.code || 'UNKNOWN_ERROR';
       const message =
         error.response?.data?.error?.message ||
         error.response?.data?.message ||
@@ -123,7 +123,9 @@ class ApiClient {
           success: false,
           error: {
             status: 0,
-            message: error.message || 'Network error. Please check your internet connection and try again.',
+            message:
+              error.message ||
+              'Network error. Please check your internet connection and try again.',
             code: 'NETWORK_ERROR',
           },
         };
@@ -132,9 +134,7 @@ class ApiClient {
 
       // Handle API errors
       const code =
-        error.response?.data?.error?.code ||
-        error.response?.data?.code ||
-        'UNKNOWN_ERROR';
+        error.response?.data?.error?.code || error.response?.data?.code || 'UNKNOWN_ERROR';
       const message =
         error.response?.data?.error?.message ||
         error.response?.data?.message ||
@@ -219,7 +219,7 @@ class ApiClient {
   async uploadDocument(
     applicationId: string,
     documentType: string,
-    file: File,
+    file: File
   ): Promise<ApiResponse> {
     const formData = new FormData();
     formData.append('applicationId', applicationId);
@@ -236,9 +236,7 @@ class ApiClient {
   }
 
   async getApplicationDocuments(applicationId: string): Promise<ApiResponse> {
-    const response = await this.api.get(
-      `/documents/application/${applicationId}`,
-    );
+    const response = await this.api.get(`/documents/application/${applicationId}`);
     return response.data;
   }
 
@@ -249,7 +247,7 @@ class ApiClient {
   async sendMessage(
     content: string,
     applicationId?: string,
-    conversationHistory?: any[],
+    conversationHistory?: any[]
   ): Promise<ApiResponse> {
     const transformedHistory = (conversationHistory || []).map((msg) => ({
       role: msg.role,
@@ -266,13 +264,11 @@ class ApiClient {
       },
       {
         timeout: 30000,
-      },
+      }
     );
 
     if (!response.data || !response.data.success || !response.data.data) {
-      throw new Error(
-        response.data?.error?.message || 'Invalid response from backend',
-      );
+      throw new Error(response.data?.error?.message || 'Invalid response from backend');
     }
 
     const aiData = response.data.data;
@@ -293,7 +289,7 @@ class ApiClient {
   async getChatHistory(
     applicationId?: string,
     limit?: number,
-    offset?: number,
+    offset?: number
   ): Promise<ApiResponse> {
     const params: any = {};
     if (applicationId) params.applicationId = applicationId;
@@ -304,10 +300,7 @@ class ApiClient {
     return response.data;
   }
 
-  async getChatSessions(
-    limit: number = 20,
-    offset: number = 0,
-  ): Promise<ApiResponse> {
+  async getChatSessions(limit: number = 20, offset: number = 0): Promise<ApiResponse> {
     const response = await this.api.get('/chat/sessions', {
       params: { limit, offset },
     });
@@ -328,10 +321,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updateUserPreferences(
-    userId: string,
-    preferences: any,
-  ): Promise<ApiResponse> {
+  async updateUserPreferences(userId: string, preferences: any): Promise<ApiResponse> {
     const response = await this.api.patch(`/users/${userId}/preferences`, preferences);
     return response.data;
   }
@@ -357,4 +347,3 @@ class ApiClient {
 // Export singleton instance
 export const apiClient = new ApiClient();
 export default apiClient;
-

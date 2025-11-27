@@ -47,7 +47,7 @@ export async function withServiceFallback<T>(
       return await withTimeout(operation(), cfg.timeout);
     } catch (error) {
       const isLastAttempt = attempt === cfg.maxRetries;
-      
+
       if (isLastAttempt) {
         // All retries exhausted, try fallback
         if (cfg.fallbackEnabled) {
@@ -173,11 +173,3 @@ export class ServiceAvailabilityChecker {
 
 // Global instance
 export const serviceAvailabilityChecker = new ServiceAvailabilityChecker();
-
-
-
-
-
-
-
-

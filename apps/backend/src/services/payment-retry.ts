@@ -3,8 +3,8 @@
  * Intelligent retry logic for handling transient payment gateway failures
  */
 
-import { PaymentError, PaymentErrorCode, PaymentErrorSeverity } from "./payment-errors";
-import { PaymentAuditLogger, PaymentAuditAction } from "./payment-audit-logger";
+import { PaymentError, PaymentErrorCode, PaymentErrorSeverity } from './payment-errors';
+import { PaymentAuditLogger, PaymentAuditAction } from './payment-audit-logger';
 
 export interface RetryConfig {
   maxRetries: number;
@@ -56,10 +56,7 @@ export class RetryStrategy {
   /**
    * Calculate delay with exponential backoff and jitter
    */
-  static calculateDelay(
-    attempt: number,
-    config: RetryConfig
-  ): number {
+  static calculateDelay(attempt: number, config: RetryConfig): number {
     // Exponential backoff: delay = initialDelay * (multiplier ^ attempt)
     let delay = config.initialDelayMs * Math.pow(config.backoffMultiplier, attempt);
 
@@ -68,7 +65,7 @@ export class RetryStrategy {
 
     // Add jitter to prevent thundering herd
     const jitter = delay * config.jitterFraction * Math.random();
-    delay = delay + (jitter * (Math.random() > 0.5 ? 1 : -1));
+    delay = delay + jitter * (Math.random() > 0.5 ? 1 : -1);
 
     return Math.max(config.initialDelayMs, Math.floor(delay));
   }
@@ -104,7 +101,7 @@ export class PaymentRetry {
     traceId: string,
     paymentMethod: string,
     operation: () => Promise<T>,
-    operationName: string = "Payment Operation"
+    operationName: string = 'Payment Operation'
   ): Promise<T> {
     let lastError: PaymentError | null = null;
     let attempt = 0;
@@ -128,9 +125,7 @@ export class PaymentRetry {
         return result;
       } catch (error: any) {
         // Convert to PaymentError if needed
-        lastError = error instanceof PaymentError
-          ? error
-          : this.convertToPaymentError(error);
+        lastError = error instanceof PaymentError ? error : this.convertToPaymentError(error);
 
         // Check if we should retry
         if (!RetryStrategy.shouldRetry(lastError, attempt, this.config.maxRetries)) {
@@ -140,8 +135,9 @@ export class PaymentRetry {
         attempt++;
 
         // Calculate delay (consider Retry-After header first)
-        let delay = RetryStrategy.getRetryAfterDelay(lastError)
-          || RetryStrategy.calculateDelay(attempt - 1, this.config);
+        let delay =
+          RetryStrategy.getRetryAfterDelay(lastError) ||
+          RetryStrategy.calculateDelay(attempt - 1, this.config);
 
         await this.auditLogger.logRetryAttempt(
           traceId,
@@ -195,7 +191,7 @@ export class PaymentRetry {
 
     return new PaymentError(
       PaymentErrorCode.UNKNOWN_ERROR,
-      error.message || "Unknown error occurred",
+      error.message || 'Unknown error occurred',
       PaymentErrorSeverity.MEDIUM,
       500,
       true,
@@ -208,6 +204,6 @@ export class PaymentRetry {
    * Sleep helper
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

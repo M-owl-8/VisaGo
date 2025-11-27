@@ -8,9 +8,16 @@ interface ProgressBarProps extends HTMLAttributes<HTMLDivElement> {
   tone?: 'primary' | 'accent';
 }
 
-export function ProgressBar({ value, showValue = true, tone = 'primary', className, ...props }: ProgressBarProps) {
+export function ProgressBar({
+  value,
+  showValue = true,
+  tone = 'primary',
+  className,
+  ...props
+}: ProgressBarProps) {
   const safeValue = Math.min(100, Math.max(0, value));
-  const toneClass = tone === 'primary' ? 'from-primary-600 to-primary-400' : 'from-accent-600 to-accent-400';
+  const toneClass =
+    tone === 'primary' ? 'from-primary-600 to-primary-400' : 'from-accent-600 to-accent-400';
 
   return (
     <div className={cn('space-y-2', className)} {...props}>
@@ -31,4 +38,3 @@ export function ProgressBar({ value, showValue = true, tone = 'primary', classNa
     </div>
   );
 }
-

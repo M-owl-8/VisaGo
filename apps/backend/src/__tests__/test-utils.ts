@@ -80,11 +80,7 @@ export const TEST_APPLICATION_FIXTURES = {
  */
 export const generateTestToken = (userId: string, email: string): string => {
   const secret = process.env.JWT_SECRET || 'test-secret';
-  return jwt.sign(
-    { userId, email },
-    secret,
-    { expiresIn: '24h' }
-  );
+  return jwt.sign({ userId, email }, secret, { expiresIn: '24h' });
 };
 
 /**
@@ -300,5 +296,7 @@ export const generateRandomEmail = (): string => {
  * Generate Random String
  */
 export const generateRandomString = (length: number = 10): string => {
-  return Math.random().toString(36).substring(2, 2 + length);
+  return Math.random()
+    .toString(36)
+    .substring(2, 2 + length);
 };

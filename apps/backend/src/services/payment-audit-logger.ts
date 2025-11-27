@@ -3,47 +3,47 @@
  * Enterprise-grade logging for all payment operations with tracing and recovery info
  */
 
-import { PrismaClient } from "@prisma/client";
-import { PaymentErrorCode, PaymentErrorSeverity } from "./payment-errors";
+import { PrismaClient } from '@prisma/client';
+import { PaymentErrorCode, PaymentErrorSeverity } from './payment-errors';
 
 export enum PaymentAuditAction {
   // Payment initiation
-  PAYMENT_INITIATED = "PAYMENT_INITIATED",
-  PAYMENT_CREATION_FAILED = "PAYMENT_CREATION_FAILED",
+  PAYMENT_INITIATED = 'PAYMENT_INITIATED',
+  PAYMENT_CREATION_FAILED = 'PAYMENT_CREATION_FAILED',
 
   // Payment processing
-  PAYMENT_SUBMITTED = "PAYMENT_SUBMITTED",
-  PAYMENT_VERIFIED = "PAYMENT_VERIFIED",
-  PAYMENT_COMPLETED = "PAYMENT_COMPLETED",
-  PAYMENT_FAILED = "PAYMENT_FAILED",
-  PAYMENT_CANCELLED = "PAYMENT_CANCELLED",
+  PAYMENT_SUBMITTED = 'PAYMENT_SUBMITTED',
+  PAYMENT_VERIFIED = 'PAYMENT_VERIFIED',
+  PAYMENT_COMPLETED = 'PAYMENT_COMPLETED',
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
+  PAYMENT_CANCELLED = 'PAYMENT_CANCELLED',
 
   // Webhook processing
-  WEBHOOK_RECEIVED = "WEBHOOK_RECEIVED",
-  WEBHOOK_VERIFIED = "WEBHOOK_VERIFIED",
-  WEBHOOK_VERIFICATION_FAILED = "WEBHOOK_VERIFICATION_FAILED",
-  WEBHOOK_PROCESSED = "WEBHOOK_PROCESSED",
-  WEBHOOK_DUPLICATE_DETECTED = "WEBHOOK_DUPLICATE_DETECTED",
+  WEBHOOK_RECEIVED = 'WEBHOOK_RECEIVED',
+  WEBHOOK_VERIFIED = 'WEBHOOK_VERIFIED',
+  WEBHOOK_VERIFICATION_FAILED = 'WEBHOOK_VERIFICATION_FAILED',
+  WEBHOOK_PROCESSED = 'WEBHOOK_PROCESSED',
+  WEBHOOK_DUPLICATE_DETECTED = 'WEBHOOK_DUPLICATE_DETECTED',
 
   // Retry operations
-  RETRY_INITIATED = "RETRY_INITIATED",
-  RETRY_SUCCEEDED = "RETRY_SUCCEEDED",
-  RETRY_FAILED = "RETRY_FAILED",
-  RETRY_EXHAUSTED = "RETRY_EXHAUSTED",
+  RETRY_INITIATED = 'RETRY_INITIATED',
+  RETRY_SUCCEEDED = 'RETRY_SUCCEEDED',
+  RETRY_FAILED = 'RETRY_FAILED',
+  RETRY_EXHAUSTED = 'RETRY_EXHAUSTED',
 
   // Fallback operations
-  FALLBACK_INITIATED = "FALLBACK_INITIATED",
-  FALLBACK_SUCCEEDED = "FALLBACK_SUCCEEDED",
-  FALLBACK_FAILED = "FALLBACK_FAILED",
+  FALLBACK_INITIATED = 'FALLBACK_INITIATED',
+  FALLBACK_SUCCEEDED = 'FALLBACK_SUCCEEDED',
+  FALLBACK_FAILED = 'FALLBACK_FAILED',
 
   // Refunds
-  REFUND_INITIATED = "REFUND_INITIATED",
-  REFUND_COMPLETED = "REFUND_COMPLETED",
-  REFUND_FAILED = "REFUND_FAILED",
+  REFUND_INITIATED = 'REFUND_INITIATED',
+  REFUND_COMPLETED = 'REFUND_COMPLETED',
+  REFUND_FAILED = 'REFUND_FAILED',
 
   // Configuration
-  CONFIGURATION_ERROR = "CONFIGURATION_ERROR",
-  CREDENTIAL_VALIDATION = "CREDENTIAL_VALIDATION",
+  CONFIGURATION_ERROR = 'CONFIGURATION_ERROR',
+  CREDENTIAL_VALIDATION = 'CREDENTIAL_VALIDATION',
 }
 
 export interface PaymentAuditLog {
@@ -78,7 +78,7 @@ export class PaymentAuditLogger {
   /**
    * Log payment audit trail
    */
-  async log(logData: Omit<PaymentAuditLog, "id" | "timestamp">): Promise<void> {
+  async log(logData: Omit<PaymentAuditLog, 'id' | 'timestamp'>): Promise<void> {
     try {
       const auditEntry = {
         ...logData,
@@ -89,10 +89,10 @@ export class PaymentAuditLogger {
       // Log to console for real-time monitoring
       const logLevel =
         logData.errorSeverity === PaymentErrorSeverity.CRITICAL
-          ? "error"
+          ? 'error'
           : logData.errorSeverity === PaymentErrorSeverity.HIGH
-            ? "warn"
-            : "info";
+            ? 'warn'
+            : 'info';
 
       const logMessage = `[Payment Audit] ${logData.action} - ${logData.paymentMethod}`;
       const logDetails = {
@@ -102,9 +102,9 @@ export class PaymentAuditLogger {
         message: logData.message,
       };
 
-      if (logLevel === "error") {
+      if (logLevel === 'error') {
         console.error(logMessage, logDetails);
-      } else if (logLevel === "warn") {
+      } else if (logLevel === 'warn') {
         console.warn(logMessage, logDetails);
       } else {
         console.log(logMessage, logDetails);
@@ -115,7 +115,7 @@ export class PaymentAuditLogger {
       // This would be configured based on your infrastructure
       await this.storeAuditLog(auditEntry);
     } catch (error) {
-      console.error("[Payment Audit Logger] Failed to log audit entry:", error);
+      console.error('[Payment Audit Logger] Failed to log audit entry:', error);
       // Don't throw - payment operations should not fail due to logging
     }
   }
@@ -131,11 +131,9 @@ export class PaymentAuditLogger {
       // - Datadog
       // - CloudWatch
       // - Splunk
-
       // For now, structured logging in console is sufficient
       // Extended implementation would send to external service:
       // await externalLoggingService.log(logData);
-
       // If you need to store in database later, uncomment:
       /*
       await this.prisma.paymentAuditLog.create({
@@ -158,7 +156,7 @@ export class PaymentAuditLogger {
       });
       */
     } catch (error) {
-      console.error("[Payment Audit Logger] Failed to store audit log:", error);
+      console.error('[Payment Audit Logger] Failed to store audit log:', error);
     }
   }
 
@@ -178,7 +176,7 @@ export class PaymentAuditLogger {
       message: `Payment initiated via ${paymentMethod}`,
       details: {
         amount: params.amount,
-        currency: params.currency || "UZS",
+        currency: params.currency || 'UZS',
       },
       requestTrace: traceId,
     });

@@ -3,7 +3,7 @@ import { checkDatabaseHealth, DatabaseConnectionState } from './utils/db-resilie
 
 /**
  * Prisma Client with enhanced connection resilience
- * 
+ *
  * Features:
  * - Connection health monitoring
  * - Automatic reconnection
@@ -11,9 +11,7 @@ import { checkDatabaseHealth, DatabaseConnectionState } from './utils/db-resilie
  * - Error recovery
  */
 export const db = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' 
-    ? ['query', 'error', 'warn'] 
-    : ['error'],
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   errorFormat: 'minimal',
 });
 

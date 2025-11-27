@@ -20,8 +20,9 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Pasport',
     nameRu: 'Паспорт',
     descriptionEn: 'Valid passport with at least 6 months validity beyond your intended stay',
-    descriptionUz: 'Qolish muddatidan kamida 6 oy amal qilish muddati bo\'lgan pasport',
-    descriptionRu: 'Действительный паспорт со сроком действия не менее 6 месяцев после предполагаемого пребывания',
+    descriptionUz: "Qolish muddatidan kamida 6 oy amal qilish muddati bo'lgan pasport",
+    descriptionRu:
+      'Действительный паспорт со сроком действия не менее 6 месяцев после предполагаемого пребывания',
   },
   bank_statement: {
     type: 'bank_statement',
@@ -29,8 +30,9 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Bank Hisobi',
     nameRu: 'Банковская Выписка',
     descriptionEn: 'Recent bank statement (last 6 months) showing sufficient funds',
-    descriptionUz: 'So\'nggi bank hisobi (oxirgi 6 oy) yetarli mablag\'ni ko\'rsatadi',
-    descriptionRu: 'Недавняя банковская выписка (последние 6 месяцев), показывающая достаточные средства',
+    descriptionUz: "So'nggi bank hisobi (oxirgi 6 oy) yetarli mablag'ni ko'rsatadi",
+    descriptionRu:
+      'Недавняя банковская выписка (последние 6 месяцев), показывающая достаточные средства',
   },
   i20_form: {
     type: 'i20_form',
@@ -38,7 +40,8 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'I-20 Shakl',
     nameRu: 'Форма I-20',
     descriptionEn: 'Certificate of Eligibility for F-1 Student Status (issued by university)',
-    descriptionUz: 'F-1 Talaba Holati uchun Muvofiqlik Sertifikati (universitet tomonidan berilgan)',
+    descriptionUz:
+      'F-1 Talaba Holati uchun Muvofiqlik Sertifikati (universitet tomonidan berilgan)',
     descriptionRu: 'Сертификат соответствия для статуса студента F-1 (выдается университетом)',
   },
   acceptance_letter: {
@@ -47,7 +50,7 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Qabul Xati',
     nameRu: 'Письмо о Зачислении',
     descriptionEn: 'Official acceptance letter from educational institution',
-    descriptionUz: 'Ta\'lim muassasasidan rasmiy qabul xati',
+    descriptionUz: "Ta'lim muassasasidan rasmiy qabul xati",
     descriptionRu: 'Официальное письмо о зачислении от учебного заведения',
   },
   academic_records: {
@@ -56,7 +59,7 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Akademik Hujjatlar',
     nameRu: 'Академические Записи',
     descriptionEn: 'Transcripts, diplomas, and certificates of previous education',
-    descriptionUz: 'Transkriptlar, diplomlar va oldingi ta\'lim sertifikatlari',
+    descriptionUz: "Transkriptlar, diplomlar va oldingi ta'lim sertifikatlari",
     descriptionRu: 'Транскрипты, дипломы и сертификаты предыдущего образования',
   },
   passport_photo: {
@@ -74,7 +77,7 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Viza Ariza Shakli',
     nameRu: 'Форма Заявления на Визу',
     descriptionEn: 'Completed and signed visa application form',
-    descriptionUz: 'To\'ldirilgan va imzolangan viza ariza shakli',
+    descriptionUz: "To'ldirilgan va imzolangan viza ariza shakli",
     descriptionRu: 'Заполненная и подписанная форма заявления на визу',
   },
   marriage_certificate: {
@@ -83,16 +86,16 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Nikoh Guvohnomasi',
     nameRu: 'Свидетельство о Браке',
     descriptionEn: 'Official marriage certificate (if married)',
-    descriptionUz: 'Rasmiy nikoh guvohnomasi (agar turmush qurgan bo\'lsa)',
+    descriptionUz: "Rasmiy nikoh guvohnomasi (agar turmush qurgan bo'lsa)",
     descriptionRu: 'Официальное свидетельство о браке (если женат/замужем)',
   },
   birth_certificates: {
     type: 'birth_certificates',
     nameEn: 'Birth Certificates of Children',
-    nameUz: 'Farzandlarning Tug\'ilganlik Guvohnomasi',
+    nameUz: "Farzandlarning Tug'ilganlik Guvohnomasi",
     nameRu: 'Свидетельства о Рождении Детей',
     descriptionEn: 'Birth certificates for all dependent children',
-    descriptionUz: 'Barcha qaramog\'idagi farzandlar uchun tug\'ilganlik guvohnomalari',
+    descriptionUz: "Barcha qaramog'idagi farzandlar uchun tug'ilganlik guvohnomalari",
     descriptionRu: 'Свидетельства о рождении всех детей на иждивении',
   },
   sponsor_letter: {
@@ -109,7 +112,7 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameEn: "Sponsor's Financial Documents",
     nameUz: 'Homiyning Moliyaviy Hujjatlari',
     nameRu: 'Финансовые Документы Спонсора',
-    descriptionEn: "Bank statements and income proof of sponsor",
+    descriptionEn: 'Bank statements and income proof of sponsor',
     descriptionUz: 'Homiyning bank hisoblari va daromad isboti',
     descriptionRu: 'Банковские выписки и доказательство дохода спонсора',
   },
@@ -161,10 +164,10 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
   proof_of_tuition_payment: {
     type: 'proof_of_tuition_payment',
     nameEn: 'Proof of Tuition Payment',
-    nameUz: 'O\'quv To\'lovi Isboti',
+    nameUz: "O'quv To'lovi Isboti",
     nameRu: 'Подтверждение Оплаты Обучения',
     descriptionEn: 'Receipt or confirmation of tuition fee payment',
-    descriptionUz: 'O\'quv to\'lovi to\'lovi kvitansiyasi yoki tasdiqlanishi',
+    descriptionUz: "O'quv to'lovi to'lovi kvitansiyasi yoki tasdiqlanishi",
     descriptionRu: 'Квитанция или подтверждение оплаты обучения',
   },
   police_clearance: {
@@ -182,7 +185,7 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Tibbiy Sertifikat',
     nameRu: 'Медицинская Справка',
     descriptionEn: 'Medical examination certificate from approved physician',
-    descriptionUz: 'Tasdiqlangan shifokordan tibbiy ko\'rik sertifikati',
+    descriptionUz: "Tasdiqlangan shifokordan tibbiy ko'rik sertifikati",
     descriptionRu: 'Медицинская справка от аккредитованного врача',
   },
   proof_of_residence: {
@@ -191,7 +194,7 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     nameUz: 'Yashash Joyi Isboti',
     nameRu: 'Подтверждение Места Жительства',
     descriptionEn: 'Utility bill or rental agreement showing current address',
-    descriptionUz: 'Joriy manzilni ko\'rsatuvchi kommunal to\'lov yoki ijara shartnomasi',
+    descriptionUz: "Joriy manzilni ko'rsatuvchi kommunal to'lov yoki ijara shartnomasi",
     descriptionRu: 'Счет за коммунальные услуги или договор аренды с текущим адресом',
   },
   degree_certificate: {
@@ -215,10 +218,10 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
   company_registration: {
     type: 'company_registration',
     nameEn: 'Company Registration',
-    nameUz: 'Kompaniya Ro\'yxatdan O\'tishi',
+    nameUz: "Kompaniya Ro'yxatdan O'tishi",
     nameRu: 'Регистрация Компании',
     descriptionEn: 'Company registration documents and business license',
-    descriptionUz: 'Kompaniya ro\'yxatdan o\'tish hujjatlari va biznes litsenziyasi',
+    descriptionUz: "Kompaniya ro'yxatdan o'tish hujjatlari va biznes litsenziyasi",
     descriptionRu: 'Документы регистрации компании и бизнес-лицензия',
   },
 };
@@ -226,26 +229,24 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
 /**
  * Get document translation by type
  */
-export function getDocumentTranslation(
-  documentType: string
-): DocumentTranslation {
+export function getDocumentTranslation(documentType: string): DocumentTranslation {
   // Normalize document type (lowercase, replace spaces with underscores)
   const normalizedType = documentType.toLowerCase().replace(/\s+/g, '_');
-  
+
   // Try exact match
   if (documentTranslations[normalizedType]) {
     return documentTranslations[normalizedType];
   }
-  
+
   // Try partial match
-  const partialMatch = Object.keys(documentTranslations).find((key) =>
-    key.includes(normalizedType) || normalizedType.includes(key)
+  const partialMatch = Object.keys(documentTranslations).find(
+    (key) => key.includes(normalizedType) || normalizedType.includes(key)
   );
-  
+
   if (partialMatch) {
     return documentTranslations[partialMatch];
   }
-  
+
   // Default fallback
   return {
     type: documentType,
@@ -257,5 +258,3 @@ export function getDocumentTranslation(
     descriptionRu: 'Необходимый документ для визовой заявки',
   };
 }
-
-

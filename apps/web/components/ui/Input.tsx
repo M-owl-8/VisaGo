@@ -15,7 +15,7 @@ export interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const Input = forwardRef<HTMLInputElement, FieldProps>(function InputField(
   { label, error, hint, className, ...props },
-  ref,
+  ref
 ) {
   return (
     <label className="block space-y-2">
@@ -35,7 +35,7 @@ export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
 
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextAreaField(
   { label, error, hint, className, ...props },
-  ref,
+  ref
 ) {
   return (
     <label className="block space-y-2">
@@ -50,4 +50,3 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
     </label>
   );
 });
-

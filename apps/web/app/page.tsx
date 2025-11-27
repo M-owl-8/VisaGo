@@ -11,7 +11,7 @@ export default function Home() {
 
   useEffect(() => {
     let mounted = true;
-    
+
     const init = async () => {
       try {
         await initializeApp();
@@ -76,4 +76,3 @@ export default function Home() {
     </div>
   );
 }
-

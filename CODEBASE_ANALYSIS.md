@@ -1,4 +1,5 @@
 # VisaBuddy Codebase Analysis
+
 **Date**: 2025-01-15  
 **Purpose**: Comprehensive analysis for external AI understanding
 
@@ -69,18 +70,18 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 
 ### 2.1. User Flow Status
 
-| Flow | Status | Notes |
-|------|--------|-------|
-| **Authentication** | ✅ Fully Working | Email/password + Google OAuth, JWT tokens, AsyncStorage |
-| **Onboarding Questionnaire** | ✅ Fully Working | Multi-step questionnaire, AI generates application from answers |
-| **Create Visa Application** | ✅ Fully Working | Manual creation + AI-generated from questionnaire |
-| **Document Upload & Viewing** | ✅ Fully Working | Multer upload, Firebase/local storage, preview screen |
-| **Document Checklist** | ✅ Fully Working | AI-generated checklist, multilingual (UZ/RU/EN), status tracking |
-| **Payments** | 🟡 Partially Implemented | Code exists for Payme/Click/Uzum/Stripe, but **frozen for 3 months** (feature flag) |
-| **AI Chat / Assistant** | ✅ Fully Working | RAG-enabled chat, application context injection, rate-limited |
-| **Notifications** | 🟡 Partially Implemented | FCM service initialized, but push notifications not fully wired to frontend |
-| **Admin Panel** | 🟡 Partially Implemented | Routes exist, but admin screens in frontend are basic |
-| **Application Progress Tracking** | ✅ Fully Working | Checkpoints, progress percentage, document status |
+| Flow                              | Status                   | Notes                                                                               |
+| --------------------------------- | ------------------------ | ----------------------------------------------------------------------------------- |
+| **Authentication**                | ✅ Fully Working         | Email/password + Google OAuth, JWT tokens, AsyncStorage                             |
+| **Onboarding Questionnaire**      | ✅ Fully Working         | Multi-step questionnaire, AI generates application from answers                     |
+| **Create Visa Application**       | ✅ Fully Working         | Manual creation + AI-generated from questionnaire                                   |
+| **Document Upload & Viewing**     | ✅ Fully Working         | Multer upload, Firebase/local storage, preview screen                               |
+| **Document Checklist**            | ✅ Fully Working         | AI-generated checklist, multilingual (UZ/RU/EN), status tracking                    |
+| **Payments**                      | 🟡 Partially Implemented | Code exists for Payme/Click/Uzum/Stripe, but **frozen for 3 months** (feature flag) |
+| **AI Chat / Assistant**           | ✅ Fully Working         | RAG-enabled chat, application context injection, rate-limited                       |
+| **Notifications**                 | 🟡 Partially Implemented | FCM service initialized, but push notifications not fully wired to frontend         |
+| **Admin Panel**                   | 🟡 Partially Implemented | Routes exist, but admin screens in frontend are basic                               |
+| **Application Progress Tracking** | ✅ Fully Working         | Checkpoints, progress percentage, document status                                   |
 
 ### 2.2. End-to-End Flow Descriptions
 
@@ -127,6 +128,7 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 ### 3.1. Main API Routes
 
 #### `/api/auth`
+
 - `POST /register` - Email/password registration ✅
 - `POST /login` - Email/password login ✅
 - `POST /google` - Google OAuth login ✅
@@ -136,6 +138,7 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 - `GET /me` - Get current user profile ✅
 
 #### `/api/applications`
+
 - `GET /` - Get user's applications ✅
 - `GET /:id` - Get single application ✅
 - `POST /` - Create application manually ✅
@@ -145,6 +148,7 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 - `DELETE /:id` - Delete application ✅
 
 #### `/api/documents`
+
 - `POST /upload` - Upload document (multer) ✅
 - `GET /:applicationId` - Get documents for application ✅
 - `GET /:id` - Get single document ✅
@@ -152,10 +156,12 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 - `DELETE /:id` - Delete document ✅
 
 #### `/api/document-checklist`
+
 - `GET /:applicationId` - Get checklist for application ✅
 - Returns multilingual checklist with status, progress, summary ✅
 
 #### `/api/payments`
+
 - `GET /methods` - Get available payment methods (returns empty if frozen) ✅
 - `POST /create` - Create payment intent ✅
 - `POST /webhook/:gateway` - Webhook handlers (Payme, Click, Uzum, Stripe) ✅
@@ -164,6 +170,7 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 - **Note**: Payments are frozen via feature flag (`isPaymentFrozen()`)
 
 #### `/api/chat`
+
 - `POST /` - Send message, get AI response ✅
 - `POST /send` - Legacy endpoint (redirects to POST /) ✅
 - `GET /sessions` - Get user's chat sessions ✅
@@ -172,14 +179,17 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 - `DELETE /sessions/:id` - Delete session ✅
 
 #### `/api/countries`
+
 - `GET /` - Get all countries ✅
 - `GET /:id` - Get country details ✅
 
 #### `/api/visa-types`
+
 - `GET /` - Get visa types (optionally filtered by country) ✅
 - `GET /:id` - Get visa type details ✅
 
 #### `/api/admin`
+
 - `GET /dashboard` - Admin dashboard stats ✅
 - `GET /users` - List users ✅
 - `GET /applications` - List all applications ✅
@@ -188,22 +198,26 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 - **Note**: Admin routes exist but frontend admin screens are basic
 
 #### `/api/analytics`
+
 - `GET /events` - Get analytics events ✅
 - `POST /events` - Track event ✅
 - `GET /metrics` - Get daily metrics ✅
 
 #### `/api/notifications`
+
 - `GET /` - Get user notifications ✅
 - `POST /register-device` - Register FCM device token ✅
 - `PUT /:id/read` - Mark notification as read ✅
 
 #### `/api/health` & `/api/monitoring`
+
 - `GET /health` - Health check ✅
 - `GET /monitoring/stats` - System stats ✅
 
 ### 3.2. Route Usage by Mobile App
 
 **Used by Mobile App:**
+
 - `/api/auth/*` - All auth endpoints
 - `/api/applications/*` - All application endpoints
 - `/api/documents/*` - Upload, list, get
@@ -213,6 +227,7 @@ VisaBuddy is a **mobile-first visa application management platform** that helps 
 - `/api/payments/methods`, `/api/payments/freeze-status` - Payment info (frozen)
 
 **Unused/Unfinished:**
+
 - `/api/admin/*` - Admin routes not fully used by mobile app
 - `/api/analytics/events` - Analytics tracking not fully integrated
 - `/api/notifications/register-device` - FCM token registration not wired
@@ -261,10 +276,12 @@ VisaType
 ```
 
 **AI/RAG Models:**
+
 - `Document` - Knowledge base documents (visa requirements, guides)
 - `RAGChunk` - Chunked documents with embeddings for RAG
 
 **Supporting Models:**
+
 - `Checkpoint` - Application progress checkpoints
 - `WebhookIdempotency` - Payment webhook deduplication
 - `AnalyticsEvent` - User analytics
@@ -274,6 +291,7 @@ VisaType
 ### 3.4. Critical TODOs / Unfinished Pieces
 
 **Found in Code:**
+
 1. **`apps/backend/src/services/form-filling.service.ts:341`** - `// TODO: Add nationality to User model`
 2. **Payment Freeze Logic** - Payments are frozen via `isPaymentFrozen()` utility, but webhook handlers still exist (may need cleanup after 3 months)
 3. **Admin Panel** - Routes exist but frontend admin screens are basic skeletons
@@ -289,38 +307,46 @@ VisaType
 ### 4.1. Main Screens
 
 **Auth Screens:**
+
 - `LoginScreen.tsx` - Email/password + Google OAuth login ✅
 - `RegisterScreen.tsx` - Email/password registration ✅
 - `ForgotPasswordScreen.tsx` - Password reset ✅
 
 **Onboarding:**
+
 - `QuestionnaireScreen.tsx` - Multi-step questionnaire (travel purpose, destination, dates, etc.) ✅
 - `OnboardingScreen.tsx` - (May be unused/duplicate)
 
 **Home / Dashboard:**
+
 - `HomeScreen.tsx` - Progress overview, active applications, recent activity ✅
 
 **Visa / Applications:**
+
 - `VisaApplicationScreen.tsx` - List of user's applications ✅
 - `ApplicationDetailScreen.tsx` - Detailed application view with checklist, documents, checkpoints ✅
 - `VisaSelectionScreen.tsx` - Country/visa type selection (may be unused)
 
 **Documents:**
+
 - `DocumentsScreen.tsx` - List documents for application ✅
 - `DocumentUploadScreen.tsx` - Upload document (file picker, preview) ✅
 - `DocumentPreviewScreen.tsx` - View uploaded document ✅
 - `CheckpointScreen.tsx` - View application checkpoints ✅
 
 **Payments:**
+
 - `PaymentScreen.tsx` - Payment form (frozen, shows promo message) ✅
 - `PaymentHistoryScreen.tsx` - Payment history ✅
 - `PaymentSuccessScreen.tsx` - Success screen ✅
 - `PaymentFailedScreen.tsx` - Failure screen ✅
 
 **Chat:**
+
 - `ChatScreen.tsx` - AI chat interface with application context ✅
 
 **Profile / Settings:**
+
 - `ProfileScreen.tsx` - User profile view ✅
 - `ProfileEditScreen.tsx` - Edit profile ✅
 - `SettingsScreen.tsx` - App settings ✅
@@ -328,6 +354,7 @@ VisaType
 - `NotificationCenterScreen.tsx` - Notification list ✅
 
 **Admin:**
+
 - `AdminDashboard.tsx` - Admin dashboard (basic) 🟡
 - `AdminUsersScreen.tsx` - User management (basic) 🟡
 - `AdminApplicationsScreen.tsx` - Application management (basic) 🟡
@@ -338,26 +365,31 @@ VisaType
 ### 4.2. Screen Functionality & Backend Integration
 
 #### **HomeScreen.tsx**
+
 - **What user sees**: Overall progress, active applications list, recent activity, quick actions
 - **Backend calls**: `GET /api/applications`, calculates progress from `application.progressPercentage`
 - **Status**: ✅ Working, but progress calculation is estimated (doesn't call checklist endpoint for each app)
 
 #### **ApplicationDetailScreen.tsx**
+
 - **What user sees**: Application details, document checklist, uploaded documents, checkpoints, chat button
 - **Backend calls**: `GET /api/applications/:id`, `GET /api/document-checklist/:id`
 - **Status**: ✅ Fully working, checklist shows multilingual names/descriptions
 
 #### **DocumentUploadScreen.tsx**
+
 - **What user sees**: File picker, preview, upload button
 - **Backend calls**: `POST /api/documents/upload` (multipart/form-data)
 - **Status**: ✅ Working, uses `react-native-document-picker`, uploads to Firebase/local storage
 
 #### **ChatScreen.tsx**
+
 - **What user sees**: Chat interface, message history, input field
 - **Backend calls**: `POST /api/chat`, `GET /api/chat/sessions/:id`
 - **Status**: ✅ Working, includes application context, rate-limited (50 messages/day)
 
 #### **PaymentScreen.tsx**
+
 - **What user sees**: Payment form (if not frozen) or promo message
 - **Backend calls**: `GET /api/payments/methods`, `GET /api/payments/freeze-status`
 - **Status**: 🟡 Code exists but payments are frozen via feature flag
@@ -365,6 +397,7 @@ VisaType
 ### 4.3. Web-Only APIs Check
 
 **Checked for:**
+
 - `localStorage` → ✅ Uses `AsyncStorage` (React Native compatible)
 - `window` → ✅ Not used (React Native doesn't have window)
 - Browser-only APIs → ✅ Not found, uses React Native APIs
@@ -374,6 +407,7 @@ VisaType
 ### 4.4. User Experience - Where Would They Get Stuck?
 
 **✅ Can Complete Successfully:**
+
 1. Register/Login (email or Google)
 2. Complete questionnaire
 3. Get AI-generated application
@@ -384,15 +418,18 @@ VisaType
 8. View profile/settings
 
 **🟡 May Encounter Issues:**
+
 1. **Payments** - Currently frozen, shows promo message (intentional)
 2. **Push Notifications** - FCM service initialized but device token registration may not be fully wired
 3. **Admin Features** - Admin screens exist but are basic (not a blocker for regular users)
 4. **Analytics** - Events may not be consistently tracked (doesn't break functionality)
 
 **🔴 Would Get Stuck:**
+
 - **None identified** - Core flows are working end-to-end
 
 **Potential Edge Cases:**
+
 - If AI service is down, chat will fail (no graceful fallback message)
 - If Firebase Storage fails, falls back to local storage (works but files won't persist across deployments)
 - If database connection fails, app will show errors (no offline mode)
@@ -430,17 +467,20 @@ VisaType
 **✅ RAG is Implemented:**
 
 **Storage:**
+
 - **Primary**: Pinecone vector database (if `PINECONE_API_KEY` set)
 - **Fallback**: Local in-memory cache with cosine similarity (`apps/ai-service/services/cache_fallback.py`)
 - **Database Models**: `Document`, `RAGChunk` in Prisma schema (for storing knowledge base)
 
 **Ingestion:**
+
 - **Knowledge Base**: `apps/ai-service/data/visa_kb.json` (visa requirements, guides)
 - **Ingestion Script**: `apps/ai-service/services/kb_ingestor.py` - Loads JSON, chunks documents
 - **Chunking**: `apps/ai-service/services/chunker.py` - 500-token chunks with 100-token overlap
 - **Embeddings**: OpenAI embeddings (1536 dimensions)
 
 **Query Flow:**
+
 1. User query → Embed query text
 2. Search Pinecone (or cache) for similar chunks
 3. Retrieve top 3-5 chunks
@@ -452,6 +492,7 @@ VisaType
 ### 5.3. AI Usage Beyond Chat
 
 **AI is used for:**
+
 1. **Application Generation** (`AIApplicationService.generateApplicationFromQuestionnaire()`):
    - Analyzes questionnaire answers
    - Selects country and visa type
@@ -462,6 +503,7 @@ VisaType
 3. **Chat with RAG** - Context-aware responses
 
 **Not Used For:**
+
 - Document verification (manual only)
 - Form filling (not implemented)
 - Automatic status updates (manual/admin only)
@@ -472,14 +514,15 @@ VisaType
 
 ### 6.1. Payment Gateway Integration Status
 
-| Gateway | Integration Status | Webhooks | Idempotency |
-|---------|-------------------|----------|-------------|
-| **Payme** | ✅ Code exists | ✅ `/api/payments/webhook/payme` | ✅ `WebhookIdempotency` model |
-| **Click** | ✅ Code exists | ✅ `/api/payments/webhook/click` | ✅ `WebhookIdempotency` model |
-| **Uzum** | ✅ Code exists | ✅ `/api/payments/webhook/uzum` | ✅ `WebhookIdempotency` model |
-| **Stripe** | ✅ Code exists | ✅ `/api/payments/webhook/stripe` | ✅ `WebhookIdempotency` model |
+| Gateway    | Integration Status | Webhooks                          | Idempotency                   |
+| ---------- | ------------------ | --------------------------------- | ----------------------------- |
+| **Payme**  | ✅ Code exists     | ✅ `/api/payments/webhook/payme`  | ✅ `WebhookIdempotency` model |
+| **Click**  | ✅ Code exists     | ✅ `/api/payments/webhook/click`  | ✅ `WebhookIdempotency` model |
+| **Uzum**   | ✅ Code exists     | ✅ `/api/payments/webhook/uzum`   | ✅ `WebhookIdempotency` model |
+| **Stripe** | ✅ Code exists     | ✅ `/api/payments/webhook/stripe` | ✅ `WebhookIdempotency` model |
 
 **Implementation Details:**
+
 - **Service**: `PaymentGatewayService` in `apps/backend/src/services/payment-gateway.service.ts`
 - **Routes**: `apps/backend/src/routes/payments-complete.ts`
 - **Webhook Verification**: HMAC signature verification for Payme/Click/Uzum, Stripe webhook secret
@@ -488,6 +531,7 @@ VisaType
 ### 6.2. Payment Flow (As Code Suggests)
 
 **Intended Flow:**
+
 1. User selects payment method on PaymentScreen
 2. Frontend calls `POST /api/payments/create` with `applicationId`, `amount`, `paymentMethod`
 3. Backend creates Payment record (status="pending"), calls gateway API to create payment
@@ -500,12 +544,14 @@ VisaType
 10. Frontend polls or receives notification, shows success screen
 
 **Current Status:**
+
 - **🟡 Payments are FROZEN** via `isPaymentFrozen()` utility (returns true for 3 months)
 - **Code is complete** but disabled by feature flag
 - **Webhook handlers exist** but won't be called while frozen
 - **Could work in test environment** if feature flag is disabled and gateway credentials are set
 
 **Missing/Fragile Parts:**
+
 1. **Feature Flag**: `apps/backend/src/utils/payment-freeze.ts` - Hardcoded freeze until date
 2. **Gateway Credentials**: Must be set in environment variables (not all may be configured)
 3. **Application Status Update**: Code exists but may need verification that it triggers on payment success
@@ -513,6 +559,7 @@ VisaType
 ### 6.3. Automatic Status Updates After Payment
 
 **Code Check:**
+
 - `PaymentGatewayService.processWebhook()` updates Payment status
 - **No automatic application status update found** in webhook handlers
 - Status updates are likely manual/admin-only
@@ -528,17 +575,20 @@ VisaType
 **Endpoint**: `POST /api/documents/upload` (multer middleware)
 
 **Storage:**
+
 - **Primary**: Firebase Storage (`FirebaseStorageService`)
 - **Fallback**: Local filesystem (`LocalStorageService`)
 - **Adapter**: `StorageAdapter` chooses based on `STORAGE_TYPE` env var
 
 **File Handling:**
+
 - **Max Size**: 20 MB (multer limit)
 - **Allowed Types**: PDF, JPEG, PNG, DOC, DOCX
 - **Compression**: Images are compressed (Sharp) before upload
 - **Thumbnails**: Generated for images (if enabled)
 
 **Database Metadata:**
+
 - `UserDocument` model stores:
   - `fileUrl` (Firebase URL or local path)
   - `fileName`, `fileSize`
@@ -549,6 +599,7 @@ VisaType
 ### 7.2. Document Checklist
 
 **How Checklist is Defined:**
+
 - **AI-Generated**: `DocumentChecklistService.generateChecklistItems()` uses OpenAI to generate checklist based on:
   - Country requirements
   - Visa type requirements
@@ -557,12 +608,14 @@ VisaType
 - **Translation Source**: `apps/backend/src/data/document-translations.ts` - Hardcoded translations for common document types
 
 **User Visibility:**
+
 - ✅ Users can see checklist on `ApplicationDetailScreen`
 - ✅ Shows status: "missing", "pending", "verified", "rejected"
 - ✅ Shows progress: "X of Y documents completed"
 - ✅ Shows uploaded documents with preview
 
 **Status Updates:**
+
 - When document uploaded → status changes from "missing" to "pending"
 - Admin can verify → status changes to "verified"
 - Admin can reject → status changes to "rejected"
@@ -572,6 +625,7 @@ VisaType
 **Status**: ❌ **NOT IMPLEMENTED** - Verification is **manual/admin-only**
 
 **Current Flow:**
+
 1. User uploads document → status="pending"
 2. Admin views document via `/api/documents/:id` or admin screen
 3. Admin calls `PUT /api/documents/:id/verify` with `status` and `verificationNotes`
@@ -586,22 +640,26 @@ VisaType
 ### 8.1. Security
 
 **JWT Tokens:**
+
 - ✅ Tokens stored in AsyncStorage (frontend)
 - ✅ Tokens validated via `authenticateToken` middleware
 - ✅ Secret must be >= 32 chars in production (enforced in `index.ts`)
 - ✅ Tokens expire (default 24h, configurable)
 
 **CORS:**
+
 - ✅ Configured in `index.ts` with `validateCorsOrigin()`
 - ⚠️ **Production Warning**: Code checks if `CORS_ORIGIN === "*"` in production and exits (good!)
 - ✅ Allows credentials, specific origins
 
 **Payment Webhooks:**
+
 - ✅ HMAC signature verification for Payme/Click/Uzum
 - ✅ Stripe webhook secret verification
 - ✅ Idempotency via `WebhookIdempotency` model (prevents duplicate processing)
 
 **Other Security:**
+
 - ✅ Helmet.js for HTTP headers
 - ✅ Rate limiting (express-rate-limit) on auth routes
 - ✅ CSRF protection (CSRF tokens in headers)
@@ -610,7 +668,8 @@ VisaType
 - ✅ Password hashing (bcrypt)
 
 **Security Risks:**
-- ⚠️ **CORS_ORIGIN = "*"** in production would be blocked (good!)
+
+- ⚠️ **CORS_ORIGIN = "\*"** in production would be blocked (good!)
 - ⚠️ **JWT_SECRET** must be strong (enforced)
 - ✅ No obvious security vulnerabilities found
 
@@ -619,6 +678,7 @@ VisaType
 **Required Environment Variables:**
 
 **Backend (`apps/backend/.env`):**
+
 - `DATABASE_URL` - PostgreSQL/SQLite connection string
 - `JWT_SECRET` - JWT signing secret (>= 32 chars in production)
 - `OPENAI_API_KEY` - OpenAI API key (for AI features)
@@ -632,6 +692,7 @@ VisaType
 - `PORT` - Server port (default: 3000)
 
 **AI Service (`apps/ai-service/.env`):**
+
 - `OPENAI_API_KEY` - OpenAI API key
 - `PINECONE_API_KEY` - Pinecone API key (optional, uses cache fallback)
 - `PINECONE_INDEX_NAME` - Pinecone index name (optional)
@@ -639,23 +700,26 @@ VisaType
 - `PORT` - Server port (default: 8001)
 
 **Frontend (`frontend_new/.env`):**
+
 - `EXPO_PUBLIC_API_URL` - Backend API URL
 - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` - Google OAuth Web Client ID
 - `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` - Google OAuth iOS Client ID
 - `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` - Google OAuth Android Client ID
 
 **What Happens if Missing:**
+
 - **JWT_SECRET**: App exits with error (required)
 - **DATABASE_URL**: App exits with error (required)
 - **OPENAI_API_KEY**: AI features won't work (chat, application generation, checklist)
 - **AI_SERVICE_URL**: Chat will fail (no fallback)
-- **FIREBASE_***: Falls back to local storage (works but files won't persist)
+- **FIREBASE\_\***: Falls back to local storage (works but files won't persist)
 - **REDIS_URL**: Falls back to node-cache (works but not persistent)
-- **GOOGLE_***: Google OAuth won't work (email/password still works)
+- **GOOGLE\_\***: Google OAuth won't work (email/password still works)
 
 ### 8.3. Testing
 
 **Backend Tests:**
+
 - ✅ Test files exist: `apps/backend/src/__tests__/`
 - **Coverage**:
   - Auth flow tests (`auth-flow.test.ts`, `auth.service.test.ts`)
@@ -666,6 +730,7 @@ VisaType
 - **Status**: Tests exist but **not verified if they pass** (no CI/CD results available)
 
 **Frontend Tests:**
+
 - ✅ Test files exist: `frontend_new/src/__tests__/`, `frontend_new/src/services/__tests__/`
 - **Coverage**:
   - Auth store tests (`auth.store.test.ts`)
@@ -674,6 +739,7 @@ VisaType
 - **Status**: Tests exist but **not verified if they pass**
 
 **Test Coverage for Payments/Chat:**
+
 - ✅ Payment tests exist (backend + frontend)
 - ✅ Chat tests exist (backend)
 - **Status**: Tests exist but **execution status unknown**
@@ -681,15 +747,18 @@ VisaType
 ### 8.4. CI/CD
 
 **GitHub Actions:**
+
 - ❌ **No CI/CD pipeline found** (searched for `.github/workflows/*.yml`, not found)
 - **Docker**: `docker-compose.yml` exists for local development
 - **Railway**: Deployment configured (based on user context), uses Nixpacks/Docker
 
 **Current Pipeline Status:**
+
 - **Would fail** - No CI/CD pipeline to run tests, lint, or deploy automatically
 - **Manual deployment** - Must be done via Railway dashboard or manual Docker build
 
 **Recommendation**: Add GitHub Actions workflow for:
+
 - Running tests on PR
 - Linting/type checking
 - Building Docker images
@@ -702,6 +771,7 @@ VisaType
 ### 9.1. User Readiness: **75%**
 
 **Justification:**
+
 - Core flows work end-to-end (auth, questionnaire, application, documents, chat)
 - Payments are frozen (intentional, not a bug)
 - Push notifications not fully wired (minor issue)
@@ -711,6 +781,7 @@ VisaType
 ### 9.2. Code Quality: **85%**
 
 **Justification:**
+
 - Well-structured monorepo with clear separation
 - TypeScript throughout (type safety)
 - Consistent error handling patterns
@@ -721,6 +792,7 @@ VisaType
 ### 9.3. Security: **90%**
 
 **Justification:**
+
 - Strong security practices (JWT, CORS, CSRF, rate limiting, input validation)
 - Payment webhook verification
 - Password hashing, SQL injection prevention
@@ -730,6 +802,7 @@ VisaType
 ### 9.4. Configuration & DevOps: **70%**
 
 **Justification:**
+
 - Environment variables well-documented
 - Docker support exists
 - Railway deployment configured
@@ -739,6 +812,7 @@ VisaType
 ### 9.5. Testing & Reliability: **60%**
 
 **Justification:**
+
 - Test files exist for critical flows (auth, payments, chat)
 - Integration tests exist
 - **Missing**: No CI/CD to run tests automatically, test execution status unknown, no test coverage reports, no load testing in production
@@ -799,16 +873,16 @@ VisaType
 
 ### 10.2. Summary Table
 
-| Gap | Difficulty | Priority | Estimated Effort |
-|-----|-----------|----------|------------------|
-| CI/CD Pipeline | Easy | High | 1-2 days |
-| Payment Testing | Medium | High | 3-5 days |
-| Push Notifications | Easy | Medium | 1-2 days |
-| Offline Mode | Hard | Medium | 1-2 weeks |
-| Admin Panel | Medium | Low | 1 week |
-| Document AI Verification | Hard | Low | 2-3 weeks |
-| Analytics/Monitoring | Medium | Medium | 3-5 days |
-| Production Hardening | Medium | High | 1 week |
+| Gap                      | Difficulty | Priority | Estimated Effort |
+| ------------------------ | ---------- | -------- | ---------------- |
+| CI/CD Pipeline           | Easy       | High     | 1-2 days         |
+| Payment Testing          | Medium     | High     | 3-5 days         |
+| Push Notifications       | Easy       | Medium   | 1-2 days         |
+| Offline Mode             | Hard       | Medium   | 1-2 weeks        |
+| Admin Panel              | Medium     | Low      | 1 week           |
+| Document AI Verification | Hard       | Low      | 2-3 weeks        |
+| Analytics/Monitoring     | Medium     | Medium   | 3-5 days         |
+| Production Hardening     | Medium     | High     | 1 week           |
 
 ---
 
@@ -817,6 +891,7 @@ VisaType
 **VisaBuddy is ~75% ready for production use by real users.** The core flows (auth, questionnaire, application generation, document upload, chat) work end-to-end. Payments are intentionally frozen for a 3-month promo period. The main gaps are in CI/CD, payment testing, push notifications, and production hardening. The codebase is well-structured and secure, but needs automated testing and monitoring before full production launch.
 
 **Recommended Next Steps:**
+
 1. Set up CI/CD pipeline (GitHub Actions)
 2. Test payment gateways end-to-end
 3. Wire up push notifications
@@ -827,4 +902,3 @@ VisaType
 ---
 
 **End of Analysis**
-

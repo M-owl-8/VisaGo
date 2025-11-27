@@ -41,7 +41,7 @@ const COMMAND_INJECTION_PATTERNS = [
  */
 export function detectSQLInjection(input: string): boolean {
   if (!input || typeof input !== 'string') return false;
-  
+
   for (const pattern of SQL_INJECTION_PATTERNS) {
     if (pattern.test(input)) {
       return true;
@@ -55,7 +55,7 @@ export function detectSQLInjection(input: string): boolean {
  */
 export function detectXSS(input: string): boolean {
   if (!input || typeof input !== 'string') return false;
-  
+
   for (const pattern of XSS_PATTERNS) {
     if (pattern.test(input)) {
       return true;
@@ -69,7 +69,7 @@ export function detectXSS(input: string): boolean {
  */
 export function detectCommandInjection(input: string): boolean {
   if (!input || typeof input !== 'string') return false;
-  
+
   for (const pattern of COMMAND_INJECTION_PATTERNS) {
     if (pattern.test(input)) {
       return true;
@@ -81,20 +81,19 @@ export function detectCommandInjection(input: string): boolean {
 /**
  * Sanitizes string input - removes dangerous characters and patterns
  */
-export function sanitizeInput(input: string, options: {
-  maxLength?: number;
-  allowHTML?: boolean;
-  allowSpecialChars?: boolean;
-} = {}): string {
+export function sanitizeInput(
+  input: string,
+  options: {
+    maxLength?: number;
+    allowHTML?: boolean;
+    allowSpecialChars?: boolean;
+  } = {}
+): string {
   if (!input || typeof input !== 'string') {
     return '';
   }
 
-  const {
-    maxLength = 10000,
-    allowHTML = false,
-    allowSpecialChars = true,
-  } = options;
+  const { maxLength = 10000, allowHTML = false, allowSpecialChars = true } = options;
 
   let sanitized = input.trim();
 
@@ -130,11 +129,14 @@ export function sanitizeInput(input: string, options: {
 /**
  * Sanitizes object recursively
  */
-export function sanitizeObject(obj: any, options: {
-  maxLength?: number;
-  allowHTML?: boolean;
-  allowSpecialChars?: boolean;
-} = {}): any {
+export function sanitizeObject(
+  obj: any,
+  options: {
+    maxLength?: number;
+    allowHTML?: boolean;
+    allowSpecialChars?: boolean;
+  } = {}
+): any {
   if (obj === null || obj === undefined) {
     return obj;
   }
@@ -144,7 +146,7 @@ export function sanitizeObject(obj: any, options: {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item, options));
+    return obj.map((item) => sanitizeObject(item, options));
   }
 
   if (typeof obj === 'object') {
@@ -161,17 +163,16 @@ export function sanitizeObject(obj: any, options: {
 /**
  * Validates and sanitizes input with security checks
  */
-export function validateAndSanitize(input: string, options: {
-  maxLength?: number;
-  required?: boolean;
-  logSuspicious?: boolean;
-} = {}): { valid: boolean; sanitized: string; errors: string[] } {
+export function validateAndSanitize(
+  input: string,
+  options: {
+    maxLength?: number;
+    required?: boolean;
+    logSuspicious?: boolean;
+  } = {}
+): { valid: boolean; sanitized: string; errors: string[] } {
   const errors: string[] = [];
-  const {
-    maxLength = 10000,
-    required = false,
-    logSuspicious = true,
-  } = options;
+  const { maxLength = 10000, required = false, logSuspicious = true } = options;
 
   if (required && (!input || input.trim().length === 0)) {
     errors.push('Input is required');
@@ -215,11 +216,3 @@ export function validateAndSanitize(input: string, options: {
     errors,
   };
 }
-
-
-
-
-
-
-
-

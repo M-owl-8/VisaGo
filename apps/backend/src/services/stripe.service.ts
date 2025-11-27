@@ -1,5 +1,5 @@
-import Stripe from "stripe";
-import { PrismaClient } from "@prisma/client";
+import Stripe from 'stripe';
+import { PrismaClient } from '@prisma/client';
 
 interface StripeConfig {
   apiKey: string;
@@ -30,7 +30,7 @@ export class StripeService {
     this.prisma = prisma;
 
     if (!config.apiKey) {
-      throw new Error("Stripe configuration incomplete: apiKey required");
+      throw new Error('Stripe configuration incomplete: apiKey required');
     }
 
     this.stripe = new Stripe(config.apiKey);
@@ -51,9 +51,9 @@ export class StripeService {
           userId: params.userId,
           applicationId: params.applicationId,
           amount: params.amount,
-          currency: "USD",
-          status: "pending",
-          paymentMethod: "stripe",
+          currency: 'USD',
+          status: 'pending',
+          paymentMethod: 'stripe',
           orderId: params.applicationId, // Use application ID as order ID
           paymentGatewayData: JSON.stringify({
             createdAt: new Date().toISOString(),
@@ -65,16 +65,16 @@ export class StripeService {
 
       // Create Stripe Checkout Session
       const session = await this.stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        mode: "payment",
+        payment_method_types: ['card'],
+        mode: 'payment',
         customer_email: params.userEmail,
         line_items: [
           {
             price_data: {
-              currency: "usd",
+              currency: 'usd',
               product_data: {
-                name: "Visa Application Fee",
-                description: params.description || "Visa Application",
+                name: 'Visa Application Fee',
+                description: params.description || 'Visa Application',
                 images: [], // Optional: add your logo
               },
               unit_amount: Math.round(params.amount * 100), // Amount in cents
@@ -105,12 +105,12 @@ export class StripeService {
       });
 
       return {
-        paymentUrl: session.url || "",
+        paymentUrl: session.url || '',
         sessionId: session.id,
         transactionId: payment.id,
       };
     } catch (error) {
-      console.error("Error creating Stripe payment:", error);
+      console.error('Error creating Stripe payment:', error);
       throw error;
     }
   }
@@ -122,7 +122,7 @@ export class StripeService {
     try {
       return await this.stripe.checkout.sessions.retrieve(sessionId);
     } catch (error) {
-      console.error("Error retrieving Stripe session:", error);
+      console.error('Error retrieving Stripe session:', error);
       return null;
     }
   }
@@ -135,19 +135,15 @@ export class StripeService {
     signature: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const event = this.stripe.webhooks.constructEvent(
-        body,
-        signature,
-        this.config.webhookSecret
-      );
+      const event = this.stripe.webhooks.constructEvent(body, signature, this.config.webhookSecret);
 
-      if (event.type === "checkout.session.completed") {
+      if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
 
         // Find payment by session ID
         const payments = await this.prisma.payment.findMany({
           where: {
-            paymentMethod: "stripe",
+            paymentMethod: 'stripe',
             paymentGatewayData: {
               contains: session.id,
             },
@@ -157,7 +153,7 @@ export class StripeService {
         if (payments.length === 0) {
           return {
             success: false,
-            error: "Payment not found",
+            error: 'Payment not found',
           };
         }
 
@@ -166,17 +162,17 @@ export class StripeService {
         // Get full payment intent details
         if (session.payment_intent) {
           const paymentIntent = await this.stripe.paymentIntents.retrieve(
-            typeof session.payment_intent === "string"
+            typeof session.payment_intent === 'string'
               ? session.payment_intent
               : session.payment_intent.id
           );
 
-          if (paymentIntent.status === "succeeded") {
+          if (paymentIntent.status === 'succeeded') {
             // Get charge details if available
             const intentData = paymentIntent as any;
             let chargeId: string | null = null;
             let receiptUrl: string | null = null;
-            
+
             if (intentData.charges?.data?.[0]) {
               chargeId = intentData.charges.data[0].id;
               receiptUrl = intentData.charges.data[0].receipt_url;
@@ -186,11 +182,11 @@ export class StripeService {
             await this.prisma.payment.update({
               where: { id: payment.id },
               data: {
-                status: "completed",
+                status: 'completed',
                 transactionId: paymentIntent.id,
                 paidAt: new Date(),
                 paymentGatewayData: JSON.stringify({
-                  ...JSON.parse(payment.paymentGatewayData || "{}"),
+                  ...JSON.parse(payment.paymentGatewayData || '{}'),
                   stripePaymentIntentId: paymentIntent.id,
                   chargeId: chargeId,
                   receiptUrl: receiptUrl,
@@ -202,7 +198,7 @@ export class StripeService {
             await this.prisma.visaApplication.update({
               where: { id: payment.applicationId },
               data: {
-                status: "submitted",
+                status: 'submitted',
               },
             });
 
@@ -212,13 +208,13 @@ export class StripeService {
         }
       }
 
-      if (event.type === "charge.failed") {
+      if (event.type === 'charge.failed') {
         const charge = event.data.object as Stripe.Charge;
 
         // Find payment by charge ID
         const payments = await this.prisma.payment.findMany({
           where: {
-            paymentMethod: "stripe",
+            paymentMethod: 'stripe',
             paymentGatewayData: {
               contains: charge.id,
             },
@@ -230,9 +226,9 @@ export class StripeService {
           await this.prisma.payment.update({
             where: { id: payment.id },
             data: {
-              status: "failed",
+              status: 'failed',
               paymentGatewayData: JSON.stringify({
-                ...JSON.parse(payment.paymentGatewayData || "{}"),
+                ...JSON.parse(payment.paymentGatewayData || '{}'),
                 failureReason: charge.failure_message,
               }),
             },
@@ -244,7 +240,7 @@ export class StripeService {
 
       return { success: true };
     } catch (error: any) {
-      console.error("Error processing Stripe webhook:", error);
+      console.error('Error processing Stripe webhook:', error);
       return {
         success: false,
         error: error.message,
@@ -265,22 +261,22 @@ export class StripeService {
         return false;
       }
 
-      if (payment.status === "completed") {
+      if (payment.status === 'completed') {
         return true;
       }
 
       // Try to get session from payment gateway data
-      const gatewayData = JSON.parse(payment.paymentGatewayData || "{}");
+      const gatewayData = JSON.parse(payment.paymentGatewayData || '{}');
 
       if (gatewayData.stripeSessionId) {
         const session = await this.getSession(gatewayData.stripeSessionId);
 
-        if (session && session.payment_status === "paid") {
+        if (session && session.payment_status === 'paid') {
           // Update payment status
           await this.prisma.payment.update({
             where: { id: transactionId },
             data: {
-              status: "completed",
+              status: 'completed',
               paidAt: new Date(),
             },
           });
@@ -289,7 +285,7 @@ export class StripeService {
           await this.prisma.visaApplication.update({
             where: { id: payment.applicationId },
             data: {
-              status: "submitted",
+              status: 'submitted',
             },
           });
 
@@ -299,7 +295,7 @@ export class StripeService {
 
       return false;
     } catch (error) {
-      console.error("Error verifying Stripe payment:", error);
+      console.error('Error verifying Stripe payment:', error);
       return false;
     }
   }
@@ -326,18 +322,18 @@ export class StripeService {
         where: { id: paymentId },
       });
 
-      if (!payment || payment.status !== "pending") {
+      if (!payment || payment.status !== 'pending') {
         return false;
       }
 
       await this.prisma.payment.update({
         where: { id: paymentId },
-        data: { status: "failed" },
+        data: { status: 'failed' },
       });
 
       return true;
     } catch (error) {
-      console.error("Error canceling Stripe payment:", error);
+      console.error('Error canceling Stripe payment:', error);
       return false;
     }
   }
@@ -358,16 +354,16 @@ export class StripeService {
       // Create refund for the payment intent
       const refund = await this.stripe.refunds.create({
         payment_intent: payment.transactionId,
-        reason: (reason as any) || "requested_by_customer",
+        reason: (reason as any) || 'requested_by_customer',
       });
 
       // Update payment status
       await this.prisma.payment.update({
         where: { id: paymentId },
         data: {
-          status: "refunded",
+          status: 'refunded',
           paymentGatewayData: JSON.stringify({
-            ...JSON.parse(payment.paymentGatewayData || "{}"),
+            ...JSON.parse(payment.paymentGatewayData || '{}'),
             refundId: refund.id,
             refundedAt: new Date().toISOString(),
           }),
@@ -377,7 +373,7 @@ export class StripeService {
       console.log(`Stripe refund created: ${refund.id}`);
       return true;
     } catch (error) {
-      console.error("Error creating Stripe refund:", error);
+      console.error('Error creating Stripe refund:', error);
       return false;
     }
   }

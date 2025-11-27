@@ -5,7 +5,10 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { PrismaClientKnownRequestError, PrismaClientUnknownRequestError } from '@prisma/client/runtime/library';
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientUnknownRequestError,
+} from '@prisma/client/runtime/library';
 
 /**
  * Database connection states
@@ -99,12 +102,12 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Execute a Prisma operation with retry logic
- * 
+ *
  * @param operation - Function that returns a Prisma promise
  * @param config - Retry configuration
  * @returns Result of the operation
  * @throws Last error if all retries fail
- * 
+ *
  * @example
  * ```typescript
  * const user = await withRetry(
@@ -156,13 +159,11 @@ export async function withRetry<T>(
 
 /**
  * Check database connection health
- * 
+ *
  * @param prisma - Prisma client instance
  * @returns Connection state and health status
  */
-export async function checkDatabaseHealth(
-  prisma: PrismaClient
-): Promise<{
+export async function checkDatabaseHealth(prisma: PrismaClient): Promise<{
   state: DatabaseConnectionState;
   healthy: boolean;
   latency?: number;
@@ -202,7 +203,7 @@ export async function checkDatabaseHealth(
 /**
  * Execute operation with connection health check
  * If database is unhealthy, throws a user-friendly error
- * 
+ *
  * @param prisma - Prisma client instance
  * @param operation - Function that returns a Prisma promise
  * @returns Result of the operation
@@ -225,7 +226,7 @@ export async function withHealthCheck<T>(
 
 /**
  * Gracefully handle database errors and return user-friendly messages
- * 
+ *
  * @param error - Error from Prisma operation
  * @returns User-friendly error message
  */
@@ -271,7 +272,7 @@ export function getDatabaseErrorMessage(error: unknown): string {
 /**
  * Create a resilient Prisma operation wrapper
  * Combines retry logic, health checks, and error handling
- * 
+ *
  * @param prisma - Prisma client instance
  * @param operation - Function that returns a Prisma promise
  * @param options - Options for retry and health check
@@ -308,4 +309,3 @@ export async function resilientOperation<T>(
     throw dbError;
   }
 }
-

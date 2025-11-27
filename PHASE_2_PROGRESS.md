@@ -8,14 +8,16 @@
 ## ✅ What's Been Done
 
 ### 1. OpenAI API Key Configured ✅
+
 - ✅ API key added to `apps/backend/.env`
 - ✅ API key added to `apps/ai-service/.env`
 - ✅ JWT secret generated and configured
 - ✅ Basic development configuration set up
 
 ### 2. Environment Files Created ✅
+
 - ✅ `apps/backend/.env` - Backend configuration
-- ✅ `apps/ai-service/.env` - AI service configuration  
+- ✅ `apps/ai-service/.env` - AI service configuration
 - ✅ `frontend_new/.env` - Frontend configuration
 
 ---
@@ -23,9 +25,11 @@
 ## 🎯 What Happens Next
 
 ### **Option A: Test Locally First (Recommended)**
+
 Test that everything works before setting up more services:
 
 1. **Start Backend:**
+
    ```bash
    cd apps/backend
    npm install
@@ -34,6 +38,7 @@ Test that everything works before setting up more services:
    ```
 
 2. **Start AI Service:**
+
    ```bash
    cd apps/ai-service
    pip install -r requirements.txt
@@ -74,6 +79,7 @@ Test that everything works before setting up more services:
 ## 📋 Current Configuration
 
 ### Backend (`apps/backend/.env`):
+
 - ✅ OpenAI API key configured
 - ✅ JWT secret generated
 - ✅ Using SQLite for local development (will switch to PostgreSQL for production)
@@ -81,11 +87,13 @@ Test that everything works before setting up more services:
 - ✅ CORS configured for localhost
 
 ### AI Service (`apps/ai-service/.env`):
+
 - ✅ OpenAI API key configured
 - ✅ CORS configured
 - ✅ Running on port 8001
 
 ### Frontend (`frontend_new/.env`):
+
 - ✅ API URL set to localhost:3000
 - ⏳ Google OAuth will be added later
 
@@ -94,6 +102,7 @@ Test that everything works before setting up more services:
 ## 🚀 Quick Test Commands
 
 **Test Backend:**
+
 ```bash
 cd apps/backend
 npm run dev
@@ -102,6 +111,7 @@ npm run dev
 ```
 
 **Test AI Service:**
+
 ```bash
 cd apps/ai-service
 python -m uvicorn main:app --reload --port 8001
@@ -142,8 +152,8 @@ python -m uvicorn main:app --reload --port 8001
 ---
 
 **Great progress! OpenAI is set up. What would you like to do next?**
+
 - Test locally?
 - Continue with Firebase?
 - Continue with Google OAuth?
 - Continue with Railway?
-

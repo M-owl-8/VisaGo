@@ -1,4 +1,5 @@
 # VisaBuddy Production Readiness Plan
+
 **Goal**: Make VisaBuddy 100% production-ready and professional  
 **Based on**: CODEBASE_ANALYSIS.md  
 **Date**: 2025-01-15
@@ -13,6 +14,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - **Phase 2**: Tasks requiring human intervention (testing, deployment, external service setup, business decisions)
 
 **Estimated Timeline:**
+
 - Phase 1: 2-3 weeks (AI-executable)
 - Phase 2: 1-2 weeks (human-executable)
 
@@ -25,6 +27,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 1-2: CI/CD Pipeline Setup**
 
 **Tasks:**
+
 1. Create GitHub Actions workflow (`.github/workflows/ci.yml`)
    - Run tests on PR (backend + frontend)
    - Type checking (TypeScript)
@@ -43,12 +46,14 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Prevent committing secrets
 
 **Files to Create/Modify:**
+
 - `.github/workflows/ci.yml`
 - `.github/workflows/deploy.yml`
 - `.husky/pre-commit`
 - `package.json` (add Husky scripts)
 
 **Success Criteria:**
+
 - ✅ All tests pass on PR
 - ✅ Type checking enforced
 - ✅ Linting enforced
@@ -59,6 +64,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 3-4: Error Handling & Offline Support**
 
 **Tasks:**
+
 1. **Improve Error Handling**
    - Add global error boundary in React Native app
    - Add retry logic for API calls (exponential backoff)
@@ -78,6 +84,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - If Redis is down, use in-memory cache
 
 **Files to Create/Modify:**
+
 - `frontend_new/src/services/network.ts` (network detection)
 - `frontend_new/src/services/cache.ts` (response caching)
 - `frontend_new/src/services/offline-queue.ts` (offline action queue)
@@ -87,6 +94,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `apps/backend/src/services/fallback-handler.ts` (service fallback logic)
 
 **Success Criteria:**
+
 - ✅ App works offline (cached data, queued actions)
 - ✅ No crashes on service failures
 - ✅ User-friendly error messages
@@ -97,6 +105,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 5: Push Notifications Integration**
 
 **Tasks:**
+
 1. **Wire Up FCM Device Token Registration**
    - Register device token on app start (if not registered)
    - Update token when it changes
@@ -115,6 +124,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Notification history
 
 **Files to Create/Modify:**
+
 - `frontend_new/src/services/notifications.ts` (FCM integration)
 - `frontend_new/src/hooks/useNotifications.ts`
 - `frontend_new/src/screens/notifications/NotificationSettingsScreen.tsx` (enhance)
@@ -122,6 +132,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `apps/backend/src/routes/notifications.ts` (ensure device token endpoint works)
 
 **Success Criteria:**
+
 - ✅ Device tokens registered on app start
 - ✅ Push notifications received for application updates
 - ✅ Notification settings work
@@ -134,6 +145,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 6-7: Admin Panel Completion**
 
 **Tasks:**
+
 1. **Complete Admin Dashboard**
    - Real-time stats (users, applications, payments)
    - Charts/graphs (recharts or similar)
@@ -169,6 +181,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Export payments (CSV)
 
 **Files to Create/Modify:**
+
 - `frontend_new/src/screens/admin/AdminDashboard.tsx` (complete)
 - `frontend_new/src/screens/admin/AdminUsersScreen.tsx` (complete)
 - `frontend_new/src/screens/admin/AdminApplicationsScreen.tsx` (complete)
@@ -180,6 +193,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `apps/backend/src/routes/admin.ts` (add missing endpoints if needed)
 
 **Success Criteria:**
+
 - ✅ All admin screens fully functional
 - ✅ CRUD operations work
 - ✅ Filters and search work
@@ -190,6 +204,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 8-9: Analytics & Monitoring**
 
 **Tasks:**
+
 1. **Add Analytics Tracking**
    - Track all user events (signup, login, application created, document uploaded, payment, etc.)
    - Track screen views
@@ -215,6 +230,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Service status dashboard
 
 **Files to Create/Modify:**
+
 - `frontend_new/src/services/analytics.ts` (analytics service)
 - `frontend_new/src/hooks/useAnalytics.ts`
 - `frontend_new/src/middleware/analytics-middleware.tsx` (track screen views)
@@ -226,6 +242,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `sentry.server.config.ts` (backend)
 
 **Success Criteria:**
+
 - ✅ All user events tracked
 - ✅ Errors logged to Sentry
 - ✅ Performance metrics collected
@@ -236,6 +253,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 10: Code Cleanup & Documentation**
 
 **Tasks:**
+
 1. **Remove Duplicate Code**
    - Remove `QuestionnaireScreenNew.tsx` if duplicate
    - Remove unused screens/components
@@ -261,6 +279,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Add architecture diagram
 
 **Files to Create/Modify:**
+
 - `apps/backend/src/routes/*.ts` (add JSDoc)
 - `apps/backend/src/services/*.ts` (add JSDoc)
 - `apps/backend/src/index.ts` (add Swagger setup)
@@ -271,6 +290,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `docs/TROUBLESHOOTING.md` (create)
 
 **Success Criteria:**
+
 - ✅ No duplicate code
 - ✅ All functions documented
 - ✅ API documentation accessible
@@ -283,6 +303,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 11-12: Payment Gateway Testing & Activation**
 
 **Tasks:**
+
 1. **Prepare Payment Activation**
    - Remove payment freeze (or make it configurable via env var)
    - Add payment gateway health checks
@@ -308,6 +329,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Payment dashboard
 
 **Files to Create/Modify:**
+
 - `apps/backend/src/utils/payment-freeze.ts` (make configurable)
 - `apps/backend/src/services/payment-gateway.service.ts` (add health checks)
 - `apps/backend/src/routes/payments-complete.ts` (improve error handling)
@@ -316,6 +338,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `frontend_new/src/screens/payment/PaymentScreen.tsx` (improve error handling)
 
 **Success Criteria:**
+
 - ✅ Payment freeze can be toggled via env var
 - ✅ Payment health checks work
 - ✅ Payment error handling robust
@@ -326,6 +349,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 13: Security Hardening**
 
 **Tasks:**
+
 1. **Add Security Headers**
    - Content Security Policy (CSP)
    - X-Frame-Options
@@ -351,6 +375,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Add security.txt file
 
 **Files to Create/Modify:**
+
 - `apps/backend/src/middleware/security.ts` (add security headers)
 - `apps/backend/src/middleware/rate-limit.ts` (enhance)
 - `apps/backend/src/middleware/validation.ts` (add Zod schemas)
@@ -359,6 +384,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `security.txt` (create)
 
 **Success Criteria:**
+
 - ✅ Security headers set
 - ✅ Rate limiting comprehensive
 - ✅ All inputs validated
@@ -369,6 +395,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 14-15: Performance Optimization**
 
 **Tasks:**
+
 1. **Backend Performance**
    - Add database query optimization (indexes)
    - Add response caching (Redis)
@@ -393,6 +420,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Add performance alerts
 
 **Files to Create/Modify:**
+
 - `apps/backend/src/services/cache.service.ts` (enhance caching)
 - `apps/backend/src/routes/*.ts` (add pagination)
 - `apps/backend/prisma/schema.prisma` (add indexes)
@@ -401,6 +429,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - `apps/ai-service/services/cache.py` (enhance)
 
 **Success Criteria:**
+
 - ✅ Database queries optimized
 - ✅ Response times < 200ms (p95)
 - ✅ Frontend loads < 3s
@@ -415,6 +444,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 16-17: Manual Testing**
 
 **Tasks:**
+
 1. **End-to-End Testing**
    - Test complete user flow (signup → questionnaire → application → documents → payment)
    - Test on iOS device
@@ -447,6 +477,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Test XSS attempts
 
 **Deliverables:**
+
 - ✅ Test plan document
 - ✅ Test results document
 - ✅ Bug reports (if any)
@@ -457,6 +488,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 18: Load Testing**
 
 **Tasks:**
+
 1. **Backend Load Testing**
    - Test API endpoints under load (100, 500, 1000 concurrent users)
    - Test database under load
@@ -477,11 +509,13 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Test Firebase Storage under load
 
 **Tools:**
+
 - Artillery (backend)
 - k6 (backend)
 - React Native Performance Monitor (frontend)
 
 **Deliverables:**
+
 - ✅ Load test results
 - ✅ Performance benchmarks
 - ✅ Optimization recommendations
@@ -493,6 +527,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 19-20: Production Deployment Setup**
 
 **Tasks:**
+
 1. **Railway Configuration**
    - Set up production environment variables
    - Configure custom domains
@@ -527,6 +562,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Set up AI service monitoring
 
 **Deliverables:**
+
 - ✅ Production environment configured
 - ✅ All services deployed
 - ✅ Monitoring set up
@@ -537,6 +573,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 21: External Service Configuration**
 
 **Tasks:**
+
 1. **Payment Gateway Setup**
    - Create Payme merchant account
    - Create Click merchant account
@@ -562,6 +599,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Set up conversion tracking
 
 **Deliverables:**
+
 - ✅ All external services configured
 - ✅ Webhooks tested
 - ✅ OAuth tested
@@ -572,6 +610,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 22: App Store Preparation**
 
 **Tasks:**
+
 1. **App Assets**
    - Create app icon (1024x1024)
    - Create splash screen
@@ -596,6 +635,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Configure content ratings
 
 **Deliverables:**
+
 - ✅ All app assets created
 - ✅ App Store listings ready
 - ✅ Privacy policy and terms of service
@@ -605,6 +645,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 23: Build & Submit Apps**
 
 **Tasks:**
+
 1. **iOS Build**
    - Build iOS app with EAS Build
    - Test iOS build on TestFlight
@@ -623,6 +664,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Prepare for launch
 
 **Deliverables:**
+
 - ✅ iOS app submitted
 - ✅ Android app submitted
 - ✅ Apps approved (hopefully)
@@ -634,6 +676,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 24-25: Pre-Launch Checklist**
 
 **Tasks:**
+
 1. **Final Checks**
    - Verify all features work in production
    - Verify payments work (if activated)
@@ -655,6 +698,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Train support team (if any)
 
 **Deliverables:**
+
 - ✅ Pre-launch checklist completed
 - ✅ Documentation complete
 - ✅ Support channels ready
@@ -664,6 +708,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 #### **Day 26-28: Launch & Monitoring**
 
 **Tasks:**
+
 1. **Launch**
    - Release apps to App Store/Play Store
    - Announce launch (social media, etc.)
@@ -684,6 +729,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
    - Update documentation based on user questions
 
 **Deliverables:**
+
 - ✅ Apps launched
 - ✅ Monitoring active
 - ✅ Initial issues resolved
@@ -693,6 +739,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 ## 📊 Success Metrics
 
 ### **Phase 1 Success Criteria:**
+
 - ✅ All code changes implemented
 - ✅ All tests pass
 - ✅ CI/CD pipeline working
@@ -700,6 +747,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - ✅ Code quality maintained
 
 ### **Phase 2 Success Criteria:**
+
 - ✅ All manual tests pass
 - ✅ Load tests pass
 - ✅ Production environment stable
@@ -707,6 +755,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 - ✅ Apps approved and launched
 
 ### **Overall Success Criteria:**
+
 - ✅ 100% feature completeness
 - ✅ 100% test coverage (critical paths)
 - ✅ < 1% error rate
@@ -719,6 +768,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 ## 🎯 Priority Matrix
 
 ### **High Priority (Must Have for Launch):**
+
 1. CI/CD Pipeline
 2. Error Handling & Offline Support
 3. Push Notifications
@@ -728,6 +778,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 7. App Store Submission
 
 ### **Medium Priority (Should Have):**
+
 1. Admin Panel Completion
 2. Analytics & Monitoring
 3. Performance Optimization
@@ -735,6 +786,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 5. Documentation
 
 ### **Low Priority (Nice to Have):**
+
 1. Advanced features (AI document verification, etc.)
 2. Advanced analytics
 3. Advanced monitoring
@@ -753,6 +805,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 ## 🚀 Getting Started
 
 **To start Phase 1:**
+
 1. Review this plan
 2. Prioritize tasks based on business needs
 3. Start with Day 1-2 (CI/CD Pipeline)
@@ -760,6 +813,7 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 5. Test each completed task before moving to next
 
 **To start Phase 2:**
+
 1. Ensure Phase 1 is complete
 2. Set up testing environment
 3. Begin manual testing
@@ -768,4 +822,3 @@ This plan addresses all gaps identified in the codebase analysis to bring VisaBu
 ---
 
 **End of Plan**
-

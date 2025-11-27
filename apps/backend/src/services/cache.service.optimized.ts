@@ -136,7 +136,7 @@ export class OptimizedCacheService {
       // Try local cache
       if (this.localCache.has(key)) {
         const entry = this.localCache.get(key)!;
-        
+
         // Check if entry has expired (TTL-based)
         const age = Date.now() - entry.createdAt;
         if (age > entry.ttl * 1000) {
@@ -145,7 +145,7 @@ export class OptimizedCacheService {
           this.updateHitRate();
           return null;
         }
-        
+
         this.stats.hits++;
         this.updateHitRate();
         console.debug(`✓ Cache HIT (Local): ${key}`);
@@ -218,7 +218,7 @@ export class OptimizedCacheService {
   async delete(key: string): Promise<void> {
     try {
       const entry = this.localCache.get(key);
-      
+
       // Remove from tag index
       if (entry?.tags) {
         for (const tag of entry.tags) {
@@ -355,7 +355,9 @@ export class OptimizedCacheService {
       },
       redis: {
         connected: this.stats.redisConnected,
-        info: redisInfo ? redisInfo.split('\r\n').filter((line: string) => line && !line.startsWith('#')) : null,
+        info: redisInfo
+          ? redisInfo.split('\r\n').filter((line: string) => line && !line.startsWith('#'))
+          : null,
       },
       overall: {
         totalOperations: stats.sets + stats.deletes,
@@ -369,7 +371,10 @@ export class OptimizedCacheService {
   /**
    * Cache warming - preload commonly used data
    */
-  async warmCache(dataLoader: () => Promise<Array<{ key: string; value: any; ttl?: number }>>, batchSize: number = 100): Promise<number> {
+  async warmCache(
+    dataLoader: () => Promise<Array<{ key: string; value: any; ttl?: number }>>,
+    batchSize: number = 100
+  ): Promise<number> {
     try {
       console.log('🔥 Starting cache warming...');
       const data = await dataLoader();
@@ -377,11 +382,7 @@ export class OptimizedCacheService {
 
       for (let i = 0; i < data.length; i += batchSize) {
         const batch = data.slice(i, i + batchSize);
-        await Promise.all(
-          batch.map(item =>
-            this.set(item.key, item.value, { ttl: item.ttl })
-          )
-        );
+        await Promise.all(batch.map((item) => this.set(item.key, item.value, { ttl: item.ttl })));
         count += batch.length;
         console.debug(`Cache warming progress: ${count}/${data.length}`);
       }
@@ -415,9 +416,10 @@ export class OptimizedCacheService {
     // If cache is getting too large, evict oldest entries
     if (this.localCache.size >= this.MAX_LOCAL_CACHE_SIZE) {
       // Remove entries with oldest creation time (simple LRU-like behavior)
-      const entries = Array.from(this.localCache.entries())
-        .sort((a, b) => a[1].createdAt - b[1].createdAt);
-      
+      const entries = Array.from(this.localCache.entries()).sort(
+        (a, b) => a[1].createdAt - b[1].createdAt
+      );
+
       // Remove oldest 10% of entries
       const toRemove = Math.ceil(this.MAX_LOCAL_CACHE_SIZE * 0.1);
       for (let i = 0; i < toRemove; i++) {

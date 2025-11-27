@@ -75,8 +75,8 @@ export class PerformanceBenchmarkService {
       timestamp: new Date().toISOString(),
       tests: results,
       efficiency: {
-        writeLatency: `${Math.round((results.cacheWrite.duration / 1000) / 100)}µs`,
-        readLatency: `${Math.round((results.cacheRead.duration / 1000) / 100)}µs`,
+        writeLatency: `${Math.round(results.cacheWrite.duration / 1000 / 100)}µs`,
+        readLatency: `${Math.round(results.cacheRead.duration / 1000 / 100)}µs`,
         hitRateTarget: 85,
         redisAvailable: health.redis,
       },
@@ -122,11 +122,7 @@ export class PerformanceBenchmarkService {
     // Pre-populate cache
     const testSize = 1000;
     for (let i = 0; i < testSize; i++) {
-      await this.cache.set(
-        `bench:read:${i}`,
-        { data: 'test' },
-        { ttl: 3600 }
-      );
+      await this.cache.set(`bench:read:${i}`, { data: 'test' }, { ttl: 3600 });
     }
 
     const startTime = Date.now();
@@ -395,7 +391,7 @@ export class PerformanceBenchmarkService {
       if ((result as any).errorRate > 1) {
         recommendations.push(
           `⚠️  High error rate in ${test}: ${(result as any).errorRate.toFixed(2)}%. ` +
-          `Check cache service logs for details.`
+            `Check cache service logs for details.`
         );
       }
     }
@@ -404,7 +400,7 @@ export class PerformanceBenchmarkService {
     if (stats.hitRate < 70) {
       recommendations.push(
         `Cache hit rate is ${stats.hitRate.toFixed(1)}%. ` +
-        `Target is 85%. Consider warming cache or adjusting TTLs.`
+          `Target is 85%. Consider warming cache or adjusting TTLs.`
       );
     }
 
@@ -412,7 +408,7 @@ export class PerformanceBenchmarkService {
     if (stats.localCacheSize > 4000) {
       recommendations.push(
         `Local cache size is large (${stats.localCacheSize} entries). ` +
-        `Consider enabling Redis for better scalability.`
+          `Consider enabling Redis for better scalability.`
       );
     }
 
@@ -430,11 +426,14 @@ export class PerformanceBenchmarkService {
     const recommendations: string[] = [];
 
     // Check connection pool usage
-    const connectionUsage = ((poolMetrics.totalConnections - poolMetrics.idleConnections) / poolMetrics.totalConnections) * 100;
+    const connectionUsage =
+      ((poolMetrics.totalConnections - poolMetrics.idleConnections) /
+        poolMetrics.totalConnections) *
+      100;
     if (connectionUsage > 80) {
       recommendations.push(
         `⚠️  High connection pool usage: ${connectionUsage.toFixed(1)}%. ` +
-        `Consider increasing max connections or optimizing query duration.`
+          `Consider increasing max connections or optimizing query duration.`
       );
     }
 
@@ -442,7 +441,7 @@ export class PerformanceBenchmarkService {
     if (results.simpleQuery.errorRate > 0) {
       recommendations.push(
         `Simple queries are failing at ${results.simpleQuery.errorRate.toFixed(2)}% rate. ` +
-        `Check database connectivity.`
+          `Check database connectivity.`
       );
     }
 
@@ -450,7 +449,7 @@ export class PerformanceBenchmarkService {
     if (results.simpleQuery.throughput < 100) {
       recommendations.push(
         `Simple query throughput is low (${results.simpleQuery.throughput} ops/sec). ` +
-        `Check database performance and network latency.`
+          `Check database performance and network latency.`
       );
     }
 
@@ -458,7 +457,7 @@ export class PerformanceBenchmarkService {
     if (poolMetrics.waitingCount > poolMetrics.totalConnections * 0.5) {
       recommendations.push(
         `High number of waiting requests (${poolMetrics.waitingCount}). ` +
-        `Connection pool may be exhausted. Consider increasing pool size.`
+          `Connection pool may be exhausted. Consider increasing pool size.`
       );
     }
 
@@ -493,12 +492,12 @@ Cache Performance:
 - Hit Rate: ${(cache.efficiency as any).hitRateTarget}% target
 
 Database Performance:
-- Connection Pool Usage: ${((database.poolMetrics.totalConnections - database.poolMetrics.idleConnections) / database.poolMetrics.totalConnections * 100).toFixed(1)}%
+- Connection Pool Usage: ${(((database.poolMetrics.totalConnections - database.poolMetrics.idleConnections) / database.poolMetrics.totalConnections) * 100).toFixed(1)}%
 - Simple Query Throughput: ${database.tests.simpleQuery.throughput} ops/sec
 - Average Query Time: ${database.poolMetrics.avgQueryTime}ms
 
 Recommendations:
-${[...cache.recommendations, ...database.recommendations].map(r => `• ${r}`).join('\n')}
+${[...cache.recommendations, ...database.recommendations].map((r) => `• ${r}`).join('\n')}
     `;
 
     console.log(summary);

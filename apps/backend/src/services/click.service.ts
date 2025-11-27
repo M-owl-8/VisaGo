@@ -1,6 +1,6 @@
-import crypto from "crypto";
-import axios from "axios";
-import { PrismaClient } from "@prisma/client";
+import crypto from 'crypto';
+import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
 
 interface ClickConfig {
   merchantId: string;
@@ -31,9 +31,7 @@ export class ClickService {
     this.prisma = prisma;
 
     if (!config.merchantId || !config.serviceId || !config.apiKey) {
-      throw new Error(
-        "Click configuration incomplete: merchantId, serviceId, and apiKey required"
-      );
+      throw new Error('Click configuration incomplete: merchantId, serviceId, and apiKey required');
     }
   }
 
@@ -62,9 +60,9 @@ export class ClickService {
           userId: params.userId,
           applicationId: params.applicationId,
           amount: params.amount,
-          currency: "UZS",
-          status: "pending",
-          paymentMethod: "click",
+          currency: 'UZS',
+          status: 'pending',
+          paymentMethod: 'click',
           orderId: merchantTransId,
           paymentGatewayData: JSON.stringify({
             merchantTransId,
@@ -89,7 +87,7 @@ export class ClickService {
         transactionId: payment.id,
       };
     } catch (error) {
-      console.error("Error creating Click payment:", error);
+      console.error('Error creating Click payment:', error);
       throw error;
     }
   }
@@ -109,7 +107,7 @@ export class ClickService {
       amount: amount.toString(),
       transaction_param: merchantTransId,
       return_url: returnUrl,
-      description: description || "Visa Application Payment",
+      description: description || 'Visa Application Payment',
     });
 
     // For Click, we generate a simple checkout URL
@@ -120,10 +118,7 @@ export class ClickService {
    * Generate signature for Click API requests
    */
   private generateSignature(data: string): string {
-    return crypto
-      .createHmac("sha256", this.config.apiKey)
-      .update(data)
-      .digest("hex");
+    return crypto.createHmac('sha256', this.config.apiKey).update(data).digest('hex');
   }
 
   /**
@@ -137,20 +132,16 @@ export class ClickService {
         transaction_param: merchantTransId,
       };
 
-      const response = await axios.post(
-        `${this.config.apiUrl}/merchant/trans/status`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${this.config.apiKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await axios.post(`${this.config.apiUrl}/merchant/trans/status`, payload, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       return response.data;
     } catch (error: any) {
-      console.error("Error checking Click transaction:", error.response?.data || error.message);
+      console.error('Error checking Click transaction:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -165,14 +156,14 @@ export class ClickService {
       // Verify signature
       const dataToSign = `${merchant_trans_id}${this.config.apiKey}`;
       const expectedSignature = crypto
-        .createHmac("sha256", this.config.apiKey)
+        .createHmac('sha256', this.config.apiKey)
         .update(dataToSign)
-        .digest("hex");
+        .digest('hex');
 
       if (sign !== expectedSignature) {
         return {
           success: false,
-          error: "Invalid signature",
+          error: 'Invalid signature',
         };
       }
 
@@ -180,14 +171,14 @@ export class ClickService {
       const payment = await this.prisma.payment.findFirst({
         where: {
           orderId: merchant_trans_id,
-          paymentMethod: "click",
+          paymentMethod: 'click',
         },
       });
 
       if (!payment) {
         return {
           success: false,
-          error: "Payment not found",
+          error: 'Payment not found',
         };
       }
 
@@ -197,7 +188,7 @@ export class ClickService {
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: "completed",
+            status: 'completed',
             transactionId: webhookData.click_trans_id,
             paidAt: new Date(),
             paymentGatewayData: JSON.stringify(webhookData),
@@ -208,7 +199,7 @@ export class ClickService {
         await this.prisma.visaApplication.update({
           where: { id: payment.applicationId },
           data: {
-            status: "submitted",
+            status: 'submitted',
           },
         });
 
@@ -221,7 +212,7 @@ export class ClickService {
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: "failed",
+            status: 'failed',
             paymentGatewayData: JSON.stringify(webhookData),
           },
         });
@@ -232,7 +223,7 @@ export class ClickService {
 
       return { success: true };
     } catch (error: any) {
-      console.error("Error processing Click webhook:", error);
+      console.error('Error processing Click webhook:', error);
       return {
         success: false,
         error: error.message,
@@ -253,7 +244,7 @@ export class ClickService {
         return false;
       }
 
-      if (payment.status === "completed") {
+      if (payment.status === 'completed') {
         return true;
       }
 
@@ -269,7 +260,7 @@ export class ClickService {
             await this.prisma.payment.update({
               where: { id: transactionId },
               data: {
-                status: "completed",
+                status: 'completed',
                 transactionId: transaction.click_trans_id,
                 paidAt: new Date(),
               },
@@ -278,7 +269,7 @@ export class ClickService {
             await this.prisma.visaApplication.update({
               where: { id: payment.applicationId },
               data: {
-                status: "submitted",
+                status: 'submitted',
               },
             });
 
@@ -289,7 +280,7 @@ export class ClickService {
 
       return false;
     } catch (error) {
-      console.error("Error verifying Click payment:", error);
+      console.error('Error verifying Click payment:', error);
       return false;
     }
   }
@@ -316,18 +307,18 @@ export class ClickService {
         where: { id: paymentId },
       });
 
-      if (!payment || payment.status !== "pending") {
+      if (!payment || payment.status !== 'pending') {
         return false;
       }
 
       await this.prisma.payment.update({
         where: { id: paymentId },
-        data: { status: "failed" },
+        data: { status: 'failed' },
       });
 
       return true;
     } catch (error) {
-      console.error("Error canceling Click payment:", error);
+      console.error('Error canceling Click payment:', error);
       return false;
     }
   }

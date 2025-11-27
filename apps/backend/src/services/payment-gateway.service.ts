@@ -1,21 +1,21 @@
-import { PrismaClient } from "@prisma/client";
-import { PaymeService } from "./payme.service";
-import { ClickService } from "./click.service";
-import { UzumService } from "./uzum.service";
-import { StripeService } from "./stripe.service";
-import { MockPaymentService } from "./mock-payment.service";
+import { PrismaClient } from '@prisma/client';
+import { PaymeService } from './payme.service';
+import { ClickService } from './click.service';
+import { UzumService } from './uzum.service';
+import { StripeService } from './stripe.service';
+import { MockPaymentService } from './mock-payment.service';
 import {
   PaymentError,
   PaymentErrorCode,
   PaymentErrorSeverity,
   PaymentErrorClassifier,
-} from "./payment-errors";
-import { PaymentAuditLogger, PaymentAuditAction } from "./payment-audit-logger";
-import { PaymentRetry, DEFAULT_RETRY_CONFIG, RetryConfig } from "./payment-retry";
-import { WebhookSecurityService } from "./webhook-security";
+} from './payment-errors';
+import { PaymentAuditLogger, PaymentAuditAction } from './payment-audit-logger';
+import { PaymentRetry, DEFAULT_RETRY_CONFIG, RetryConfig } from './payment-retry';
+import { WebhookSecurityService } from './webhook-security';
 
-export type PaymentMethod = "payme" | "click" | "uzum" | "stripe" | "mock";
-export type FallbackStrategy = "sequential" | "random";
+export type PaymentMethod = 'payme' | 'click' | 'uzum' | 'stripe' | 'mock';
+export type FallbackStrategy = 'sequential' | 'random';
 
 interface PaymentGatewayConfig {
   payme?: {
@@ -77,8 +77,8 @@ export class PaymentGatewayService {
     this.webhookSecurity = new WebhookSecurityService(prisma);
     this.retryConfig = config.retryConfig || DEFAULT_RETRY_CONFIG;
     this.retryService = new PaymentRetry(this.auditLogger, this.retryConfig);
-    this.fallbackStrategy = config.fallbackStrategy || "sequential";
-    this.primaryMethod = config.primaryMethod || "payme";
+    this.fallbackStrategy = config.fallbackStrategy || 'sequential';
+    this.primaryMethod = config.primaryMethod || 'payme';
 
     // Initialize available payment gateways
     // Only initialize if config is complete (has all required fields)
@@ -86,7 +86,10 @@ export class PaymentGatewayService {
       try {
         this.paymeService = new PaymeService(config.payme, prisma);
       } catch (error) {
-        console.warn("⚠️  Payme service initialization skipped:", error instanceof Error ? error.message : error);
+        console.warn(
+          '⚠️  Payme service initialization skipped:',
+          error instanceof Error ? error.message : error
+        );
       }
     }
 
@@ -94,7 +97,10 @@ export class PaymentGatewayService {
       try {
         this.clickService = new ClickService(config.click, prisma);
       } catch (error) {
-        console.warn("⚠️  Click service initialization skipped:", error instanceof Error ? error.message : error);
+        console.warn(
+          '⚠️  Click service initialization skipped:',
+          error instanceof Error ? error.message : error
+        );
       }
     }
 
@@ -102,7 +108,10 @@ export class PaymentGatewayService {
       try {
         this.uzumService = new UzumService(config.uzum, prisma);
       } catch (error) {
-        console.warn("⚠️  Uzum service initialization skipped:", error instanceof Error ? error.message : error);
+        console.warn(
+          '⚠️  Uzum service initialization skipped:',
+          error instanceof Error ? error.message : error
+        );
       }
     }
 
@@ -110,12 +119,15 @@ export class PaymentGatewayService {
       try {
         this.stripeService = new StripeService(config.stripe, prisma);
       } catch (error) {
-        console.warn("⚠️  Stripe service initialization skipped:", error instanceof Error ? error.message : error);
+        console.warn(
+          '⚠️  Stripe service initialization skipped:',
+          error instanceof Error ? error.message : error
+        );
       }
     }
 
     // Always enable mock service for development/testing
-    if (process.env.NODE_ENV === "development" || process.env.ENABLE_MOCK_PAYMENTS === "true") {
+    if (process.env.NODE_ENV === 'development' || process.env.ENABLE_MOCK_PAYMENTS === 'true') {
       this.mockService = new MockPaymentService({}, prisma);
     }
   }
@@ -126,11 +138,11 @@ export class PaymentGatewayService {
   getAvailableMethods(): PaymentMethod[] {
     const methods: PaymentMethod[] = [];
 
-    if (this.paymeService) methods.push("payme");
-    if (this.clickService) methods.push("click");
-    if (this.uzumService) methods.push("uzum");
-    if (this.stripeService) methods.push("stripe");
-    if (this.mockService) methods.push("mock");
+    if (this.paymeService) methods.push('payme');
+    if (this.clickService) methods.push('click');
+    if (this.uzumService) methods.push('uzum');
+    if (this.stripeService) methods.push('stripe');
+    if (this.mockService) methods.push('mock');
 
     return methods;
   }
@@ -140,50 +152,55 @@ export class PaymentGatewayService {
    */
   private getGateway(method: PaymentMethod): any {
     switch (method) {
-      case "payme":
-        if (!this.paymeService) throw new PaymentError(
-          PaymentErrorCode.MISSING_CONFIGURATION,
-          "Payme gateway not configured",
-          PaymentErrorSeverity.HIGH,
-          500,
-          false
-        );
+      case 'payme':
+        if (!this.paymeService)
+          throw new PaymentError(
+            PaymentErrorCode.MISSING_CONFIGURATION,
+            'Payme gateway not configured',
+            PaymentErrorSeverity.HIGH,
+            500,
+            false
+          );
         return this.paymeService;
-      case "click":
-        if (!this.clickService) throw new PaymentError(
-          PaymentErrorCode.MISSING_CONFIGURATION,
-          "Click gateway not configured",
-          PaymentErrorSeverity.HIGH,
-          500,
-          false
-        );
+      case 'click':
+        if (!this.clickService)
+          throw new PaymentError(
+            PaymentErrorCode.MISSING_CONFIGURATION,
+            'Click gateway not configured',
+            PaymentErrorSeverity.HIGH,
+            500,
+            false
+          );
         return this.clickService;
-      case "uzum":
-        if (!this.uzumService) throw new PaymentError(
-          PaymentErrorCode.MISSING_CONFIGURATION,
-          "Uzum gateway not configured",
-          PaymentErrorSeverity.HIGH,
-          500,
-          false
-        );
+      case 'uzum':
+        if (!this.uzumService)
+          throw new PaymentError(
+            PaymentErrorCode.MISSING_CONFIGURATION,
+            'Uzum gateway not configured',
+            PaymentErrorSeverity.HIGH,
+            500,
+            false
+          );
         return this.uzumService;
-      case "stripe":
-        if (!this.stripeService) throw new PaymentError(
-          PaymentErrorCode.MISSING_CONFIGURATION,
-          "Stripe gateway not configured",
-          PaymentErrorSeverity.HIGH,
-          500,
-          false
-        );
+      case 'stripe':
+        if (!this.stripeService)
+          throw new PaymentError(
+            PaymentErrorCode.MISSING_CONFIGURATION,
+            'Stripe gateway not configured',
+            PaymentErrorSeverity.HIGH,
+            500,
+            false
+          );
         return this.stripeService;
-      case "mock":
-        if (!this.mockService) throw new PaymentError(
-          PaymentErrorCode.MISSING_CONFIGURATION,
-          "Mock payment gateway not available",
-          PaymentErrorSeverity.HIGH,
-          500,
-          false
-        );
+      case 'mock':
+        if (!this.mockService)
+          throw new PaymentError(
+            PaymentErrorCode.MISSING_CONFIGURATION,
+            'Mock payment gateway not available',
+            PaymentErrorSeverity.HIGH,
+            500,
+            false
+          );
         return this.mockService;
       default:
         throw new PaymentError(
@@ -201,9 +218,9 @@ export class PaymentGatewayService {
    */
   private getFallbackMethods(primaryMethod: PaymentMethod): PaymentMethod[] {
     const available = this.getAvailableMethods();
-    const fallbacks = available.filter(m => m !== primaryMethod);
+    const fallbacks = available.filter((m) => m !== primaryMethod);
 
-    if (this.fallbackStrategy === "random") {
+    if (this.fallbackStrategy === 'random') {
       // Shuffle array
       return fallbacks.sort(() => Math.random() - 0.5);
     }
@@ -232,10 +249,10 @@ export class PaymentGatewayService {
       await this.auditLogger.logPaymentInitiated(traceId, method, params);
 
       // Validate stripe requires email
-      if (method === "stripe" && !params.userEmail) {
+      if (method === 'stripe' && !params.userEmail) {
         throw new PaymentError(
           PaymentErrorCode.INVALID_AMOUNT,
-          "User email is required for Stripe payments",
+          'User email is required for Stripe payments',
           PaymentErrorSeverity.LOW,
           400,
           false
@@ -252,9 +269,10 @@ export class PaymentGatewayService {
           `Payment initiation via ${method}`
         );
       } catch (error: any) {
-        const paymentError = error instanceof PaymentError
-          ? error
-          : PaymentErrorClassifier.classifyNetworkError(error);
+        const paymentError =
+          error instanceof PaymentError
+            ? error
+            : PaymentErrorClassifier.classifyNetworkError(error);
 
         await this.auditLogger.logPaymentError(
           traceId,
@@ -267,12 +285,7 @@ export class PaymentGatewayService {
 
         // If primary method fails, try fallbacks
         if (paymentError.retryable || this.getAvailableMethods().length > 1) {
-          return await this.initiatePaymentWithFallback(
-            traceId,
-            method,
-            params,
-            paymentError
-          );
+          return await this.initiatePaymentWithFallback(traceId, method, params, paymentError);
         }
 
         throw paymentError;
@@ -315,11 +328,15 @@ export class PaymentGatewayService {
 
         return result;
       } catch (error: any) {
-        const fallbackError = error instanceof PaymentError
-          ? error
-          : PaymentErrorClassifier.classifyNetworkError(error);
+        const fallbackError =
+          error instanceof PaymentError
+            ? error
+            : PaymentErrorClassifier.classifyNetworkError(error);
 
-        console.warn(`[Payment Gateway] Fallback to ${fallbackMethod} failed:`, fallbackError.message);
+        console.warn(
+          `[Payment Gateway] Fallback to ${fallbackMethod} failed:`,
+          fallbackError.message
+        );
         // Continue to next fallback
       }
     }
@@ -331,10 +348,7 @@ export class PaymentGatewayService {
   /**
    * Verify payment completion with error handling
    */
-  async verifyPayment(
-    transactionId: string,
-    method: PaymentMethod
-  ): Promise<boolean> {
+  async verifyPayment(transactionId: string, method: PaymentMethod): Promise<boolean> {
     const traceId = this.auditLogger.generateTraceId();
 
     try {
@@ -346,9 +360,8 @@ export class PaymentGatewayService {
         `Payment verification`
       );
     } catch (error) {
-      const paymentError = error instanceof PaymentError
-        ? error
-        : PaymentErrorClassifier.classifyNetworkError(error);
+      const paymentError =
+        error instanceof PaymentError ? error : PaymentErrorClassifier.classifyNetworkError(error);
 
       await this.auditLogger.logPaymentError(
         traceId,
@@ -379,7 +392,7 @@ export class PaymentGatewayService {
       if (!payment) {
         throw new PaymentError(
           PaymentErrorCode.APPLICATION_NOT_FOUND,
-          "Payment not found",
+          'Payment not found',
           PaymentErrorSeverity.LOW,
           404,
           false
@@ -391,7 +404,7 @@ export class PaymentGatewayService {
       if (error instanceof PaymentError) throw error;
       throw new PaymentError(
         PaymentErrorCode.UNKNOWN_ERROR,
-        "Failed to fetch payment details",
+        'Failed to fetch payment details',
         PaymentErrorSeverity.HIGH,
         500,
         true
@@ -420,7 +433,7 @@ export class PaymentGatewayService {
       const isDuplicate = await this.webhookSecurity.isWebhookDuplicate(
         finalWebhookId,
         method,
-        data.transaction_id || data.id || ""
+        data.transaction_id || data.id || ''
       );
 
       if (isDuplicate) {
@@ -436,27 +449,23 @@ export class PaymentGatewayService {
       }
 
       // Verify webhook signature
-      if (!await this.verifyWebhookSignature(method, data, signature)) {
-        await this.auditLogger.logWebhookVerificationFailed(
-          traceId,
-          method,
-          "Invalid signature"
-        );
+      if (!(await this.verifyWebhookSignature(method, data, signature))) {
+        await this.auditLogger.logWebhookVerificationFailed(traceId, method, 'Invalid signature');
 
         const error = PaymentErrorClassifier.classifyWebhookError(
-          new Error("Signature verification failed"),
+          new Error('Signature verification failed'),
           method
         );
 
         await this.webhookSecurity.recordWebhookAttempt(
           finalWebhookId,
           method,
-          data.transaction_id || data.id || "",
-          data.event_type || "payment",
+          data.transaction_id || data.id || '',
+          data.event_type || 'payment',
           data,
-          signature || "",
+          signature || '',
           false,
-          "Signature verification failed"
+          'Signature verification failed'
         );
 
         return {
@@ -480,13 +489,13 @@ export class PaymentGatewayService {
         method,
         () => {
           switch (method) {
-            case "payme":
+            case 'payme':
               return gateway.processWebhook(data, signature);
-            case "click":
+            case 'click':
               return gateway.processWebhook(data);
-            case "uzum":
+            case 'uzum':
               return gateway.processWebhook(data);
-            case "stripe":
+            case 'stripe':
               return gateway.processWebhook(data, signature);
             default:
               throw new Error(`Unknown payment method: ${method}`);
@@ -499,10 +508,10 @@ export class PaymentGatewayService {
       await this.webhookSecurity.recordWebhookAttempt(
         finalWebhookId,
         method,
-        data.transaction_id || data.id || "",
-        data.event_type || "payment",
+        data.transaction_id || data.id || '',
+        data.event_type || 'payment',
         data,
-        signature || "",
+        signature || '',
         true
       );
 
@@ -519,12 +528,13 @@ export class PaymentGatewayService {
       if (result && typeof result === 'object' && 'success' in result) {
         return result as { success: boolean; error?: string };
       }
-      
+
       return { success: true };
     } catch (error: any) {
-      const paymentError = error instanceof PaymentError
-        ? error
-        : PaymentErrorClassifier.classifyWebhookError(error, method);
+      const paymentError =
+        error instanceof PaymentError
+          ? error
+          : PaymentErrorClassifier.classifyWebhookError(error, method);
 
       console.error(`[Payment Gateway] Webhook processing failed for ${method}:`, error);
 
@@ -549,29 +559,29 @@ export class PaymentGatewayService {
 
     try {
       switch (method) {
-        case "payme":
+        case 'payme':
           return this.webhookSecurity.verifyPaymeSignature(
             data.params,
             signature,
-            process.env.PAYME_API_KEY || ""
+            process.env.PAYME_API_KEY || ''
           );
-        case "click":
+        case 'click':
           return this.webhookSecurity.verifyClickSignature(
             data,
             signature,
-            process.env.CLICK_API_KEY || ""
+            process.env.CLICK_API_KEY || ''
           );
-        case "uzum":
+        case 'uzum':
           return this.webhookSecurity.verifyUzumSignature(
             data,
             signature,
-            process.env.UZUM_API_KEY || ""
+            process.env.UZUM_API_KEY || ''
           );
-        case "stripe":
+        case 'stripe':
           return this.webhookSecurity.verifyStripeSignature(
             data,
             signature,
-            process.env.STRIPE_WEBHOOK_SECRET || ""
+            process.env.STRIPE_WEBHOOK_SECRET || ''
           );
         default:
           return false;
@@ -596,7 +606,7 @@ export class PaymentGatewayService {
       if (!payment) {
         throw new PaymentError(
           PaymentErrorCode.APPLICATION_NOT_FOUND,
-          "Payment not found",
+          'Payment not found',
           PaymentErrorSeverity.LOW,
           404,
           false
@@ -613,9 +623,8 @@ export class PaymentGatewayService {
         `Payment cancellation`
       );
     } catch (error) {
-      const paymentError = error instanceof PaymentError
-        ? error
-        : PaymentErrorClassifier.classifyNetworkError(error);
+      const paymentError =
+        error instanceof PaymentError ? error : PaymentErrorClassifier.classifyNetworkError(error);
 
       throw paymentError;
     }
@@ -631,12 +640,12 @@ export class PaymentGatewayService {
         include: {
           application: true,
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
       });
     } catch (error) {
       throw new PaymentError(
         PaymentErrorCode.UNKNOWN_ERROR,
-        "Failed to fetch user payments",
+        'Failed to fetch user payments',
         PaymentErrorSeverity.HIGH,
         500,
         true
@@ -647,10 +656,7 @@ export class PaymentGatewayService {
   /**
    * Create refund (for gateways that support it)
    */
-  async createRefund(
-    transactionId: string,
-    reason?: string
-  ): Promise<boolean> {
+  async createRefund(transactionId: string, reason?: string): Promise<boolean> {
     const traceId = this.auditLogger.generateTraceId();
 
     try {
@@ -661,7 +667,7 @@ export class PaymentGatewayService {
       if (!payment) {
         throw new PaymentError(
           PaymentErrorCode.APPLICATION_NOT_FOUND,
-          "Payment not found",
+          'Payment not found',
           PaymentErrorSeverity.LOW,
           404,
           false
@@ -671,7 +677,7 @@ export class PaymentGatewayService {
       const method = payment.paymentMethod as PaymentMethod;
 
       // Currently only Stripe supports refunds
-      if (method === "stripe" && this.stripeService) {
+      if (method === 'stripe' && this.stripeService) {
         return await this.retryService.executeWithRetry(
           traceId,
           method,
@@ -688,9 +694,8 @@ export class PaymentGatewayService {
         false
       );
     } catch (error) {
-      const paymentError = error instanceof PaymentError
-        ? error
-        : PaymentErrorClassifier.classifyNetworkError(error);
+      const paymentError =
+        error instanceof PaymentError ? error : PaymentErrorClassifier.classifyNetworkError(error);
 
       throw paymentError;
     }
@@ -707,33 +712,33 @@ export class PaymentGatewayService {
   } {
     const methodInfoMap = {
       mock: {
-        name: "Mock Payment",
-        description: "Development/testing payment provider",
-        supportedCurrencies: ["USD", "UZS", "EUR"],
+        name: 'Mock Payment',
+        description: 'Development/testing payment provider',
+        supportedCurrencies: ['USD', 'UZS', 'EUR'],
         supportsRefunds: true,
       },
       payme: {
-        name: "Payme",
-        description: "Popular payment gateway in Uzbekistan",
-        supportedCurrencies: ["UZS"],
+        name: 'Payme',
+        description: 'Popular payment gateway in Uzbekistan',
+        supportedCurrencies: ['UZS'],
         supportsRefunds: false,
       },
       click: {
-        name: "Click",
-        description: "Click payment system for Central Asia",
-        supportedCurrencies: ["UZS"],
+        name: 'Click',
+        description: 'Click payment system for Central Asia',
+        supportedCurrencies: ['UZS'],
         supportsRefunds: false,
       },
       uzum: {
-        name: "Uzum",
-        description: "Digital payment platform in Uzbekistan",
-        supportedCurrencies: ["UZS"],
+        name: 'Uzum',
+        description: 'Digital payment platform in Uzbekistan',
+        supportedCurrencies: ['UZS'],
         supportsRefunds: false,
       },
       stripe: {
-        name: "Stripe",
-        description: "International payment processing",
-        supportedCurrencies: ["USD", "EUR", "GBP"],
+        name: 'Stripe',
+        description: 'International payment processing',
+        supportedCurrencies: ['USD', 'EUR', 'GBP'],
         supportsRefunds: true,
       },
     };

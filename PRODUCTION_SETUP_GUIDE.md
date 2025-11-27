@@ -20,9 +20,11 @@ Before starting, ensure you have:
 ## 🔑 Required External Services
 
 ### 1. OpenAI API (CRITICAL)
+
 **Purpose:** AI chat functionality
 
 **Setup:**
+
 1. Go to https://platform.openai.com
 2. Create account and add payment method
 3. Generate API key
@@ -33,9 +35,11 @@ Before starting, ensure you have:
    ```
 
 ### 2. Firebase (CRITICAL)
+
 **Purpose:** File storage and push notifications
 
 **Setup:**
+
 1. Go to https://console.firebase.google.com
 2. Create project: "VisaBuddy"
 3. Enable Firebase Storage
@@ -50,9 +54,11 @@ Before starting, ensure you have:
    ```
 
 ### 3. Google OAuth (CRITICAL)
+
 **Purpose:** Google Sign-In
 
 **Setup:**
+
 1. Go to https://console.cloud.google.com
 2. Create project: "VisaBuddy"
 3. Enable Google+ API
@@ -65,11 +71,13 @@ Before starting, ensure you have:
    ```
 
 ### 4. Database (CRITICAL)
+
 **Purpose:** PostgreSQL database
 
 **Recommended:** Railway (https://railway.app)
 
 **Setup:**
+
 1. Create Railway account
 2. Create new project
 3. Add PostgreSQL database
@@ -79,9 +87,11 @@ Before starting, ensure you have:
    ```
 
 ### 5. Redis (RECOMMENDED)
+
 **Purpose:** Caching for better performance
 
 **Setup:**
+
 1. In Railway, add Redis database
 2. Copy connection string to `.env`:
    ```
@@ -89,9 +99,11 @@ Before starting, ensure you have:
    ```
 
 ### 6. Email Service (OPTIONAL)
+
 **Purpose:** Email notifications
 
 **Option A: SendGrid**
+
 1. Create account at https://sendgrid.com
 2. Verify sender email
 3. Generate API key
@@ -101,6 +113,7 @@ Before starting, ensure you have:
    ```
 
 **Option B: Gmail SMTP**
+
 ```
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -115,13 +128,14 @@ SMTP_PASS=your-app-password
 ### Option A: Railway (Recommended)
 
 1. **Create Railway Project:**
+
    ```bash
    # Install Railway CLI
    npm install -g @railway/cli
-   
+
    # Login
    railway login
-   
+
    # Link project
    cd apps/backend
    railway link
@@ -138,11 +152,13 @@ SMTP_PASS=your-app-password
    - Set `NODE_ENV=production`
 
 4. **Deploy:**
+
    ```bash
    railway up
    ```
 
 5. **Run Migrations:**
+
    ```bash
    railway run npx prisma migrate deploy
    railway run npx prisma db seed
@@ -159,6 +175,7 @@ SMTP_PASS=your-app-password
    - Set root directory: `apps/ai-service`
 
 2. **Set Environment Variables:**
+
    ```
    OPENAI_API_KEY=sk-your-key
    PORT=8001
@@ -174,16 +191,19 @@ SMTP_PASS=your-app-password
 ### iOS Build
 
 1. **Install EAS CLI:**
+
    ```bash
    npm install -g eas-cli
    ```
 
 2. **Login to Expo:**
+
    ```bash
    eas login
    ```
 
 3. **Configure Project:**
+
    ```bash
    cd frontend_new
    eas build:configure
@@ -194,9 +214,11 @@ SMTP_PASS=your-app-password
    - Set `EXPO_PUBLIC_API_URL=https://api.visabuddy.uz`
 
 5. **Build for iOS:**
+
    ```bash
    eas build --platform ios --profile production
    ```
+
    - EAS will prompt for Apple credentials
    - Build takes 30-60 minutes
    - Download `.ipa` file
@@ -209,11 +231,13 @@ SMTP_PASS=your-app-password
 ### Android Build
 
 1. **Build APK (for testing):**
+
    ```bash
    eas build --platform android --profile production
    ```
 
 2. **Build AAB (for Play Store):**
+
    ```bash
    eas build --platform android --profile production-aab
    ```
@@ -265,6 +289,7 @@ SMTP_PASS=your-app-password
 ## ✅ Pre-Launch Checklist
 
 ### Backend
+
 - [ ] Database migrations run successfully
 - [ ] All environment variables set
 - [ ] OpenAI API key configured and working
@@ -275,6 +300,7 @@ SMTP_PASS=your-app-password
 - [ ] Error monitoring setup (Sentry recommended)
 
 ### Mobile App
+
 - [ ] Production API URL configured
 - [ ] Tested on real iOS device
 - [ ] Tested on real Android device
@@ -285,6 +311,7 @@ SMTP_PASS=your-app-password
 - [ ] Screenshots prepared
 
 ### Legal & Content
+
 - [ ] Privacy policy published
 - [ ] Terms of service published
 - [ ] Support email setup: support@visabuddy.uz
@@ -292,6 +319,7 @@ SMTP_PASS=your-app-password
 - [ ] Keywords researched
 
 ### Testing
+
 - [ ] Registration and login work
 - [ ] Questionnaire flow works
 - [ ] Application creation works
@@ -305,6 +333,7 @@ SMTP_PASS=your-app-password
 ## 📊 Post-Launch Monitoring
 
 ### Day 1-7
+
 - [ ] Monitor crash reports (Firebase Crashlytics)
 - [ ] Monitor error logs (Railway/Sentry)
 - [ ] Respond to user reviews
@@ -312,6 +341,7 @@ SMTP_PASS=your-app-password
 - [ ] Monitor API performance
 
 ### Week 2-4
+
 - [ ] Analyze user behavior (Firebase Analytics)
 - [ ] Identify drop-off points
 - [ ] Collect user feedback
@@ -323,24 +353,28 @@ SMTP_PASS=your-app-password
 ## 🆘 Troubleshooting
 
 ### Backend won't start
+
 - Check `DATABASE_URL` is correct
 - Check `JWT_SECRET` is at least 32 characters
 - Check PostgreSQL is accessible
 - Check logs: `railway logs`
 
 ### AI chat not working
+
 - Check `OPENAI_API_KEY` is set
 - Check AI service is running
 - Check `AI_SERVICE_URL` is correct
 - Test AI service: `curl https://visabuddy-ai.railway.app/health`
 
 ### Document upload fails
+
 - Check Firebase Storage is configured
 - Check storage rules allow uploads
 - Check file size limits (20MB max)
 - Check file types are allowed
 
 ### Google Sign-In not working
+
 - Check `GOOGLE_CLIENT_ID` is set
 - Check OAuth consent screen is configured
 - Check redirect URIs are correct
@@ -351,6 +385,7 @@ SMTP_PASS=your-app-password
 ## 📞 Support
 
 For deployment help:
+
 - Email: support@visabuddy.uz
 - Check logs in Railway dashboard
 - Review error messages carefully
@@ -360,5 +395,3 @@ For deployment help:
 
 **Last Updated:** November 2024  
 **Version:** 1.0.0
-
-

@@ -3,11 +3,11 @@
  * Logs all requests with context and performance metrics
  */
 
-import { Request, Response, NextFunction } from "express";
-import { v4 as uuidv4 } from "uuid";
-import { getEnvConfig } from "../config/env";
-import { getLogWriter } from "../utils/log-writer";
-import { sendToIntegrations } from "../utils/log-integrations";
+import { Request, Response, NextFunction } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import { getEnvConfig } from '../config/env';
+import { getLogWriter } from '../utils/log-writer';
+import { sendToIntegrations } from '../utils/log-integrations';
 
 /**
  * Extended request with request ID
@@ -25,10 +25,10 @@ declare global {
  * Log levels
  */
 export enum LogLevel {
-  DEBUG = "DEBUG",
-  INFO = "INFO",
-  WARN = "WARN",
-  ERROR = "ERROR",
+  DEBUG = 'DEBUG',
+  INFO = 'INFO',
+  WARN = 'WARN',
+  ERROR = 'ERROR',
 }
 
 /**
@@ -56,11 +56,7 @@ export interface LogEntry {
  * Request logging middleware
  * Logs incoming requests with full context
  */
-export function requestLogger(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   // Generate unique request ID
   const requestId = uuidv4();
   req.requestId = requestId;
@@ -68,10 +64,10 @@ export function requestLogger(
 
   // Get client IP
   const ip =
-    (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
-    (req.headers["x-real-ip"] as string) ||
+    (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+    (req.headers['x-real-ip'] as string) ||
     req.socket.remoteAddress ||
-    "unknown";
+    'unknown';
 
   // Log request start
   logRequest({
@@ -80,7 +76,7 @@ export function requestLogger(
     path: req.path,
     userId: req.userId,
     ip,
-    userAgent: req.headers["user-agent"],
+    userAgent: req.headers['user-agent'],
     metadata: {
       query: req.query,
       body: sanitizeBodyForLogging(req.body),
@@ -88,7 +84,7 @@ export function requestLogger(
   });
 
   // Log response when finished
-  res.on("finish", () => {
+  res.on('finish', () => {
     const duration = req.startTime ? Date.now() - req.startTime : 0;
 
     logResponse({
@@ -109,13 +105,8 @@ export function requestLogger(
  * Error logging middleware
  * Logs errors with full context (but sanitizes sensitive data)
  */
-export function errorLogger(
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
-  const requestId = req.requestId || "unknown";
+export function errorLogger(err: Error, req: Request, res: Response, next: NextFunction): void {
+  const requestId = req.requestId || 'unknown';
   const duration = req.startTime ? Date.now() - req.startTime : 0;
 
   // Sanitize error message for logging (remove sensitive data)
@@ -132,7 +123,7 @@ export function errorLogger(
     /authorization["\s:=]+[^\s"']+/gi,
   ];
 
-  sensitivePatterns.forEach(pattern => {
+  sensitivePatterns.forEach((pattern) => {
     errorMessage = errorMessage.replace(pattern, '[REDACTED]');
     if (errorStack) {
       errorStack = errorStack.replace(pattern, '[REDACTED]');
@@ -158,7 +149,7 @@ export function errorLogger(
       errorName: err.name,
     },
   };
-  
+
   logErrorEntry(errorLogEntry);
 
   next(err);
@@ -169,12 +160,12 @@ export function errorLogger(
  */
 function shouldLog(level: LogLevel): boolean {
   const envConfig = getEnvConfig();
-  const configuredLevel = (envConfig.LOG_LEVEL || "INFO") as LogLevel;
-  
+  const configuredLevel = (envConfig.LOG_LEVEL || 'INFO') as LogLevel;
+
   const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
   const configuredIndex = levels.indexOf(configuredLevel);
   const entryIndex = levels.indexOf(level);
-  
+
   return entryIndex >= configuredIndex;
 }
 
@@ -189,9 +180,9 @@ function logRequest(entry: Partial<LogEntry>): void {
   const logEntry: LogEntry = {
     timestamp: new Date().toISOString(),
     level: LogLevel.INFO,
-    requestId: entry.requestId || "unknown",
-    method: entry.method || "UNKNOWN",
-    path: entry.path || "unknown",
+    requestId: entry.requestId || 'unknown',
+    method: entry.method || 'UNKNOWN',
+    path: entry.path || 'unknown',
     userId: entry.userId,
     ip: entry.ip,
     userAgent: entry.userAgent,
@@ -200,11 +191,11 @@ function logRequest(entry: Partial<LogEntry>): void {
 
   const logString = JSON.stringify(logEntry);
   console.log(logString);
-  
+
   // Write to file if enabled
   const logWriter = getLogWriter();
   logWriter.write(logString);
-  
+
   // Send to external integrations (async, don't wait)
   sendToIntegrations(logEntry).catch(() => {
     // Silently fail - external logging should not break the app
@@ -216,7 +207,7 @@ function logRequest(entry: Partial<LogEntry>): void {
  */
 function logResponse(entry: Partial<LogEntry>): void {
   const level = entry.statusCode && entry.statusCode >= 400 ? LogLevel.WARN : LogLevel.INFO;
-  
+
   if (!shouldLog(level)) {
     return;
   }
@@ -224,9 +215,9 @@ function logResponse(entry: Partial<LogEntry>): void {
   const logEntry: LogEntry = {
     timestamp: new Date().toISOString(),
     level,
-    requestId: entry.requestId || "unknown",
-    method: entry.method || "UNKNOWN",
-    path: entry.path || "unknown",
+    requestId: entry.requestId || 'unknown',
+    method: entry.method || 'UNKNOWN',
+    path: entry.path || 'unknown',
     statusCode: entry.statusCode,
     duration: entry.duration,
     userId: entry.userId,
@@ -238,17 +229,17 @@ function logResponse(entry: Partial<LogEntry>): void {
   };
 
   const logString = JSON.stringify(logEntry);
-  
+
   if (level === LogLevel.WARN) {
     console.warn(logString);
   } else {
     console.log(logString);
   }
-  
+
   // Write to file if enabled
   const logWriter = getLogWriter();
   logWriter.write(logString);
-  
+
   // Send to external integrations (async, don't wait)
   sendToIntegrations(logEntry).catch(() => {
     // Silently fail - external logging should not break the app
@@ -266,9 +257,9 @@ function logErrorEntry(entry: Partial<LogEntry>): void {
   const logEntry: LogEntry = {
     timestamp: new Date().toISOString(),
     level: LogLevel.ERROR,
-    requestId: entry.requestId || "unknown",
-    method: entry.method || "UNKNOWN",
-    path: entry.path || "unknown",
+    requestId: entry.requestId || 'unknown',
+    method: entry.method || 'UNKNOWN',
+    path: entry.path || 'unknown',
     duration: entry.duration,
     userId: entry.userId,
     error: entry.error,
@@ -277,11 +268,11 @@ function logErrorEntry(entry: Partial<LogEntry>): void {
 
   const logString = JSON.stringify(logEntry);
   console.error(logString);
-  
+
   // Write to file if enabled
   const logWriter = getLogWriter();
   logWriter.write(logString);
-  
+
   // Send to external integrations (async, don't wait)
   sendToIntegrations(logEntry).catch(() => {
     // Silently fail - external logging should not break the app
@@ -293,28 +284,28 @@ function logErrorEntry(entry: Partial<LogEntry>): void {
  * Removes sensitive information like passwords, tokens, etc.
  */
 function sanitizeBodyForLogging(body: any): any {
-  if (!body || typeof body !== "object") {
+  if (!body || typeof body !== 'object') {
     return body;
   }
 
   const sensitiveFields = [
-    "password",
-    "token",
-    "secret",
-    "apiKey",
-    "api_key",
-    "accessToken",
-    "refreshToken",
-    "creditCard",
-    "cvv",
-    "ssn",
+    'password',
+    'token',
+    'secret',
+    'apiKey',
+    'api_key',
+    'accessToken',
+    'refreshToken',
+    'creditCard',
+    'cvv',
+    'ssn',
   ];
 
   const sanitized = { ...body };
 
   for (const field of sensitiveFields) {
     if (sanitized[field]) {
-      sanitized[field] = "[REDACTED]";
+      sanitized[field] = '[REDACTED]';
     }
   }
 
@@ -332,9 +323,9 @@ export function createLogEntry(
   return {
     timestamp: new Date().toISOString(),
     level,
-    requestId: "system",
-    method: "SYSTEM",
-    path: "system",
+    requestId: 'system',
+    method: 'SYSTEM',
+    path: 'system',
     metadata: {
       message,
       ...metadata,
@@ -353,11 +344,11 @@ export function logDebug(message: string, metadata?: Record<string, unknown>): v
   const entry = createLogEntry(LogLevel.DEBUG, message, metadata);
   const logString = JSON.stringify(entry);
   console.debug(logString);
-  
+
   // Write to file if enabled
   const logWriter = getLogWriter();
   logWriter.write(logString);
-  
+
   // Send to external integrations (async, don't wait)
   sendToIntegrations(entry).catch(() => {
     // Silently fail - external logging should not break the app
@@ -375,11 +366,11 @@ export function logInfo(message: string, metadata?: Record<string, unknown>): vo
   const entry = createLogEntry(LogLevel.INFO, message, metadata);
   const logString = JSON.stringify(entry);
   console.log(logString);
-  
+
   // Write to file if enabled
   const logWriter = getLogWriter();
   logWriter.write(logString);
-  
+
   // Send to external integrations (async, don't wait)
   sendToIntegrations(entry).catch(() => {
     // Silently fail - external logging should not break the app
@@ -397,11 +388,11 @@ export function logWarn(message: string, metadata?: Record<string, unknown>): vo
   const entry = createLogEntry(LogLevel.WARN, message, metadata);
   const logString = JSON.stringify(entry);
   console.warn(logString);
-  
+
   // Write to file if enabled
   const logWriter = getLogWriter();
   logWriter.write(logString);
-  
+
   // Send to external integrations (async, don't wait)
   sendToIntegrations(entry).catch(() => {
     // Silently fail - external logging should not break the app
@@ -425,18 +416,16 @@ export function logError(message: string, error?: Error, metadata?: Record<strin
         }
       : undefined,
   };
-  
+
   const logString = JSON.stringify(entry);
   console.error(logString);
-  
+
   // Write to file if enabled
   const logWriter = getLogWriter();
   logWriter.write(logString);
-  
+
   // Send to external integrations (async, don't wait)
   sendToIntegrations(entry).catch(() => {
     // Silently fail - external logging should not break the app
   });
 }
-
-

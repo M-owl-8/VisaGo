@@ -73,7 +73,10 @@ const setSessionHeader = (res: Response, sessionId: string) => {
   const existing = res.getHeader('Access-Control-Expose-Headers');
   const exposeSet = new Set<string>(
     typeof existing === 'string'
-      ? existing.split(',').map((value) => value.trim()).filter(Boolean)
+      ? existing
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean)
       : Array.isArray(existing)
         ? existing.flatMap((value) =>
             (value ?? '')
@@ -108,7 +111,9 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   const headerSessionId = (req.headers[SESSION_HEADER_NAME] as string | undefined)?.trim();
   const cookieSessionId = (req as any).cookies?.sessionId as string | undefined;
   const bodySessionId =
-    typeof (req.body as any)?.sessionId === 'string' ? ((req.body as any).sessionId as string) : undefined;
+    typeof (req.body as any)?.sessionId === 'string'
+      ? ((req.body as any).sessionId as string)
+      : undefined;
 
   let sessionId = headerSessionId || cookieSessionId || bodySessionId;
   const isNewSession = !sessionId;
@@ -123,8 +128,7 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   const isPublicAuthRoute = pathMatches(path, publicAuthRoutes);
   const isExemptRoute = pathMatches(path, exemptRoutes);
 
-  const shouldVerify =
-    STATE_CHANGING_METHODS.has(method) && !isPublicAuthRoute && !isExemptRoute;
+  const shouldVerify = STATE_CHANGING_METHODS.has(method) && !isPublicAuthRoute && !isExemptRoute;
 
   // Always rotate and attach a token when we either have a new session or a client needs one
   const ensureTokenPrepared = () => {
@@ -150,9 +154,13 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
 
   const headerToken = (req.headers[CSRF_HEADER_NAME] as string | undefined)?.trim();
   const bodyToken =
-    typeof (req.body as any)?.csrfToken === 'string' ? ((req.body as any).csrfToken as string) : undefined;
+    typeof (req.body as any)?.csrfToken === 'string'
+      ? ((req.body as any).csrfToken as string)
+      : undefined;
   const queryToken =
-    typeof (req.query as any)?.csrfToken === 'string' ? ((req.query as any).csrfToken as string) : undefined;
+    typeof (req.query as any)?.csrfToken === 'string'
+      ? ((req.query as any).csrfToken as string)
+      : undefined;
 
   const incomingToken = headerToken || bodyToken || queryToken;
 
