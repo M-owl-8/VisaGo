@@ -257,7 +257,7 @@ export class DocumentChecklistService {
               `document_${index}`;
             const existingDoc = existingDocumentsMap.get(docType) as any;
 
-            return {
+            const item = {
               id: `checklist-item-${index}`,
               documentType: docType,
               name: aiItem.name || aiItem.document || 'Unknown Document',
@@ -285,6 +285,10 @@ export class DocumentChecklistService {
                 undefined,
               aiVerified: existingDoc?.verifiedByAI === true,
               aiConfidence: existingDoc?.aiConfidence as number | undefined,
+            };
+            return {
+              ...item,
+              category: aiItem.category ?? inferCategory(item),
             };
           });
 
