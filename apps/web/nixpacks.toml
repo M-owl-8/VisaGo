@@ -1,0 +1,15 @@
+# Nixpacks configuration for Railway deployment
+# Railway will use this if it detects a Next.js app
+
+[phases.setup]
+nixPkgs = ["nodejs-20_x", "npm"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
+

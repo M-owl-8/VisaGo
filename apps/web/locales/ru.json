@@ -1,0 +1,89 @@
+{
+  "common": {
+    "yes": "Да",
+    "no": "Нет",
+    "ok": "OK",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "back": "Назад",
+    "next": "Далее",
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успешно",
+    "warning": "Предупреждение",
+    "info": "Информация",
+    "close": "Закрыть",
+    "submit": "Отправить",
+    "search": "Поиск"
+  },
+  "auth": {
+    "title": "Ketdik",
+    "signIn": "Войти в ваш аккаунт",
+    "email": "Адрес электронной почты",
+    "password": "Пароль",
+    "forgotPassword": "Забыли пароль?",
+    "signInButton": "Войти",
+    "dontHaveAccount": "Нет аккаунта? ",
+    "signUp": "Зарегистрироваться",
+    "registerTitle": "Создайте ваш аккаунт",
+    "firstName": "Имя",
+    "lastName": "Фамилия",
+    "confirmPassword": "Подтвердить пароль",
+    "createAccount": "Создать аккаунт",
+    "alreadyHaveAccount": "Уже есть аккаунт? ",
+    "fillAllFields": "Пожалуйста, заполните все поля",
+    "loginFailed": "Ошибка входа",
+    "loginSuccess": "Успешно вошли!",
+    "resetPassword": "Сбросить пароль",
+    "sendResetLink": "Отправить ссылку сброса",
+    "passwordReset": "Ссылка для сброса пароля отправлена на вашу почту"
+  },
+  "applications": {
+    "title": "Заявки",
+    "myApplications": "Мои заявки",
+    "noApplicationsYet": "Пока нет заявок",
+    "startNewApplication": "Начать новую заявку"
+  },
+  "chat": {
+    "aiAssistant": "AI помощник",
+    "messagePlaceholder": "Введите ваш вопрос...",
+    "send": "Отправить",
+    "sending": "Отправляется...",
+    "noMessages": "Нет сообщений"
+  },
+  "profile": {
+    "profile": "Профиль",
+    "myProfile": "Мой профиль",
+    "firstName": "Имя",
+    "lastName": "Фамилия",
+    "email": "Почта",
+    "phone": "Телефон",
+    "language": "Язык",
+    "logout": "Выход"
+  },
+  "helpSupport": {
+    "title": "Помощь и поддержка",
+    "emailSupport": "Поддержка по email",
+    "phoneSupport": "Телефонная поддержка",
+    "telegramSupportTitle": "Поддержка через Telegram",
+    "telegramSupportSubtitle": "@Ketdikuz",
+    "whatsappSupportTitle": "Поддержка через WhatsApp",
+    "whatsappSupportSubtitle": "+998997614313",
+    "instagramSupportTitle": "Поддержка через Instagram",
+    "instagramSupportSubtitle": "_ketdik",
+    "needHelp": "Нужна помощь?",
+    "supportAvailable": "Наша команда поддержки доступна 24/7, чтобы помочь вам с любыми вопросами или проблемами.",
+    "supportEmail": "ketdik@gmail.com",
+    "supportPhone": "+998997614313"
+  },
+  "errors": {
+    "genericError": "Произошла ошибка",
+    "networkError": "Ошибка сети. Пожалуйста, проверьте подключение к интернету и попробуйте снова.",
+    "networkErrorDetail": "Не удается подключиться к серверу. Пожалуйста, проверьте подключение к интернету и попробуйте снова.",
+    "tryAgain": "Попробовать снова",
+    "invalidCredentials": "Неверный email или пароль. Пожалуйста, попробуйте снова.",
+    "emailExists": "Этот email уже зарегистрирован. Пожалуйста, используйте другой email или попробуйте войти."
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "common": {
+    "yes": "Ha",
+    "no": "Yo'q",
+    "ok": "OK",
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "delete": "O'chirish",
+    "edit": "Tahrir qilish",
+    "back": "Orqaga",
+    "next": "Keyingi",
+    "loading": "Yuklanmoqda...",
+    "error": "Xato",
+    "success": "Muvaffaqiyat",
+    "warning": "Ogohlantirish",
+    "info": "Ma'lumot",
+    "close": "Yopish",
+    "submit": "Yuborish",
+    "search": "Qidirish"
+  },
+  "auth": {
+    "title": "Ketdik",
+    "signIn": "Hisobingizga kirish",
+    "email": "Email manzili",
+    "password": "Parol",
+    "forgotPassword": "Parolni unutdingizmi?",
+    "signInButton": "Kirish",
+    "dontHaveAccount": "Hisobingiz yo'qmi? ",
+    "signUp": "Ro'yxatdan o'tish",
+    "registerTitle": "Hisobingizni yarating",
+    "firstName": "Ism",
+    "lastName": "Familiya",
+    "confirmPassword": "Parolni tasdiqlang",
+    "createAccount": "Hisobni yaratish",
+    "alreadyHaveAccount": "Allaqachon hisobingiz bormi? ",
+    "fillAllFields": "Iltimos, barcha maydonlarni to'ldiring",
+    "loginFailed": "Kirish muvaffaqiyatsiz",
+    "loginSuccess": "Muvaffaqiyatli kirildi!",
+    "resetPassword": "Parolni qayta o'rnatish",
+    "sendResetLink": "Qayta o'rnatish havolasini yuborish",
+    "passwordReset": "Parol qayta o'rnatish havolasi email manzilingizga yuborildi"
+  },
+  "applications": {
+    "title": "Arizalar",
+    "myApplications": "Mening arizalarim",
+    "noApplicationsYet": "Hali arizalar yo'q",
+    "startNewApplication": "Yangi ariza boshlash"
+  },
+  "chat": {
+    "aiAssistant": "AI yordamchi",
+    "messagePlaceholder": "Savolingizni kiriting...",
+    "send": "Yuborish",
+    "sending": "Yuborilmoqda...",
+    "noMessages": "Xabarlar yo'q"
+  },
+  "profile": {
+    "profile": "Profil",
+    "myProfile": "Mening profilim",
+    "firstName": "Ism",
+    "lastName": "Familiya",
+    "email": "Email",
+    "phone": "Telefon",
+    "language": "Til",
+    "logout": "Chiqish"
+  },
+  "helpSupport": {
+    "title": "Yordam va qo'llab-quvvatlash",
+    "emailSupport": "Email orqali yordam",
+    "phoneSupport": "Telefon orqali yordam",
+    "telegramSupportTitle": "Telegram orqali yordam",
+    "telegramSupportSubtitle": "@Ketdikuz",
+    "whatsappSupportTitle": "WhatsApp orqali yordam",
+    "whatsappSupportSubtitle": "+998997614313",
+    "instagramSupportTitle": "Instagram orqali yordam",
+    "instagramSupportSubtitle": "_ketdik",
+    "needHelp": "Yordam kerakmi?",
+    "supportAvailable": "Bizning yordam jamoamiz 24/7 sizning barcha savollaringiz va muammolaringizga yordam berish uchun mavjud.",
+    "supportEmail": "ketdik@gmail.com",
+    "supportPhone": "+998997614313"
+  },
+  "errors": {
+    "genericError": "Xato yuz berdi",
+    "networkError": "Tarmoq xatosi. Iltimos, internet ulanishingizni tekshiring va qayta urinib ko'ring.",
+    "networkErrorDetail": "Serverga ulanib bo'lmadi. Iltimos, internet ulanishingizni tekshiring va qayta urinib ko'ring.",
+    "tryAgain": "Qayta urinib ko'ring",
+    "invalidCredentials": "Noto'g'ri email yoki parol. Iltimos, qayta urinib ko'ring.",
+    "emailExists": "Bu email allaqachon ro'yxatdan o'tgan. Iltimos, boshqa email ishlating yoki kirishni urinib ko'ring."
+  }
+}
