@@ -1008,10 +1008,7 @@ Only return the JSON object, no other text.`;
               descriptionUz: aiItem.descriptionUz || aiItem.description || '',
               descriptionRu: aiItem.descriptionRu || aiItem.description || '',
               required: aiItem.required !== undefined ? aiItem.required : true,
-              priority: (aiItem.priority || (aiItem.required ? 'high' : 'medium')) as
-                | 'high'
-                | 'medium'
-                | 'low',
+              priority: normalizePriority(aiItem.priority || (aiItem.required ? 'high' : 'medium')),
               status: existingDoc ? (existingDoc.status as any) : 'missing',
               userDocumentId: existingDoc?.id,
               fileUrl: existingDoc?.fileUrl,
