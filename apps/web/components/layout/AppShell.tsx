@@ -123,16 +123,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-white shadow-inner shadow-black/20 transition hover:bg-white/10 md:flex">
-              <Languages size={16} />
+            <div className="hidden items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide shadow-inner shadow-black/20 transition hover:bg-white/15 md:flex">
+              <Languages size={16} className="text-white" />
               <select
                 value={currentLang}
                 onChange={(e) => changeLanguage(e.target.value)}
-                className="bg-transparent text-xs font-semibold uppercase tracking-[0.2em] text-white focus:outline-none"
+                className="bg-transparent text-xs font-semibold uppercase tracking-[0.2em] text-white focus:outline-none [&>option]:bg-[#0E1A2C] [&>option]:text-white [&>option]:text-white"
+                style={{ color: 'white' }}
               >
-                <option value="en">EN</option>
-                <option value="ru">RU</option>
-                <option value="uz">UZ</option>
+                <option value="en" className="bg-[#0E1A2C] text-white">EN</option>
+                <option value="ru" className="bg-[#0E1A2C] text-white">RU</option>
+                <option value="uz" className="bg-[#0E1A2C] text-white">UZ</option>
               </select>
             </div>
 
@@ -210,11 +211,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <select
                   value={currentLang}
                   onChange={(e) => changeLanguage(e.target.value)}
-                  className="rounded-2xl border border-white/10 bg-transparent px-3 py-2 text-sm text-white"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                  style={{ color: 'white' }}
                 >
-                  <option value="en">English</option>
-                  <option value="ru">Русский</option>
-                  <option value="uz">O‘zbekcha</option>
+                  <option value="en" className="bg-[#0E1A2C] text-white">English</option>
+                  <option value="ru" className="bg-[#0E1A2C] text-white">Русский</option>
+                  <option value="uz" className="bg-[#0E1A2C] text-white">O'zbekcha</option>
                 </select>
               </div>
             </motion.div>
@@ -230,7 +232,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             © {new Date().getFullYear()} Ketdik.{' '}
-            {t('common.allRightsReserved', 'All rights reserved.')}
+            {t('common.allRightsReserved')}
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <Link href="/privacy" className="transition hover:text-white">

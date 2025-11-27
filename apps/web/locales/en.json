@@ -16,7 +16,8 @@
     "info": "Info",
     "close": "Close",
     "submit": "Submit",
-    "search": "Search"
+    "search": "Search",
+    "allRightsReserved": "All rights reserved."
   },
   "auth": {
     "title": "Ketdik",
@@ -100,13 +101,16 @@
     "title": "Questionnaire",
     "step": "Step",
     "of": "of",
-    "step1Title": "Travel Purpose & Destination",
-    "step2Title": "Personal Information",
-    "step3Title": "Status & Education",
+    "step0Title": "Travel Purpose & Destination",
+    "step1Title": "Personal Information",
+    "step2Title": "Status & Education",
+    "step3Title": "Travel Profile",
     "step4Title": "Financial Situation",
-    "step5Title": "Travel History & Ties",
-    "step6Title": "Documents & Special Conditions",
-    "step7Title": "Review",
+    "step5Title": "Invitation & Accommodation",
+    "step6Title": "Stay & Tickets",
+    "step7Title": "Travel History",
+    "step8Title": "Ties & Documents",
+    "step9Title": "Special Conditions",
     "visaType": "Visa Type",
     "visaTypeTourist": "Tourist",
     "visaTypeStudent": "Student",
@@ -224,7 +228,10 @@
     "propertyTypeLand": "Land",
     "propertyTypeBusiness": "Business",
     "reviewTitle": "Review Your Information",
-    "reviewSubtitle": "Please review your answers before submitting"
+    "reviewSubtitle": "Please review your answers before submitting",
+    "pleaseAnswerAll": "Please answer all required questions",
+    "selectRequiredFields": "Please fill in all required fields",
+    "step1Description": "Choose your destination country and visa type"
   },
   "documents": {
     "title": "Upload Document",
