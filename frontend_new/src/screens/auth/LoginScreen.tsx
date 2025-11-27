@@ -10,10 +10,12 @@ import {
   ScrollView,
   Dimensions,
   ImageBackground,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useAuthStore} from '../../store/auth';
 import {signInWithGoogle} from '../../services/google-oauth';
+import KetdikLogo from '../../assets/ketdik-icon.png.jpg';
 
 const {width, height} = Dimensions.get('window');
 
@@ -84,9 +86,11 @@ export default function LoginScreen({navigation}: any) {
           keyboardShouldPersistTaps="handled">
           {/* Logo and Header */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Icon name="globe-outline" size={48} color="#4A9EFF" />
-            </View>
+            <Image
+              source={KetdikLogo}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Ketdik</Text>
             <Text style={styles.subtitle}>
               Your trusted digital visa companion.
@@ -263,16 +267,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: 'rgba(74, 158, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 158, 255, 0.3)',
+  logo: {
+    width: 72,
+    height: 72,
+    marginBottom: 12,
   },
   title: {
     fontSize: 36,

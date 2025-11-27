@@ -467,12 +467,13 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
   }) as 'padding' | 'height' | 'position' | undefined;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={keyboardBehavior}
-        keyboardVerticalOffset={0}>
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
         <View style={styles.contentContainer}>
+          {/* Messages List */}
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -503,6 +504,7 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
             </TouchableOpacity>
           )}
 
+          {/* Error Banner */}
           {errorMessage && (
             <View style={styles.errorBanner}>
               <Icon name="alert-circle" size={16} color="#EF4444" />
@@ -515,6 +517,7 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
             </View>
           )}
 
+          {/* Input Container - Always visible above keyboard */}
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -661,8 +664,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 12,
     backgroundColor: '#0A1929',
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(74, 158, 255, 0.2)',
     alignItems: 'flex-end',
     minHeight: 60,
