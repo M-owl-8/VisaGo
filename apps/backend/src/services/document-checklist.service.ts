@@ -26,7 +26,8 @@ export interface ChecklistItem {
   description: string;
   descriptionUz: string;
   descriptionRu: string;
-  required: boolean;
+  category: 'required' | 'highly_recommended' | 'optional'; // NEW: Explicit categorization
+  required: boolean; // Kept for backward compatibility
   priority: 'high' | 'medium' | 'low';
   status: 'missing' | 'pending' | 'verified' | 'rejected';
   userDocumentId?: string;
