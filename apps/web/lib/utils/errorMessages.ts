@@ -13,6 +13,25 @@ export const getErrorMessage = (
     return error.message;
   }
 
+  // Timeout errors
+  if (
+    error.code === 'ECONNABORTED' ||
+    error.message?.includes('timeout') ||
+    error.message?.includes('exceeded')
+  ) {
+    const translated = t('errors.timeoutError');
+    if (translated && translated !== 'errors.timeoutError') {
+      return translated;
+    }
+    
+    const fallbacks: Record<string, string> = {
+      en: 'Request timed out. The file may be too large or the connection is slow. Please try again.',
+      ru: 'Превышено время ожидания. Файл может быть слишком большим или соединение медленное. Пожалуйста, попробуйте снова.',
+      uz: "So'rov vaqti tugadi. Fayl juda katta bo'lishi yoki ulanish sekin bo'lishi mumkin. Iltimos, qayta urinib ko'ring.",
+    };
+    return fallbacks[language] || fallbacks.en;
+  }
+
   // Network errors
   if (error.code === 'NETWORK_ERROR' || error.status === 0) {
     const translated = t('errors.networkErrorDetail');

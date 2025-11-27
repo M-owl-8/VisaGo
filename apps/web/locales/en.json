@@ -89,6 +89,7 @@
     "genericError": "An error occurred",
     "networkError": "Network error. Please check your internet connection and try again.",
     "networkErrorDetail": "Cannot connect to server. Please check your internet connection and try again.",
+    "timeoutError": "Request timed out. The file may be too large or the connection is slow. Please try again.",
     "tryAgain": "Try Again",
     "invalidCredentials": "Invalid email or password. Please try again.",
     "emailExists": "This email is already registered. Please use a different email or try logging in.",
