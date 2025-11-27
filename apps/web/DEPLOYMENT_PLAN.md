@@ -625,10 +625,9 @@ After deployment, verify:
 
 ## Docker Dependency Notes
 
-- Docker builds copy `apps/web/package.json` and `apps/web/package-lock.json`.
-- We run `npm ci` when the lockfile exists to guarantee reproducible installs.
-- If the lockfile is missing, the Dockerfile automatically falls back to `npm install` so builds don’t block.
-- After changing dependencies, run `npm install` inside `apps/web/` and commit the updated `package-lock.json` so CI continues to use `npm ci`.
+- Docker builds copy `apps/web/package.json` only and run `npm install` inside the container.
+- The lockfile is maintained outside Docker (local dev / CI). Keep `apps/web/package-lock.json` up to date locally, but the container no longer depends on it.
+- This avoids build failures on Cloud Run when the lockfile is unavailable yet still lets developers use the lockfile locally for reproducible installs.
 
 ---
 
