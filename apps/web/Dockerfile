@@ -21,6 +21,9 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy source code
 COPY . .
 
+# Ensure public directory exists (Next.js optional)
+RUN mkdir -p public
+
 # Build Next.js app
 RUN npm run build
 
