@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +12,6 @@ import {
   LogOut,
   Languages,
   MessageCircle,
-  Sparkles,
   ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
@@ -74,9 +74,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <nav className="sticky top-0 z-40 px-4 py-6 sm:px-6 lg:px-8">
         <div className="glass-panel relative flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <Link href="/applications" className="flex items-center gap-2">
-              <div className="rounded-2xl bg-primary-900 px-3 py-2 text-white shadow-card-soft">
-                <Sparkles size={18} />
+            <Link href="/applications" className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black shadow-card-soft">
+                <Image
+                  src="/images/ketdik-icon.jpg"
+                  alt="Ketdik icon"
+                  width={40}
+                  height={40}
+                  priority
+                  className="h-10 w-10 rounded-2xl object-cover"
+                />
               </div>
               <div>
                 <p className="font-display text-lg font-semibold tracking-tight text-primary-900">
@@ -99,13 +106,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               return (
                 <Button
                   key={link.href}
-                  variant={isActive ? 'primary' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   className={cn(
-                    'rounded-full px-4 py-2 text-sm font-medium',
+                    'rounded-full px-5 py-2 text-sm font-semibold transition',
                     isActive
-                      ? 'bg-primary-900 text-white shadow-card'
-                      : 'text-neutral-600 hover:bg-white/80',
+                      ? 'bg-black text-white shadow-[0_15px_35px_rgba(15,15,20,0.25)]'
+                      : 'text-neutral-500 hover:bg-white hover:text-primary-900',
                   )}
                   onClick={() => router.push(link.href)}
                 >

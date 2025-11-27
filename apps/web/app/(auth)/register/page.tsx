@@ -1,11 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+import { Mail, Lock, UserRound } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
-import Link from 'next/link';
+import { AuthLayout } from '@/components/layout/AuthLayout';
+import { AuthField } from '@/components/auth/AuthField';
 
 export default function RegisterPage() {
   const { t, i18n } = useTranslation();
@@ -54,132 +57,95 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t('auth.registerTitle')}
-          </h2>
+    <AuthLayout formTitle={t('auth.registerTitle')} formSubtitle={t('auth.subtitle')}>
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        {error && (
+          <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
+            {error}
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <AuthField
+            label={t('auth.firstName')}
+            icon={UserRound}
+            id="firstName"
+            name="firstName"
+            type="text"
+            placeholder={t('auth.firstName')}
+            value={formData.firstName}
+            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+            required
+          />
+          <AuthField
+            label={t('auth.lastName')}
+            icon={UserRound}
+            id="lastName"
+            name="lastName"
+            type="text"
+            placeholder={t('auth.lastName')}
+            value={formData.lastName}
+            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+            required
+          />
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-          <div className="space-y-4 rounded-md shadow-sm">
-            <div>
-              <label htmlFor="firstName" className="sr-only">
-                {t('auth.firstName')}
-              </label>
-              <input
-                id="firstName"
-                name="firstName"
-                type="text"
-                required
-                className="relative block w-full rounded-t-md border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                placeholder={t('auth.firstName')}
-                value={formData.firstName}
-                onChange={(e) =>
-                  setFormData({ ...formData, firstName: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label htmlFor="lastName" className="sr-only">
-                {t('auth.lastName')}
-              </label>
-              <input
-                id="lastName"
-                name="lastName"
-                type="text"
-                required
-                className="relative block w-full border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                placeholder={t('auth.lastName')}
-                value={formData.lastName}
-                onChange={(e) =>
-                  setFormData({ ...formData, lastName: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="sr-only">
-                {t('auth.email')}
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="relative block w-full border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                placeholder={t('auth.email')}
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                {t('auth.password')}
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="relative block w-full border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                placeholder={t('auth.password')}
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label htmlFor="confirmPassword" className="sr-only">
-                {t('auth.confirmPassword')}
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="relative block w-full rounded-b-md border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                placeholder={t('auth.confirmPassword')}
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
-                }
-              />
-            </div>
-          </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="group relative flex w-full justify-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
-            >
-              {isSubmitting ? t('common.loading') : t('auth.createAccount')}
-            </button>
-          </div>
+        <AuthField
+          label={t('auth.email')}
+          icon={Mail}
+          id="email"
+          name="email"
+          type="email"
+          placeholder="you@email.com"
+          autoComplete="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          required
+        />
 
-          <div className="text-center text-sm">
-            <span className="text-gray-600">{t('auth.alreadyHaveAccount')}</span>
-            <Link
-              href="/login"
-              className="font-medium text-primary-600 hover:text-primary-500"
-            >
-              {t('auth.signIn')}
-            </Link>
-          </div>
-        </form>
-      </div>
-    </div>
+        <AuthField
+          label={t('auth.password')}
+          icon={Lock}
+          id="password"
+          name="password"
+          type="password"
+          placeholder={t('auth.password')}
+          autoComplete="new-password"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          required
+          hint={t('auth.passwordHint', 'Minimum 6 characters to sync with mobile app.')}
+        />
+
+        <AuthField
+          label={t('auth.confirmPassword')}
+          icon={Lock}
+          id="confirmPassword"
+          name="confirmPassword"
+          type="password"
+          placeholder={t('auth.confirmPassword')}
+          autoComplete="new-password"
+          value={formData.confirmPassword}
+          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+          required
+        />
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#4A9EFF] to-[#3EA6FF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(74,158,255,0.35)] transition hover:brightness-110 disabled:opacity-60"
+        >
+          {isSubmitting ? t('common.loading') : t('auth.createAccount')}
+        </button>
+
+        <div className="text-center text-sm text-white/70">
+          <span>{t('auth.alreadyHaveAccount')}</span>{' '}
+          <Link href="/login" className="font-semibold text-white hover:text-[#4A9EFF]">
+            {t('auth.signIn')}
+          </Link>
+        </div>
+      </form>
+    </AuthLayout>
   );
 }
 

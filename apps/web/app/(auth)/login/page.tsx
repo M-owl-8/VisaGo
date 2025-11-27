@@ -1,11 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+import { Mail, Lock, Eye, EyeOff, Shield, Globe } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
-import Link from 'next/link';
+import { AuthLayout } from '@/components/layout/AuthLayout';
+import { AuthField } from '@/components/auth/AuthField';
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation();
@@ -15,6 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,87 +36,100 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t('auth.signIn')}
-          </h2>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-          <div className="space-y-4 rounded-md shadow-sm">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                {t('auth.email')}
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="relative block w-full rounded-t-md border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                placeholder={t('auth.email')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                {t('auth.password')}
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="relative block w-full rounded-b-md border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                placeholder={t('auth.password')}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+    <AuthLayout formTitle={t('auth.signIn')} formSubtitle={t('auth.subtitle')}>
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        {error && (
+          <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
+            {error}
           </div>
+        )}
 
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <Link
-                href="/forgot-password"
-                className="font-medium text-primary-600 hover:text-primary-500"
-              >
-                {t('auth.forgotPassword')}
-              </Link>
-            </div>
-          </div>
+        <AuthField
+          label={t('auth.email')}
+          icon={Mail}
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
 
-          <div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="group relative flex w-full justify-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
-            >
-              {isSubmitting ? t('common.loading') : t('auth.signInButton')}
-            </button>
-          </div>
-
-          <div className="text-center text-sm">
-            <span className="text-gray-600">{t('auth.dontHaveAccount')}</span>
-            <Link
-              href="/register"
-              className="font-medium text-primary-600 hover:text-primary-500"
-            >
-              {t('auth.signUp')}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm text-white/70">
+            <span className="font-semibold">{t('auth.password')}</span>
+            <Link href="/forgot-password" className="text-[#4A9EFF] hover:text-white">
+              {t('auth.forgotPassword')}
             </Link>
           </div>
-        </form>
-      </div>
-    </div>
+          <AuthField
+            label=""
+            icon={Lock}
+            id="password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            placeholder={t('auth.password')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            trailing={
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="text-white/50 transition hover:text-white"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            }
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#3EA6FF] to-[#4A9EFF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(62,166,255,0.35)] transition hover:brightness-110 disabled:opacity-60"
+        >
+          {isSubmitting ? t('common.loading') : t('auth.signInButton')}
+        </button>
+
+        <div className="flex items-center gap-4 text-white/50">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-xs uppercase tracking-[0.4em]">{t('auth.or', 'Or')}</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <button
+          type="button"
+          disabled
+          className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white/80 shadow-inner shadow-black/20"
+        >
+          <Globe size={18} />
+          {t('auth.continueWithGoogle', 'Continue with Google')}
+        </button>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+          <div className="flex items-center gap-2">
+            <Shield size={16} />
+            <p>
+              {t(
+                'auth.securityNote',
+                'Your credentials are encrypted and synced securely with the Ketdik mobile app.',
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="text-center text-sm text-white/70">
+          <span>{t('auth.dontHaveAccount')}</span>{' '}
+          <Link href="/register" className="font-semibold text-white hover:text-[#4A9EFF]">
+            {t('auth.signUp')}
+          </Link>
+        </div>
+      </form>
+    </AuthLayout>
   );
 }
 

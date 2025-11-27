@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
+import { Mail } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
-import ErrorBanner from '@/components/ErrorBanner';
-import Link from 'next/link';
+import { AuthLayout } from '@/components/layout/AuthLayout';
+import { AuthField } from '@/components/auth/AuthField';
 
 export default function ForgotPasswordPage() {
   const { t, i18n } = useTranslation();
@@ -35,74 +37,58 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  if (success) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-8">
-          <div className="rounded-md bg-green-50 p-4">
-            <p className="text-sm text-green-800">
-              {t('auth.passwordReset')}
-            </p>
+  return (
+    <AuthLayout formTitle={t('auth.resetPassword')} formSubtitle={t('auth.subtitle')}>
+      {success ? (
+        <div className="space-y-6 text-white/80">
+          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+            {t('auth.passwordReset')}
           </div>
           <Link
             href="/login"
-            className="block text-center text-sm font-medium text-primary-600 hover:text-primary-500"
+            className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white hover:bg-white/10"
           >
             {t('forgotPassword.backToLogin')}
           </Link>
         </div>
-      </div>
-    );
-  }
+      ) : (
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
+              {error}
+            </div>
+          )}
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {t('auth.resetPassword')}
-          </h2>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && <ErrorBanner message={error} onClose={() => setError('')} />}
-          <div>
-            <label htmlFor="email" className="sr-only">
-              {t('auth.email')}
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="relative block w-full rounded-md border-0 px-3 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-              placeholder={t('auth.email')}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+          <AuthField
+            label={t('auth.email')}
+            icon={Mail}
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            hint={t('auth.resetHint', 'We will send a secure link to this email.')}
+          />
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative flex w-full justify-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
-            >
-              {isLoading ? t('common.loading') : t('auth.sendResetLink')}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#4A9EFF] to-[#3EA6FF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(74,158,255,0.35)] transition hover:brightness-110 disabled:opacity-60"
+          >
+            {isLoading ? t('common.loading') : t('auth.sendResetLink')}
+          </button>
 
-          <div className="text-center text-sm">
-            <Link
-              href="/login"
-              className="font-medium text-primary-600 hover:text-primary-500"
-            >
+          <div className="text-center text-sm text-white/70">
+            <Link href="/login" className="font-semibold text-white hover:text-[#4A9EFF]">
               {t('forgotPassword.backToLogin')}
             </Link>
           </div>
         </form>
-      </div>
-    </div>
+      )}
+    </AuthLayout>
   );
 }
 
