@@ -267,10 +267,7 @@ export class DocumentChecklistService {
               descriptionUz: aiItem.descriptionUz || aiItem.description || '',
               descriptionRu: aiItem.descriptionRu || aiItem.description || '',
               required: aiItem.required !== undefined ? aiItem.required : true,
-              priority: (aiItem.priority || (aiItem.required ? 'high' : 'medium')) as
-                | 'high'
-                | 'medium'
-                | 'low',
+              priority: normalizePriority(aiItem.priority || (aiItem.required ? 'high' : 'medium')),
               status: existingDoc?.status ? (existingDoc.status as any) : 'missing',
               userDocumentId: existingDoc?.id as string | undefined,
               fileUrl: existingDoc?.fileUrl as string | undefined,
