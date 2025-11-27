@@ -29,7 +29,7 @@ export interface ChecklistItem {
   descriptionRu: string;
   category?: 'required' | 'highly_recommended' | 'optional'; // Optional for backward compatibility
   required: boolean; // Kept for backward compatibility
-  priority: 'high' | 'medium' | 'low';
+  priority: string; // Loosened type - runtime normalization ensures valid values
   status: 'missing' | 'pending' | 'verified' | 'rejected';
   userDocumentId?: string;
   fileUrl?: string;

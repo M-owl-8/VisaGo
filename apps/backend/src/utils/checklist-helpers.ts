@@ -32,10 +32,13 @@ export function deriveRequiredFromCategory(
  */
 export function deriveCategoryFromRequiredAndPriority(
   required: boolean | undefined,
-  priority: 'high' | 'medium' | 'low' | undefined
+  priority: string | undefined
 ): 'required' | 'highly_recommended' | 'optional' {
   if (required) return 'required';
-  if (priority === 'high' || priority === 'medium') return 'highly_recommended';
+  // Normalize priority for comparison
+  const normalizedPriority =
+    priority === 'high' || priority === 'medium' || priority === 'low' ? priority : 'medium';
+  if (normalizedPriority === 'high' || normalizedPriority === 'medium') return 'highly_recommended';
   return 'optional';
 }
 
@@ -46,7 +49,7 @@ export function deriveCategoryFromRequiredAndPriority(
 export function inferCategory(item: {
   category?: 'required' | 'highly_recommended' | 'optional';
   required?: boolean;
-  priority?: 'high' | 'medium' | 'low';
+  priority?: string;
 }): 'required' | 'highly_recommended' | 'optional' {
   if (item.category) return item.category;
   return deriveCategoryFromRequiredAndPriority(item.required, item.priority);
@@ -71,15 +74,15 @@ export function normalizeCategory(
 export function ensureCategoryConsistency(item: {
   category?: 'required' | 'highly_recommended' | 'optional';
   required?: boolean;
-  priority?: 'high' | 'medium' | 'low';
+  priority?: string;
 }): {
   category: 'required' | 'highly_recommended' | 'optional';
   required: boolean;
-  priority: 'high' | 'medium' | 'low';
+  priority: ChecklistPriority;
 } {
   let category = item.category;
   let required = item.required;
-  let priority = item.priority;
+  let priority: string | undefined = item.priority;
 
   // If category is provided, it takes precedence
   if (category) {
@@ -100,10 +103,8 @@ export function ensureCategoryConsistency(item: {
     }
   }
 
-  // Ensure priority is always set
-  if (!priority) {
-    priority = 'medium'; // Default if all else fails
-  }
+  // Ensure priority is always set and normalized
+  const normalizedPriority = normalizePriority(priority);
 
-  return { category, required: !!required, priority };
+  return { category, required: !!required, priority: normalizedPriority };
 }
