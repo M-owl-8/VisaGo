@@ -8,6 +8,7 @@ import { authenticateToken } from '../middleware/auth';
 import { DocumentChecklistService } from '../services/document-checklist.service';
 import { successResponse, errorResponse } from '../utils/response';
 import { HTTP_STATUS, ERROR_CODES } from '../config/constants';
+import { logWarn } from '../middleware/logger';
 
 const router = express.Router();
 
