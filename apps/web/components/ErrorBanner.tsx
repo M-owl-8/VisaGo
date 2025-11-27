@@ -50,3 +50,4 @@ export default function ErrorBanner({ message, onClose }: ErrorBannerProps) {
   );
 }
 
+

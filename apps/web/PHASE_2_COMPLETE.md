@@ -86,7 +86,7 @@
 
 - `next.config.js` - Added security headers & standalone output
 - `package.json` - Added `deploy:check:railway` script
-- `components/Layout.tsx` - Added footer with privacy/terms links
+- `components/layout/AppShell.tsx` - Added footer with privacy/terms links
 
 ---
 

@@ -36,3 +36,5 @@ Write-Host "Now run: npx prisma db push" -ForegroundColor Cyan
 
 
 
+
+

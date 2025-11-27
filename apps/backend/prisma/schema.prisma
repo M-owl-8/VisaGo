@@ -130,7 +130,6 @@ model VisaApplication {
   documents         UserDocument[]
   payment           Payment?
   checkpoints       Checkpoint[]
-  checklist         DocumentChecklist?
 
   @@unique([userId, countryId, visaTypeId])
   @@index([userId])
@@ -153,23 +152,6 @@ model Checkpoint {
 
   @@index([applicationId])
   @@index([isCompleted])
-}
-
-model DocumentChecklist {
-  id                String    @id @default(cuid())
-  applicationId     String    @unique
-  status            String    @default("pending") // pending, ready, failed
-  checklistData     String    // JSON string containing checklist items
-  errorMessage      String?
-  aiGenerated       Boolean   @default(false)
-  generatedAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-
-  @@index([applicationId])
-  @@index([status])
 }
 
 model DocumentType {
@@ -361,11 +343,6 @@ model ChatMessage {
   @@index([sessionId])
   @@index([userId])
   @@index([createdAt])
-  // HIGH PRIORITY FIX: Composite indexes for common query patterns
-  // These indexes significantly speed up chat history queries that filter by sessionId/userId and order by createdAt
-  @@index([sessionId, createdAt]) // For getConversationHistory queries
-  @@index([userId, createdAt]) // For user chat history queries
-  // Note: applicationId is on ChatSession, not ChatMessage, so queries filter by sessionId which has applicationId
 }
 
 model AIUsageMetrics {

@@ -161,7 +161,7 @@ Use the checklist in `DEPLOYMENT_CHECKLIST.md` to verify everything works.
 
 - `next.config.js` - Added security headers & optimizations
 - `package.json` - Added `deploy:check` and `build:prod` scripts
-- `components/Layout.tsx` - Added footer with privacy/terms links
+- `components/layout/AppShell.tsx` - Added footer with privacy/terms links
 
 ---
 

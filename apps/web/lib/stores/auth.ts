@@ -42,6 +42,8 @@ interface UserApplication {
   status: string;
   progressPercentage: number;
   submissionDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
   approvalDate?: string;
   country: {
     name: string;

@@ -152,3 +152,5 @@ async function generateAndroidIcons() {
 // Run the script
 generateAndroidIcons();
 
+
+

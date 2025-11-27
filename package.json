@@ -5,7 +5,8 @@
   "private": true,
   "workspaces": [
     "apps/backend",
-    "apps/ai-service"
+    "apps/ai-service",
+    "apps/web"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces",

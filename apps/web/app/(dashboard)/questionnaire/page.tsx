@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import Layout from '@/components/Layout';
 import { useAuthStore } from '@/lib/stores/auth';
 import { apiClient } from '@/lib/api/client';
 import { QuestionnaireV2, TargetCountry, COUNTRY_OPTIONS } from '@/lib/types/questionnaire';
@@ -759,58 +758,54 @@ export default function QuestionnairePage() {
   };
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="mb-6 text-2xl font-bold text-gray-900">{t('questionnaire.title')}</h1>
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+      <h1 className="mb-6 text-2xl font-bold text-gray-900">{t('questionnaire.title')}</h1>
 
-        {error && <ErrorBanner message={error} onClose={() => setError('')} />}
+      {error && <ErrorBanner message={error} onClose={() => setError('')} />}
 
-        <div className="mb-4">
-          <div className="mb-2 flex justify-between text-sm text-gray-600">
-            <span>
-              {t('questionnaire.step')} {currentStep + 1} {t('questionnaire.of')} {TOTAL_STEPS}
-            </span>
-            <span>{Math.round(((currentStep + 1) / TOTAL_STEPS) * 100)}%</span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-gray-200">
-            <div
-              className="h-2 rounded-full bg-primary-600 transition-all"
-              style={{ width: `${((currentStep + 1) / TOTAL_STEPS) * 100}%` }}
-            />
-          </div>
+      <div className="mb-4">
+        <div className="mb-2 flex justify-between text-sm text-gray-600">
+          <span>
+            {t('questionnaire.step')} {currentStep + 1} {t('questionnaire.of')} {TOTAL_STEPS}
+          </span>
+          <span>{Math.round(((currentStep + 1) / TOTAL_STEPS) * 100)}%</span>
         </div>
-
-        <div className="rounded-lg bg-white p-6 shadow">
-          {renderStep()}
-        </div>
-
-        <div className="mt-6 flex justify-between">
-          <button
-            onClick={handleBack}
-            disabled={currentStep === 0}
-            className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-          >
-            {t('common.back')}
-          </button>
-          {currentStep < TOTAL_STEPS - 1 ? (
-            <button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-            >
-              {t('common.next')}
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !canProceed()}
-              className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-            >
-              {loading ? t('common.loading') : t('common.submit')}
-            </button>
-          )}
+        <div className="h-2 w-full rounded-full bg-gray-200">
+          <div
+            className="h-2 rounded-full bg-primary-600 transition-all"
+            style={{ width: `${((currentStep + 1) / TOTAL_STEPS) * 100}%` }}
+          />
         </div>
       </div>
-    </Layout>
+
+      <div className="rounded-lg bg-white p-6 shadow">{renderStep()}</div>
+
+      <div className="mt-6 flex justify-between">
+        <button
+          onClick={handleBack}
+          disabled={currentStep === 0}
+          className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+        >
+          {t('common.back')}
+        </button>
+        {currentStep < TOTAL_STEPS - 1 ? (
+          <button
+            onClick={handleNext}
+            disabled={!canProceed()}
+            className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            {t('common.next')}
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !canProceed()}
+            className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            {loading ? t('common.loading') : t('common.submit')}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

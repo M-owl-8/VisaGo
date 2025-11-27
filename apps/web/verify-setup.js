@@ -52,13 +52,13 @@ checkDir('locales', 'Translation files');
 // Check key app files
 checkFile('app/layout.tsx', 'Root layout');
 checkFile('app/page.tsx', 'Home page');
-checkFile('app/login/page.tsx', 'Login page');
-checkFile('app/register/page.tsx', 'Register page');
-checkFile('app/applications/page.tsx', 'Applications page');
-checkFile('app/questionnaire/page.tsx', 'Questionnaire page');
-checkFile('app/chat/page.tsx', 'Chat page');
-checkFile('app/profile/page.tsx', 'Profile page');
-checkFile('app/support/page.tsx', 'Support page');
+checkFile('app/(auth)/login/page.tsx', 'Login page');
+checkFile('app/(auth)/register/page.tsx', 'Register page');
+checkFile('app/(dashboard)/applications/page.tsx', 'Applications page');
+checkFile('app/(dashboard)/questionnaire/page.tsx', 'Questionnaire page');
+checkFile('app/(dashboard)/chat/page.tsx', 'Chat page');
+checkFile('app/(dashboard)/profile/page.tsx', 'Profile page');
+checkFile('app/(dashboard)/support/page.tsx', 'Support page');
 
 // Check lib files
 checkFile('lib/api/client.ts', 'API client');
@@ -73,7 +73,7 @@ checkFile('locales/ru.json', 'Russian translations');
 checkFile('locales/uz.json', 'Uzbek translations');
 
 // Check components
-checkFile('components/Layout.tsx', 'Layout component');
+checkFile('components/layout/AppShell.tsx', 'App shell component');
 
 console.log('\n📊 Summary:');
 console.log(`Total checks: ${checks.length}`);
@@ -92,5 +92,6 @@ if (hasErrors) {
   console.log('4. Open: http://localhost:3000');
   process.exit(0);
 }
+
 
 

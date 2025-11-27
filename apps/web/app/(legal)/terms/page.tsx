@@ -1,17 +1,15 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import Layout from '@/components/Layout';
 
 export default function TermsPage() {
   const { t } = useTranslation();
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="mb-6 text-3xl font-bold">{t('terms.title', 'Terms of Service')}</h1>
-        
-        <div className="prose prose-lg max-w-none">
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <h1 className="mb-6 text-3xl font-bold">{t('terms.title', 'Terms of Service')}</h1>
+
+      <div className="prose prose-lg max-w-none">
           <p className="text-gray-600">
             {t('terms.lastUpdated', 'Last updated:')} {new Date().toLocaleDateString()}
           </p>
@@ -86,7 +84,8 @@ export default function TermsPage() {
           </div>
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }
+
 

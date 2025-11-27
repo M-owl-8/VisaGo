@@ -1,17 +1,15 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import Layout from '@/components/Layout';
 
 export default function PrivacyPage() {
   const { t } = useTranslation();
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="mb-6 text-3xl font-bold">{t('privacy.title', 'Privacy Policy')}</h1>
-        
-        <div className="prose prose-lg max-w-none">
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <h1 className="mb-6 text-3xl font-bold">{t('privacy.title', 'Privacy Policy')}</h1>
+
+      <div className="prose prose-lg max-w-none">
           <p className="text-gray-600">
             {t('privacy.lastUpdated', 'Last updated:')} {new Date().toLocaleDateString()}
           </p>
@@ -81,7 +79,8 @@ export default function PrivacyPage() {
           </div>
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }
+
 

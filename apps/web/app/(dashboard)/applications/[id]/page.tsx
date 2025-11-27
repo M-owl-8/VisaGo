@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
-import Layout from '@/components/Layout';
 import { useAuthStore } from '@/lib/stores/auth';
 import { apiClient } from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
@@ -56,40 +55,35 @@ export default function ApplicationDetailPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex min-h-screen items-center justify-center">
-          <div>{t('common.loading')}</div>
-        </div>
-      </Layout>
+      <div className="flex min-h-screen items-center justify-center">
+        <div>{t('common.loading')}</div>
+      </div>
     );
   }
 
   if (!application && !loading) {
     return (
-      <Layout>
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          {error && <ErrorBanner message={error} />}
-          <div className="mt-4">
-            <Link
-              href="/applications"
-              className="text-sm text-primary-600 hover:text-primary-500"
-            >
-              {t('applications.backToApplications')}
-            </Link>
-          </div>
-          <div className="mt-4 flex min-h-[400px] items-center justify-center">
-            <div className="text-center">
-              <p className="text-gray-600">{t('applications.applicationNotFound')}</p>
-            </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {error && <ErrorBanner message={error} />}
+        <div className="mt-4">
+          <Link
+            href="/applications"
+            className="text-sm text-primary-600 hover:text-primary-500"
+          >
+            {t('applications.backToApplications')}
+          </Link>
+        </div>
+        <div className="mt-4 flex min-h-[400px] items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600">{t('applications.applicationNotFound')}</p>
           </div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {error && <ErrorBanner message={error} onClose={() => setError('')} />}
 
         <Link
@@ -162,7 +156,7 @@ export default function ApplicationDetailPage() {
           </>
         )}
       </div>
-    </Layout>
+    </div>
   );
 }
 

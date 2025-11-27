@@ -3,33 +3,108 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  color-scheme: light;
+  --ketdik-bg: #f8f6f2;
+  --ketdik-surface: #ffffff;
+  --ketdik-text: #0f172a;
+  --ketdik-muted: #4d4d4d;
+  --ketdik-border: rgba(15, 23, 42, 0.08);
+  --ketdik-card-shadow: 0 25px 65px rgba(15, 23, 42, 0.12);
+  --ketdik-radius-xl: 32px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+* {
+  font-feature-settings: 'ss01' on, 'cv11' on;
+  letter-spacing: -0.01em;
+}
+
+html,
+body {
+  background-color: var(--ketdik-bg);
+  color: var(--ketdik-text);
+  min-height: 100%;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  margin: 0;
+  background-image: radial-gradient(
+      circle at 20% 20%,
+      rgba(199, 154, 82, 0.12),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 80% 0%,
+      rgba(15, 23, 42, 0.08),
+      transparent 35%
+    ),
+    linear-gradient(120deg, #fdfcf9, #f7f2ec, #f7f6f2);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 23, 42, 0.25);
+  border-radius: 999px;
+}
+
+::selection {
+  background-color: rgba(15, 23, 42, 0.15);
+}
+
+.glass-panel {
+  backdrop-filter: blur(22px);
+  background-color: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--ketdik-border);
+  border-radius: var(--ketdik-radius-xl);
+  box-shadow: var(--ketdik-card-shadow);
+}
+
+.shimmer {
+  background-image: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 40%,
+    rgba(255, 255, 255, 0.4) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
+  .animate-blob {
+    animation: blob 8s infinite ease-in-out;
+  }
+
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(10px, -10px) scale(1.02);
+    }
+    66% {
+      transform: translate(-10px, 10px) scale(0.98);
+    }
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
 }
-
-
