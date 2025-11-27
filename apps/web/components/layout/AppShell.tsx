@@ -216,7 +216,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <option value="en" className="bg-[#0E1A2C] text-white">English</option>
                   <option value="ru" className="bg-[#0E1A2C] text-white">Русский</option>
-                  <option value="uz" className="bg-[#0E1A2C] text-white">O'zbekcha</option>
+                  <option value="uz" className="bg-[#0E1A2C] text-white">O&apos;zbekcha</option>
                 </select>
               </div>
             </motion.div>
