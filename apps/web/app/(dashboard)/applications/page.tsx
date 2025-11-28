@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ export default function ApplicationsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const hasFetchedRef = useRef(false);
 
   const loadApplications = useCallback(async () => {
     try {
@@ -34,15 +35,31 @@ export default function ApplicationsPage() {
     }
   }, [fetchUserApplications, t]);
 
+  // Initial fetch - only once when user signs in
   useEffect(() => {
     if (!isSignedIn && !isLoading) {
       router.push('/login');
       return;
     }
-    if (isSignedIn) {
-      loadApplications();
+    // Only fetch once when user becomes signed in
+    if (isSignedIn && !hasFetchedRef.current && !isLoading) {
+      hasFetchedRef.current = true;
+      // Fetch directly to avoid dependency issues
+      (async () => {
+        try {
+          setIsRefreshing(true);
+          setError(null);
+          await fetchUserApplications();
+        } catch (err) {
+          setError(getErrorMessage(err, t));
+        } finally {
+          setIsRefreshing(false);
+          setInitialFetchDone(true);
+        }
+      })();
     }
-  }, [isSignedIn, isLoading, router, loadApplications]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, isLoading]);
 
   const totalApplications = userApplications.length;
 

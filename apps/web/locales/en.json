@@ -47,15 +47,9 @@
     "sendResetLink": "Send Reset Link",
     "passwordReset": "Password reset link sent to your email"
   },
-  "applications": {
-    "title": "Applications",
-    "myApplications": "My applications",
-    "noApplicationsYet": "No applications yet",
-    "startNewApplication": "Start New Application"
-  },
   "chat": {
     "aiAssistant": "AI Assistant",
-    "messagePlaceholder": "Type your question...",
+    "messagePlaceholder": "Type your message…",
     "send": "Send",
     "sending": "Sending...",
     "noMessages": "No messages yet"
@@ -72,18 +66,18 @@
   },
   "helpSupport": {
     "title": "Help & Support",
-    "emailSupport": "Email Support",
-    "phoneSupport": "Phone Support",
-    "telegramSupportTitle": "Telegram Support",
+    "emailSupport": "Email support",
+    "phoneSupport": "Phone support",
+    "telegramSupportTitle": "Support via Telegram",
     "telegramSupportSubtitle": "@Ketdikuz",
-    "whatsappSupportTitle": "WhatsApp Support",
-    "whatsappSupportSubtitle": "+998997614313",
-    "instagramSupportTitle": "Instagram Support",
+    "whatsappSupportTitle": "Support via WhatsApp",
+    "whatsappSupportSubtitle": "+998 99 761 43 13",
+    "instagramSupportTitle": "Support via Instagram",
     "instagramSupportSubtitle": "_ketdik",
-    "needHelp": "Need Help?",
-    "supportAvailable": "Our support team is available 24/7 to assist you with any questions or issues you may have.",
+    "needHelp": "Need help?",
+    "supportAvailable": "Our support team is available 24/7 to help you with any questions or issues.",
     "supportEmail": "ketdik@gmail.com",
-    "supportPhone": "+998997614313"
+    "supportPhone": "+998 99 761 43 13"
   },
   "errors": {
     "genericError": "An error occurred",
@@ -260,8 +254,8 @@
     "heroBadge": "Premium workspace",
     "heroEyebrow": "Dashboard",
     "heroTitle": "Welcome back, {{name}}",
+    "heroDefaultName": "Traveler",
     "heroSubtitle": "Keep every visa document, AI chat, and payment status perfectly synced with your mobile app.",
-    "heroDefaultName": "traveler",
     "heroAiCta": "Open AI assistant",
     "refresh": "Refresh",
     "metrics": {

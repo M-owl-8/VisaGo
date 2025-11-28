@@ -44,8 +44,11 @@ export default function ChatPage() {
     setLastFailedMessage(''); // Clear last failed message on new send
     try {
       await sendMessage(message, applicationId || undefined);
-    } catch (err) {
-      setLastFailedMessage(message); // Store failed message for retry
+    } catch (err: any) {
+      // Only store for retry if it's not a rate limit error
+      if (err?.message && !err.message.includes('too quickly') && !err.message.includes('rate limit')) {
+        setLastFailedMessage(message);
+      }
     }
   };
 

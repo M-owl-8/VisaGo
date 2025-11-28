@@ -36,6 +36,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: async (content: string, applicationId?: string) => {
+    // Prevent duplicate submissions
+    if (get().isLoading) {
+      return;
+    }
+
     // Store user message ID for potential removal on error
     const userMessageId = `user-${Date.now()}`;
 
@@ -67,6 +72,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         conversationHistory
       );
 
+      // Handle 429 rate limit response
+      if (!response.success && response.error?.status === 429) {
+        throw new Error(response.error.message || 'You\'re sending messages too quickly. Please wait a few seconds and try again.');
+      }
+
       if (!response.success || !response.data) {
         throw new Error(response.error?.message || 'Failed to send message');
       }
@@ -86,8 +96,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messages: [...state.messages, assistantMessage],
       }));
     } catch (error: any) {
-      console.error('Failed to send message:', error);
-      set({ error: error.message || 'Failed to send message' });
+      // Handle 429 rate limit errors specifically
+      if (error.response?.status === 429 || error.message?.includes('429') || error.message?.includes('rate limit') || error.message?.includes('limit exceeded')) {
+        set({ 
+          error: 'You\'re sending messages too quickly. Please wait a few seconds and try again.' 
+        });
+      } else {
+        set({ error: error.message || 'Failed to send message' });
+      }
       // Remove optimistic user message on error using the stored ID
       set((state) => ({
         messages: state.messages.filter((msg) => msg.id !== userMessageId),

@@ -82,9 +82,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <p className="font-display text-lg font-semibold tracking-tight text-white">
                   Ketdik
                 </p>
-                <span className="text-xs uppercase tracking-[0.3em] text-white/40">
-                  Visa Workspace
-                </span>
               </div>
             </Link>
             <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium text-white/70 shadow-inner sm:flex">

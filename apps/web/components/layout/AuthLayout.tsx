@@ -28,7 +28,6 @@ export function AuthLayout({ children, formTitle, formSubtitle }: AuthLayoutProp
               className="h-14 w-14 rounded-2xl object-cover"
             />
           </div>
-          <p className="text-xs uppercase tracking-[0.5em] text-white/60">Visa Workspace</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">Ketdik</h1>
           <p className="mt-2 text-sm text-white/50">
             {formSubtitle ||

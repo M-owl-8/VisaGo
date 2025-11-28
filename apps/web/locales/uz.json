@@ -66,8 +66,8 @@
     "heroBadge": "Professional ish maydoni",
     "heroEyebrow": "Panel",
     "heroTitle": "Xush kelibsiz, {{name}}",
-    "heroSubtitle": "Barcha viza hujjatlari, AI chat va to'lov holatlari mobil ilova bilan sinxron holda bo'lsin.",
     "heroDefaultName": "sayohatchi",
+    "heroSubtitle": "Barcha viza hujjatlari, AI chat va to'lov holatlari mobil ilova bilan sinxron holda bo'lsin.",
     "heroAiCta": "AI yordamchini ochish",
     "refresh": "Yangilash",
     "metrics": {

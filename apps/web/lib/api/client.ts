@@ -249,41 +249,61 @@ class ApiClient {
     applicationId?: string,
     conversationHistory?: any[]
   ): Promise<ApiResponse> {
-    const transformedHistory = (conversationHistory || []).map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    try {
+      const transformedHistory = (conversationHistory || []).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
 
-    const response = await this.api.post(
-      '/chat',
-      {
-        query: content,
-        content: content,
-        applicationId: applicationId,
-        conversationHistory: transformedHistory,
-      },
-      {
-        timeout: 30000,
+      const response = await this.api.post(
+        '/chat',
+        {
+          query: content,
+          content: content,
+          applicationId: applicationId,
+          conversationHistory: transformedHistory,
+        },
+        {
+          timeout: 30000,
+        }
+      );
+
+      if (!response.data || !response.data.success || !response.data.data) {
+        throw new Error(response.data?.error?.message || 'Invalid response from backend');
       }
-    );
 
-    if (!response.data || !response.data.success || !response.data.data) {
-      throw new Error(response.data?.error?.message || 'Invalid response from backend');
+      const aiData = response.data.data;
+
+      return {
+        success: true,
+        data: {
+          message: aiData.message,
+          sources: aiData.sources || [],
+          tokens_used: aiData.tokens_used || 0,
+          model: aiData.model || 'deepseek-reasoner',
+          id: aiData.id || `assistant-${Date.now()}`,
+          applicationContext: aiData.applicationContext,
+        },
+      };
+    } catch (error: any) {
+      // Handle 429 rate limit errors
+      if (error.response?.status === 429) {
+        const errorMessage =
+          error.response?.data?.error?.message ||
+          'You\'re sending messages too quickly. Please wait a few seconds and try again.';
+        return {
+          success: false,
+          error: {
+            status: 429,
+            message: errorMessage,
+            code: 'RATE_LIMIT_EXCEEDED',
+          },
+        };
+      }
+
+      // Re-throw other errors to be handled by the store
+      throw error;
     }
-
-    const aiData = response.data.data;
-
-    return {
-      success: true,
-      data: {
-        message: aiData.message,
-        sources: aiData.sources || [],
-        tokens_used: aiData.tokens_used || 0,
-        model: aiData.model || 'deepseek-reasoner',
-        id: aiData.id || `assistant-${Date.now()}`,
-        applicationContext: aiData.applicationContext,
-      },
-    };
   }
 
   async getChatHistory(
