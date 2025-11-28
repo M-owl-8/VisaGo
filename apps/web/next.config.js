@@ -6,8 +6,10 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   
-  // Output configuration for Railway
-  output: 'standalone',
+  // Output configuration
+  // Use 'standalone' for Railway/Docker, but NOT for Vercel
+  // Vercel handles Next.js builds natively and doesn't need standalone mode
+  ...(process.env.VERCEL ? {} : { output: 'standalone' }),
   
   // Security headers
   async headers() {
