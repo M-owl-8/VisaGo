@@ -225,10 +225,11 @@ router.get('/history', async (req: Request, res: Response) => {
       });
     }
 
-    // CRITICAL SECURITY FIX: Always pass userId for verification, even in legacy mode
+    // Fix: Explicitly pass null for applicationId when undefined to use new API path
+    // This prevents falling into legacy mode which expects sessionId
     const history = await ChatService.getConversationHistory(
-      userId, // For new API, this is userId; for legacy, we still pass it
-      applicationId,
+      userId,
+      applicationId || null, // Explicitly pass null instead of undefined
       limit,
       offset,
       userId // Always pass verified userId for security
