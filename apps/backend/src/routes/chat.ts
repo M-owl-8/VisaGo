@@ -225,11 +225,12 @@ router.get('/history', async (req: Request, res: Response) => {
       });
     }
 
-    // Fix: Explicitly pass null for applicationId when undefined to use new API path
+    // Fix: Pass undefined (not null) when applicationId is missing to use new API path
     // This prevents falling into legacy mode which expects sessionId
+    // The service handles undefined applicationId by treating it as null internally
     const history = await ChatService.getConversationHistory(
       userId,
-      applicationId || null, // Explicitly pass null instead of undefined
+      applicationId || undefined, // Pass undefined, service will handle it
       limit,
       offset,
       userId // Always pass verified userId for security
