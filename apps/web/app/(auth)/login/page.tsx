@@ -105,6 +105,7 @@ export default function LoginPage() {
           type="button"
           disabled
           className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white/80 shadow-inner shadow-black/20"
+          title={t('auth.googleOAuthComingSoon', 'Google OAuth coming soon')}
         >
           <Globe size={18} />
           {t('auth.continueWithGoogle', 'Continue with Google')}

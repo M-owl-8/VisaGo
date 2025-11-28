@@ -7,10 +7,13 @@
     "build": "next build",
     "build:prod": "NODE_ENV=production next build",
     "start": "next start",
+    "start:prod": "NODE_ENV=production next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
     "deploy:check": "node scripts/deploy-check.js",
-    "deploy:check:railway": "node scripts/railway-deploy-check.js",
-    "typecheck": "tsc --noEmit"
+    "deploy:check:railway": "node scripts/railway-deploy-check.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

@@ -134,15 +134,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           get()
             .fetchUserProfile()
             .catch((error) => {
-              console.warn('Failed to fetch fresh profile on init:', error);
+              // Silently fail - user can refresh if needed
             });
           get()
             .fetchUserApplications()
             .catch((error) => {
-              console.warn('Failed to fetch applications on init:', error);
+              // Silently fail - user can refresh if needed
             });
         } catch (parseError) {
-          console.error('Failed to parse user data:', parseError);
+          // Clear invalid stored data
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user');
           set({ isLoading: false });
@@ -152,7 +152,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ isLoading: false });
       }
     } catch (error) {
-      console.error('initializeApp error:', error);
       set({ isLoading: false });
     }
   },
@@ -214,14 +213,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         await get().fetchUserProfile();
       } catch (error) {
-        console.warn('Failed to fetch full profile after login:', error);
+        // Silently fail - profile will be fetched on next page load
       }
 
       // Load user applications in background (non-blocking)
       get()
         .fetchUserApplications()
         .catch((error) => {
-          console.warn('Failed to fetch applications after login:', error);
+          // Silently fail - applications will be fetched on next page load
         });
 
       // Set loading to false immediately after successful login
@@ -291,20 +290,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         await get().fetchUserProfile();
       } catch (error) {
-        console.warn('Failed to fetch full profile after registration:', error);
+        // Silently fail - profile will be fetched on next page load
       }
 
       // Load user applications in background (non-blocking)
       get()
         .fetchUserApplications()
         .catch((error) => {
-          console.warn('Failed to fetch applications after registration:', error);
+          // Silently fail - applications will be fetched on next page load
         });
 
       // Set loading to false immediately after successful registration
       set({ isLoading: false });
     } catch (error: any) {
-      console.error('Registration failed:', error.message);
       set({ isLoading: false });
       throw error;
     }
@@ -314,7 +312,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await apiClient.logout();
     } catch (error) {
-      console.error('Logout endpoint error:', error);
+      // Silently fail - logout will proceed anyway
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token');
@@ -373,7 +371,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ user: updatedUser });
     } catch (error: any) {
-      console.error('Failed to fetch profile:', error.message);
       throw error;
     } finally {
       set({ isLoading: false });
@@ -408,7 +405,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ user: updatedUser });
     } catch (error: any) {
-      console.error('Failed to update profile:', error.message);
       throw error;
     } finally {
       set({ isLoading: false });
@@ -431,7 +427,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ userApplications: response.data });
     } catch (error: any) {
-      console.error('Failed to fetch applications:', error.message);
       throw error;
     }
   },

@@ -90,16 +90,10 @@ export class DocumentChecklistService {
         },
       });
 
-      // Get stored checklist separately (if DocumentChecklist model exists)
-      let storedChecklist = null;
-      try {
-        storedChecklist = await (prisma as any).documentChecklist?.findUnique({
-          where: { applicationId },
-        });
-      } catch {
-        // DocumentChecklist model may not exist yet (needs migration)
-        storedChecklist = null;
-      }
+      // Get stored checklist from database
+      const storedChecklist = await prisma.documentChecklist.findUnique({
+        where: { applicationId },
+      });
 
       if (!application) {
         throw errors.notFound('Application');
@@ -206,7 +200,7 @@ export class DocumentChecklistService {
             );
 
             // Update stored checklist to 'ready' with fallback data
-            await (prisma as any).documentChecklist?.update({
+            await prisma.documentChecklist.update({
               where: { applicationId },
               data: {
                 status: 'ready',
@@ -241,7 +235,7 @@ export class DocumentChecklistService {
 
       // No checklist exists or needs regeneration - start async generation
       // Create checklist entry with status 'pending'
-      const checklistEntry = await (prisma as any).documentChecklist?.upsert({
+      const checklistEntry = await prisma.documentChecklist.upsert({
         where: { applicationId },
         create: {
           applicationId,
@@ -283,15 +277,9 @@ export class DocumentChecklistService {
   ): Promise<void> {
     try {
       // STEP 1: Check if checklist already exists - if so, skip AI generation
-      let storedChecklist = null;
-      try {
-        storedChecklist = await (prisma as any).documentChecklist?.findUnique({
-          where: { applicationId },
-        });
-      } catch {
-        // DocumentChecklist model may not exist yet
-        storedChecklist = null;
-      }
+      const storedChecklist = await prisma.documentChecklist.findUnique({
+        where: { applicationId },
+      });
 
       // If checklist already exists and is ready, skip generation
       if (storedChecklist && storedChecklist.status === 'ready') {
@@ -564,7 +552,7 @@ export class DocumentChecklistService {
         aiFallbackUsed,
         aiErrorOccurred,
       };
-      await (prisma as any).documentChecklist?.update({
+      await prisma.documentChecklist.update({
         where: { applicationId },
         data: {
           status: 'ready',
@@ -653,7 +641,7 @@ export class DocumentChecklistService {
 
         // Store checklist with status 'ready' (not 'failed')
         // Include metadata about emergency fallback usage
-        await (prisma as any).documentChecklist?.update({
+        await prisma.documentChecklist.update({
           where: { applicationId },
           data: {
             status: 'ready',

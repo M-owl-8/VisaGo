@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth';
+import { logger } from '@/lib/logger';
 
 export default function Home() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function Home() {
           setInitialized(true);
         }
       } catch (error) {
-        console.error('Initialization error:', error);
+        logger.error('Initialization error', error);
         if (mounted) {
           setInitialized(true);
         }
@@ -31,7 +32,7 @@ export default function Home() {
     // Timeout fallback - if initialization takes too long, proceed anyway
     const timeout = setTimeout(() => {
       if (mounted && !initialized) {
-        console.warn('Initialization timeout, proceeding anyway');
+        logger.warn('Initialization timeout, proceeding anyway');
         setInitialized(true);
       }
     }, 3000);
@@ -60,7 +61,7 @@ export default function Home() {
   useEffect(() => {
     const fallbackTimer = setTimeout(() => {
       if (isLoading) {
-        console.warn('Loading timeout, redirecting to login');
+        logger.warn('Loading timeout, redirecting to login');
         router.push('/login');
       }
     }, 5000);

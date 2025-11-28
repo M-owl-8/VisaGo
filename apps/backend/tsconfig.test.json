@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "node"],
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": false
+  },
+  "include": ["src/**/*.ts", "src/**/__tests__/**/*.ts", "tests/**/*.ts"],
+  "ts-node": {
+    "compilerOptions": {
+      "types": ["jest", "node"]
+    }
+  }
+}

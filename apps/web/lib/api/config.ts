@@ -4,13 +4,15 @@
  * Supports both local development and production
  */
 
+import { logger } from '@/lib/logger';
+
 const getApiBaseUrl = (): string => {
   // Priority 1: Environment variable (set at build time or in .env.local)
   if (typeof window !== 'undefined') {
     // In browser, check Next.js public env vars
     const envUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
     if (envUrl) {
-      console.log('🌐 Using API URL from environment:', envUrl);
+      logger.debug('Using API URL from environment', { url: envUrl });
       return envUrl;
     }
   }
@@ -26,12 +28,10 @@ const getApiBaseUrl = (): string => {
     // Set NEXT_PUBLIC_API_URL in .env.local to override this
     const LOCAL_API_URL = 'http://localhost:3000';
     if (typeof window !== 'undefined') {
-      console.warn(
-        '⚠️ NEXT_PUBLIC_API_URL not set. Using local backend:',
-        LOCAL_API_URL,
-        '\n💡 Create .env.local with: NEXT_PUBLIC_API_URL=http://localhost:3000',
-        '\n💡 Make sure backend is running on port 3000'
-      );
+      logger.warn('NEXT_PUBLIC_API_URL not set, using local backend', {
+        url: LOCAL_API_URL,
+        hint: 'Create .env.local with NEXT_PUBLIC_API_URL=http://localhost:3000',
+      });
     }
     return LOCAL_API_URL;
   }
@@ -39,15 +39,19 @@ const getApiBaseUrl = (): string => {
   // Priority 3: Fallback to production Railway URL
   const FALLBACK_API_URL = 'https://visago-production.up.railway.app';
   if (typeof window !== 'undefined') {
-    console.warn('⚠️ API base URL is not configured. Using production fallback:', FALLBACK_API_URL);
+    logger.warn('API base URL not configured, using production fallback', {
+      url: FALLBACK_API_URL,
+    });
   }
   return FALLBACK_API_URL;
 };
 
 export const API_BASE_URL = getApiBaseUrl();
 
-// Log the API URL being used
-if (typeof window !== 'undefined') {
-  console.log('🔗 API Base URL:', API_BASE_URL);
-  console.log('🔗 Full API endpoint will be:', `${API_BASE_URL}/api`);
+// Log the API URL being used (only in development)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  logger.debug('API configuration', {
+    baseUrl: API_BASE_URL,
+    endpoint: `${API_BASE_URL}/api`,
+  });
 }

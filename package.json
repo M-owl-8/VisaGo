@@ -14,6 +14,7 @@
     "dev:ai": "cd apps/ai-service && python -m uvicorn main:app --reload --port 8001",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
+    "test:checklist": "jest --runInBand --config apps/backend/jest.config.js --testPathPattern=checklist",
     "install-all": "npm install && npm run install-all --workspaces",
     "prepare": "husky install",
     "lint": "npm run lint --workspaces",

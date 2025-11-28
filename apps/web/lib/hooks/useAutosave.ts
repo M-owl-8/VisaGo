@@ -24,7 +24,7 @@ export function useAutosave<T>({ key, data, delay = 800, onSave }: AutosaveOptio
         localStorage.setItem(key, JSON.stringify(data));
         onSave?.(data);
       } catch (error) {
-        console.warn('Autosave failed', error);
+        // Silently fail - autosave is non-critical
       }
     }, delay);
 
