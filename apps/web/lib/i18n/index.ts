@@ -1,9 +1,15 @@
 import i18next from 'i18next';
-import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import en from '../../locales/en.json';
 import ru from '../../locales/ru.json';
 import uz from '../../locales/uz.json';
+
+// Conditionally import initReactI18next only on client side to avoid SSR/build errors
+let initReactI18next: any = null;
+if (typeof window !== 'undefined') {
+  // Only import on client side
+  initReactI18next = require('react-i18next').initReactI18next;
+}
 
 const resources = {
   en: { translation: en },
