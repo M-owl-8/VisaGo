@@ -104,12 +104,17 @@
   "profile": {
     "profile": "Профиль",
     "myProfile": "Мой профиль",
+    "subtitle": "Управляйте настройками и параметрами аккаунта",
     "firstName": "Имя",
     "lastName": "Фамилия",
     "email": "Почта",
     "phone": "Телефон",
     "language": "Язык",
-    "logout": "Выход"
+    "logout": "Выход",
+    "verified": "Подтверждено",
+    "accountStatus": "Статус аккаунта",
+    "active": "Активен",
+    "notProvided": "Не указано"
   },
   "helpSupport": {
     "title": "Помощь и поддержка",

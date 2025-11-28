@@ -104,12 +104,17 @@
   "profile": {
     "profile": "Profil",
     "myProfile": "Mening profilim",
+    "subtitle": "Hisob sozlamalari va parametrlarni boshqaring",
     "firstName": "Ism",
     "lastName": "Familiya",
     "email": "Email",
     "phone": "Telefon",
     "language": "Til",
-    "logout": "Chiqish"
+    "logout": "Chiqish",
+    "verified": "Tasdiqlangan",
+    "accountStatus": "Hisob holati",
+    "active": "Faol",
+    "notProvided": "Ko'rsatilmagan"
   },
   "helpSupport": {
     "title": "Yordam va qo'llab-quvvatlash",

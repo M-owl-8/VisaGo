@@ -13,6 +13,44 @@ This release represents the complete production-hardening of the Ketdik/VisaBudd
 
 ## 🚀 Major Improvements
 
+### 0. Critical Production Fixes (Latest)
+
+#### Applications Dashboard Refresh Loop
+
+- ✅ **Fixed infinite refresh loop** - Applications now fetch only once on mount
+- ✅ **Removed unstable dependencies** from useEffect hooks
+- ✅ **Added ref-based tracking** to prevent duplicate fetches
+- ✅ **Improved error handling** - No retry storms on fetch failures
+- ✅ **Result:** Dashboard loads once, no excessive API calls
+
+#### Internationalization (i18n) Fixes
+
+- ✅ **Fixed missing translations** - All keys now have proper translations
+- ✅ **Added missing keys** for dashboard, chat, profile, support pages
+- ✅ **Removed "Visa Workspace" label** from all UI components
+- ✅ **Fixed translation interpolation** - heroTitle now displays correctly with user name
+- ✅ **Result:** All UI text is human-readable, no raw keys visible
+
+#### Chat 429 Error Handling
+
+- ✅ **Added graceful 429 handling** - User-friendly error messages
+- ✅ **Prevented duplicate submissions** - Send button disabled during request
+- ✅ **No auto-retry on 429** - Prevents rate limit spam
+- ✅ **Improved error messages** - "You're sending messages too quickly. Please wait..."
+- ✅ **Result:** Chat works smoothly without ugly 429 errors
+
+#### Help & Support Page
+
+- ✅ **Implemented real contact details** matching mobile app:
+  - Email: ketdik@gmail.com
+  - Phone: +998 99 761 43 13
+  - Telegram: @Ketdikuz
+  - WhatsApp: +998 99 761 43 13
+  - Instagram: \_ketdik
+- ✅ **Beautiful card-based UI** with icons and hover effects
+- ✅ **Proper localization** (EN/RU) with correct translations
+- ✅ **Result:** Support page matches mobile app exactly
+
 ### 1. Production Performance Optimization
 
 #### Next.js App Optimizations

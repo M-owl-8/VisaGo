@@ -201,8 +201,10 @@ router.post('/send', async (req: Request, res: Response) => {
  * Get conversation history
  */
 router.get('/history', async (req: Request, res: Response) => {
+  // Extract userId outside try-catch so it's accessible in catch block
+  const userId = req.userId || (req as any).user?.id;
+
   try {
-    const userId = req.userId || (req as any).user?.id;
     if (!userId) {
       return res.status(401).json({
         success: false,

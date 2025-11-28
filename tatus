@@ -1,0 +1,11 @@
+warning: in the working copy of 'FINAL_PRODUCTION_STATUS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'RELEASE_NOTES_PRODUCTION_V1.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/app/(dashboard)/applications/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/app/(dashboard)/chat/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/app/(dashboard)/support/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/components/layout/AppShell.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/components/layout/AuthLayout.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/lib/api/client.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/lib/stores/chat.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/locales/en.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/locales/uz.json', LF will be replaced by CRLF the next time Git touches it

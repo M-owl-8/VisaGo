@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Image from 'next/image';
@@ -53,7 +53,7 @@ export default function ProfilePage() {
       {/* Premium Header Section */}
       <div className="mb-8">
         <h1 className="mb-2 text-4xl font-bold text-white">{t('profile.myProfile')}</h1>
-        <p className="text-white/60">Manage your account settings and preferences</p>
+        <p className="text-white/60">{t('profile.subtitle')}</p>
       </div>
 
       {/* Premium Profile Card */}
@@ -98,7 +98,7 @@ export default function ProfilePage() {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Verified
+                  {t('profile.verified')}
                 </span>
               )}
             </div>
@@ -132,7 +132,7 @@ export default function ProfilePage() {
                   {t('profile.phone')}
                 </label>
               </div>
-              <p className="text-base font-medium text-white">{user.phone || 'Not provided'}</p>
+              <p className="text-base font-medium text-white">{user.phone || t('profile.notProvided')}</p>
             </div>
 
             {/* Language */}
@@ -157,10 +157,10 @@ export default function ProfilePage() {
                   <User size={18} className="text-primary-400" />
                 </div>
                 <label className="text-xs font-medium uppercase tracking-wider text-white/50">
-                  Account Status
+                  {t('profile.accountStatus')}
                 </label>
               </div>
-              <p className="text-base font-medium text-white">Active</p>
+              <p className="text-base font-medium text-white">{t('profile.active')}</p>
             </div>
           </div>
         </div>

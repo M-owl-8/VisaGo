@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, FileUp, MessageCircle, Plus, RefreshCcw, Sparkles } from 'lucide-react';
+import { ArrowUpRight, MessageCircle, Plus, RefreshCcw, Sparkles } from 'lucide-react';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -349,49 +349,6 @@ export default function ApplicationsPage() {
                 )}
               </div>
             </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="glass-panel space-y-4 border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
-            >
-              <h2 className="font-display text-lg text-white">
-                {t('applications.quickActions', 'Quick actions')}
-              </h2>
-              <div className="space-y-3">
-                <QuickAction
-                  icon={<Plus size={18} />}
-                  title={t('applications.startNewApplication')}
-                  description={t('applications.quickStartDescription', 'Launch a new visa journey')}
-                  onClick={() => router.push('/questionnaire')}
-                />
-                <QuickAction
-                  icon={<MessageCircle size={18} />}
-                  title={t('chat.aiAssistant')}
-                  description={t(
-                    'applications.quickAiDescription',
-                    'Get instant answers powered by AI'
-                  )}
-                  onClick={() => router.push('/chat')}
-                />
-                <QuickAction
-                  icon={<FileUp size={18} />}
-                  title={t('applications.uploadDocuments')}
-                  description={t(
-                    'applications.quickDocsDescription',
-                    'Upload proofs & supporting docs'
-                  )}
-                  onClick={() => {
-                    if (userApplications[0]) {
-                      router.push(`/applications/${userApplications[0].id}/documents`);
-                    } else {
-                      router.push('/applications');
-                    }
-                  }}
-                />
-              </div>
-            </motion.div>
           </div>
         </div>
       )}
@@ -415,34 +372,6 @@ const Metric = ({
   </div>
 );
 
-const QuickAction = ({
-  icon,
-  title,
-  description,
-  onClick,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-white shadow-[0_20px_45px_rgba(0,0,0,0.45)] transition hover:-translate-y-0.5 hover:bg-white/[0.08]"
-  >
-    <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white">
-        {icon}
-      </div>
-      <div>
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <p className="text-xs text-white/60">{description}</p>
-      </div>
-    </div>
-    <ArrowUpRight size={16} className="text-white/40" />
-  </button>
-);
 
 const EmptyState = () => {
   const { t } = useTranslation();
