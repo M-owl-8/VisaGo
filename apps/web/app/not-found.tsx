@@ -1,7 +1,12 @@
+'use client';
+
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 import { FileQuestion, Home, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+
+// Force dynamic rendering to prevent build-time evaluation
+export const dynamic = 'force-dynamic';
 
 export default function NotFound() {
   const { t } = useTranslation();
