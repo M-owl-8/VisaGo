@@ -49,6 +49,7 @@
   },
   "chat": {
     "aiAssistant": "AI Assistant",
+    "inlineTitle": "Need help?",
     "messagePlaceholder": "Type your message…",
     "send": "Send",
     "sending": "Sending...",

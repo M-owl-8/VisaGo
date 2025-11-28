@@ -14,6 +14,9 @@ export interface ApiResponse<T = any> {
 
 class ApiClient {
   private api: AxiosInstance;
+  private requestQueue: Map<string, Promise<any>> = new Map();
+  private lastRequestTime: Map<string, number> = new Map();
+  private readonly MIN_REQUEST_INTERVAL = 100; // Minimum 100ms between requests to same endpoint
 
   constructor() {
     this.api = axios.create({
@@ -24,7 +27,7 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add token
+    // Request interceptor to add token and implement request throttling
     this.api.interceptors.request.use(
       (config) => {
         if (typeof window !== 'undefined') {
@@ -33,6 +36,23 @@ class ApiClient {
             config.headers.Authorization = `Bearer ${token}`;
           }
         }
+
+        // Throttle requests to prevent 429 errors
+        const endpoint = `${config.method?.toUpperCase()}_${config.url}`;
+        const lastTime = this.lastRequestTime.get(endpoint) || 0;
+        const now = Date.now();
+        const timeSinceLastRequest = now - lastTime;
+
+        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+          // If request is too soon, wait a bit
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              resolve(config);
+            }, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest);
+          });
+        }
+
+        this.lastRequestTime.set(endpoint, now);
         return config;
       },
       (error) => Promise.reject(error)
@@ -50,6 +70,21 @@ class ApiClient {
             // Redirect to login will be handled by auth guard
           }
         }
+        
+        // Handle 429 rate limit errors with user-friendly message
+        if (error.response?.status === 429) {
+          const retryAfter = error.response.headers['retry-after'];
+          const message = retryAfter
+            ? `Too many requests. Please wait ${retryAfter} seconds before trying again.`
+            : 'Too many requests. Please wait a moment before trying again.';
+          
+          // Create a more user-friendly error
+          const rateLimitError = new Error(message);
+          (rateLimitError as any).isRateLimit = true;
+          (rateLimitError as any).retryAfter = retryAfter ? parseInt(retryAfter, 10) : 5;
+          return Promise.reject(rateLimitError);
+        }
+        
         return Promise.reject(error);
       }
     );
