@@ -23,12 +23,7 @@ export default function ApplicationsPage() {
     autoFetch: isSignedIn,
   });
 
-  // Redirect if not signed in
-  if (!authLoading && !isSignedIn) {
-    router.push('/login');
-    return null;
-  }
-
+  // All hooks must be called before any early returns
   const totalApplications = userApplications.length;
 
   const overallProgress = useMemo(() => {
@@ -60,6 +55,12 @@ export default function ApplicationsPage() {
       }))
       .slice(0, 4);
   }, [userApplications, t]);
+
+  // Redirect if not signed in (after all hooks)
+  if (!authLoading && !isSignedIn) {
+    router.push('/login');
+    return null;
+  }
 
   const statusStyles: Record<string, { label: string; classes: string; chip: string }> = {
     draft: {
