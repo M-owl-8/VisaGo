@@ -54,14 +54,14 @@ const getInitialLanguage = (): string => {
   return 'en';
 };
 
-// Initialize i18n - only once
-if (!i18next.isInitialized) {
+// Initialize i18n - only once and only on client side
+if (!i18next.isInitialized && typeof window !== 'undefined') {
   i18next
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
       resources,
-      lng: typeof window !== 'undefined' ? getInitialLanguage() : 'en',
+      lng: getInitialLanguage(),
       fallbackLng: 'en',
       interpolation: {
         escapeValue: false,
@@ -70,6 +70,16 @@ if (!i18next.isInitialized) {
         useSuspense: false,
       },
     });
+} else if (!i18next.isInitialized) {
+  // Server-side: initialize without React plugin
+  i18next.init({
+    resources,
+    lng: 'en',
+    fallbackLng: 'en',
+    interpolation: {
+      escapeValue: false,
+    },
+  });
 }
 
 export default i18next;
