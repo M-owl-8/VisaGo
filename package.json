@@ -13,12 +13,17 @@
     "dev:backend": "npm run dev -w apps/backend",
     "dev:ai": "cd apps/ai-service && python -m uvicorn main:app --reload --port 8001",
     "build": "npm run build --workspaces",
+    "build:backend": "cd apps/backend && npm run build",
+    "build:web": "cd apps/web && npm run build",
+    "build:all": "npm run build:backend && npm run build:web",
     "test": "npm run test --workspaces",
     "test:checklist": "jest --runInBand --config apps/backend/jest.config.js --testPathPattern=checklist",
     "install-all": "npm install && npm run install-all --workspaces",
     "prepare": "husky install",
     "lint": "npm run lint --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "db:generate": "cd apps/backend && npm run db:generate",
+    "db:migrate:deploy": "cd apps/backend && npm run db:migrate:deploy"
   },
   "engines": {
     "node": ">=20.0.0"

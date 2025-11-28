@@ -42,9 +42,17 @@ npm run db:generate
 
 ## Production Database (PostgreSQL)
 
-**Location:** `apps/backend`
+**Location:** `apps/backend` (or repository root for monorepo)
 
-**Commands:**
+**For Railway Postgres (Recommended):**
+
+```bash
+# From repository root
+npm run db:migrate:deploy
+npm run db:generate
+```
+
+**For Local/Remote PostgreSQL:**
 
 ```bash
 cd apps/backend
@@ -63,6 +71,8 @@ npm run db:generate
 - This command will **modify your production database**
 - Ensure you have a database backup before running
 - Run this during a maintenance window if possible
+- **For Railway Postgres:** Use the `DATABASE_URL` from Railway dashboard in your `.env.production`
+- **For VPS deployment:** Migrations can be run from VPS against Railway Postgres (remote database)
 
 ## Verification
 

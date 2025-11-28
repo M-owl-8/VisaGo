@@ -269,4 +269,57 @@ After deployment, verify:
 
 ---
 
-**Last Updated:** November 27, 2025
+## 🖥️ VPS Deployment Ready
+
+### Deployment Artifacts Added
+
+Complete VPS deployment package has been added to `deployment/vps/`:
+
+- ✅ PM2 ecosystem configuration for process management
+- ✅ Nginx reverse proxy configuration with SSL/TLS
+- ✅ Production environment variables template (Railway Postgres compatible)
+- ✅ Step-by-step deployment checklist
+- ✅ PostgreSQL database setup hints (optional - for local DB)
+- ✅ Complete architecture documentation
+
+### Recommended Setup: Railway Backend + Railway Postgres + VPS Web
+
+**Architecture:**
+
+- **Database:** Railway Postgres (remote) - already working
+- **Backend:** Railway (already working with mobile app) - optional to move to VPS
+- **Web:** VPS (what we're deploying)
+
+**Benefits:**
+
+- ✅ Consistent backend for mobile and web apps
+- ✅ No database migration needed
+- ✅ Simpler VPS setup (only web app)
+- ✅ Can optionally move backend to VPS later
+
+### Quick Deploy Commands
+
+After setting up the VPS and environment variables:
+
+```bash
+npm install
+# Use Railway Postgres DATABASE_URL from Railway dashboard
+npm run db:migrate:deploy  # Runs against Railway Postgres
+npm run db:generate
+npm run build:web  # Only build web if backend stays on Railway
+# OR: npm run build:all  # If deploying backend too
+pm2 start deployment/vps/pm2.ecosystem.config.cjs
+pm2 save
+```
+
+**Important Configuration:**
+
+- `NEXT_PUBLIC_API_URL`: Set to your Railway backend URL (same as mobile app uses)
+- `DATABASE_URL`: Use Railway Postgres connection string (from Railway dashboard)
+- `CORS_ORIGIN`: Add VPS domain (`https://ketdik.uz`) to Railway backend CORS settings
+
+See `deployment/vps/deploy_checklist.md` for detailed instructions.
+
+---
+
+**Last Updated:** November 28, 2025

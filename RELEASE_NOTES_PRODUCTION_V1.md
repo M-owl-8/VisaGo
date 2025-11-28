@@ -484,4 +484,39 @@ psql -U visabuddy_user -d visabuddy -h localhost
 
 ---
 
-**Last Updated:** November 27, 2025
+## 🖥️ VPS Deployment Artifacts (NEW)
+
+### Complete VPS Deployment Package
+
+All necessary files for deploying to a single Ubuntu VPS have been added to `deployment/vps/`:
+
+- ✅ **PM2 Configuration** (`pm2.ecosystem.config.cjs`) - Manages both backend and web app services
+- ✅ **Nginx Configuration** (`nginx.ketdik.conf`) - Reverse proxy with SSL/TLS support
+- ✅ **Environment Template** (`server-env.sample.env`) - Complete production environment variables
+- ✅ **Deployment Checklist** (`deploy_checklist.md`) - Step-by-step deployment instructions
+- ✅ **PostgreSQL Setup** (`postgres.sample.sql`) - Database initialization hints
+- ✅ **Overview Documentation** (`DEPLOYMENT_VPS_OVERVIEW.md`) - Architecture and deployment guide
+
+### Build Scripts Added
+
+Root `package.json` now includes:
+
+- `npm run build:backend` - Build backend only
+- `npm run build:web` - Build web app only
+- `npm run build:all` - Build both services
+- `npm run db:migrate:deploy` - Run production database migrations
+- `npm run db:generate` - Generate Prisma client
+
+### Deployment Architecture
+
+```
+Internet (80/443) → Nginx → Next.js (3000) → Backend (4000) → PostgreSQL
+```
+
+Both services managed by PM2 with automatic restarts and log management.
+
+**See `deployment/vps/deploy_checklist.md` for complete deployment instructions.**
+
+---
+
+**Last Updated:** November 28, 2025
