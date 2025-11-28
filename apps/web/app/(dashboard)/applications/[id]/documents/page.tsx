@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+
+// Force dynamic rendering to prevent build-time evaluation
+export const dynamic = 'force-dynamic';
 import { apiClient } from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import ErrorBanner from '@/components/ErrorBanner';

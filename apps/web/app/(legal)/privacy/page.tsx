@@ -3,6 +3,9 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+// Force dynamic rendering to prevent build-time evaluation
+export const dynamic = 'force-dynamic';
+
 const sections = [
   { key: 'introduction', defaultTitle: 'Introduction', bodyKey: 'introText' },
   {
