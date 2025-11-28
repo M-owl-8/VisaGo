@@ -38,13 +38,17 @@ class ApiClient {
           }
         }
 
-        // Log request for debugging (only in browser console)
-        if (typeof window !== 'undefined') {
-          console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
-            baseURL: config.baseURL,
-            fullURL: `${config.baseURL}${config.url}`,
-            hasToken: !!localStorage.getItem('auth_token'),
-          });
+        // Log request for debugging (only in development, rate-limited)
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+          const logKey = `api-request-${config.method}-${config.url}`;
+          const lastLog = (window as any).__apiRequestLogs?.[logKey] || 0;
+          if (Date.now() - lastLog > 1000) { // Only log once per second per endpoint
+            if (!(window as any).__apiRequestLogs) {
+              (window as any).__apiRequestLogs = {};
+            }
+            (window as any).__apiRequestLogs[logKey] = Date.now();
+            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+          }
         }
 
         // Throttle requests to prevent 429 errors
@@ -71,25 +75,35 @@ class ApiClient {
     // Response interceptor for error handling
     this.api.interceptors.response.use(
       (response) => {
-        // Log successful responses for debugging
-        if (typeof window !== 'undefined') {
-          console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
-            status: response.status,
-            statusText: response.statusText,
-          });
+        // Only log in development, rate-limited
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+          const logKey = `api-response-${response.config.method}-${response.config.url}`;
+          const lastLog = (window as any).__apiResponseLogs?.[logKey] || 0;
+          if (Date.now() - lastLog > 1000) {
+            if (!(window as any).__apiResponseLogs) {
+              (window as any).__apiResponseLogs = {};
+            }
+            (window as any).__apiResponseLogs[logKey] = Date.now();
+            // Only log errors or first success
+            if (response.status >= 400) {
+              console.warn(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+            }
+          }
         }
         return response;
       },
       async (error: AxiosError) => {
-        // Log errors for debugging
+        // Log errors for debugging (rate-limited to prevent spam)
         if (typeof window !== 'undefined') {
-          console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            message: error.message,
-            responseData: error.response?.data,
-            requestURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown',
-          });
+          const errorKey = error.config ? `api-error-${error.config.method}-${error.config.url}` : 'api-error-unknown';
+          const lastErrorLog = (window as any).__apiErrorLogs?.[errorKey] || 0;
+          if (Date.now() - lastErrorLog > 5000) { // Only log same error once per 5 seconds
+            if (!(window as any).__apiErrorLogs) {
+              (window as any).__apiErrorLogs = {};
+            }
+            (window as any).__apiErrorLogs[errorKey] = Date.now();
+            console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status || 'Network Error'}`);
+          }
         }
 
         if (error.response?.status === 401) {
