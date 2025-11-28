@@ -1,58 +1,33 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, MessageCircle, Plus, RefreshCcw, Sparkles } from 'lucide-react';
+import { ArrowUpRight, MessageCircle, Plus, RefreshCcw, Sparkles, AlertCircle } from 'lucide-react';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
+import { ApplicationCard } from '@/components/applications/ApplicationCard';
 import { useAuthStore } from '@/lib/stores/auth';
-import { getErrorMessage } from '@/lib/utils/errorMessages';
+import { useApplications } from '@/lib/hooks/useApplications';
 
 export default function ApplicationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user, userApplications, fetchUserApplications, isSignedIn, isLoading } = useAuthStore();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [initialFetchDone, setInitialFetchDone] = useState(false);
-  const hasFetchedRef = useRef(false);
+  const { user, isSignedIn, isLoading: authLoading } = useAuthStore();
+  const { applications: userApplications, isLoading, isRefreshing, error, refetch, clearError } = useApplications({
+    autoFetch: isSignedIn,
+  });
 
-  const loadApplications = useCallback(async () => {
-    if (isRefreshing) return; // Prevent concurrent calls
-    try {
-      setIsRefreshing(true);
-      setError(null);
-      await fetchUserApplications();
-    } catch (err) {
-      setError(getErrorMessage(err, t));
-    } finally {
-      setIsRefreshing(false);
-      setInitialFetchDone(true);
-    }
-  }, [fetchUserApplications, t, isRefreshing]);
-
-  // Initial fetch - only ONCE when component mounts and user is signed in
-  useEffect(() => {
-    if (!isSignedIn) {
-      if (!isLoading) {
-        router.push('/login');
-      }
-      return;
-    }
-    
-    // Only fetch once - use ref to prevent re-fetching
-    if (!hasFetchedRef.current && !isRefreshing) {
-      hasFetchedRef.current = true;
-      loadApplications();
-    }
-    // Intentionally minimal dependencies - only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps - only run once on mount
+  // Redirect if not signed in
+  if (!authLoading && !isSignedIn) {
+    router.push('/login');
+    return null;
+  }
 
   const totalApplications = userApplications.length;
 
@@ -121,27 +96,44 @@ export default function ApplicationsPage() {
   };
 
   const renderSkeleton = () => (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <div className="glass-panel h-48 animate-pulse bg-white/5" />
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
+      <SkeletonCard className="h-48" />
       <div className="grid gap-4 md:grid-cols-3">
         {[...Array(3)].map((_, idx) => (
-          <div key={`metric-${idx}`} className="glass-panel h-32 animate-pulse bg-white/5" />
+          <Skeleton key={`metric-${idx}`} className="h-32" />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-        <div className="glass-panel h-72 animate-pulse bg-white/5" />
-        <div className="glass-panel h-72 animate-pulse bg-white/5" />
+        <Skeleton className="h-72" />
+        <Skeleton className="h-72" />
       </div>
     </div>
   );
 
-  if (!initialFetchDone && isRefreshing) {
-    return <div className="px-2 py-10 sm:px-0">{renderSkeleton()}</div>;
+  // Loading state
+  if (isLoading && !isRefreshing) {
+    return <div className="py-10">{renderSkeleton()}</div>;
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 text-white">
-      {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 text-white sm:px-6 lg:px-8">
+      {error && (
+        <ErrorBanner
+          message={error}
+          onClose={clearError}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={refetch}
+              className="ml-4"
+            >
+              <RefreshCcw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+              <span className="ml-2">{t('errors.tryAgain', 'Try Again')}</span>
+            </Button>
+          }
+        />
+      )}
 
       <section className="grid gap-6 lg:grid-cols-[2fr,1fr]">
         <motion.div
@@ -194,7 +186,8 @@ export default function ApplicationsPage() {
               <Button
                 variant="ghost"
                 className="rounded-2xl border border-white/10 px-4 text-white/70 hover:bg-white/5"
-                onClick={loadApplications}
+                onClick={refetch}
+                disabled={isRefreshing}
               >
                 <RefreshCcw size={16} className={isRefreshing ? 'animate-spin' : ''} />
                 <span className="ml-2">{t('applications.refresh', 'Refresh')}</span>
@@ -252,54 +245,15 @@ export default function ApplicationsPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {userApplications.slice(0, 4).map((app) => {
-                const statusVariant = getStatusVariant(app.status);
-                return (
-                  <Card
-                    key={app.id}
-                    className="group relative overflow-hidden border-white/5 bg-white/[0.04] p-5 transition hover:-translate-y-1 hover:shadow-[0_30px_60px_rgba(7,12,30,0.6)]"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm text-white/60">
-                          {app.country?.name || t('applications.unknownCountry', 'Unknown country')}
-                        </p>
-                        <p className="font-medium text-white">{app.visaType?.name}</p>
-                      </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${statusVariant.chip}`}
-                      >
-                        {statusVariant.label}
-                      </span>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-white/60">
-                        <span>{t('applications.progress')}</span>
-                        <span>{app.progressPercentage ?? 0}%</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width]"
-                          style={{ width: `${app.progressPercentage || 0}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between text-sm text-primary">
-                      <Link
-                        href={`/applications/${app.id}`}
-                        className="inline-flex items-center gap-2 text-white"
-                      >
-                        {t('applications.viewDetails', 'View details')}
-                        <ArrowUpRight size={16} />
-                      </Link>
-                      <Link href={`/applications/${app.id}/documents`} className="text-white/50">
-                        {t('applications.uploadDocuments')}
-                      </Link>
-                    </div>
-                  </Card>
-                );
-              })}
+              {userApplications.map((app) => (
+                <ApplicationCard
+                  key={app.id}
+                  application={app}
+                  statusStyles={statusStyles}
+                  getStatusVariant={getStatusVariant}
+                  t={t}
+                />
+              ))}
             </div>
           </motion.div>
 
@@ -376,21 +330,24 @@ const Metric = ({
 const EmptyState = () => {
   const { t } = useTranslation();
   return (
-    <Card className="glass-panel flex flex-col items-center justify-center border-dashed border-white/10 bg-white/[0.03] px-8 py-16 text-center text-white">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white">
-        <Plus size={28} />
+    <Card className="glass-panel flex flex-col items-center justify-center border-dashed border-white/10 bg-white/[0.03] px-8 py-20 text-center text-white">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 text-primary">
+        <Plus size={32} />
       </div>
-      <h3 className="font-display text-2xl">{t('applications.noApplicationsYet')}</h3>
+      <h3 className="font-display text-2xl font-semibold text-white">
+        {t('applications.noApplicationsYet', 'No applications yet')}
+      </h3>
       <p className="mt-3 max-w-xl text-sm text-white/60">
         {t(
           'applications.emptySubtitle',
           'Start your first application to unlock personalized timelines, AI planning, and shared mobile progress.'
         )}
       </p>
-      <div className="mt-6 flex flex-wrap justify-center gap-3">
+      <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link href="/questionnaire">
           <Button className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 shadow-[0_20px_45px_rgba(62,166,255,0.45)]">
-            {t('applications.startNewApplication')}
+            <Plus size={18} />
+            <span className="ml-2">{t('applications.startNewApplication', 'Start New Application')}</span>
           </Button>
         </Link>
         <Link href="/chat">
@@ -398,7 +355,8 @@ const EmptyState = () => {
             variant="secondary"
             className="rounded-2xl border border-white/10 !bg-transparent text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)]"
           >
-            {t('applications.heroAiCta', 'Open AI assistant')}
+            <MessageCircle size={18} />
+            <span className="ml-2">{t('applications.heroAiCta', 'Open AI assistant')}</span>
           </Button>
         </Link>
       </div>

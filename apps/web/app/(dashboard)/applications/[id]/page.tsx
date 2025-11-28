@@ -1,160 +1,242 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
+import { ArrowLeft, Upload, MessageCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
-import { apiClient } from '@/lib/api/client';
-import { getErrorMessage } from '@/lib/utils/errorMessages';
+import { useApplication } from '@/lib/hooks/useApplication';
 import ErrorBanner from '@/components/ErrorBanner';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { StatusBadge } from '@/components/applications/StatusBadge';
+import { DocumentChecklist } from '@/components/checklist/DocumentChecklist';
+import { ChecklistSummary } from '@/components/checklist/ChecklistSummary';
+import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
+import { RefreshCcw } from 'lucide-react';
 
 export default function ApplicationDetailPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const params = useParams();
   const { isSignedIn } = useAuthStore();
-  const [application, setApplication] = useState<any>(null);
-  const [checklist, setChecklist] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const applicationId = params.id as string;
+  const { application, checklist, isLoading, isRefreshing, error, refetch, clearError } = useApplication(
+    applicationId,
+    { autoFetch: isSignedIn }
+  );
 
-  const loadData = useCallback(async () => {
-    try {
-      setError('');
-      const [appRes, checklistRes] = await Promise.all([
-        apiClient.getApplication(params.id as string),
-        apiClient.getDocumentChecklist(params.id as string),
-      ]);
+  // Redirect if not signed in
+  if (!isSignedIn) {
+    router.push('/login');
+    return null;
+  }
 
-      if (appRes.success && appRes.data) {
-        setApplication(appRes.data);
-      } else {
-        const errorMsg = getErrorMessage(appRes.error || {}, t, i18n.language);
-        setError(errorMsg || t('errors.failedToLoadApplication'));
-      }
-
-      if (checklistRes.success && checklistRes.data) {
-        setChecklist(checklistRes.data);
-      }
-    } catch (err: any) {
-      const errorMsg = getErrorMessage(err, t, i18n.language);
-      setError(errorMsg || t('errors.failedToLoadApplication'));
-    } finally {
-      setLoading(false);
-    }
-  }, [params.id, t, i18n.language]);
-
-  useEffect(() => {
-    if (!isSignedIn) {
-      router.push('/login');
-      return;
-    }
-    loadData();
-  }, [isSignedIn, router, loadData]);
-
-  if (loading) {
+  // Loading state
+  if (isLoading && !isRefreshing) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div>{t('common.loading')}</div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <Skeleton className="mb-6 h-8 w-48" />
+        <SkeletonCard className="mb-6 h-32" />
+        <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+          <Skeleton className="h-96" />
+          <Skeleton className="h-96" />
+        </div>
       </div>
     );
   }
 
-  if (!application && !loading) {
+  // Error state
+  if (!application && !isLoading) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {error && <ErrorBanner message={error} />}
+        {error && (
+          <ErrorBanner
+            message={error}
+            onClose={clearError}
+            action={
+              <Button variant="secondary" size="sm" onClick={refetch} className="ml-4">
+                <RefreshCcw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                <span className="ml-2">{t('errors.tryAgain', 'Try Again')}</span>
+              </Button>
+            }
+          />
+        )}
         <div className="mt-4">
-          <Link href="/applications" className="text-sm text-primary-600 hover:text-primary-500">
-            {t('applications.backToApplications')}
+          <Link
+            href="/applications"
+            className="inline-flex items-center gap-2 text-sm text-primary hover:text-white"
+          >
+            <ArrowLeft size={16} />
+            {t('applications.backToApplications', 'Back to Applications')}
           </Link>
         </div>
-        <div className="mt-4 flex min-h-[400px] items-center justify-center">
+        <div className="mt-8 flex min-h-[400px] items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-600">{t('applications.applicationNotFound')}</p>
+            <p className="text-white/60">{t('applications.applicationNotFound', 'Application not found')}</p>
           </div>
         </div>
       </div>
     );
   }
+
+  if (!application) return null;
+
+  // Parse checklist items
+  const checklistItems = checklist?.items || [];
+
+  const countryCode = application.country?.code?.toLowerCase() || 'xx';
+  const flagEmoji = getFlagEmoji(countryCode);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 text-white sm:px-6 lg:px-8">
-      {error && <ErrorBanner message={error} onClose={() => setError('')} />}
+      {error && (
+        <ErrorBanner
+          message={error}
+          onClose={clearError}
+          action={
+            <Button variant="secondary" size="sm" onClick={refetch} className="ml-4">
+              <RefreshCcw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+              <span className="ml-2">{t('errors.tryAgain', 'Try Again')}</span>
+            </Button>
+          }
+        />
+      )}
 
-      <Link href="/applications" className="mb-4 text-sm text-primary hover:text-white">
-        ← {t('applications.backToApplications')}
+      {/* Back Button */}
+      <Link
+        href="/applications"
+        className="mb-6 inline-flex items-center gap-2 text-sm text-white/60 transition hover:text-white"
+      >
+        <ArrowLeft size={16} />
+        {t('applications.backToApplications', 'Back to Applications')}
       </Link>
 
-      {application && (
-        <>
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-white">
-              {application.country?.name || t('applications.title')} - {application.visaType?.name}
-            </h1>
-            <p className="text-sm text-white/60">
-              {t('applications.status')}: <span className="capitalize">{application.status}</span>
-            </p>
-            <div className="mt-4">
-              <div className="mb-1 flex justify-between text-xs text-white/60">
-                <span>{t('applications.progress')}</span>
-                <span>{application.progressPercentage || 0}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-white/10">
-                <div
-                  className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
-                  style={{ width: `${application.progressPercentage || 0}%` }}
-                />
+      {/* Summary Section */}
+      <Card className="glass-panel mb-8 border border-white/10 bg-white/[0.03] p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 text-4xl">
+              {flagEmoji}
+            </div>
+            <div>
+              <h1 className="font-display text-2xl font-semibold text-white sm:text-3xl">
+                {application.country?.name || t('applications.title')} - {application.visaType?.name}
+              </h1>
+              <div className="mt-2 flex items-center gap-3">
+                <StatusBadge status={application.status} />
+                <span className="text-sm text-white/60">
+                  {t('applications.progress', 'Progress')}: {application.progressPercentage || 0}%
+                </span>
               </div>
             </div>
           </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="glass-panel border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="mb-4 text-lg font-semibold text-white">
-                {t('applications.documentChecklist')}
-              </h2>
-              {checklist?.items ? (
-                <ul className="space-y-2">
-                  {checklist.items.map((item: any, index: number) => (
-                    <li key={index} className="flex items-center justify-between text-white/80">
-                      <span
-                        className={
-                          item.status === 'verified' ? 'text-emerald-300' : 'text-white/80'
-                        }
-                      >
-                        {item.name}
-                      </span>
-                      <span className="text-sm text-white/50 capitalize">{item.status}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-white/60">{t('applications.noChecklistAvailable')}</p>
-              )}
-            </div>
-
-            <div className="glass-panel border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="mb-4 text-lg font-semibold text-white">{t('applications.actions')}</h2>
-              <div className="space-y-2">
-                <Link
-                  href={`/applications/${params.id}/documents`}
-                  className="block rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-center text-sm font-medium text-white shadow-[0_15px_35px_rgba(62,166,255,0.35)]"
-                >
-                  {t('applications.uploadDocuments')}
-                </Link>
-                <Link
-                  href={`/chat?applicationId=${params.id}`}
-                  className="block rounded-2xl border border-white/10 bg-transparent px-4 py-2 text-center text-sm font-medium text-white hover:bg-white/10"
-                >
-                  {t('applications.chatAboutApplication')}
-                </Link>
-              </div>
-            </div>
+          <div className="flex gap-2">
+            <Link href={`/applications/${applicationId}/documents`}>
+              <Button className="rounded-xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-sm shadow-[0_15px_35px_rgba(62,166,255,0.35)]">
+                <Upload size={16} />
+                <span className="ml-2">{t('applications.uploadDocuments', 'Upload Documents')}</span>
+              </Button>
+            </Link>
+            <Link href={`/chat?applicationId=${applicationId}`}>
+              <Button
+                variant="secondary"
+                className="rounded-xl border border-white/10 bg-transparent px-4 py-2 text-sm text-white hover:bg-white/10"
+              >
+                <MessageCircle size={16} />
+                <span className="ml-2">{t('applications.chatAboutApplication', 'Chat')}</span>
+              </Button>
+            </Link>
           </div>
-        </>
-      )}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="mt-6">
+          <div className="mb-2 flex items-center justify-between text-sm text-white/60">
+            <span>{t('applications.overallProgress', 'Overall Progress')}</span>
+            <span className="font-semibold text-white">{application.progressPercentage || 0}%</span>
+          </div>
+          <div className="h-3 w-full rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width]"
+              style={{ width: `${application.progressPercentage || 0}%` }}
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Main Content Grid */}
+      <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+        {/* Document Checklist */}
+        <div className="space-y-6">
+          {checklist?.status === 'processing' && (
+            <Card className="glass-panel border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+                <p className="text-sm text-white/60">
+                  {t('applications.checklistProcessing', 'Checklist is being generated...')}
+                </p>
+              </div>
+            </Card>
+          )}
+          <DocumentChecklist
+            items={checklistItems}
+            applicationId={applicationId}
+            language={i18n.language}
+          />
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Checklist Summary */}
+          <ChecklistSummary items={checklistItems} />
+
+          {/* Quick Actions */}
+          <Card className="glass-panel border border-white/10 bg-white/[0.03] p-6">
+            <h3 className="mb-4 text-lg font-semibold text-white">
+              {t('applications.quickActions', 'Quick Actions')}
+            </h3>
+            <div className="space-y-2">
+              <Link href={`/applications/${applicationId}/documents`}>
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start border border-white/10 bg-transparent text-white hover:bg-white/10"
+                >
+                  <Upload size={16} />
+                  <span className="ml-2">{t('applications.uploadDocuments', 'Upload Documents')}</span>
+                </Button>
+              </Link>
+              <Link href={`/chat?applicationId=${applicationId}`}>
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start border border-white/10 bg-transparent text-white hover:bg-white/10"
+                >
+                  <MessageCircle size={16} />
+                  <span className="ml-2">{t('applications.chatAboutApplication', 'Chat with AI')}</span>
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   );
+}
+
+// Helper to get flag emoji from country code
+function getFlagEmoji(countryCode: string): string {
+  const flagMap: Record<string, string> = {
+    us: '🇺🇸',
+    ca: '🇨🇦',
+    gb: '🇬🇧',
+    au: '🇦🇺',
+    de: '🇩🇪',
+    fr: '🇫🇷',
+    es: '🇪🇸',
+    it: '🇮🇹',
+    jp: '🇯🇵',
+    ae: '🇦🇪',
+    uz: '🇺🇿',
+  };
+  return flagMap[countryCode] || '🌍';
 }

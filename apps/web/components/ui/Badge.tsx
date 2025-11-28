@@ -4,12 +4,12 @@ import { cn } from '@/lib/utils/cn';
 type BadgeVariant = 'solid' | 'soft' | 'outline';
 
 const baseClasses =
-  'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide';
+  'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold';
 
 const variantClasses: Record<BadgeVariant, string> = {
-  solid: 'bg-primary-900 text-white shadow-card-soft',
-  soft: 'bg-primary-900/5 text-primary-900 border border-primary-900/10',
-  outline: 'border border-primary-900/30 text-primary-900 bg-transparent',
+  solid: 'bg-primary text-white shadow-lg',
+  soft: 'bg-primary/10 text-primary border border-primary/30',
+  outline: 'border border-white/30 text-white/90 bg-transparent',
 };
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

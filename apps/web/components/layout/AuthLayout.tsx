@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Image from 'next/image';
+import { LanguageSwitcher } from '@/components/landing/LanguageSwitcher';
 
 type AuthLayoutProps = {
   children: ReactNode;
@@ -14,6 +15,11 @@ export function AuthLayout({ children, formTitle, formSubtitle }: AuthLayoutProp
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(62,166,255,0.15),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(7,12,30,0.7),transparent_35%),linear-gradient(180deg,#030814,#060b1c,#0d162a)]" />
         <div className="absolute -left-32 top-20 h-80 w-80 rounded-full border border-white/10 blur-3xl" />
         <div className="absolute -right-20 bottom-0 h-96 w-96 rounded-full border border-white/5 blur-[180px]" />
+      </div>
+
+      {/* Language Switcher - Top Right */}
+      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+        <LanguageSwitcher />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-6 py-12">

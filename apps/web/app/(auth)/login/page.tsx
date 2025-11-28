@@ -39,8 +39,14 @@ export default function LoginPage() {
     <AuthLayout formTitle={t('auth.signIn')} formSubtitle={t('auth.subtitle')}>
       <form className="space-y-6" onSubmit={handleSubmit}>
         {error && (
-          <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
-            {error}
+          <div
+            className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200"
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-2">
+              <span className="flex-1">{error}</span>
+            </div>
           </div>
         )}
 
@@ -90,7 +96,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#3EA6FF] to-[#4A9EFF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(62,166,255,0.35)] transition hover:brightness-110 disabled:opacity-60"
+          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#3EA6FF] to-[#4A9EFF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(62,166,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814]"
         >
           {isSubmitting ? t('common.loading') : t('auth.signInButton')}
         </button>
@@ -129,6 +135,20 @@ export default function LoginPage() {
             {t('auth.signUp')}
           </Link>
         </div>
+
+        {/* Terms & Privacy */}
+        <p className="text-center text-xs text-white/50">
+          {t('auth.termsAgreement', 'By continuing, you agree to our')}{' '}
+          <Link href="/terms" className="underline hover:text-white">
+            {t('auth.terms', 'Terms')}
+          </Link>
+          {' '}
+          {t('auth.and', 'and')}{' '}
+          <Link href="/privacy" className="underline hover:text-white">
+            {t('auth.privacy', 'Privacy Policy')}
+          </Link>
+          .
+        </p>
       </form>
     </AuthLayout>
   );

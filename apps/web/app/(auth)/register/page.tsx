@@ -55,8 +55,14 @@ export default function RegisterPage() {
     <AuthLayout formTitle={t('auth.registerTitle')} formSubtitle={t('auth.subtitle')}>
       <form className="space-y-6" onSubmit={handleSubmit}>
         {error && (
-          <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">
-            {error}
+          <div
+            className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200"
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-2">
+              <span className="flex-1">{error}</span>
+            </div>
           </div>
         )}
 
@@ -128,7 +134,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#4A9EFF] to-[#3EA6FF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(74,158,255,0.35)] transition hover:brightness-110 disabled:opacity-60"
+          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#4A9EFF] to-[#3EA6FF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(74,158,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814]"
         >
           {isSubmitting ? t('common.loading') : t('auth.createAccount')}
         </button>
@@ -139,6 +145,20 @@ export default function RegisterPage() {
             {t('auth.signIn')}
           </Link>
         </div>
+
+        {/* Terms & Privacy */}
+        <p className="text-center text-xs text-white/50">
+          {t('auth.termsAgreement', 'By continuing, you agree to our')}{' '}
+          <Link href="/terms" className="underline hover:text-white">
+            {t('auth.terms', 'Terms')}
+          </Link>
+          {' '}
+          {t('auth.and', 'and')}{' '}
+          <Link href="/privacy" className="underline hover:text-white">
+            {t('auth.privacy', 'Privacy Policy')}
+          </Link>
+          .
+        </p>
       </form>
     </AuthLayout>
   );
