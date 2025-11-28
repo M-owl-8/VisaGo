@@ -113,21 +113,28 @@ export class DocumentChecklistService {
             status: storedChecklist.status,
           });
 
-          const checklistData = JSON.parse(storedChecklist.checklistData);
-          // Handle both old format (array) and new format (object with items and metadata)
-          const items = Array.isArray(checklistData) ? checklistData : checklistData.items || [];
-          const aiFallbackUsed = checklistData.aiFallbackUsed || false;
-          const aiErrorOccurred = checklistData.aiErrorOccurred || false;
-          return this.buildChecklistResponse(
-            applicationId,
-            application.countryId,
-            application.visaTypeId,
-            items,
-            application.documents,
-            storedChecklist.aiGenerated,
-            aiFallbackUsed,
-            aiErrorOccurred
-          );
+          if (!storedChecklist.checklistData) {
+            logWarn('[Checklist][Cache] Stored checklist has no data, will regenerate', {
+              applicationId,
+            });
+            // Fall through to generate new checklist
+          } else {
+            const checklistData = JSON.parse(storedChecklist.checklistData);
+            // Handle both old format (array) and new format (object with items and metadata)
+            const items = Array.isArray(checklistData) ? checklistData : checklistData.items || [];
+            const aiFallbackUsed = checklistData.aiFallbackUsed || false;
+            const aiErrorOccurred = checklistData.aiErrorOccurred || false;
+            return this.buildChecklistResponse(
+              applicationId,
+              application.countryId,
+              application.visaTypeId,
+              items,
+              application.documents,
+              storedChecklist.aiGenerated,
+              aiFallbackUsed,
+              aiErrorOccurred
+            );
+          }
         }
 
         // If checklist is pending, return status
