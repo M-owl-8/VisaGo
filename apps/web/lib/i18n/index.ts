@@ -4,13 +4,6 @@ import en from '../../locales/en.json';
 import ru from '../../locales/ru.json';
 import uz from '../../locales/uz.json';
 
-// Conditionally import initReactI18next only on client side to avoid SSR/build errors
-let initReactI18next: any = null;
-if (typeof window !== 'undefined') {
-  // Only import on client side
-  initReactI18next = require('react-i18next').initReactI18next;
-}
-
 const resources = {
   en: { translation: en },
   ru: { translation: ru },
@@ -60,32 +53,66 @@ const getInitialLanguage = (): string => {
   return 'en';
 };
 
-// Initialize i18n - only once and only on client side
-if (!i18next.isInitialized && typeof window !== 'undefined') {
-  i18next
-    .use(LanguageDetector)
-    .use(initReactI18next)
-    .init({
+// Initialize i18n - only once
+// During SSR/build, initialize without React plugin to avoid createContext errors
+if (!i18next.isInitialized) {
+  if (typeof window !== 'undefined') {
+    // Client-side: dynamically import and use React plugin
+    // Use dynamic import to prevent evaluation during build
+    import('react-i18next')
+      .then((module) => {
+        if (!i18next.isInitialized) {
+          i18next
+            .use(LanguageDetector)
+            .use(module.initReactI18next)
+            .init({
+              resources,
+              lng: getInitialLanguage(),
+              fallbackLng: 'en',
+              interpolation: {
+                escapeValue: false,
+              },
+              react: {
+                useSuspense: false,
+              },
+            });
+        }
+      })
+      .catch(() => {
+        // Fallback: initialize without React plugin if import fails
+        if (!i18next.isInitialized) {
+          i18next.init({
+            resources,
+            lng: 'en',
+            fallbackLng: 'en',
+            interpolation: {
+              escapeValue: false,
+            },
+          });
+        }
+      });
+    
+    // Also initialize synchronously for immediate use (without React plugin initially)
+    // The React plugin will be added asynchronously
+    i18next.use(LanguageDetector).init({
       resources,
       lng: getInitialLanguage(),
       fallbackLng: 'en',
       interpolation: {
         escapeValue: false,
       },
-      react: {
-        useSuspense: false,
+    });
+  } else {
+    // Server-side/build: initialize without React plugin
+    i18next.init({
+      resources,
+      lng: 'en',
+      fallbackLng: 'en',
+      interpolation: {
+        escapeValue: false,
       },
     });
-} else if (!i18next.isInitialized) {
-  // Server-side: initialize without React plugin
-  i18next.init({
-    resources,
-    lng: 'en',
-    fallbackLng: 'en',
-    interpolation: {
-      escapeValue: false,
-    },
-  });
+  }
 }
 
 export default i18next;
