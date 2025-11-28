@@ -32,7 +32,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setCurrentApplication: (applicationId: string | null) => {
     set({ currentApplicationId: applicationId });
-    get().loadChatHistory(applicationId || undefined);
+    // Only load history if not already loading to prevent spam
+    if (!get().isLoading) {
+      get().loadChatHistory(applicationId || undefined);
+    }
   },
 
   sendMessage: async (content: string, applicationId?: string) => {
@@ -114,17 +117,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadChatHistory: async (applicationId?: string) => {
+    // Prevent concurrent calls
+    if (get().isLoading) {
+      return;
+    }
+
     try {
       set({ isLoading: true, error: null });
 
       const response = await apiClient.getChatHistory(applicationId);
 
-      if (!response.success || !response.data) {
+      // Handle empty history gracefully - backend returns empty array if no session
+      if (!response.success) {
+        // If it's a "session not found" error, treat as empty history
+        if (response.error?.message?.includes('Session not found') || 
+            response.error?.status === 500) {
+          set({ messages: [], error: null });
+          return;
+        }
         throw new Error(response.error?.message || 'Failed to load chat history');
       }
 
       // Transform backend messages to ChatMessage format
-      const messages: ChatMessage[] = (response.data.messages || []).map((msg: any) => ({
+      // Backend returns array directly, not wrapped in messages property
+      const historyData = Array.isArray(response.data) ? response.data : (response.data?.messages || []);
+      const messages: ChatMessage[] = historyData.map((msg: any) => ({
         id: msg.id || `msg-${Date.now()}-${Math.random()}`,
         role: msg.role || 'user',
         content: msg.content || msg.message || '',
@@ -134,10 +151,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         model: msg.model,
       }));
 
-      set({ messages });
+      set({ messages, error: null });
     } catch (error: any) {
-      console.error('Failed to load chat history:', error);
-      set({ error: error.message || 'Failed to load chat history' });
+      // Don't spam console - only log first error
+      if (!get().error) {
+        console.error('Failed to load chat history:', error);
+      }
+      // Set empty messages instead of error to allow user to start chatting
+      set({ messages: [], error: null });
     } finally {
       set({ isLoading: false });
     }

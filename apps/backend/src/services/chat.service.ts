@@ -496,18 +496,24 @@ User's Current Visa Application:
     offset = 0,
     verifiedUserId?: string // Required for legacy API to verify session ownership
   ) {
-    // If applicationId is provided, it's the new API with userId, applicationId, limit, offset
+    // If applicationId is provided (including null), it's the new API with userId, applicationId, limit, offset
+    // We check !== undefined to distinguish between "not provided" (legacy mode) and "explicitly null" (general chat)
     if (applicationId !== undefined) {
       const userId = userIdOrSessionId;
       const sessions = await prisma.chatSession.findMany({
         where: {
           userId,
-          applicationId: applicationId || null,
+          applicationId: applicationId || null, // Convert empty string to null for Prisma
         },
         select: { id: true },
       });
 
       const sessionIds = sessions.map((s: any): string => s.id);
+
+      // If no sessions exist, return empty array instead of error
+      if (sessionIds.length === 0) {
+        return [];
+      }
 
       const messages = await prisma.chatMessage.findMany({
         where: {

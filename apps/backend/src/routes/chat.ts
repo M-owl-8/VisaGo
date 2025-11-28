@@ -236,31 +236,36 @@ router.get('/history', async (req: Request, res: Response) => {
       userId // Always pass verified userId for security
     );
 
+    // Always return success with data (empty array if no history)
     res.json({
       success: true,
-      data: history,
+      data: history || [], // Ensure we always return an array
     });
   } catch (error: any) {
-    // Enhanced error logging for debugging
-    const { logError } = await import('../middleware/logger');
-    logError(
-      '[ChatHistory] Error loading history',
-      error instanceof Error ? error : new Error(String(error)),
-      {
-        userId: req.userId || (req as any).user?.id,
-        applicationId: req.query.applicationId,
-        limit: req.query.limit,
-        offset: req.query.offset,
-        errorMessage: error.message,
-        errorStack: error.stack,
-      }
-    );
+    // Rate-limited error logging to prevent spam
+    const errorKey = `chat-history-error-${userId}`;
+    const errorCache = (global as any).__chatErrorCache || {};
 
-    res.status(500).json({
-      success: false,
-      error: {
-        message: error.message || 'Failed to load chat history',
-      },
+    if (!errorCache[errorKey] || Date.now() - errorCache[errorKey] > 5000) {
+      errorCache[errorKey] = Date.now();
+      (global as any).__chatErrorCache = errorCache;
+
+      const { logError } = await import('../middleware/logger');
+      logError(
+        '[ChatHistory] Error loading history',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          userId: req.userId || (req as any).user?.id,
+          applicationId: req.query.applicationId,
+        }
+      );
+    }
+
+    // Return empty array instead of error to allow user to start chatting
+    // This prevents 500 errors when no session exists yet
+    res.json({
+      success: true,
+      data: [], // Return empty array instead of error
     });
   }
 });

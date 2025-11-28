@@ -17,6 +17,7 @@ class ApiClient {
   private requestQueue: Map<string, Promise<any>> = new Map();
   private lastRequestTime: Map<string, number> = new Map();
   private readonly MIN_REQUEST_INTERVAL = 100; // Minimum 100ms between requests to same endpoint
+  private pendingRequests: Map<string, Promise<any>> = new Map(); // Deduplicate concurrent requests
 
   constructor() {
     this.api = axios.create({
@@ -384,13 +385,31 @@ class ApiClient {
     limit?: number,
     offset?: number
   ): Promise<ApiResponse> {
-    const params: any = {};
-    if (applicationId) params.applicationId = applicationId;
-    if (limit) params.limit = limit;
-    if (offset) params.offset = offset;
+    // Deduplicate concurrent requests
+    const requestKey = `getChatHistory-${applicationId || 'general'}-${limit || 50}-${offset || 0}`;
+    if (this.pendingRequests.has(requestKey)) {
+      return this.pendingRequests.get(requestKey)!;
+    }
 
-    const response = await this.api.get('/chat/history', { params });
-    return response.data;
+    const requestPromise = (async () => {
+      try {
+        const params: any = {};
+        if (applicationId) params.applicationId = applicationId;
+        if (limit) params.limit = limit;
+        if (offset) params.offset = offset;
+
+        const response = await this.api.get('/chat/history', { params });
+        return response.data;
+      } finally {
+        // Remove from pending after a short delay to allow deduplication
+        setTimeout(() => {
+          this.pendingRequests.delete(requestKey);
+        }, 100);
+      }
+    })();
+
+    this.pendingRequests.set(requestKey, requestPromise);
+    return requestPromise;
   }
 
   async getChatSessions(limit: number = 20, offset: number = 0): Promise<ApiResponse> {
@@ -405,13 +424,49 @@ class ApiClient {
   // ============================================================================
 
   async getUserProfile(): Promise<ApiResponse> {
-    const response = await this.api.get('/users/me');
-    return response.data;
+    // Deduplicate concurrent requests
+    const requestKey = 'getUserProfile';
+    if (this.pendingRequests.has(requestKey)) {
+      return this.pendingRequests.get(requestKey)!;
+    }
+
+    const requestPromise = (async () => {
+      try {
+        const response = await this.api.get('/users/me');
+        return response.data;
+      } finally {
+        // Remove from pending after a short delay to allow deduplication
+        setTimeout(() => {
+          this.pendingRequests.delete(requestKey);
+        }, 100);
+      }
+    })();
+
+    this.pendingRequests.set(requestKey, requestPromise);
+    return requestPromise;
   }
 
   async getUserApplications(userId: string): Promise<ApiResponse> {
-    const response = await this.api.get(`/users/${userId}/applications`);
-    return response.data;
+    // Deduplicate concurrent requests
+    const requestKey = `getUserApplications-${userId}`;
+    if (this.pendingRequests.has(requestKey)) {
+      return this.pendingRequests.get(requestKey)!;
+    }
+
+    const requestPromise = (async () => {
+      try {
+        const response = await this.api.get(`/users/${userId}/applications`);
+        return response.data;
+      } finally {
+        // Remove from pending after a short delay to allow deduplication
+        setTimeout(() => {
+          this.pendingRequests.delete(requestKey);
+        }, 100);
+      }
+    })();
+
+    this.pendingRequests.set(requestKey, requestPromise);
+    return requestPromise;
   }
 
   async updateUserPreferences(userId: string, preferences: any): Promise<ApiResponse> {

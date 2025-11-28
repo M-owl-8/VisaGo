@@ -12,13 +12,22 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, isSignedIn, fetchUserProfile } = useAuthStore();
 
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => {
     if (!isSignedIn) {
       router.push('/login');
       return;
     }
-    fetchUserProfile();
-  }, [isSignedIn, fetchUserProfile, router]);
+    // Only fetch once on mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchUserProfile().catch(() => {
+        // Silently fail - user data already in store
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   if (!user) {
     return (

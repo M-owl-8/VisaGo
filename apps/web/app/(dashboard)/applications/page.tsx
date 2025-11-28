@@ -23,6 +23,7 @@ export default function ApplicationsPage() {
   const hasFetchedRef = useRef(false);
 
   const loadApplications = useCallback(async () => {
+    if (isRefreshing) return; // Prevent concurrent calls
     try {
       setIsRefreshing(true);
       setError(null);
@@ -33,33 +34,25 @@ export default function ApplicationsPage() {
       setIsRefreshing(false);
       setInitialFetchDone(true);
     }
-  }, [fetchUserApplications, t]);
+  }, [fetchUserApplications, t, isRefreshing]);
 
-  // Initial fetch - only once when user signs in
+  // Initial fetch - only ONCE when component mounts and user is signed in
   useEffect(() => {
-    if (!isSignedIn && !isLoading) {
-      router.push('/login');
+    if (!isSignedIn) {
+      if (!isLoading) {
+        router.push('/login');
+      }
       return;
     }
-    // Only fetch once when user becomes signed in
-    if (isSignedIn && !hasFetchedRef.current && !isLoading) {
+    
+    // Only fetch once - use ref to prevent re-fetching
+    if (!hasFetchedRef.current && !isRefreshing) {
       hasFetchedRef.current = true;
-      // Fetch directly to avoid dependency issues
-      (async () => {
-        try {
-          setIsRefreshing(true);
-          setError(null);
-          await fetchUserApplications();
-        } catch (err) {
-          setError(getErrorMessage(err, t));
-        } finally {
-          setIsRefreshing(false);
-          setInitialFetchDone(true);
-        }
-      })();
+      loadApplications();
     }
+    // Intentionally minimal dependencies - only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, isLoading]);
+  }, []); // Empty deps - only run once on mount
 
   const totalApplications = userApplications.length;
 

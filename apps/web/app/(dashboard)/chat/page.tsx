@@ -19,17 +19,26 @@ export default function ChatPage() {
 
   const applicationId = searchParams.get('applicationId');
 
+  const hasLoadedRef = useRef(false);
+
   useEffect(() => {
     if (!isSignedIn) {
       router.push('/login');
       return;
     }
-    if (applicationId) {
-      setCurrentApplication(applicationId);
-    } else {
-      loadChatHistory();
+    
+    // Only load history ONCE when component mounts or applicationId changes
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      if (applicationId) {
+        setCurrentApplication(applicationId);
+      } else {
+        loadChatHistory();
+      }
     }
-  }, [isSignedIn, applicationId, setCurrentApplication, loadChatHistory, router]);
+    // Only re-run if applicationId actually changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId]); // Minimal deps - only applicationId changes should trigger reload
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

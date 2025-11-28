@@ -130,17 +130,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isLoading: false, // Set loading to false immediately after restoring from storage
           });
 
-          // Fetch fresh data in background (don't block initialization)
-          get()
-            .fetchUserProfile()
-            .catch((error) => {
-              // Silently fail - user can refresh if needed
-            });
-          get()
-            .fetchUserApplications()
-            .catch((error) => {
-              // Silently fail - user can refresh if needed
-            });
+          // DO NOT fetch here - let pages fetch their own data to prevent loops
+          // Pages will fetch when they mount if needed
         } catch (parseError) {
           // Clear invalid stored data
           localStorage.removeItem('auth_token');
@@ -342,12 +333,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   fetchUserProfile: async () => {
+    // Prevent concurrent calls
+    if (get().isLoading) {
+      return;
+    }
+
     try {
-      set({ isLoading: true });
       const user = get().user;
 
       if (!user?.id) {
         throw new Error('User not authenticated');
+      }
+
+      // Only set loading if not already loading to prevent UI flicker
+      const wasLoading = get().isLoading;
+      if (!wasLoading) {
+        set({ isLoading: true });
       }
 
       const response = await apiClient.getUserProfile();
@@ -373,7 +374,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error: any) {
       throw error;
     } finally {
-      set({ isLoading: false });
+      // Only reset loading if we set it
+      if (!get().isLoading) {
+        set({ isLoading: false });
+      }
     }
   },
 
@@ -412,6 +416,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   fetchUserApplications: async () => {
+    // Prevent concurrent calls
+    const currentState = get();
+    if (currentState.isLoading && currentState.userApplications.length > 0) {
+      // Already loading and have data - don't refetch
+      return;
+    }
+
     try {
       const user = get().user;
 
@@ -425,7 +436,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error(response.error?.message || 'Failed to fetch applications');
       }
 
-      set({ userApplications: response.data });
+      set({ userApplications: response.data || [] });
     } catch (error: any) {
       throw error;
     }
