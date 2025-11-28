@@ -282,6 +282,29 @@ export class DocumentChecklistService {
     application: any
   ): Promise<void> {
     try {
+      // STEP 1: Check if checklist already exists - if so, skip AI generation
+      let storedChecklist = null;
+      try {
+        storedChecklist = await (prisma as any).documentChecklist?.findUnique({
+          where: { applicationId },
+        });
+      } catch {
+        // DocumentChecklist model may not exist yet
+        storedChecklist = null;
+      }
+
+      // If checklist already exists and is ready, skip generation
+      if (storedChecklist && storedChecklist.status === 'ready') {
+        logInfo(
+          '[Checklist][Async] Checklist already exists for application, skipping AI generation',
+          {
+            applicationId,
+            status: storedChecklist.status,
+          }
+        );
+        return; // Early return - do not call OpenAI
+      }
+
       // Get existing documents with full data
       const existingDocumentsMap = new Map(
         application.documents.map((doc: any) => [
@@ -403,7 +426,7 @@ export class DocumentChecklistService {
           });
 
           // STEP 2: Validate AI result - if too few items, treat as weak result and use fallback
-          const MIN_AI_ITEMS = 8;
+          const MIN_AI_ITEMS = 10; // Stricter minimum: 10 items required
           if (items.length < MIN_AI_ITEMS) {
             logWarn('[Checklist][AI] Weak AI result - too few items, using fallback', {
               applicationId,
@@ -1275,7 +1298,7 @@ Only return the JSON object, no other text.`;
           });
 
           // Validate AI result - if too few items, use fallback
-          const MIN_AI_ITEMS = 8;
+          const MIN_AI_ITEMS = 10; // Stricter minimum: 10 items required
           if (items.length < MIN_AI_ITEMS) {
             logWarn('[DocumentProgress] Weak AI result - too few items, using fallback', {
               applicationId,

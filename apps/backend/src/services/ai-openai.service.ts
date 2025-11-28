@@ -800,9 +800,9 @@ ${visaKb || 'No specific knowledge base available - use general requirements for
 ${documentGuidesText ? `\nDocument Guides:\n${documentGuidesText}` : ''}
 
 CRITICAL REMINDERS:
-- ALWAYS output 8-15 documents total
+- ALWAYS output 10-16 documents total (aim for 12-14 for optimal coverage)
 - ALWAYS include ALL THREE categories (required, highly_recommended, optional)
-- NEVER output fewer than 8 items
+- NEVER output fewer than 10 items
 - NEVER output only "required" items
 - Use correct country-specific terminology (I-20 for USA, LOA for Canada, CAS for UK, etc.)
 - All whereToObtain fields must be realistic for Uzbekistan
@@ -1027,12 +1027,12 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       }
 
       // STEP 3: Handle "too few items" gracefully - warn but don't fail
-      const MIN_ITEMS = 8;
-      const MAX_ITEMS = 15;
+      const MIN_ITEMS = 10; // Stricter minimum: 10 items required
+      const MAX_ITEMS = 16; // Increased maximum: 16 items allowed
       const itemCount = parsed.checklist.length;
 
       if (itemCount < MIN_ITEMS) {
-        logWarn('[OpenAI][Checklist] AI returned too few items, minimum 8 required', {
+        logWarn('[OpenAI][Checklist] AI returned too few items, minimum 10 required', {
           country,
           visaType,
           itemCount,

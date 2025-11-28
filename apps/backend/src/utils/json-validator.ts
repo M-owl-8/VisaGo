@@ -121,11 +121,11 @@ export function validateChecklistResponse(
   const items = parsed.checklist;
   const itemCount = items.length;
 
-  // Validate item count
-  if (itemCount < 8) {
-    errors.push(`Too few items: ${itemCount} (minimum 8 required)`);
-  } else if (itemCount > 15) {
-    warnings.push(`Too many items: ${itemCount} (maximum 15 recommended)`);
+  // Validate item count - stricter thresholds
+  if (itemCount < 10) {
+    errors.push(`Too few items: ${itemCount} (minimum 10 required)`);
+  } else if (itemCount > 16) {
+    warnings.push(`Too many items: ${itemCount} (maximum 16 recommended)`);
   }
 
   // Validate categories
