@@ -37,6 +37,15 @@ class ApiClient {
           }
         }
 
+        // Log request for debugging (only in browser console)
+        if (typeof window !== 'undefined') {
+          console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
+            baseURL: config.baseURL,
+            fullURL: `${config.baseURL}${config.url}`,
+            hasToken: !!localStorage.getItem('auth_token'),
+          });
+        }
+
         // Throttle requests to prevent 429 errors
         const endpoint = `${config.method?.toUpperCase()}_${config.url}`;
         const lastTime = this.lastRequestTime.get(endpoint) || 0;
@@ -60,8 +69,28 @@ class ApiClient {
 
     // Response interceptor for error handling
     this.api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // Log successful responses for debugging
+        if (typeof window !== 'undefined') {
+          console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+            status: response.status,
+            statusText: response.statusText,
+          });
+        }
+        return response;
+      },
       async (error: AxiosError) => {
+        // Log errors for debugging
+        if (typeof window !== 'undefined') {
+          console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            message: error.message,
+            responseData: error.response?.data,
+            requestURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown',
+          });
+        }
+
         if (error.response?.status === 401) {
           // Token expired or invalid - clear auth
           if (typeof window !== 'undefined') {
@@ -83,6 +112,15 @@ class ApiClient {
           (rateLimitError as any).isRateLimit = true;
           (rateLimitError as any).retryAfter = retryAfter ? parseInt(retryAfter, 10) : 5;
           return Promise.reject(rateLimitError);
+        }
+
+        // Handle network errors (no response)
+        if (!error.response) {
+          console.error('[API Error] Network error - no response from server', {
+            message: error.message,
+            code: error.code,
+            requestURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown',
+          });
         }
         
         return Promise.reject(error);

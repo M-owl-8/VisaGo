@@ -48,10 +48,18 @@ const getApiBaseUrl = (): string => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
-// Log the API URL being used (only in development)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  logger.debug('API configuration', {
-    baseUrl: API_BASE_URL,
-    endpoint: `${API_BASE_URL}/api`,
-  });
+// Log the API URL being used (always log in browser for debugging)
+if (typeof window !== 'undefined') {
+  console.log('[API Config] Using API base URL:', API_BASE_URL);
+  console.log('[API Config] Full API endpoint:', `${API_BASE_URL}/api`);
+  console.log('[API Config] NEXT_PUBLIC_API_URL env var:', process.env.NEXT_PUBLIC_API_URL || 'NOT SET');
+  
+  // Also log in development
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('API configuration', {
+      baseUrl: API_BASE_URL,
+      endpoint: `${API_BASE_URL}/api`,
+      envVar: process.env.NEXT_PUBLIC_API_URL || 'NOT SET',
+    });
+  }
 }
