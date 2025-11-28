@@ -66,16 +66,13 @@ export default function Error({
             {t('errors.tryAgain', 'Try again')}
           </Button>
 
-          <Button
-            variant="secondary"
-            asChild
-            className="flex items-center justify-center gap-2"
+          <Link
+            href="/applications"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 shadow-inner shadow-primary-600/10 transition-all hover:border-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 border border-primary-100"
           >
-            <Link href="/applications">
-              <Home size={18} />
-              {t('errors.goHome', 'Go home')}
-            </Link>
-          </Button>
+            <Home size={18} />
+            {t('errors.goHome', 'Go home')}
+          </Link>
         </div>
       </div>
     </div>

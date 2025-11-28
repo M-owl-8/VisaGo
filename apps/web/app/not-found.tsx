@@ -29,12 +29,13 @@ export default function NotFound() {
         </p>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button variant="primary" asChild className="flex items-center justify-center gap-2">
-            <Link href="/applications">
-              <Home size={18} />
-              {t('errors.goHome', 'Go home')}
-            </Link>
-          </Button>
+          <Link
+            href="/applications"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/30 transition-all hover:bg-primary-500 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+          >
+            <Home size={18} />
+            {t('errors.goHome', 'Go home')}
+          </Link>
 
           <Button
             variant="secondary"
