@@ -23,7 +23,7 @@ export function ChatMessageList({ messages, isLoading, isSending }: ChatMessageL
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <SkeletonList count={3} itemClassName="h-20" />
+        <SkeletonList items={3} />
       </div>
     );
   }

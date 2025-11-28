@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowUpRight, Upload } from 'lucide-react';
+import type { TFunction } from 'i18next';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils/cn';
@@ -11,7 +12,7 @@ interface ApplicationCardProps {
   application: Application;
   statusStyles: Record<string, { label: string; classes: string; chip: string }>;
   getStatusVariant: (status?: string) => { label: string; classes: string; chip: string };
-  t: (key: string, defaultValue?: string) => string;
+  t: TFunction<'translation', undefined>;
 }
 
 export function ApplicationCard({

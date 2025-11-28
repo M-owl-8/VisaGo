@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Clock, XCircle, Upload, Eye } from 'lucide-react';
 import Link from 'next/link';
+import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils/cn';
@@ -30,7 +31,7 @@ interface DocumentChecklistItemProps {
   };
   applicationId: string;
   language?: string;
-  t: (key: string, defaultValue?: string) => string;
+  t: TFunction<'translation', undefined>;
 }
 
 export function DocumentChecklistItem({
