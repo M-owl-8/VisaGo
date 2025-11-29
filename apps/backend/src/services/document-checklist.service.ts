@@ -91,6 +91,9 @@ export class DocumentChecklistService {
       });
 
       // Get stored checklist from database
+      // NOTE: DocumentChecklist is a Prisma model backed by a database table created via migration
+      // (Migration: 20251130042626_add_document_checklist)
+      // If you see "table does not exist" errors, check that migrations have been applied in production
       const storedChecklist = await prisma.documentChecklist.findUnique({
         where: { applicationId },
       });
