@@ -130,6 +130,7 @@ model VisaApplication {
   documents         UserDocument[]
   payment           Payment?
   checkpoints       Checkpoint[]
+  documentChecklist DocumentChecklist?  // FIXED: Added relation to DocumentChecklist
 
   @@unique([userId, countryId, visaTypeId])
   @@index([userId])
@@ -498,7 +499,6 @@ model Application {
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   country           Country   @relation(fields: [countryId], references: [id])
   visaType          VisaType  @relation(fields: [visaTypeId], references: [id])
-  documentChecklist DocumentChecklist?
 
   @@index([userId])
   @@index([status])
@@ -517,7 +517,9 @@ model DocumentChecklist {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  // FIXED: Point to VisaApplication (the table actually used by the API), not Application
+  // The API routes use prisma.visaApplication, so DocumentChecklist must reference VisaApplication
+  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
   @@index([status])
