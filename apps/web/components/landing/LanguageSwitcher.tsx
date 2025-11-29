@@ -6,19 +6,35 @@ import { Languages } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 export function LanguageSwitcher({ className }: { className?: string }) {
-  const { i18n, t } = useTranslation();
-  const [currentLang, setCurrentLang] = useState('en');
+  const { i18n } = useTranslation();
+  const [currentLang, setCurrentLang] = useState(i18n?.language || 'en');
 
+  // Update currentLang when i18n language changes (e.g., from other components)
   useEffect(() => {
     if (i18n) {
       setCurrentLang(i18n.language);
+      
+      // Listen for language changes to update state
+      const handleLanguageChanged = (lng: string) => {
+        setCurrentLang(lng);
+      };
+      
+      i18n.on('languageChanged', handleLanguageChanged);
+      
+      return () => {
+        i18n.off('languageChanged', handleLanguageChanged);
+      };
     }
   }, [i18n]);
 
-  const changeLanguage = (lang: string) => {
+  const changeLanguage = async (lang: string) => {
     if (!i18n) return;
-    i18n.changeLanguage(lang);
+    // Change language and wait for it to complete
+    // This will trigger 'languageChanged' event which updates all components
+    await i18n.changeLanguage(lang);
     setCurrentLang(lang);
+    // LanguageDetector will automatically save to localStorage with the configured key
+    // But we also save explicitly to ensure consistency
     if (typeof window !== 'undefined') {
       localStorage.setItem('app_language', lang);
     }
