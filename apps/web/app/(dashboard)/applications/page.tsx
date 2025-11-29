@@ -20,7 +20,7 @@ export default function ApplicationsPage() {
   const router = useRouter();
   const { user, isSignedIn, isLoading: authLoading } = useAuthStore();
   const { applications: userApplications, isLoading, isRefreshing, error, refetch, clearError } = useApplications({
-    autoFetch: isSignedIn,
+    autoFetch: isSignedIn && !authLoading,
   });
 
   // All hooks must be called before any early returns
