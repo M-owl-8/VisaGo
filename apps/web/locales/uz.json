@@ -96,10 +96,21 @@
   },
   "chat": {
     "aiAssistant": "AI yordamchi",
+    "inlineTitle": "Yordam kerakmi?",
     "messagePlaceholder": "Savolingizni kiriting...",
     "send": "Yuborish",
     "sending": "Yuborilmoqda...",
-    "noMessages": "Xabarlar yo'q"
+    "noMessages": "Xabarlar yo'q",
+    "subtitle": "Vizangiz, hujjatlar va talablar haqida savollar bering.",
+    "emptyStateTitle": "Suhbatni boshlang",
+    "emptyStateSubtitle": "Viza talablari, hujjatlar ro'yxati yoki ariza jarayonlari haqida menga istalgan savolni bering.",
+    "inputHint": "Yuborish uchun Enter, yangi qator uchun Shift+Enter bosing",
+    "quickAction1": "Mening hujjatlar ro'yxatini tushuntiring",
+    "quickAction2": "Qanday hujjatlar kerak?",
+    "quickAction2WithCountry": "{{country}} uchun qanday hujjatlar kerak?",
+    "quickAction3": "Tasdiqlanish imkoniyatini qanday oshirish mumkin?",
+    "quickAction4": "Viza arizasidagi keng tarqalgan xatolar qanday?",
+    "quickAction5": "Viza ko'rib chiqish qancha vaqt oladi?"
   },
   "profile": {
     "profile": "Profil",
