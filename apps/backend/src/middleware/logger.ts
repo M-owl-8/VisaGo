@@ -160,11 +160,17 @@ export function errorLogger(err: Error, req: Request, res: Response, next: NextF
  */
 function shouldLog(level: LogLevel): boolean {
   const envConfig = getEnvConfig();
-  const configuredLevel = (envConfig.LOG_LEVEL || 'INFO') as LogLevel;
+  // Normalize LOG_LEVEL to uppercase to handle case-insensitive matching
+  const configuredLevel = (envConfig.LOG_LEVEL?.toUpperCase() || 'INFO') as LogLevel;
 
   const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
   const configuredIndex = levels.indexOf(configuredLevel);
   const entryIndex = levels.indexOf(level);
+
+  // If configured level is not found, default to INFO
+  if (configuredIndex === -1) {
+    return entryIndex >= levels.indexOf(LogLevel.INFO);
+  }
 
   return entryIndex >= configuredIndex;
 }
@@ -190,7 +196,8 @@ function logRequest(entry: Partial<LogEntry>): void {
   };
 
   const logString = JSON.stringify(logEntry);
-  console.log(logString);
+  // Use process.stdout.write to ensure immediate flush on Railway
+  process.stdout.write(logString + '\n');
 
   // Write to file if enabled
   const logWriter = getLogWriter();
@@ -229,11 +236,11 @@ function logResponse(entry: Partial<LogEntry>): void {
   };
 
   const logString = JSON.stringify(logEntry);
-
+  // Use process.stdout.write to ensure immediate flush on Railway
   if (level === LogLevel.WARN) {
-    console.warn(logString);
+    process.stderr.write(logString + '\n');
   } else {
-    console.log(logString);
+    process.stdout.write(logString + '\n');
   }
 
   // Write to file if enabled
@@ -267,7 +274,8 @@ function logErrorEntry(entry: Partial<LogEntry>): void {
   };
 
   const logString = JSON.stringify(logEntry);
-  console.error(logString);
+  // Use process.stderr.write to ensure immediate flush on Railway
+  process.stderr.write(logString + '\n');
 
   // Write to file if enabled
   const logWriter = getLogWriter();
@@ -343,7 +351,8 @@ export function logDebug(message: string, metadata?: Record<string, unknown>): v
 
   const entry = createLogEntry(LogLevel.DEBUG, message, metadata);
   const logString = JSON.stringify(entry);
-  console.debug(logString);
+  // Use process.stdout.write to ensure immediate flush on Railway
+  process.stdout.write(logString + '\n');
 
   // Write to file if enabled
   const logWriter = getLogWriter();
@@ -365,7 +374,8 @@ export function logInfo(message: string, metadata?: Record<string, unknown>): vo
 
   const entry = createLogEntry(LogLevel.INFO, message, metadata);
   const logString = JSON.stringify(entry);
-  console.log(logString);
+  // Use process.stdout.write to ensure immediate flush on Railway
+  process.stdout.write(logString + '\n');
 
   // Write to file if enabled
   const logWriter = getLogWriter();
@@ -387,7 +397,8 @@ export function logWarn(message: string, metadata?: Record<string, unknown>): vo
 
   const entry = createLogEntry(LogLevel.WARN, message, metadata);
   const logString = JSON.stringify(entry);
-  console.warn(logString);
+  // Use process.stderr.write to ensure immediate flush on Railway
+  process.stderr.write(logString + '\n');
 
   // Write to file if enabled
   const logWriter = getLogWriter();
@@ -418,7 +429,8 @@ export function logError(message: string, error?: Error, metadata?: Record<strin
   };
 
   const logString = JSON.stringify(entry);
-  console.error(logString);
+  // Use process.stderr.write to ensure immediate flush on Railway
+  process.stderr.write(logString + '\n');
 
   // Write to file if enabled
   const logWriter = getLogWriter();
