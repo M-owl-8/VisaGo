@@ -410,7 +410,7 @@ router.get('/sessions', async (req: Request, res: Response) => {
 
 /**
  * GET /api/chat/sessions/:sessionId
- * Get specific session details with all messages
+ * Get specific session details with message history (last N messages, default 100)
  */
 router.get('/sessions/:sessionId', async (req: Request, res: Response) => {
   try {
@@ -424,8 +424,19 @@ router.get('/sessions/:sessionId', async (req: Request, res: Response) => {
       });
     }
     const { sessionId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 100;
 
-    const session = await ChatService.getSessionDetails(sessionId, userId);
+    // Validate limit (max 1000 to prevent abuse)
+    if (limit > 1000) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Limit cannot exceed 1000',
+        },
+      });
+    }
+
+    const session = await ChatService.getSessionDetails(sessionId, userId, limit);
 
     res.json({
       success: true,

@@ -594,26 +594,22 @@ User's Current Visa Application:
   }
 
   /**
-   * Get session details
+   * Get session details with message history
+   * @param sessionId - Session ID
+   * @param userId - User ID for authorization
+   * @param limit - Maximum number of messages to return (default: 100)
    */
-  async getSessionDetails(sessionId: string, userId: string) {
+  async getSessionDetails(sessionId: string, userId: string, limit: number = 100) {
     const session = await prisma.chatSession.findFirst({
       where: { id: sessionId, userId },
-      include: {
-        messages: {
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            role: true,
-            content: true,
-            sources: true,
-            model: true,
-            tokensUsed: true,
-            responseTime: true,
-            feedback: true,
-            createdAt: true,
-          },
-        },
+      select: {
+        id: true,
+        userId: true,
+        applicationId: true,
+        title: true,
+        systemPrompt: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -621,7 +617,31 @@ User's Current Visa Application:
       throw new Error('Session not found');
     }
 
-    return session;
+    // Get messages ordered by createdAt DESC (newest first), then take last N and reverse
+    const messages = await prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        sources: true,
+        model: true,
+        tokensUsed: true,
+        responseTime: true,
+        feedback: true,
+        createdAt: true,
+      },
+    });
+
+    // Reverse to get oldest → newest order for client
+    const orderedMessages = messages.reverse();
+
+    return {
+      ...session,
+      messages: orderedMessages,
+    };
   }
 
   /**

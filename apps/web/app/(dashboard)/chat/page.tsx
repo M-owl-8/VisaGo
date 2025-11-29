@@ -40,11 +40,11 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [lastFailedMessage, setLastFailedMessage] = useState<string>('');
 
-  // Load chat history when component mounts or applicationId changes
+  // Load chat history when component mounts or applicationId changes (last 100 messages)
   useEffect(() => {
     if (isSignedIn) {
       setCurrentApplication(applicationId || null);
-      loadChatHistory(applicationId);
+      loadChatHistory(applicationId, 100);
     }
   }, [isSignedIn, applicationId, setCurrentApplication, loadChatHistory]);
 

@@ -16,11 +16,12 @@ interface ChatState {
   isLoading: boolean;
   error: string | null;
   currentApplicationId: string | null;
+  currentSessionId: string | null;
 
   // Actions
   setCurrentApplication: (applicationId: string | null) => void;
   sendMessage: (content: string, applicationId?: string) => Promise<void>;
-  loadChatHistory: (applicationId?: string) => Promise<void>;
+  loadChatHistory: (applicationId?: string, limit?: number) => Promise<void>;
   clearMessages: () => void;
 }
 
@@ -29,6 +30,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   error: null,
   currentApplicationId: null,
+  currentSessionId: null,
 
   setCurrentApplication: (applicationId: string | null) => {
     set({ currentApplicationId: applicationId });
@@ -116,7 +118,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  loadChatHistory: async (applicationId?: string) => {
+  loadChatHistory: async (applicationId?: string, limit: number = 100) => {
     // Prevent concurrent calls
     if (get().isLoading) {
       return;
@@ -125,7 +127,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
 
-      const response = await apiClient.getChatHistory(applicationId);
+      // First, get or find the session for this applicationId
+      let sessionId = get().currentSessionId;
+      
+      if (!sessionId) {
+        // Get user sessions to find the one for this applicationId
+        const sessionsResponse = await apiClient.getChatSessions(100, 0);
+        if (sessionsResponse.success && sessionsResponse.data?.sessions) {
+          const sessions = sessionsResponse.data.sessions;
+          // Find session matching applicationId (or general chat if no applicationId)
+          const matchingSession = sessions.find((s: any) => 
+            applicationId ? s.applicationId === applicationId : !s.applicationId
+          );
+          if (matchingSession) {
+            sessionId = matchingSession.id;
+            set({ currentSessionId: sessionId });
+          }
+        }
+      }
+
+      // If we have a sessionId, use the session-based endpoint for cross-platform sync
+      if (sessionId) {
+        const sessionResponse = await apiClient.getChatSessionDetails(sessionId, limit);
+        if (sessionResponse.success && sessionResponse.data) {
+          const sessionData = sessionResponse.data;
+          const historyData = sessionData.messages || [];
+          const messages: ChatMessage[] = historyData.map((msg: any) => ({
+            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+            role: msg.role || 'user',
+            content: msg.content || msg.message || '',
+            timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
+            sources: msg.sources,
+            tokens_used: msg.tokens_used,
+            model: msg.model,
+          }));
+          set({ messages, error: null, currentSessionId: sessionId });
+          return;
+        }
+      }
+
+      // Fallback to the old endpoint if no session found (for backward compatibility)
+      const response = await apiClient.getChatHistory(applicationId, limit);
 
       // Handle empty history gracefully - backend returns empty array if no session
       if (!response.success) {

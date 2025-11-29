@@ -95,8 +95,8 @@ export const useChatStore = create<ChatStore>()(
       isSending: false,
       error: null,
 
-      // Load chat history
-      loadChatHistory: async (applicationId?: string, limit = 50) => {
+      // Load chat history (last 100 messages for cross-platform sync)
+      loadChatHistory: async (applicationId?: string, limit = 100) => {
         try {
           set({isLoading: true, error: null});
 
@@ -110,13 +110,133 @@ export const useChatStore = create<ChatStore>()(
             return;
           }
 
+          // First, try to get or find the session for this applicationId
+          let sessionId = _get().currentSessionId;
+
+          if (!sessionId) {
+            // Get user sessions to find the one for this applicationId
+            const sessionsResponse = await apiClient.getChatSessions(100, 0);
+            if (sessionsResponse.success && sessionsResponse.data?.sessions) {
+              const sessions = sessionsResponse.data.sessions;
+              // Find session matching applicationId (or general chat if no applicationId)
+              const matchingSession = sessions.find((s: any) =>
+                applicationId
+                  ? s.applicationId === applicationId
+                  : !s.applicationId,
+              );
+              if (matchingSession) {
+                sessionId = matchingSession.id;
+                set({currentSessionId: sessionId});
+              }
+            }
+          }
+
+          // If we have a sessionId, use the session-based endpoint for cross-platform sync
+          if (sessionId) {
+            const sessionResponse = await apiClient.getSessionDetails(
+              sessionId,
+              limit,
+            );
+            if (sessionResponse.success && sessionResponse.data) {
+              const sessionData = sessionResponse.data;
+              const serverMessages = sessionData.messages || [];
+
+              const key = applicationId || 'general';
+              set(state => {
+                const existingConversation = state.conversations[key];
+
+                // If we have optimistic updates (messages with status 'sending'), preserve them
+                if (
+                  existingConversation &&
+                  existingConversation.messages.length > 0
+                ) {
+                  const optimisticMessages =
+                    existingConversation.messages.filter(
+                      msg => msg.status === 'sending' || msg.status === 'error',
+                    );
+
+                  // Merge: server messages + optimistic messages that aren't on server yet
+                  const serverMessageIds = new Set(
+                    serverMessages.map((m: any) => m.id),
+                  );
+                  const optimisticToAdd = optimisticMessages.filter(
+                    msg => !serverMessageIds.has(msg.id),
+                  );
+
+                  // Combine all messages and deduplicate by ID
+                  const allMessages = [...serverMessages, ...optimisticToAdd];
+                  const messageMap = new Map();
+                  allMessages.forEach((msg: any) => {
+                    const existing = messageMap.get(msg.id);
+                    if (
+                      !existing ||
+                      new Date(msg.createdAt || msg.timestamp || 0) >
+                        new Date(existing.createdAt || existing.timestamp || 0)
+                    ) {
+                      messageMap.set(msg.id, msg);
+                    }
+                  });
+
+                  // Convert back to array and sort by createdAt
+                  const mergedMessages = Array.from(messageMap.values()).sort(
+                    (a: any, b: any) =>
+                      new Date(a.createdAt || a.timestamp || 0).getTime() -
+                      new Date(b.createdAt || b.timestamp || 0).getTime(),
+                  );
+
+                  const mergedConversation = {
+                    messages: mergedMessages,
+                    total: mergedMessages.length,
+                    limit,
+                    offset: 0,
+                  };
+
+                  return {
+                    conversations: {
+                      ...state.conversations,
+                      [key]: mergedConversation,
+                    },
+                    currentConversation: mergedConversation,
+                    currentApplicationId: applicationId || null,
+                    currentSessionId: sessionId,
+                    isLoading: false,
+                  };
+                }
+
+                // No existing conversation, use server data as-is
+                const conversation = {
+                  messages: serverMessages,
+                  total: serverMessages.length,
+                  limit,
+                  offset: 0,
+                };
+
+                return {
+                  conversations: {
+                    ...state.conversations,
+                    [key]: conversation,
+                  },
+                  currentConversation: conversation,
+                  currentApplicationId: applicationId || null,
+                  currentSessionId: sessionId,
+                  isLoading: false,
+                };
+              });
+              return;
+            }
+          }
+
+          // Fallback to the old endpoint if no session found (for backward compatibility)
           const response = await apiClient.getChatHistory(applicationId, limit);
 
           if (response.success) {
             const key = applicationId || 'general';
             set(state => {
               const existingConversation = state.conversations[key];
-              const serverMessages = response.data.messages || [];
+              // Backend returns array directly or wrapped in messages property
+              const serverMessages = Array.isArray(response.data)
+                ? response.data
+                : response.data?.messages || [];
 
               // If we have optimistic updates (messages with status 'sending'), preserve them
               if (

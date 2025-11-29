@@ -1701,8 +1701,13 @@ class ApiClient {
     return response.data;
   }
 
-  async getSessionDetails(sessionId: string): Promise<ApiResponse> {
-    const response = await this.api.get(`/chat/sessions/${sessionId}`);
+  async getSessionDetails(
+    sessionId: string,
+    limit: number = 100,
+  ): Promise<ApiResponse> {
+    const response = await this.api.get(`/chat/sessions/${sessionId}`, {
+      params: {limit},
+    });
     return response.data;
   }
 

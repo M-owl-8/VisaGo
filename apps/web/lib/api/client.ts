@@ -433,6 +433,13 @@ class ApiClient {
     return response.data;
   }
 
+  async getChatSessionDetails(sessionId: string, limit: number = 100): Promise<ApiResponse> {
+    const response = await this.api.get(`/chat/sessions/${sessionId}`, {
+      params: { limit },
+    });
+    return response.data;
+  }
+
   // ============================================================================
   // USER ENDPOINTS
   // ============================================================================

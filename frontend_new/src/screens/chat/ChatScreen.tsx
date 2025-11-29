@@ -130,7 +130,7 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
           try {
             const {useChatStore} = require('../../store/chat');
             const chatStore = useChatStore.getState();
-            await chatStore.loadChatHistory(applicationId);
+            await chatStore.loadChatHistory(applicationId, 100); // Load last 100 messages for cross-platform sync
 
             // Merge backend messages with local messages (backend is source of truth)
             const backendConversation = chatStore.currentConversation;
