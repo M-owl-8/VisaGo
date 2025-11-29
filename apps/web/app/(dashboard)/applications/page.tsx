@@ -56,8 +56,13 @@ export default function ApplicationsPage() {
       .slice(0, 4);
   }, [userApplications, t]);
 
+  // Show loading while checking auth
+  if (authLoading) {
+    return <div className="py-10">{renderSkeleton()}</div>;
+  }
+
   // Redirect if not signed in (after all hooks)
-  if (!authLoading && !isSignedIn) {
+  if (!isSignedIn) {
     router.push('/login');
     return null;
   }
