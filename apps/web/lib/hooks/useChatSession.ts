@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { getErrorMessage } from '../utils/errorMessages';
 import { useTranslation } from 'react-i18next';
@@ -31,9 +31,16 @@ export function useChatSession(
 ): UseChatSessionResult {
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const shouldAutoFetch = options?.autoFetch !== false;
+  const [isLoading, setIsLoading] = useState<boolean>(shouldAutoFetch);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Use refs to avoid recreating callbacks when options change
+  const onErrorRef = useRef(options?.onError);
+  useEffect(() => {
+    onErrorRef.current = options?.onError;
+  }, [options?.onError]);
 
   const fetchHistory = useCallback(
     async (isRefresh = false) => {
@@ -77,8 +84,8 @@ export function useChatSession(
           const errorMsg = getErrorMessage(response.error || {}, t, i18n.language);
           const finalError = errorMsg || t('errors.failedToLoadChatHistory', 'Failed to load chat history');
           setError(finalError);
-          if (options?.onError) {
-            options.onError(finalError);
+          if (onErrorRef.current) {
+            onErrorRef.current(finalError);
           }
         }
       } catch (err: any) {
@@ -92,25 +99,28 @@ export function useChatSession(
         const errorMsg = getErrorMessage(err, t, i18n.language);
         const finalError = errorMsg || t('errors.failedToLoadChatHistory', 'Failed to load chat history');
         setError(finalError);
-        if (options?.onError) {
-          options.onError(finalError);
+        if (onErrorRef.current) {
+          onErrorRef.current(finalError);
         }
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     },
-    [applicationId, t, i18n.language, options]
+    [applicationId, t, i18n.language]
   );
 
   const loadHistory = useCallback(() => fetchHistory(true), [fetchHistory]);
   const clearError = useCallback(() => setError(null), []);
 
+  // Only fetch when autoFetch is enabled and applicationId changes
   useEffect(() => {
-    if (options?.autoFetch !== false) {
+    if (shouldAutoFetch) {
       fetchHistory(false);
+    } else {
+      setIsLoading(false);
     }
-  }, [applicationId, fetchHistory, options?.autoFetch]);
+  }, [applicationId, shouldAutoFetch, fetchHistory]);
 
   return {
     messages,
