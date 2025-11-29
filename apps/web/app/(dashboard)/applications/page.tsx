@@ -56,6 +56,22 @@ export default function ApplicationsPage() {
       .slice(0, 4);
   }, [userApplications, t]);
 
+  // Define renderSkeleton before it's used
+  const renderSkeleton = () => (
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
+      <SkeletonCard className="h-48" />
+      <div className="grid gap-4 md:grid-cols-3">
+        {[...Array(3)].map((_, idx) => (
+          <Skeleton key={`metric-${idx}`} className="h-32" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+        <Skeleton className="h-72" />
+        <Skeleton className="h-72" />
+      </div>
+    </div>
+  );
+
   // Show loading while checking auth
   if (authLoading) {
     return <div className="py-10">{renderSkeleton()}</div>;
@@ -100,21 +116,6 @@ export default function ApplicationsPage() {
     const normalized = status.toLowerCase().replace(/\s+/g, '_');
     return statusStyles[normalized] ?? statusStyles.in_progress;
   };
-
-  const renderSkeleton = () => (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
-      <SkeletonCard className="h-48" />
-      <div className="grid gap-4 md:grid-cols-3">
-        {[...Array(3)].map((_, idx) => (
-          <Skeleton key={`metric-${idx}`} className="h-32" />
-        ))}
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-        <Skeleton className="h-72" />
-        <Skeleton className="h-72" />
-      </div>
-    </div>
-  );
 
   // Loading state
   if (isLoading && !isRefreshing) {

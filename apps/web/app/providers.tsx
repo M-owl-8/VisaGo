@@ -52,7 +52,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, []); // Empty deps - only run once on mount
+  }, [initializeApp]); // Include initializeApp - Zustand selector returns stable reference
 
   // Prevent hydration mismatch and ensure i18n is ready before rendering
   if (!mounted || !i18nReady) {
