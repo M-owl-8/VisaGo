@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { getErrorMessage } from '../utils/errorMessages';
 import { useTranslation } from 'react-i18next';
@@ -71,9 +71,16 @@ export function useApplication(
   const { t, i18n } = useTranslation();
   const [application, setApplication] = useState<ApplicationDetail | null>(null);
   const [checklist, setChecklist] = useState<DocumentChecklist | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const shouldAutoFetch = options?.autoFetch !== false;
+  const [isLoading, setIsLoading] = useState(shouldAutoFetch);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Use ref for onError callback to avoid dependency issues
+  const onErrorRef = useRef(options?.onError);
+  useEffect(() => {
+    onErrorRef.current = options?.onError;
+  }, [options?.onError]);
 
   const fetchApplication = useCallback(
     async (isRefresh = false) => {
@@ -102,8 +109,8 @@ export function useApplication(
           const errorMsg = getErrorMessage(appRes.error || {}, t, i18n.language);
           const finalError = errorMsg || t('errors.failedToLoadApplication', 'Failed to load application');
           setError(finalError);
-          if (options?.onError) {
-            options.onError(finalError);
+          if (onErrorRef.current) {
+            onErrorRef.current(finalError);
           }
         }
 
@@ -128,25 +135,27 @@ export function useApplication(
         const errorMsg = getErrorMessage(err, t, i18n.language);
         const finalError = errorMsg || t('errors.failedToLoadApplication', 'Failed to load application');
         setError(finalError);
-        if (options?.onError) {
-          options.onError(finalError);
+        if (onErrorRef.current) {
+          onErrorRef.current(finalError);
         }
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     },
-    [applicationId, t, i18n.language, options]
+    [applicationId, t, i18n.language]
   );
 
   const refetch = useCallback(() => fetchApplication(true), [fetchApplication]);
   const clearError = useCallback(() => setError(null), []);
 
   useEffect(() => {
-    if (options?.autoFetch !== false && applicationId) {
+    if (shouldAutoFetch && applicationId) {
       fetchApplication(false);
+    } else {
+      setIsLoading(false);
     }
-  }, [applicationId, fetchApplication, options?.autoFetch]);
+  }, [applicationId, shouldAutoFetch, fetchApplication]);
 
   return {
     application,
