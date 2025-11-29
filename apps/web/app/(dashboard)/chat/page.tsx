@@ -46,7 +46,8 @@ export default function ChatPage() {
       setCurrentApplication(applicationId || null);
       loadChatHistory(applicationId, 100);
     }
-  }, [isSignedIn, applicationId, setCurrentApplication, loadChatHistory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, applicationId]); // loadChatHistory and setCurrentApplication are stable Zustand functions
 
   // Redirect if not signed in
   if (!isSignedIn) {

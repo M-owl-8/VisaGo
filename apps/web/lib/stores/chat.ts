@@ -131,18 +131,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       let sessionId = get().currentSessionId;
       
       if (!sessionId) {
-        // Get user sessions to find the one for this applicationId
-        const sessionsResponse = await apiClient.getChatSessions(100, 0);
-        if (sessionsResponse.success && sessionsResponse.data?.sessions) {
-          const sessions = sessionsResponse.data.sessions;
-          // Find session matching applicationId (or general chat if no applicationId)
-          const matchingSession = sessions.find((s: any) => 
-            applicationId ? s.applicationId === applicationId : !s.applicationId
-          );
-          if (matchingSession) {
-            sessionId = matchingSession.id;
-            set({ currentSessionId: sessionId });
+        try {
+          // Get user sessions to find the one for this applicationId
+          const sessionsResponse = await apiClient.getChatSessions(100, 0);
+          if (sessionsResponse.success && sessionsResponse.data?.sessions) {
+            const sessions = sessionsResponse.data.sessions;
+            // Find session matching applicationId (or general chat if no applicationId)
+            const matchingSession = sessions.find((s: any) => 
+              applicationId ? s.applicationId === applicationId : !s.applicationId
+            );
+            if (matchingSession?.id) {
+              sessionId = matchingSession.id;
+              set({ currentSessionId: sessionId });
+            }
           }
+        } catch (sessionsError) {
+          // If getting sessions fails, continue with fallback endpoint
+          console.warn('Failed to get sessions, using fallback:', sessionsError);
         }
       }
 
@@ -152,15 +157,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (sessionResponse.success && sessionResponse.data) {
           const sessionData = sessionResponse.data;
           const historyData = sessionData.messages || [];
-          const messages: ChatMessage[] = historyData.map((msg: any) => ({
-            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-            role: msg.role || 'user',
-            content: msg.content || msg.message || '',
-            timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
-            sources: msg.sources,
-            tokens_used: msg.tokens_used,
-            model: msg.model,
-          }));
+          const messages: ChatMessage[] = historyData.map((msg: any) => {
+            // Parse sources if it's a JSON string
+            let sources = msg.sources;
+            if (typeof sources === 'string') {
+              try {
+                sources = JSON.parse(sources);
+              } catch {
+                sources = [];
+              }
+            }
+            if (!Array.isArray(sources)) {
+              sources = [];
+            }
+            
+            return {
+              id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+              role: msg.role || 'user',
+              content: msg.content || msg.message || '',
+              timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
+              sources,
+              tokens_used: msg.tokens_used || msg.tokensUsed || 0,
+              model: msg.model || 'gpt-4',
+            };
+          });
           set({ messages, error: null, currentSessionId: sessionId });
           return;
         }
@@ -183,15 +203,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Transform backend messages to ChatMessage format
       // Backend returns array directly, not wrapped in messages property
       const historyData = Array.isArray(response.data) ? response.data : (response.data?.messages || []);
-      const messages: ChatMessage[] = historyData.map((msg: any) => ({
-        id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-        role: msg.role || 'user',
-        content: msg.content || msg.message || '',
-        timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
-        sources: msg.sources,
-        tokens_used: msg.tokens_used,
-        model: msg.model,
-      }));
+      const messages: ChatMessage[] = historyData.map((msg: any) => {
+        // Parse sources if it's a JSON string
+        let sources = msg.sources;
+        if (typeof sources === 'string') {
+          try {
+            sources = JSON.parse(sources);
+          } catch {
+            sources = [];
+          }
+        }
+        if (!Array.isArray(sources)) {
+          sources = [];
+        }
+        
+        return {
+          id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+          role: msg.role || 'user',
+          content: msg.content || msg.message || '',
+          timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
+          sources,
+          tokens_used: msg.tokens_used || msg.tokensUsed || 0,
+          model: msg.model || 'gpt-4',
+        };
+      });
 
       set({ messages, error: null });
     } catch (error: any) {
