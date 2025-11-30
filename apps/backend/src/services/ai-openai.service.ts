@@ -78,7 +78,7 @@ export class AIOpenAIService {
       }
       AIOpenAIService.openai = new OpenAI({
         apiKey,
-        timeout: 30000, // HIGH PRIORITY FIX: 30 second timeout (reduced from 60s to prevent slow GPT responses)
+        timeout: 35000, // 35 second timeout for checklist generation (within 30-40s range)
       });
       AIOpenAIService.prisma = prisma;
       logInfo('[OpenAI] Service initialized', {
@@ -425,8 +425,468 @@ If you don't know something, say so clearly and suggest how to find the informat
   }
 
   /**
+   * Check if hybrid checklist generation is enabled for this country+visa type
+   * Hybrid mode: Rule engine decides documents, GPT-4 only enriches
+   * Legacy mode: GPT-4 decides everything (old behavior)
+   */
+  private static isHybridChecklistEnabled(countryCode: string, visaType: string): boolean {
+    const { findVisaDocumentRuleSet } = require('../data/visaDocumentRules');
+    const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
+    return !!ruleSet;
+  }
+
+  /**
+   * Build system prompt for hybrid mode
+   * GPT-4 is NOT allowed to add or remove documents, only enrich with descriptions
+   */
+  private static buildHybridSystemPrompt(
+    country: string,
+    visaType: string,
+    visaKb: string
+  ): string {
+    return `You are a visa document checklist ENRICHMENT assistant specialized for Uzbek applicants.
+
+CRITICAL: You are NOT allowed to add or remove documents. The document list is FINAL and determined by rules.
+
+Your task:
+Given a list of document types (with category and required status already determined), you must ONLY enrich each document with:
+- Human-readable names (EN/UZ/RU)
+- Descriptions explaining what the document is and why it's needed (EN/UZ/RU)
+- Instructions on where to obtain the document in Uzbekistan (EN/UZ/RU)
+
+RULES:
+- You MUST output exactly the same documentType values you receive as input
+- You MUST NOT add new documents
+- You MUST NOT remove documents
+- You MUST NOT change category or required status
+- Each documentType must have complete name, description, and whereToObtain in EN, UZ, and RU
+- Use correct country-specific terminology:
+  * USA student: "Form I-20" (NOT "LOA")
+  * Canada student: "Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)" (NOT "I-20")
+  * Schengen: "Travel health insurance" covering at least 30,000 EUR
+- Uzbekistan context is ALWAYS assumed:
+  - Passport = Uzbek biometric passport
+  - Bank statements = Uzbek banks
+  - Income certificates = Uzbek employers/government
+  - Documents may be in Uzbek or Russian
+
+OUTPUT FORMAT:
+You MUST return valid JSON with this exact structure:
+{
+  "checklist": [
+    {
+      "documentType": "passport",  // MUST match input exactly
+      "category": "required",      // MUST match input exactly
+      "required": true,            // MUST match input exactly
+      "name": "Valid Passport",
+      "nameUz": "Yaroqli Pasport",
+      "nameRu": "Действительный Паспорт",
+      "description": "Passport valid for at least 6 months beyond intended stay",
+      "descriptionUz": "Kamida 6 oy muddati qolgan yaroqli pasport",
+      "descriptionRu": "Действительный паспорт со сроком действия не менее 6 месяцев",
+      "whereToObtain": "Apply at migration service or internal affairs office",
+      "whereToObtainUz": "Migratsiya xizmatiga yoki Ichki ishlar organlariga murojaat qiling",
+      "whereToObtainRu": "Обратитесь в службу миграции или органы внутренних дел"
+    }
+  ]
+}
+
+NO markdown, NO extra text, ONLY valid JSON.`;
+  }
+
+  /**
+   * Build user prompt for hybrid mode
+   * Includes base checklist and context
+   */
+  private static buildHybridUserPrompt(
+    userContext: any,
+    country: string,
+    visaType: string,
+    baseChecklist: Array<{ documentType: string; category: string; required: boolean }>,
+    visaKb: string,
+    documentGuidesText: string
+  ): string {
+    const summary = userContext.questionnaireSummary;
+    const riskScore = userContext.riskScore;
+
+    // Extract key info
+    const sponsorType = summary?.sponsorType || 'self';
+    const duration = summary?.duration || summary?.travelInfo?.duration || 'Not specified';
+    const hasTravelHistory = summary?.hasInternationalTravel ?? false;
+    const previousRefusals = summary?.previousVisaRejections ?? false;
+    const bankBalance = summary?.bankBalanceUSD || summary?.financialInfo?.selfFundsUSD;
+
+    return `Enrich the following document checklist with names, descriptions, and whereToObtain instructions.
+
+Destination Country: ${country}
+Visa Type: ${visaType}
+Sponsor: ${sponsorType}
+Duration: ${duration}
+Travel History: ${hasTravelHistory ? 'Has previous travel' : 'No previous international travel'}
+Previous Refusals: ${previousRefusals ? 'Yes' : 'No'}
+Financial Capacity: ${bankBalance ? `~$${bankBalance}` : 'Not specified'}
+Risk Score: ${riskScore ? `${riskScore.probabilityPercent}% (${riskScore.level})` : 'Not calculated'}
+
+Knowledge Base Context:
+${visaKb || 'No specific knowledge base available.'}
+
+${documentGuidesText ? `Document Guides:\n${documentGuidesText}` : ''}
+
+BASE DOCUMENT LIST (you MUST enrich these exact documents, no additions or removals):
+${JSON.stringify(
+  baseChecklist.map((item) => ({
+    documentType: item.documentType,
+    category: item.category,
+    required: item.required,
+  })),
+  null,
+  2
+)}
+
+CRITICAL REMINDERS:
+- Output EXACTLY these ${baseChecklist.length} documents, no more, no less
+- Keep documentType, category, and required EXACTLY as shown above
+- Generate complete EN, UZ, RU translations for name, description, and whereToObtain
+- Use correct country-specific terminology
+- All whereToObtain fields must be realistic for Uzbekistan
+
+Return ONLY valid JSON matching the schema, no other text, no markdown, no comments.`;
+  }
+
+  /**
+   * Parse hybrid response from GPT-4
+   */
+  private static parseHybridResponse(
+    rawContent: string,
+    baseChecklist: Array<{ documentType: string; category: string; required: boolean }>,
+    country: string,
+    visaType: string
+  ): any {
+    try {
+      // Extract JSON from response
+      let jsonText = rawContent.trim();
+      if (jsonText.includes('```json')) {
+        const start = jsonText.indexOf('```json') + 7;
+        const end = jsonText.indexOf('```', start);
+        if (end !== -1) {
+          jsonText = jsonText.substring(start, end).trim();
+        }
+      } else if (jsonText.includes('```')) {
+        const start = jsonText.indexOf('```') + 3;
+        const end = jsonText.indexOf('```', start);
+        if (end !== -1) {
+          jsonText = jsonText.substring(start, end).trim();
+        }
+      }
+
+      // Find JSON object
+      if (jsonText.includes('{')) {
+        const start = jsonText.indexOf('{');
+        const end = jsonText.lastIndexOf('}') + 1;
+        if (end > start) {
+          jsonText = jsonText.substring(start, end);
+        }
+      }
+
+      const parsed = JSON.parse(jsonText);
+
+      if (!parsed.checklist || !Array.isArray(parsed.checklist)) {
+        return null;
+      }
+
+      return parsed;
+    } catch (error) {
+      logError('[OpenAI][Checklist] Hybrid mode JSON parse error', error as Error, {
+        country,
+        visaType,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Validate hybrid response matches base checklist
+   */
+  private static validateHybridResponse(
+    gptChecklist: any[],
+    baseChecklist: Array<{ documentType: string; category: string; required: boolean }>
+  ): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    const baseDocTypes = new Set(baseChecklist.map((b) => b.documentType));
+    const gptDocTypes = new Set(gptChecklist.map((g: any) => g.documentType || g.document));
+
+    // Check for missing documents
+    for (const baseDoc of baseChecklist) {
+      if (!gptDocTypes.has(baseDoc.documentType)) {
+        errors.push(`Missing document: ${baseDoc.documentType}`);
+      }
+    }
+
+    // Check for extra documents
+    for (const gptDoc of gptChecklist) {
+      const docType = gptDoc.documentType || gptDoc.document;
+      if (!baseDocTypes.has(docType)) {
+        errors.push(`Extra document: ${docType}`);
+      }
+    }
+
+    // Check category/required matches
+    for (const gptItem of gptChecklist) {
+      const docType = gptItem.documentType || gptItem.document;
+      const baseItem = baseChecklist.find((b) => b.documentType === docType);
+      if (baseItem) {
+        if (gptItem.category !== baseItem.category) {
+          errors.push(
+            `Category mismatch for ${docType}: expected ${baseItem.category}, got ${gptItem.category}`
+          );
+        }
+        if (gptItem.required !== baseItem.required) {
+          errors.push(
+            `Required mismatch for ${docType}: expected ${baseItem.required}, got ${gptItem.required}`
+          );
+        }
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Correct hybrid response to match base checklist
+   * Removes extras, adds missing, fixes category/required
+   */
+  private static correctHybridResponse(
+    gptChecklist: any[],
+    baseChecklist: Array<{ documentType: string; category: string; required: boolean }>
+  ): any[] {
+    const corrected: any[] = [];
+    const baseMap = new Map(baseChecklist.map((b) => [b.documentType, b]));
+
+    // Process each base document
+    for (const baseItem of baseChecklist) {
+      const gptItem = gptChecklist.find(
+        (g) => (g.documentType || g.document) === baseItem.documentType
+      );
+
+      if (gptItem) {
+        // Use GPT enrichment but fix category/required
+        corrected.push({
+          ...gptItem,
+          documentType: baseItem.documentType,
+          category: baseItem.category,
+          required: baseItem.required,
+        });
+      } else {
+        // Missing document - create minimal entry
+        corrected.push({
+          documentType: baseItem.documentType,
+          category: baseItem.category,
+          required: baseItem.required,
+          name: baseItem.documentType,
+          nameUz: baseItem.documentType,
+          nameRu: baseItem.documentType,
+          description: '',
+          descriptionUz: '',
+          descriptionRu: '',
+          whereToObtain: '',
+          whereToObtainUz: '',
+          whereToObtainRu: '',
+        });
+      }
+    }
+
+    return corrected;
+  }
+
+  /**
+   * Infer priority from category
+   */
+  private static inferPriorityFromCategory(
+    category?: 'required' | 'highly_recommended' | 'optional'
+  ): 'high' | 'medium' | 'low' {
+    if (category === 'required') return 'high';
+    if (category === 'highly_recommended') return 'medium';
+    return 'low';
+  }
+
+  /**
+   * Get basic document name/description from knowledge base for fallback
+   */
+  private static getDocumentNameFromKB(
+    documentType: string,
+    country: string,
+    visaType: string,
+    visaKb: string
+  ): {
+    en: string;
+    uz: string;
+    ru: string;
+    description?: string;
+    descriptionUz?: string;
+    descriptionRu?: string;
+  } {
+    // Basic document name mappings
+    const docNames: Record<string, { en: string; uz: string; ru: string }> = {
+      passport: { en: 'Passport', uz: 'Pasport', ru: 'Паспорт' },
+      passport_photo: { en: 'Passport Photo', uz: 'Pasport surati', ru: 'Фотография на паспорт' },
+      bank_statement_main: { en: 'Bank Statement', uz: 'Bank hisoboti', ru: 'Выписка из банка' },
+      i20_form: { en: 'Form I-20', uz: 'I-20 formasi', ru: 'Форма I-20' },
+      sevis_fee_receipt: {
+        en: 'SEVIS Fee Receipt',
+        uz: "SEVIS to'lov kvitansiyasi",
+        ru: 'Квитанция об оплате SEVIS',
+      },
+      ds160_confirmation: {
+        en: 'DS-160 Confirmation',
+        uz: 'DS-160 tasdiqlash',
+        ru: 'Подтверждение DS-160',
+      },
+      loa_letter: {
+        en: 'Letter of Acceptance (LOA)',
+        uz: 'Qabul qilish xati (LOA)',
+        ru: 'Письмо о зачислении (LOA)',
+      },
+      cas_letter: { en: 'CAS Letter', uz: 'CAS xati', ru: 'Письмо CAS' },
+      coe_letter: {
+        en: 'Confirmation of Enrolment (COE)',
+        uz: "Ro'yxatdan o'tish tasdiqlovchisi (COE)",
+        ru: 'Подтверждение о зачислении (COE)',
+      },
+      travel_insurance: {
+        en: 'Travel Insurance',
+        uz: "Sayohat sug'urtasi",
+        ru: 'Страховка для путешествий',
+      },
+      accommodation_proof: {
+        en: 'Accommodation Proof',
+        uz: 'Yashash joyi hujjati',
+        ru: 'Подтверждение проживания',
+      },
+      round_trip_ticket: {
+        en: 'Round Trip Ticket',
+        uz: 'Ikki tomonlama chipta',
+        ru: 'Билет туда и обратно',
+      },
+      employment_letter: {
+        en: 'Employment Letter',
+        uz: 'Ish joyi xati',
+        ru: 'Справка с места работы',
+      },
+      sponsor_bank_statement: {
+        en: 'Sponsor Bank Statement',
+        uz: 'Homiylik bank hisoboti',
+        ru: 'Выписка из банка спонсора',
+      },
+      sponsor_employment_letter: {
+        en: 'Sponsor Employment Letter',
+        uz: 'Homiylik ish joyi xati',
+        ru: 'Справка с места работы спонсора',
+      },
+      property_documents: {
+        en: 'Property Documents',
+        uz: 'Mulk hujjatlari',
+        ru: 'Документы на недвижимость',
+      },
+      family_ties_proof: {
+        en: 'Family Ties Proof',
+        uz: 'Oila aloqalari hujjati',
+        ru: 'Подтверждение семейных связей',
+      },
+      refusal_explanation_letter: {
+        en: 'Refusal Explanation Letter',
+        uz: 'Rad etish tushuntirish xati',
+        ru: 'Письмо с объяснением отказа',
+      },
+      travel_itinerary: { en: 'Travel Itinerary', uz: 'Sayohat rejasi', ru: 'Маршрут поездки' },
+      visa_application_form: {
+        en: 'Visa Application Form',
+        uz: 'Viza ariza formasi',
+        ru: 'Форма заявления на визу',
+      },
+      schengen_visa_form: {
+        en: 'Schengen Visa Form',
+        uz: 'Shengen viza formasi',
+        ru: 'Форма заявления на шенгенскую визу',
+      },
+      daily_itinerary: { en: 'Daily Itinerary', uz: 'Kunlik reja', ru: 'Ежедневный маршрут' },
+      travel_history_proof: {
+        en: 'Travel History Proof',
+        uz: 'Sayohat tarixi hujjati',
+        ru: 'Подтверждение истории поездок',
+      },
+      gic_certificate: { en: 'GIC Certificate', uz: 'GIC sertifikati', ru: 'Сертификат GIC' },
+      tuition_payment_proof: {
+        en: 'Tuition Payment Proof',
+        uz: "To'lov hujjati",
+        ru: 'Подтверждение оплаты обучения',
+      },
+      health_insurance: {
+        en: 'Health Insurance (OSHC)',
+        uz: "Sog'liqni saqlash sug'urtasi (OSHC)",
+        ru: 'Медицинская страховка (OSHC)',
+      },
+      sop: { en: 'Statement of Purpose', uz: 'Maqsad deklaratsiyasi', ru: 'Заявление о целях' },
+      tuberculosis_test: { en: 'Tuberculosis Test', uz: 'Sil testi', ru: 'Тест на туберкулез' },
+      academic_records: {
+        en: 'Academic Records',
+        uz: 'Akademik yozuvlar',
+        ru: 'Академические записи',
+      },
+      language_certificate: {
+        en: 'Language Certificate',
+        uz: 'Til sertifikati',
+        ru: 'Сертификат о знании языка',
+      },
+      english_test_proof: {
+        en: 'English Test Proof',
+        uz: 'Ingliz tili testi hujjati',
+        ru: 'Подтверждение теста по английскому языку',
+      },
+    };
+
+    const defaultName = docNames[documentType] || {
+      en: documentType,
+      uz: documentType,
+      ru: documentType,
+    };
+
+    return {
+      en: defaultName.en,
+      uz: defaultName.uz,
+      ru: defaultName.ru,
+      description: `Required document for ${country} ${visaType} visa application.`,
+      descriptionUz: `${country} ${visaType} viza arizasi uchun talab qilinadigan hujjat.`,
+      descriptionRu: `Требуемый документ для заявления на визу ${country} ${visaType}.`,
+    };
+  }
+
+  /**
    * Generate document checklist for visa application
    * Enhanced with visa knowledge base and document guides
+   *
+   * FULL HYBRID COVERAGE for 8 countries × visa types:
+   * - USA: student, tourist
+   * - Canada: student, tourist
+   * - UK: student, tourist
+   * - Australia: student, tourist
+   * - Spain: tourist (Schengen)
+   * - Germany: tourist (Schengen)
+   * - Japan: tourist
+   * - UAE: tourist
+   *
+   * HYBRID MODE (if rule set exists):
+   * - Rule engine decides which documents to include (base + conditional + risk-based)
+   * - GPT-4 only enriches with names, descriptions, whereToObtain (EN/UZ/RU)
+   * - Retry logic: up to 2 attempts if GPT fails
+   * - Severe safety fallback: if GPT fails twice, build minimal checklist from rules only
+   * - Strict validation: ensures no document hallucinations, exact match with rule set
+   *
+   * LEGACY MODE (if no rule set):
+   * - GPT-4 decides everything (original behavior)
+   * - Only used for unsupported future countries
    */
   static async generateChecklist(
     userContext: any,
@@ -455,6 +915,299 @@ If you don't know something, say so clearly and suggest how to find the informat
       // Import visa knowledge base and document guides
       const { getVisaKnowledgeBase } = await import('../data/visaKnowledgeBase');
       const { getRelevantDocumentGuides } = await import('../data/documentGuides');
+
+      // Normalize country code for rule lookup
+      const countryCodeMap: Record<string, string> = {
+        'united states': 'US',
+        usa: 'US',
+        'united kingdom': 'GB',
+        uk: 'GB',
+        canada: 'CA',
+        australia: 'AU',
+        germany: 'DE',
+        spain: 'ES',
+        japan: 'JP',
+        uae: 'AE',
+        'united arab emirates': 'AE',
+        poland: 'PL',
+        'new zealand': 'NZ',
+      };
+      const normalizedCountry = country.toLowerCase();
+      const countryCode =
+        countryCodeMap[normalizedCountry] || country.substring(0, 2).toUpperCase();
+
+      // Check if hybrid mode is enabled
+      const isHybrid = this.isHybridChecklistEnabled(countryCode, visaType);
+
+      if (isHybrid) {
+        // ========================================================================
+        // HYBRID CHECKLIST PATH: documents come from rule engine; GPT only enriches
+        // ========================================================================
+        logInfo('[OpenAI][Checklist] Using HYBRID mode (rule engine + GPT enrichment)', {
+          country,
+          visaType,
+          countryCode,
+        });
+
+        const { findVisaDocumentRuleSet } = await import('../data/visaDocumentRules');
+        const { buildBaseChecklistFromRules } = await import('./checklist-rules.service');
+
+        const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
+        if (!ruleSet) {
+          logWarn('[OpenAI][Checklist] Rule set not found, falling back to legacy mode', {
+            country,
+            visaType,
+            countryCode,
+          });
+          // Fall through to legacy mode
+        } else {
+          // Build base checklist from rules
+          const baseChecklist = buildBaseChecklistFromRules(userContext, ruleSet);
+
+          if (baseChecklist.length === 0) {
+            logWarn('[OpenAI][Checklist] Base checklist is empty, falling back to legacy mode', {
+              country,
+              visaType,
+            });
+            // Fall through to legacy mode
+          } else {
+            // Get visa knowledge base for context
+            const visaKb = getVisaKnowledgeBase(country, visaType as 'tourist' | 'student');
+            const userQuery = JSON.stringify(userContext);
+            const documentGuidesText = getRelevantDocumentGuides(userQuery, 3);
+
+            // Build hybrid system prompt (GPT only enriches, doesn't decide documents)
+            const hybridSystemPrompt = this.buildHybridSystemPrompt(country, visaType, visaKb);
+
+            // Build hybrid user prompt with base checklist
+            const hybridUserPrompt = this.buildHybridUserPrompt(
+              userContext,
+              country,
+              visaType,
+              baseChecklist,
+              visaKb,
+              documentGuidesText
+            );
+
+            // Call GPT-4 for enrichment only (with retry logic)
+            let response;
+            let attempt = 0;
+            const maxAttempts = 2;
+            let lastError: any = null;
+            let rawContent = '{}';
+            let parsed: any = null;
+
+            while (attempt < maxAttempts) {
+              attempt++;
+              try {
+                response = await AIOpenAIService.openai.chat.completions.create({
+                  model: this.MODEL,
+                  messages: [
+                    { role: 'system', content: hybridSystemPrompt },
+                    { role: 'user', content: hybridUserPrompt },
+                  ],
+                  temperature: 0.5,
+                  max_completion_tokens: 2000,
+                  response_format: { type: 'json_object' },
+                });
+
+                rawContent = response.choices[0]?.message?.content || '{}';
+                const responseTime = Date.now() - startTime;
+
+                logInfo('[OpenAI][Checklist] Hybrid mode GPT-4 response received', {
+                  country,
+                  visaType,
+                  countryCode,
+                  ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+                  attempt,
+                  responseLength: rawContent.length,
+                  baseChecklistCount: baseChecklist.length,
+                  responseTimeMs: responseTime,
+                });
+
+                // Parse and validate hybrid response
+                parsed = this.parseHybridResponse(rawContent, baseChecklist, country, visaType);
+
+                if (!parsed || !parsed.checklist || parsed.checklist.length === 0) {
+                  logWarn('[OpenAI][Checklist] Hybrid mode parsing failed', {
+                    country,
+                    visaType,
+                    attempt,
+                    willRetry: attempt < maxAttempts,
+                  });
+                  if (attempt < maxAttempts) {
+                    continue; // Retry
+                  }
+                } else {
+                  // Validate that all base documents are present and no extras
+                  const validationResult = this.validateHybridResponse(
+                    parsed.checklist,
+                    baseChecklist
+                  );
+
+                  if (!validationResult.isValid) {
+                    logWarn('[OpenAI][Checklist] Hybrid mode validation failed', {
+                      country,
+                      visaType,
+                      attempt,
+                      errors: validationResult.errors,
+                      willRetry: attempt < maxAttempts,
+                    });
+                    if (attempt < maxAttempts) {
+                      continue; // Retry
+                    }
+                    // Correct the response to match base checklist
+                    parsed.checklist = this.correctHybridResponse(parsed.checklist, baseChecklist);
+                    logInfo('[OpenAI][Checklist] Hybrid mode response corrected', {
+                      country,
+                      visaType,
+                      correctionsApplied: validationResult.errors.length,
+                    });
+                  } else {
+                    // Success - break out of retry loop
+                    break;
+                  }
+                }
+              } catch (openaiError: any) {
+                lastError = openaiError;
+                const errorMessage = openaiError?.message || String(openaiError);
+                logWarn('[OpenAI][Checklist] Hybrid mode request error', {
+                  country,
+                  visaType,
+                  attempt,
+                  errorMessage,
+                  willRetry: attempt < maxAttempts,
+                });
+
+                if (
+                  errorMessage.includes('timeout') ||
+                  errorMessage.includes('ECONNABORTED') ||
+                  errorMessage.includes('Request timed out')
+                ) {
+                  if (attempt < maxAttempts) {
+                    continue; // Retry on timeout
+                  }
+                  throw new Error('Request timed out.');
+                }
+
+                if (attempt >= maxAttempts) {
+                  throw openaiError;
+                }
+              }
+            }
+
+            // If we have a valid parsed response, use it
+            if (parsed && parsed.checklist && parsed.checklist.length > 0) {
+              const responseTime = Date.now() - startTime;
+
+              // Convert to internal format
+              const enrichedChecklist = parsed.checklist.map((item: any) => {
+                const baseItem = baseChecklist.find((b) => b.documentType === item.documentType);
+                return {
+                  document: item.documentType || item.document || 'Unknown',
+                  name: item.name || item.documentType || 'Unknown',
+                  nameUz: item.nameUz || item.name || item.documentType || "Noma'lum",
+                  nameRu: item.nameRu || item.name || item.documentType || 'Неизвестно',
+                  category: baseItem?.category || item.category || 'optional',
+                  required:
+                    baseItem?.required !== undefined ? baseItem.required : item.required !== false,
+                  description: item.description || '',
+                  descriptionUz: item.descriptionUz || item.description || '',
+                  descriptionRu: item.descriptionRu || item.description || '',
+                  priority: this.inferPriorityFromCategory(baseItem?.category || item.category),
+                  whereToObtain: item.whereToObtain || '',
+                  whereToObtainUz: item.whereToObtainUz || item.whereToObtain || '',
+                  whereToObtainRu: item.whereToObtainRu || item.whereToObtain || '',
+                };
+              });
+
+              logInfo('[OpenAI][Checklist] Hybrid mode checklist generation completed', {
+                model: this.MODEL,
+                country,
+                visaType,
+                countryCode,
+                ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+                itemCount: enrichedChecklist.length,
+                baseChecklistCount: baseChecklist.length,
+                responseTimeMs: responseTime,
+                attempts: attempt,
+                mode: 'hybrid',
+              });
+
+              return {
+                type: visaType,
+                checklist: enrichedChecklist,
+              };
+            }
+
+            // ========================================================================
+            // SEVERE SAFETY MODE: GPT failed twice, build minimal fallback from rules
+            // ========================================================================
+            logWarn(
+              '[OpenAI][Checklist] Hybrid mode GPT failed after retries, using rule-based fallback',
+              {
+                country,
+                visaType,
+                countryCode,
+                ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+                baseChecklistCount: baseChecklist.length,
+              }
+            );
+
+            // Build minimal fallback checklist using ruleSet only
+            const fallbackChecklist = baseChecklist.map((item) => {
+              // Get basic descriptions from knowledge base
+              const docName = this.getDocumentNameFromKB(
+                item.documentType,
+                country,
+                visaType,
+                visaKb
+              );
+              return {
+                document: item.documentType,
+                name: docName.en || item.documentType,
+                nameUz: docName.uz || item.documentType,
+                nameRu: docName.ru || item.documentType,
+                category: item.category,
+                required: item.required,
+                description: docName.description || `Required document: ${item.documentType}`,
+                descriptionUz:
+                  docName.descriptionUz || `Talab qilinadigan hujjat: ${item.documentType}`,
+                descriptionRu: docName.descriptionRu || `Требуемый документ: ${item.documentType}`,
+                priority: this.inferPriorityFromCategory(item.category),
+                whereToObtain: 'Contact embassy or visa application center for details.',
+                whereToObtainUz:
+                  'Tafsilotlar uchun elchixona yoki viza ariza markaziga murojaat qiling.',
+                whereToObtainRu:
+                  'Обратитесь в посольство или центр подачи заявлений на визу для получения подробной информации.',
+              };
+            });
+
+            logInfo('[OpenAI][Checklist] Rule-based fallback checklist generated', {
+              country,
+              visaType,
+              countryCode,
+              ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+              itemCount: fallbackChecklist.length,
+              mode: 'fallback',
+            });
+
+            return {
+              type: visaType,
+              checklist: fallbackChecklist,
+            };
+          }
+        }
+      }
+
+      // ========================================================================
+      // LEGACY CHECKLIST PATH: GPT-4 decides everything (original behavior)
+      // ========================================================================
+      logInfo('[OpenAI][Checklist] Using LEGACY mode (GPT-4 decides documents)', {
+        country,
+        visaType,
+        countryCode,
+      });
 
       // Get visa knowledge base for the country and visa type
       const visaKb = getVisaKnowledgeBase(country, visaType as 'tourist' | 'student');
@@ -838,10 +1591,11 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           errorMessage.includes('ECONNABORTED') ||
           errorMessage.includes('Request timed out')
         ) {
-          logWarn('[OpenAI][Checklist] Request timed out, will use fallback', {
+          logWarn('[OpenAI][Checklist] Request timed out, using fallback', {
             country,
             visaType,
             errorMessage,
+            timeoutMs: 35000,
           });
           // Throw a specific timeout error that will be caught by outer catch
           throw new Error('Request timed out.');

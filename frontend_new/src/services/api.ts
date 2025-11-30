@@ -740,6 +740,30 @@ class ApiClient {
           );
         }
 
+        // FIXED: Handle 409 Conflict (validation error, not system error)
+        // This occurs when user tries to create duplicate application for same country
+        if (error.response?.status === 409) {
+          const errorData = (error.response?.data as any)?.error;
+          const errorMessage =
+            errorData?.message ||
+            'You already have an active application for this country. Please complete or delete it before creating a new one.';
+
+          // Create a user-friendly error object
+          const conflictError = new Error(errorMessage);
+          (conflictError as any).status = 409;
+          (conflictError as any).code =
+            errorData?.code || 'APPLICATION_CONFLICT';
+          (conflictError as any).isValidationError = true; // Flag as validation error, not system error
+          (conflictError as any).response = error.response;
+
+          console.warn('[ApiClient] 409 Conflict - duplicate application', {
+            url: error.config?.url,
+            message: errorMessage,
+          });
+
+          return Promise.reject(conflictError);
+        }
+
         return Promise.reject(error);
       },
     );

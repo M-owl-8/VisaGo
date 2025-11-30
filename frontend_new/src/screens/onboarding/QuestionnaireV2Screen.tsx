@@ -290,6 +290,27 @@ export default function QuestionnaireV2Screen({navigation}: any) {
         }
       } catch (error: any) {
         console.error('AI generation failed:', error);
+
+        // FIXED: Handle 409 Conflict as validation error with user-friendly message
+        if (error.response?.status === 409) {
+          const conflictMessage =
+            error.response?.data?.error?.message ||
+            'You already have an active application for this country. Please complete or delete it before creating a new one.';
+          Alert.alert(
+            t('common.error') || 'Application Conflict',
+            conflictMessage,
+            [
+              {
+                text: t('common.ok'),
+                onPress: () =>
+                  navigation.navigate('MainTabs', {screen: 'Applications'}),
+              },
+            ],
+          );
+          return;
+        }
+
+        // Other errors
         const errorMessage =
           error.response?.data?.error?.message ||
           error.message ||

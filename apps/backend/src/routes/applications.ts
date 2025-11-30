@@ -4,7 +4,7 @@ import { ApplicationsService } from '../services/applications.service';
 import { AIApplicationService } from '../services/ai-application.service';
 import { authenticateToken } from '../middleware/auth';
 import { buildAIUserContext, getQuestionnaireSummary } from '../services/ai-context.service';
-import { logError, logInfo } from '../middleware/logger';
+import { logError, logInfo, logWarn } from '../middleware/logger';
 import { AIOpenAIService } from '../services/ai-openai.service';
 
 const router = express.Router();
@@ -281,9 +281,33 @@ router.post('/ai-generate', async (req: Request, res: Response, next: NextFuncti
       data: result,
     });
   } catch (error: any) {
-    // Return user-friendly error message
+    // FIXED: Handle ApiError with status 409 (Conflict) properly
+    // Import ApiError to check instance
+    const { ApiError } = await import('../utils/errors');
+
+    if (error instanceof ApiError && error.status === 409) {
+      // Log conflict with clear message
+      logWarn('[AI Application Generation] Conflict – active application already exists', {
+        userId: req.userId,
+        country: req.body.questionnaireData?.country,
+        targetCountry: req.body.questionnaireData?.targetCountry,
+        purpose: req.body.questionnaireData?.purpose,
+        errorMessage: error.message,
+      });
+
+      // Return 409 Conflict status (not 500)
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: error.code || 'APPLICATION_CONFLICT',
+          message: error.message || 'Active application for this country already exists',
+        },
+      });
+    }
+
+    // Return user-friendly error message for other errors
     const errorMessage = error.message || 'Failed to generate application from questionnaire';
-    const statusCode = error.statusCode || 500;
+    const statusCode = error.statusCode || error.status || 500;
 
     logError(
       '[AI Application Generation] Failed',
@@ -292,6 +316,7 @@ router.post('/ai-generate', async (req: Request, res: Response, next: NextFuncti
         userId: req.userId,
         purpose: req.body.questionnaireData?.purpose,
         country: req.body.questionnaireData?.country,
+        statusCode,
       }
     );
 

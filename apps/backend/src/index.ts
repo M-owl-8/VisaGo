@@ -329,8 +329,18 @@ app.use(errorLogger);
 app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
   // Error already logged by errorLogger middleware
 
-  // Determine status code
-  const status = err.status || err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
+  // FIXED: Explicitly preserve 409 (Conflict) status for ApiError
+  // This ensures 409 errors are returned as 409, not converted to 500
+  const { ApiError } = await import('./utils/errors');
+  let status: number;
+  if (err instanceof ApiError && err.status === HTTP_STATUS.CONFLICT) {
+    // Preserve 409 Conflict status
+    status = HTTP_STATUS.CONFLICT;
+  } else {
+    // For other errors, use standard status resolution
+    status = err.status || err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
+  }
+
   const message = err.message || API_MESSAGES.INTERNAL_ERROR;
   const code = err.code || 'INTERNAL_ERROR';
 

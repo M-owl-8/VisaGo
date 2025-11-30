@@ -63,8 +63,34 @@ export const getErrorMessage = (
     return fallbacks[language] || fallbacks.en;
   }
 
-  // 409 Conflict (email exists)
+  // 409 Conflict (email exists or application conflict)
   if (error.status === 409) {
+    // Check if it's an application conflict (from /api/applications/ai-generate)
+    if (
+      error.code === 'APPLICATION_CONFLICT' ||
+      error.isValidationError ||
+      error.message?.includes('application') ||
+      error.message?.includes('country')
+    ) {
+      // Use the error message from the API if available
+      if (error.message && !error.message.startsWith('errors.')) {
+        return error.message;
+      }
+
+      const translated = t('errors.applicationConflict');
+      if (translated && translated !== 'errors.applicationConflict') {
+        return translated;
+      }
+
+      const fallbacks: Record<string, string> = {
+        en: 'You already have an active application for this country. Please complete or delete it before creating a new one.',
+        ru: 'У вас уже есть активная заявка на эту страну. Пожалуйста, завершите или удалите её перед созданием новой.',
+        uz: "Bu mamlakat uchun allaqachon faol ariza mavjud. Iltimos, yangisini yaratishdan oldin uni yakunlang yoki o'chiring.",
+      };
+      return fallbacks[language] || fallbacks.en;
+    }
+
+    // Otherwise, treat as email conflict (for registration)
     const translated = t('errors.emailExists');
     if (translated && translated !== 'errors.emailExists') {
       return translated;
