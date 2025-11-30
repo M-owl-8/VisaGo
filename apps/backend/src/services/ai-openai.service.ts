@@ -1102,7 +1102,9 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
 
               // Convert to internal format
               const enrichedChecklist = parsed.checklist.map((item: any) => {
-                const baseItem = baseChecklist.find((b) => b.documentType === item.documentType);
+                const baseItem = baseChecklist.find(
+                  (b: any) => b.documentType === item.documentType
+                );
                 return {
                   document: item.documentType || item.document || 'Unknown',
                   name: item.name || item.documentType || 'Unknown',
@@ -1155,7 +1157,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
             );
 
             // Build minimal fallback checklist using ruleSet only
-            const fallbackChecklist = baseChecklist.map((item) => {
+            const fallbackChecklist = baseChecklist.map((item: any) => {
               // Get basic descriptions from knowledge base
               const docName = this.getDocumentNameFromKB(
                 item.documentType,
