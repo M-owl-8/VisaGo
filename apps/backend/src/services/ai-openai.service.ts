@@ -1633,7 +1633,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
         }
         // Re-throw other errors to be handled by outer catch
         throw openaiError;
-      }
+      } // end nested try-catch
 
       const responseTime = Date.now() - startTime;
       const inputTokens = response.usage?.prompt_tokens || 0;
@@ -1879,7 +1879,8 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
         type: parsed.type || visaType,
         checklist: enrichedChecklist,
       };
-    } catch (error: any) {
+    }
+    catch (error: any) {
       // STEP 3: Enhanced error logging (no sensitive user data)
       // Note: startTime may not be in scope if error occurs before declaration
       const errorResponseTime = Date.now() - startTime;
@@ -2001,8 +2002,8 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
         type: visaType,
         checklist: baseChecklist,
       };
-    }
-  }
+    } // end catch
+  } // end function
 
   /**
    * Check a document against a checklist item using GPT-4.
