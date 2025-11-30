@@ -26,23 +26,25 @@ export function ApplicationCard({
   const flagEmoji = getFlagEmoji(countryCode);
 
   return (
-    <Card className="group relative overflow-hidden border-white/5 bg-white/[0.04] p-6 transition-all hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_30px_60px_rgba(7,12,30,0.6)]">
+    <Card className="group relative overflow-hidden border-white/5 bg-white/[0.04] p-4 transition-all hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_30px_60px_rgba(7,12,30,0.6)] sm:p-6">
       {/* Country Flag & Header */}
-      <div className="mb-4 flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-2xl">
+      <div className="mb-3 flex items-start justify-between gap-2 sm:mb-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl sm:h-12 sm:w-12 sm:text-2xl">
             {flagEmoji}
           </div>
-          <div>
-            <p className="text-sm font-medium text-white/60">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-white/60 sm:text-sm">
               {application.country?.name || t('applications.unknownCountry', 'Unknown country')}
             </p>
-            <p className="mt-0.5 font-semibold text-white">{application.visaType?.name}</p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-white sm:text-base">
+              {application.visaType?.name}
+            </p>
           </div>
         </div>
         <span
           className={cn(
-            'rounded-full px-3 py-1 text-xs font-semibold',
+            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold sm:px-3 sm:py-1 sm:text-xs',
             statusVariant.chip
           )}
         >
@@ -51,12 +53,12 @@ export function ApplicationCard({
       </div>
 
       {/* Progress Bar */}
-      <div className="mb-4 space-y-2">
-        <div className="flex items-center justify-between text-xs text-white/60">
+      <div className="mb-3 space-y-1.5 sm:mb-4 sm:space-y-2">
+        <div className="flex items-center justify-between text-[10px] text-white/60 sm:text-xs">
           <span>{t('applications.progress', 'Progress')}</span>
           <span className="font-semibold text-white">{application.progressPercentage ?? 0}%</span>
         </div>
-        <div className="h-2 w-full rounded-full bg-white/10">
+        <div className="h-1.5 w-full rounded-full bg-white/10 sm:h-2">
           <div
             className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width]"
             style={{ width: `${application.progressPercentage || 0}%` }}
@@ -65,20 +67,20 @@ export function ApplicationCard({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 border-t border-white/5 pt-4">
+      <div className="flex flex-col gap-2 border-t border-white/5 pt-3 sm:flex-row sm:items-center sm:gap-3 sm:pt-4">
         <Link
           href={`/applications/${application.id}`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/10 sm:px-4 sm:text-sm"
         >
           <span>{t('applications.viewDetails', 'View details')}</span>
-          <ArrowUpRight size={16} />
+          <ArrowUpRight size={14} className="sm:size-4" />
         </Link>
         <Link
           href={`/applications/${application.id}/documents`}
-          className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary/20"
+          className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition hover:bg-primary/20 sm:px-4 sm:text-sm"
         >
-          <Upload size={16} />
-          <span className="hidden sm:inline">{t('applications.uploadDocuments', 'Upload')}</span>
+          <Upload size={14} className="sm:size-4" />
+          <span>{t('applications.uploadDocuments', 'Upload')}</span>
         </Link>
       </div>
     </Card>

@@ -214,3 +214,7 @@ Once your backend is online and accessible:
 5. **Optional** - Configure Google Sign-In and Push Notifications if needed
 
 **The app will work automatically once the backend is online!**
+
+
+
+

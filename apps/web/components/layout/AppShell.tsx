@@ -64,27 +64,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="blur-[200px] opacity-30 absolute left-[-5%] bottom-[-10%] h-72 w-72 rounded-full bg-primary-dark animate-blob" />
       </div>
 
-      <nav className="sticky top-0 z-40 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="glass-panel relative flex items-center justify-between border border-white/10 bg-midnight/80 px-6 py-4 text-white">
-          <div className="flex items-center gap-3">
-            <Link href="/applications" className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.45)]">
+      <nav className="sticky top-0 z-40 px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
+        <div className="glass-panel relative flex items-center justify-between border border-white/10 bg-midnight/80 px-3 py-3 text-white sm:px-4 sm:py-4 md:px-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link href="/applications" className="flex items-center gap-2 sm:gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:h-12 sm:w-12">
                 <Image
                   src="/images/ketdik-icon.jpg"
                   alt="Ketdik icon"
                   width={40}
                   height={40}
                   priority
-                  className="h-10 w-10 rounded-2xl object-cover"
+                  className="h-8 w-8 rounded-2xl object-cover sm:h-10 sm:w-10"
                 />
               </div>
               <div>
-                <p className="font-display text-lg font-semibold tracking-tight text-white">
+                <p className="font-display text-base font-semibold tracking-tight text-white sm:text-lg">
                   Ketdik
                 </p>
               </div>
             </Link>
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium text-white/70 shadow-inner sm:flex">
+            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70 shadow-inner sm:flex sm:px-4">
               <ShieldCheck size={14} className="text-primary" />
               <span>{t('applications.status')}</span>
             </div>
@@ -112,9 +112,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide shadow-inner shadow-black/20 transition hover:bg-white/15 md:flex">
-              <Languages size={16} className="text-white" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden items-center gap-2 rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold tracking-wide shadow-inner shadow-black/20 transition hover:bg-white/15 md:flex md:px-3">
+              <Languages size={14} className="text-white sm:size-4" />
               <select
                 value={currentLang}
                 onChange={(e) => changeLanguage(e.target.value)}
@@ -133,28 +133,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </select>
             </div>
 
-            <div className="hidden items-center gap-3 md:flex">
-              <div className="rounded-full bg-white/10 px-4 py-2 text-sm text-white">
+            <div className="hidden items-center gap-2 md:flex md:gap-3">
+              <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white sm:px-4 sm:py-2 sm:text-sm">
                 {user?.firstName} {user?.lastName}
               </div>
               <Button
                 variant="secondary"
                 size="sm"
-                className="rounded-full border border-white/10 !bg-transparent text-white shadow-[0_20px_40px_rgba(0,0,0,0.45)]"
+                className="rounded-full border border-white/10 !bg-transparent px-3 py-1.5 text-xs text-white shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:px-4 sm:py-2 sm:text-sm"
                 onClick={handleLogout}
               >
-                <LogOut size={16} />
-                <span className="ml-2">{t('profile.logout')}</span>
+                <LogOut size={14} className="sm:size-4" />
+                <span className="ml-1.5 sm:ml-2">{t('profile.logout')}</span>
               </Button>
             </div>
 
             <button
               type="button"
               onClick={() => setIsNavOpen((prev) => !prev)}
-              className="md:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-lg transition hover:bg-white/10 md:hidden"
               aria-label="Toggle navigation"
             >
-              {isNavOpen ? <X size={24} /> : <Menu size={24} />}
+              {isNavOpen ? <X size={20} className="sm:size-6" /> : <Menu size={20} className="sm:size-6" />}
             </button>
           </div>
         </div>
@@ -230,7 +230,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </nav>
 
-      <main className="relative z-10 px-4 pb-16 pt-4 sm:px-6 lg:px-8">{children}</main>
+      <main className="relative z-10 px-3 pb-16 pt-3 sm:px-4 sm:pt-4 lg:px-8">{children}</main>
 
       <footer className="relative z-10 border-t border-white/10 px-4 pb-8 pt-6 text-white/60 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">

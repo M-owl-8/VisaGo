@@ -39,34 +39,34 @@ export function FeaturesSection() {
   const { t } = useTranslation();
 
   return (
-    <section id="features" className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="features" className="px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
-          <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">
+          <h2 className="font-display text-2xl font-bold text-white sm:text-3xl md:text-4xl">
             {t('landing.featuresTitle', 'Everything You Need')}
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-white/60">
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-white/60 sm:mt-4 sm:text-base md:text-lg">
             {t('landing.featuresSubtitle', 'All the tools you need for a successful visa application')}
           </p>
         </div>
 
-        <div className="mt-16 grid gap-6 md:grid-cols-2">
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:mt-12 sm:gap-6 md:grid-cols-2">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
               <Card
                 key={index}
-                className="glass-panel group border border-white/10 bg-white/[0.03] p-8 transition hover:border-white/20 hover:bg-white/[0.05]"
+                className="glass-panel group border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/20 hover:bg-white/[0.05] sm:p-6 md:p-8"
               >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary-dark/20">
-                    <Icon size={24} className="text-primary" />
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary-dark/20 sm:h-12 sm:w-12">
+                    <Icon size={20} className="text-primary sm:size-6" />
                   </div>
                   <div>
-                    <h3 className="mb-2 text-xl font-semibold text-white">
+                    <h3 className="mb-1.5 text-base font-semibold text-white sm:mb-2 sm:text-lg md:text-xl">
                       {t(feature.titleKey, feature.titleDefault)}
                     </h3>
-                    <p className="text-white/60">
+                    <p className="text-xs leading-relaxed text-white/60 sm:text-sm">
                       {t(feature.descriptionKey, feature.descriptionDefault)}
                     </p>
                   </div>

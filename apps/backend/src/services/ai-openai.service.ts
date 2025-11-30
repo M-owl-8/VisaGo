@@ -430,9 +430,15 @@ If you don't know something, say so clearly and suggest how to find the informat
    * Legacy mode: GPT-4 decides everything (old behavior)
    */
   private static isHybridChecklistEnabled(countryCode: string, visaType: string): boolean {
-    const { findVisaDocumentRuleSet } = require('../data/visaDocumentRules');
-    const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
-    return !!ruleSet;
+    try {
+      // @ts-ignore - Module may not exist
+      const { findVisaDocumentRuleSet } = require('../data/visaDocumentRules');
+      const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
+      return !!ruleSet;
+    } catch (e) {
+      // Module doesn't exist - hybrid mode not available
+      return false;
+    }
   }
 
   /**
@@ -949,18 +955,41 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           countryCode,
         });
 
-        const { findVisaDocumentRuleSet } = await import('../data/visaDocumentRules');
-        const { buildBaseChecklistFromRules } = await import('./checklist-rules.service');
+        // Try to import rule-based modules (optional - may not exist)
+        let findVisaDocumentRuleSet: any = null;
+        let buildBaseChecklistFromRules: any = null;
+        try {
+          // @ts-ignore - Module may not exist
+          const visaDocumentRulesModule = await import('../data/visaDocumentRules');
+          findVisaDocumentRuleSet = visaDocumentRulesModule.findVisaDocumentRuleSet;
+        } catch (e) {
+          // Module doesn't exist - hybrid mode not available
+        }
+        try {
+          // @ts-ignore - Module may not exist
+          const checklistRulesModule = await import('./checklist-rules.service');
+          buildBaseChecklistFromRules = checklistRulesModule.buildBaseChecklistFromRules;
+        } catch (e) {
+          // Module doesn't exist - hybrid mode not available
+        }
 
-        const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
-        if (!ruleSet) {
-          logWarn('[OpenAI][Checklist] Rule set not found, falling back to legacy mode', {
+        if (!findVisaDocumentRuleSet || !buildBaseChecklistFromRules) {
+          logWarn('[OpenAI][Checklist] Hybrid mode modules not available, falling back to legacy mode', {
             country,
             visaType,
             countryCode,
           });
           // Fall through to legacy mode
         } else {
+          const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
+          if (!ruleSet) {
+            logWarn('[OpenAI][Checklist] Rule set not found, falling back to legacy mode', {
+              country,
+              visaType,
+              countryCode,
+            });
+            // Fall through to legacy mode
+          } else {
           // Build base checklist from rules
           const baseChecklist = buildBaseChecklistFromRules(userContext, ruleSet);
 
@@ -1971,6 +2000,148 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       return {
         type: visaType,
         checklist: baseChecklist,
+      };
+    }
+  }
+
+  /**
+   * Check a document against a checklist item using GPT-4.
+   * 
+   * Phase 3.2: Document checking (Inspector mode)
+   * 
+   * @param checklistItem - The checklist item to check against
+   * @param documentText - Extracted text from the document (or placeholder)
+   * @param applicantProfile - Applicant context
+   * @returns DocCheckResult with status, problems, and suggestions
+   */
+  static async checkDocument(
+    checklistItem: {
+      id: string;
+      name: string;
+      description: string;
+      status: string;
+      whoNeedsIt?: string;
+    },
+    documentText: string | null,
+    applicantProfile: any // ApplicantProfile type
+  ): Promise<{
+    checklistItemId: string;
+    status: 'OK' | 'MISSING' | 'PROBLEM' | 'UNCERTAIN';
+    problems: Array<{ code: string; message: string; userMessage?: string }>;
+    suggestions: Array<{ code: string; message: string }>;
+  }> {
+    try {
+      // Ensure OpenAI is initialized
+      if (!AIOpenAIService.isInitialized()) {
+        const { default: db } = await import('../db');
+        AIOpenAIService.initialize(db);
+      }
+      
+      if (!AIOpenAIService.openai) {
+        throw new Error('OpenAI client not initialized');
+      }
+
+      const { DOC_CHECK_SYSTEM_PROMPT } = await import('../config/ai-prompts');
+
+      // Build user prompt with document context
+      const documentTextForPrompt = documentText || 'NO_TEXT_EXTRACTED - Document text extraction not available.';
+      
+      const userPrompt = `You are checking a document against a checklist item.
+
+CHECKLIST ITEM:
+- ID: ${checklistItem.id}
+- Name: ${checklistItem.name}
+- Description: ${checklistItem.description}
+- Status: ${checklistItem.status}
+- Who needs it: ${checklistItem.whoNeedsIt || 'applicant'}
+
+APPLICANT PROFILE:
+${JSON.stringify(applicantProfile, null, 2)}
+
+DOCUMENT TEXT:
+${documentTextForPrompt}
+
+Analyze this document and determine:
+1. Status: OK, MISSING, PROBLEM, or UNCERTAIN
+2. Problems (if any) with standardized codes
+3. Suggestions for improvement (if any)
+
+Return ONLY valid JSON matching the DocCheckResult schema:
+{
+  "checklistItemId": "${checklistItem.id}",
+  "status": "OK" | "MISSING" | "PROBLEM" | "UNCERTAIN",
+  "problems": [
+    {
+      "code": "PROBLEM_CODE",
+      "message": "English explanation",
+      "userMessage": "User-facing explanation (optional)"
+    }
+  ],
+  "suggestions": [
+    {
+      "code": "SUGGESTION_CODE",
+      "message": "English message"
+    }
+  ]
+}`;
+
+      const response = await this.openai.chat.completions.create({
+        model: this.MODEL,
+        messages: [
+          { role: 'system', content: DOC_CHECK_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2, // Low temperature for consistent checking
+        max_tokens: 1000,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('Empty response from AI document checker');
+      }
+
+      // Parse and validate response
+      const parsed = JSON.parse(content);
+      
+      // Validate status
+      const validStatuses = ['OK', 'MISSING', 'PROBLEM', 'UNCERTAIN'];
+      const status = validStatuses.includes(parsed.status) ? parsed.status : 'UNCERTAIN';
+
+      // Ensure problems and suggestions are arrays
+      const problems = Array.isArray(parsed.problems) ? parsed.problems : [];
+      const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+
+      logInfo('[OpenAI][DocCheck] Document checked', {
+        checklistItemId: checklistItem.id,
+        status,
+        problemsCount: problems.length,
+        suggestionsCount: suggestions.length,
+      });
+
+      return {
+        checklistItemId: checklistItem.id,
+        status: status as 'OK' | 'MISSING' | 'PROBLEM' | 'UNCERTAIN',
+        problems,
+        suggestions,
+      };
+    } catch (error: any) {
+      logError('[OpenAI][DocCheck] Document check failed', error as Error, {
+        checklistItemId: checklistItem.id,
+      });
+
+      // Return uncertain status on error
+      return {
+        checklistItemId: checklistItem.id,
+        status: 'UNCERTAIN',
+        problems: [
+          {
+            code: 'CHECK_FAILED',
+            message: 'Document check failed due to technical error',
+            userMessage: 'Unable to verify document. Please try again or upload a clearer version.',
+          },
+        ],
+        suggestions: [],
       };
     }
   }

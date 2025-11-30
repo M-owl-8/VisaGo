@@ -42,18 +42,18 @@ export function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section className="px-4 py-20 sm:px-6 lg:px-8">
+    <section className="px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
       <div className="mx-auto max-w-4xl">
         <div className="text-center">
-          <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">
+          <h2 className="font-display text-2xl font-bold text-white sm:text-3xl md:text-4xl">
             {t('landing.faqTitle', 'Frequently Asked Questions')}
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-white/60">
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-white/60 sm:mt-4 sm:text-base md:text-lg">
             {t('landing.faqSubtitle', 'Everything you need to know about Ketdik')}
           </p>
         </div>
 
-        <div className="mt-12 space-y-4">
+        <div className="mt-8 space-y-3 sm:mt-12 sm:space-y-4">
           {faqs.map((faq, index) => (
             <Card
               key={index}
@@ -61,22 +61,24 @@ export function FAQSection() {
             >
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                className="flex w-full items-center justify-between p-6 text-left"
+                className="flex w-full items-center justify-between p-4 text-left sm:p-6"
               >
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="pr-4 text-base font-semibold text-white sm:text-lg">
                   {t(faq.questionKey, faq.questionDefault)}
                 </h3>
                 <ChevronDown
-                  size={20}
+                  size={18}
                   className={cn(
-                    'text-white/60 transition-transform',
+                    'shrink-0 text-white/60 transition-transform sm:size-5',
                     openIndex === index && 'rotate-180'
                   )}
                 />
               </button>
               {openIndex === index && (
-                <div className="border-t border-white/10 px-6 pb-6 pt-4">
-                  <p className="text-white/70">{t(faq.answerKey, faq.answerDefault)}</p>
+                <div className="border-t border-white/10 px-4 pb-4 pt-3 sm:px-6 sm:pb-6 sm:pt-4">
+                  <p className="text-sm leading-relaxed text-white/70 sm:text-base">
+                    {t(faq.answerKey, faq.answerDefault)}
+                  </p>
                 </div>
               )}
             </Card>

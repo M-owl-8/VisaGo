@@ -11,6 +11,7 @@ import {
   VisaQuestionnaireSummary,
   VisaProbabilityResult,
 } from '../types/ai-context';
+import type { ApplicantProfile } from '../types/visa-brain';
 
 const prisma = new PrismaClient();
 
@@ -310,4 +311,172 @@ export async function getQuestionnaireSummary(
     logError('Failed to get questionnaire summary', error as Error, { userId });
     return null;
   }
+}
+
+/**
+ * Map duration category from VisaQuestionnaireSummary to ApplicantProfile format
+ */
+function mapDurationCategory(
+  duration?: string
+): '<90_days' | '90_to_180_days' | '>180_days' | 'more_than_1_year' | undefined {
+  if (!duration) return undefined;
+
+  // Map from questionnaire format to profile format
+  const mapping: Record<string, '<90_days' | '90_to_180_days' | '>180_days' | 'more_than_1_year'> = {
+    'less_than_1_month': '<90_days',
+    '1_3_months': '90_to_180_days',
+    '3_6_months': '90_to_180_days',
+    '6_12_months': '>180_days',
+    'more_than_1_year': 'more_than_1_year',
+    'less_than_15_days': '<90_days',
+    '15_30_days': '<90_days',
+    'more_than_6_months': 'more_than_1_year',
+  };
+
+  return mapping[duration] || undefined;
+}
+
+/**
+ * Map sponsor type from VisaQuestionnaireSummary to ApplicantProfile format
+ */
+function mapSponsorType(
+  sponsorType?: string
+): 'self' | 'parent' | 'family' | 'company' | 'other' | undefined {
+  if (!sponsorType) return undefined;
+
+  const mapping: Record<string, 'self' | 'parent' | 'family' | 'company' | 'other'> = {
+    self: 'self',
+    parent: 'parent',
+    relative: 'family',
+    company: 'company',
+    other: 'other',
+  };
+
+  return mapping[sponsorType] || 'other';
+}
+
+/**
+ * Build ApplicantProfile from AIUserContext
+ * 
+ * This function maps the existing AIUserContext structure to the new canonical ApplicantProfile schema.
+ * It serves as the bridge between legacy data structures and the frozen canonical types defined in visa-brain.ts.
+ * 
+ * The function extracts and normalizes data from:
+ * - userProfile: Basic user information (userId, citizenship, age, appLanguage)
+ * - application: Visa application details (country, visaType)
+ * - questionnaireSummary: Detailed questionnaire responses (financial info, travel history, ties, etc.)
+ * 
+ * All field mappings are designed to handle missing or incomplete data gracefully, with sensible defaults
+ * for Uzbekistan-based applicants (default nationality: UZ, default residence: Uzbekistan).
+ * 
+ * This function is used by ai-openai.service.ts when generating checklist prompts, ensuring that GPT-4
+ * receives structured, canonical input data via ApplicantProfile rather than ad-hoc field extraction.
+ * 
+ * @param ctx - AIUserContext from buildAIUserContext(), containing userProfile, application, questionnaireSummary, and riskScore
+ * @param countryName - Full country name (e.g., "United States") - required for canonical profile's destinationCountryName field
+ * @param visaTypeLabel - Full visa type label (e.g., "Student Visa") - required for canonical profile's visaTypeLabel field
+ * @returns ApplicantProfile with normalized values, ready for use in GPT-4 prompts and internal processing
+ * 
+ * @example
+ * ```typescript
+ * const userContext = await buildAIUserContext(userId, applicationId);
+ * const profile = buildApplicantProfile(userContext, "United States", "Student Visa");
+ * // profile is now ready to be sent to GPT-4 as structured JSON
+ * ```
+ */
+/**
+ * Normalize country name to ISO country code
+ * Maps country names to consistent ISO-like codes for template lookup
+ */
+function normalizeCountryCodeFromName(name: string): string | null {
+  const n = name.trim().toLowerCase();
+  if (n.includes('united states') || n === 'usa' || n === 'us') return 'US';
+  if (n.includes('united kingdom') || n.includes('uk') || n === 'gb') return 'GB';
+  if (n.includes('spain')) return 'ES';
+  if (n.includes('germany')) return 'DE';
+  if (n.includes('japan')) return 'JP';
+  if (n.includes('united arab emirates') || n.includes('uae')) return 'AE';
+  if (n.includes('canada')) return 'CA';
+  if (n.includes('australia')) return 'AU';
+  if (n.includes('france')) return 'FR';
+  if (n.includes('italy')) return 'IT';
+  return null;
+}
+
+export function buildApplicantProfile(
+  ctx: AIUserContext,
+  countryName: string,
+  visaTypeLabel: string
+): ApplicantProfile {
+  const { userProfile, application, questionnaireSummary } = ctx;
+
+  // Extract nationality/citizenship (default to UZ for Uzbekistan-based applicants)
+  const nationality = questionnaireSummary?.citizenship || userProfile.citizenship || 'UZ';
+  const residenceCountry = questionnaireSummary?.personalInfo?.currentResidenceCountry || 'Uzbekistan';
+
+  // Extract trip purpose from questionnaire
+  const tripPurpose = questionnaireSummary?.travelInfo?.purpose || questionnaireSummary?.notes;
+
+  // Extract travel dates if available
+  const plannedTravelDates = questionnaireSummary?.travelInfo?.plannedDates
+    ? {
+        start: questionnaireSummary.travelInfo.plannedDates,
+        // End date would need to be calculated from duration, not available in current schema
+      }
+    : undefined;
+
+  // Extract sponsor information
+  const sponsorType = mapSponsorType(
+    questionnaireSummary?.sponsorType || questionnaireSummary?.financialInfo?.sponsorDetails?.relationship
+  );
+  const sponsorDescription = sponsorType === 'other' 
+    ? questionnaireSummary?.financialInfo?.sponsorDetails?.relationship 
+    : undefined;
+
+  // Extract financial information
+  const bankBalanceUSD = questionnaireSummary?.bankBalanceUSD || questionnaireSummary?.financialInfo?.selfFundsUSD;
+  const monthlyIncomeUSD = questionnaireSummary?.monthlyIncomeUSD || questionnaireSummary?.employment?.monthlySalaryUSD;
+
+  // Extract travel history
+  const hasTravelHistory =
+    questionnaireSummary?.hasInternationalTravel ??
+    questionnaireSummary?.travelHistory?.traveledBefore ??
+    (questionnaireSummary?.travelHistory?.visitedCountries?.length ?? 0) > 0;
+
+  // Extract property and family ties
+  const hasPropertyInHomeCountry =
+    questionnaireSummary?.hasPropertyInUzbekistan ?? questionnaireSummary?.ties?.propertyDocs ?? false;
+  const hasFamilyInHomeCountry =
+    questionnaireSummary?.hasFamilyInUzbekistan ?? questionnaireSummary?.ties?.familyTies ?? false;
+
+  // Normalize destination country code for template lookup
+  const normalizedCountryCode = normalizeCountryCodeFromName(countryName) || application.country || nationality;
+
+  // Build the profile
+  const profile: ApplicantProfile = {
+    userId: userProfile.userId,
+    nationality,
+    residenceCountry,
+    destinationCountryCode: normalizedCountryCode,
+    destinationCountryName: countryName,
+    visaTypeCode: application.visaType,
+    visaTypeLabel,
+    tripPurpose,
+    durationCategory: mapDurationCategory(questionnaireSummary?.duration || questionnaireSummary?.travelInfo?.duration),
+    plannedTravelDates,
+    sponsorType,
+    sponsorDescription,
+    hasTravelHistory,
+    previousVisaRefusals: questionnaireSummary?.previousVisaRejections ?? questionnaireSummary?.travelHistory?.hasRefusals ?? false,
+    previousOverstays: questionnaireSummary?.previousOverstay ?? false,
+    hasPropertyInHomeCountry,
+    hasFamilyInHomeCountry,
+    bankBalanceUSD,
+    monthlyIncomeUSD,
+    appLanguage: userProfile.appLanguage,
+    age: userProfile.age ?? questionnaireSummary?.age,
+    citizenshipCode: nationality,
+  };
+
+  return profile;
 }

@@ -24,7 +24,7 @@ export function QuickActions({ onSelect, applicationContext }: QuickActionsProps
   ];
 
   return (
-    <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2 lg:max-w-2xl">
       {actions.map((action, idx) => (
         <button
           key={idx}

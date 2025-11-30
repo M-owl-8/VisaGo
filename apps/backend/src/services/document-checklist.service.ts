@@ -79,20 +79,7 @@ export class DocumentChecklistService {
     userId: string
   ): Promise<DocumentChecklist | { status: 'processing' | 'failed'; errorMessage?: string }> {
     try {
-      // DEFENSIVE: Validate inputs first
-      if (!applicationId || typeof applicationId !== 'string' || applicationId.trim() === '') {
-        logWarn('[Checklist][Error] Invalid applicationId provided', { applicationId, userId });
-        throw errors.badRequest('Invalid application ID');
-      }
-
-      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-        logWarn('[Checklist][Error] Invalid userId provided', { applicationId, userId });
-        throw errors.badRequest('Invalid user ID');
-      }
-
       // Get application with related data
-      // CRITICAL: Use VisaApplication (the model actually used by the API routes)
-      // DocumentChecklist FK now points to VisaApplication, not Application
       const application = await prisma.visaApplication.findUnique({
         where: { id: applicationId },
         include: {
@@ -103,36 +90,19 @@ export class DocumentChecklistService {
         },
       });
 
-      // DEFENSIVE: Check application exists BEFORE any DocumentChecklist operations
-      // This prevents FK violations and provides clear error messages
+      // Get stored checklist from database
+      const storedChecklist = await prisma.documentChecklist.findUnique({
+        where: { applicationId },
+      });
+
       if (!application) {
-        logWarn('[Checklist][Error] Application not found', {
-          applicationId,
-          userId,
-          note: 'Application does not exist in VisaApplication table',
-        });
         throw errors.notFound('Application');
       }
 
       // Verify ownership
       if (application.userId !== userId) {
-        logWarn('[Checklist][Error] Application ownership mismatch', {
-          applicationId,
-          applicationUserId: application.userId,
-          requestedUserId: userId,
-        });
         throw errors.forbidden();
       }
-
-      // Get stored checklist from database
-      // NOTE: DocumentChecklist is a Prisma model backed by a database table created via migration
-      // (Migration: 20251130042626_add_document_checklist)
-      // FK fix migration: 20251130044327_fix_document_checklist_fk_to_visa_application
-      // If you see "table does not exist" errors, check that migrations have been applied in production
-      // If you see FK violations, verify the FK points to VisaApplication (not Application)
-      const storedChecklist = await prisma.documentChecklist.findUnique({
-        where: { applicationId },
-      });
 
       // CRITICAL FIX: Check for existing stored checklist first
       if (storedChecklist) {
@@ -237,42 +207,16 @@ export class DocumentChecklistService {
             );
 
             // Update stored checklist to 'ready' with fallback data
-            // DEFENSIVE: Wrap update in try-catch to handle FK violations gracefully
-            try {
-              await prisma.documentChecklist.update({
-                where: { applicationId: application.id },
-                data: {
-                  status: 'ready',
-                  checklistData: JSON.stringify(sanitizedItems),
-                  aiGenerated: false,
-                  generatedAt: new Date(),
-                  errorMessage: null,
-                },
-              });
-            } catch (updateError: any) {
-              // Catch FK violations specifically
-              if (
-                updateError.code === 'P2003' ||
-                updateError.message?.includes('Foreign key constraint') ||
-                updateError.message?.includes('violated')
-              ) {
-                logError(
-                  'DocumentChecklist FK violation during fallback update',
-                  updateError as Error,
-                  {
-                    applicationId: application.id,
-                    userId,
-                    errorCode: updateError.code,
-                    errorMessage: updateError.message,
-                  }
-                );
-                // Don't throw - continue to return the checklist response
-                // The checklist was generated successfully, just storage failed
-              } else {
-                // Re-throw other errors
-                throw updateError;
-              }
-            }
+            await prisma.documentChecklist.update({
+              where: { applicationId },
+              data: {
+                status: 'ready',
+                checklistData: JSON.stringify(sanitizedItems),
+                aiGenerated: false,
+                generatedAt: new Date(),
+                errorMessage: null,
+              },
+            });
 
             return this.buildChecklistResponse(
               applicationId,
@@ -297,60 +241,19 @@ export class DocumentChecklistService {
       }
 
       // No checklist exists or needs regeneration - start async generation
-      // DEFENSIVE: Ensure application exists before attempting upsert
-      // This prevents FK violations if application was deleted between fetch and upsert
-      if (!application || !application.id) {
-        logWarn('[Checklist][Error] Application not found before upsert', {
-          applicationId,
-          userId,
-        });
-        throw errors.notFound('Application');
-      }
-
-      // Use application.id (from DB) instead of raw param to ensure consistency
-      const validApplicationId = application.id;
-
       // Create checklist entry with status 'pending'
-      let checklistEntry;
-      try {
-        checklistEntry = await prisma.documentChecklist.upsert({
-          where: { applicationId: validApplicationId },
-          create: {
-            applicationId: validApplicationId,
-            status: 'pending',
-            checklistData: '[]',
-          },
-          update: {
-            status: 'pending',
-            errorMessage: null,
-          },
-        });
-      } catch (fkError: any) {
-        // Catch FK violations specifically
-        if (
-          fkError.code === 'P2003' ||
-          fkError.message?.includes('Foreign key constraint') ||
-          fkError.message?.includes('violated')
-        ) {
-          logError(
-            'DocumentChecklist FK violation – application missing or mismatched table',
-            fkError as Error,
-            {
-              applicationId: validApplicationId,
-              userId,
-              errorCode: fkError.code,
-              errorMessage: fkError.message,
-            }
-          );
-          // Return user-friendly error instead of leaking stack trace
-          return {
-            status: 'failed' as const,
-            errorMessage: 'Unable to create checklist. Please try again or contact support.',
-          };
-        }
-        // Re-throw other errors
-        throw fkError;
-      }
+      const checklistEntry = await prisma.documentChecklist.upsert({
+        where: { applicationId },
+        create: {
+          applicationId,
+          status: 'pending',
+          checklistData: '[]',
+        },
+        update: {
+          status: 'pending',
+          errorMessage: null,
+        },
+      });
 
       // Trigger async generation (don't await - let it run in background)
       this.generateChecklistAsync(applicationId, userId, application).catch((error) => {
@@ -380,31 +283,9 @@ export class DocumentChecklistService {
     application: any
   ): Promise<void> {
     try {
-      // DEFENSIVE: Validate application parameter
-      if (!application || !application.id) {
-        logWarn('[Checklist][Async] Invalid application parameter', {
-          applicationId,
-          userId,
-          hasApplication: !!application,
-          applicationIdInApp: application?.id,
-        });
-        throw new Error('Invalid application parameter - application must exist');
-      }
-
-      // Ensure we use the application ID from the validated application object
-      const validApplicationId = application.id;
-      if (validApplicationId !== applicationId) {
-        logWarn('[Checklist][Async] Application ID mismatch', {
-          providedApplicationId: applicationId,
-          applicationIdFromObject: validApplicationId,
-        });
-        // Use the ID from the application object (more reliable)
-        applicationId = validApplicationId;
-      }
-
       // STEP 1: Check if checklist already exists - if so, skip AI generation
       const storedChecklist = await prisma.documentChecklist.findUnique({
-        where: { applicationId: validApplicationId },
+        where: { applicationId },
       });
 
       // If checklist already exists and is ready, skip generation
@@ -678,45 +559,19 @@ export class DocumentChecklistService {
         aiFallbackUsed,
         aiErrorOccurred,
       };
-      // DEFENSIVE: Wrap update in try-catch to handle FK violations gracefully
-      try {
-        await prisma.documentChecklist.update({
-          where: { applicationId: validApplicationId },
-          data: {
-            status: 'ready',
-            checklistData: JSON.stringify({
-              items: sanitizedItems,
-              ...checklistMetadata,
-            }),
-            aiGenerated,
-            generatedAt: new Date(),
-            errorMessage: null,
-          },
-        });
-      } catch (updateError: any) {
-        // Catch FK violations specifically
-        if (
-          updateError.code === 'P2003' ||
-          updateError.message?.includes('Foreign key constraint') ||
-          updateError.message?.includes('violated')
-        ) {
-          logError(
-            'DocumentChecklist FK violation during update – application missing or mismatched table',
-            updateError as Error,
-            {
-              applicationId: validApplicationId,
-              userId,
-              errorCode: updateError.code,
-              errorMessage: updateError.message,
-            }
-          );
-          // Don't throw - log and continue (checklist generation succeeded, just storage failed)
-          // The next request will regenerate it
-          return;
-        }
-        // Re-throw other errors
-        throw updateError;
-      }
+      await prisma.documentChecklist.update({
+        where: { applicationId },
+        data: {
+          status: 'ready',
+          checklistData: JSON.stringify({
+            items: sanitizedItems,
+            ...checklistMetadata,
+          }),
+          aiGenerated,
+          generatedAt: new Date(),
+          errorMessage: null,
+        },
+      });
 
       logInfo('[Checklist][Async] Checklist generated and stored', {
         applicationId,
@@ -793,48 +648,21 @@ export class DocumentChecklistService {
 
         // Store checklist with status 'ready' (not 'failed')
         // Include metadata about emergency fallback usage
-        // DEFENSIVE: Wrap update in try-catch to handle FK violations gracefully
-        // Use application.id (from validated application object) for consistency
-        const emergencyApplicationId = application?.id || applicationId;
-        try {
-          await prisma.documentChecklist.update({
-            where: { applicationId: emergencyApplicationId },
-            data: {
-              status: 'ready',
-              checklistData: JSON.stringify({
-                items: sanitizedItems,
-                aiGenerated: false,
-                aiFallbackUsed: true,
-                aiErrorOccurred: true,
-              }),
+        await prisma.documentChecklist.update({
+          where: { applicationId },
+          data: {
+            status: 'ready',
+            checklistData: JSON.stringify({
+              items: sanitizedItems,
               aiGenerated: false,
-              generatedAt: new Date(),
-              errorMessage: null, // Clear error message since we have a fallback
-            },
-          });
-        } catch (updateError: any) {
-          // Catch FK violations specifically
-          if (
-            updateError.code === 'P2003' ||
-            updateError.message?.includes('Foreign key constraint') ||
-            updateError.message?.includes('violated')
-          ) {
-            logError(
-              'DocumentChecklist FK violation during emergency fallback update',
-              updateError as Error,
-              {
-                applicationId: emergencyApplicationId,
-                userId,
-                errorCode: updateError.code,
-                errorMessage: updateError.message,
-              }
-            );
-            // Don't throw - log and continue
-            return;
-          }
-          // Re-throw other errors
-          throw updateError;
-        }
+              aiFallbackUsed: true,
+              aiErrorOccurred: true,
+            }),
+            aiGenerated: false,
+            generatedAt: new Date(),
+            errorMessage: null, // Clear error message since we have a fallback
+          },
+        });
 
         logInfo('[Checklist][Async] Emergency fallback checklist generated and stored', {
           applicationId,

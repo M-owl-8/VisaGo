@@ -9,7 +9,7 @@ export function HeroSection() {
   const { t } = useTranslation();
 
   return (
-    <section className="relative overflow-hidden px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
+    <section className="relative overflow-hidden px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-32">
       {/* Background Effects */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute right-[-10%] top-[-20%] h-96 w-96 rounded-full bg-primary/20 blur-[140px]" />
@@ -19,18 +19,18 @@ export function HeroSection() {
       <div className="relative mx-auto max-w-7xl">
         <div className="text-center">
           {/* Badge */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
-            <Sparkles size={14} className="text-primary" />
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/70 sm:mb-6 sm:gap-2 sm:px-4 sm:py-1.5">
+            <Sparkles size={12} className="text-primary sm:size-4" />
             {t('landing.badge', 'AI-Powered Visa Assistant')}
           </div>
 
           {/* Headline */}
-          <h1 className="mx-auto max-w-4xl font-display text-4xl font-bold text-white sm:text-5xl lg:text-6xl">
+          <h1 className="mx-auto max-w-4xl font-display text-2xl font-bold leading-tight text-white sm:text-3xl sm:leading-tight md:text-4xl lg:text-5xl xl:text-6xl">
             {t('landing.heroTitle', 'AI-powered visa partner for students and travelers')}
           </h1>
 
           {/* Subheadline */}
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/70 sm:text-xl">
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-white/70 sm:mt-6 sm:text-base md:text-lg lg:text-xl">
             {t(
               'landing.heroSubtitle',
               'Get personalized document checklists, step-by-step guidance, and 24/7 AI support. Everything you need for your visa application, synced across mobile and web.'
@@ -38,17 +38,17 @@ export function HeroSection() {
           </p>
 
           {/* CTAs */}
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link href="/register">
-              <Button className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-8 py-4 text-base font-semibold shadow-[0_20px_45px_rgba(62,166,255,0.45)]">
+          <div className="mt-8 flex w-full max-w-md flex-col items-stretch gap-3 sm:mx-auto sm:mt-10 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4">
+            <Link href="/register" className="w-full sm:w-auto">
+              <Button className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 text-sm font-semibold shadow-[0_20px_45px_rgba(62,166,255,0.45)] sm:px-8 sm:py-4 sm:text-base">
                 {t('landing.ctaStart', 'Start Web App')}
-                <ArrowRight size={18} className="ml-2" />
+                <ArrowRight size={16} className="ml-2 sm:size-5" />
               </Button>
             </Link>
-            <Link href="#how-it-works">
+            <Link href="#how-it-works" className="w-full sm:w-auto">
               <Button
                 variant="secondary"
-                className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 text-base font-semibold text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)] hover:bg-white/10"
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)] hover:bg-white/10 sm:px-8 sm:py-4 sm:text-base"
               >
                 {t('landing.ctaLearn', 'See How It Works')}
               </Button>
@@ -56,7 +56,7 @@ export function HeroSection() {
           </div>
 
           {/* Trust Indicators */}
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-sm text-white/50">
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 text-xs text-white/50 sm:mt-12 sm:flex-row sm:flex-wrap sm:gap-6 sm:text-sm">
             <div className="flex items-center gap-2">
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               <span>{t('landing.trustSecure', 'Bank-level security')}</span>

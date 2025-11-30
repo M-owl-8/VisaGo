@@ -52,6 +52,7 @@ import securityRoutes from './routes/security';
 import healthRoutes from './routes/health';
 import formRoutes from './routes/forms';
 import documentChecklistRoutes from './routes/document-checklist';
+import docCheckRoutes from './routes/doc-check';
 import internalRoutes from './routes/internal';
 import devRoutes from './routes/dev';
 
@@ -267,6 +268,8 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/forms', formRoutes);
 // Document checklist routes (AI-generated checklists)
 app.use('/api/document-checklist', documentChecklistRoutes);
+// Document check routes (Phase 3: Document checking & readiness)
+app.use('/api/doc-check', docCheckRoutes);
 // Chat routes with user-level rate limiting and cost tracking
 // NOTE: chatRateLimitMiddleware must run AFTER authentication (which is in chatRoutes)
 // So we apply it inside the chatRoutes router, not here
@@ -329,18 +332,8 @@ app.use(errorLogger);
 app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
   // Error already logged by errorLogger middleware
 
-  // FIXED: Explicitly preserve 409 (Conflict) status for ApiError
-  // This ensures 409 errors are returned as 409, not converted to 500
-  const { ApiError } = await import('./utils/errors');
-  let status: number;
-  if (err instanceof ApiError && err.status === HTTP_STATUS.CONFLICT) {
-    // Preserve 409 Conflict status
-    status = HTTP_STATUS.CONFLICT;
-  } else {
-    // For other errors, use standard status resolution
-    status = err.status || err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
-  }
-
+  // Determine status code
+  const status = err.status || err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
   const message = err.message || API_MESSAGES.INTERNAL_ERROR;
   const code = err.code || 'INTERNAL_ERROR';
 

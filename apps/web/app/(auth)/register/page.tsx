@@ -53,7 +53,7 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout formTitle={t('auth.registerTitle')} formSubtitle={t('auth.subtitle')}>
-      <form className="space-y-6" onSubmit={handleSubmit}>
+      <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit}>
         {error && (
           <div
             className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200"
@@ -66,7 +66,7 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <AuthField
             label={t('auth.firstName')}
             icon={UserRound}
@@ -134,12 +134,12 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#4A9EFF] to-[#3EA6FF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(74,158,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814]"
+          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#4A9EFF] to-[#3EA6FF] py-3 text-sm font-semibold text-white shadow-[0_15px_30px_rgba(74,158,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814] sm:py-3 sm:text-base"
         >
           {isSubmitting ? t('common.loading') : t('auth.createAccount')}
         </button>
 
-        <div className="text-center text-sm text-white/70">
+        <div className="text-center text-xs text-white/70 sm:text-sm">
           <span>{t('auth.alreadyHaveAccount')}</span>{' '}
           <Link href="/login" className="font-semibold text-white hover:text-[#4A9EFF]">
             {t('auth.signIn')}
@@ -147,7 +147,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Terms & Privacy */}
-        <p className="text-center text-xs text-white/50">
+        <p className="text-center text-[10px] leading-relaxed text-white/50 sm:text-xs">
           {t('auth.termsAgreement', 'By continuing, you agree to our')}{' '}
           <Link href="/terms" className="underline hover:text-white">
             {t('auth.terms', 'Terms')}

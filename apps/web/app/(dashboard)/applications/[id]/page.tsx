@@ -89,7 +89,7 @@ export default function ApplicationDetailPage() {
   const flagEmoji = getFlagEmoji(countryCode);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 text-white sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-3 py-6 text-white sm:px-4 sm:py-8 lg:px-8">
       {error && (
         <ErrorBanner
           message={error}
@@ -113,38 +113,40 @@ export default function ApplicationDetailPage() {
       </Link>
 
       {/* Summary Section */}
-      <Card className="glass-panel mb-8 border border-white/10 bg-white/[0.03] p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 text-4xl">
+      <Card className="glass-panel mb-6 border border-white/10 bg-white/[0.03] p-4 sm:mb-8 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-3xl sm:h-16 sm:w-16 sm:text-4xl">
               {flagEmoji}
             </div>
-            <div>
-              <h1 className="font-display text-2xl font-semibold text-white sm:text-3xl">
-                {application.country?.name || t('applications.title')} - {application.visaType?.name}
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display text-xl font-semibold text-white sm:text-2xl md:text-3xl">
+                <span className="block sm:inline">{application.country?.name || t('applications.title')}</span>
+                <span className="hidden sm:inline"> - </span>
+                <span className="block sm:inline">{application.visaType?.name}</span>
               </h1>
-              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3">
                 <StatusBadge status={application.status} />
-                <span className="text-sm text-white/60">
+                <span className="text-xs text-white/60 sm:text-sm">
                   {t('applications.progress', 'Progress')}: {application.progressPercentage || 0}%
                 </span>
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Link href={`/applications/${applicationId}/documents`}>
-              <Button className="rounded-xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-sm shadow-[0_15px_35px_rgba(62,166,255,0.35)]">
-                <Upload size={16} />
-                <span className="ml-2">{t('applications.uploadDocuments', 'Upload Documents')}</span>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link href={`/applications/${applicationId}/documents`} className="w-full sm:w-auto">
+              <Button className="w-full rounded-xl bg-gradient-to-r from-primary to-primary-dark px-3 py-2 text-xs shadow-[0_15px_35px_rgba(62,166,255,0.35)] sm:px-4 sm:text-sm">
+                <Upload size={14} className="sm:size-4" />
+                <span className="ml-1.5 sm:ml-2">{t('applications.uploadDocuments', 'Upload Documents')}</span>
               </Button>
             </Link>
-            <Link href={`/chat?applicationId=${applicationId}`}>
+            <Link href={`/chat?applicationId=${applicationId}`} className="w-full sm:w-auto">
               <Button
                 variant="secondary"
-                className="rounded-xl border border-white/10 bg-transparent px-4 py-2 text-sm text-white hover:bg-white/10"
+                className="w-full rounded-xl border border-white/10 bg-transparent px-3 py-2 text-xs text-white hover:bg-white/10 sm:px-4 sm:text-sm"
               >
-                <MessageCircle size={16} />
-                <span className="ml-2">{t('applications.chatAboutApplication', 'Chat')}</span>
+                <MessageCircle size={14} className="sm:size-4" />
+                <span className="ml-1.5 sm:ml-2">{t('applications.chatAboutApplication', 'Chat')}</span>
               </Button>
             </Link>
           </div>
@@ -166,7 +168,7 @@ export default function ApplicationDetailPage() {
       </Card>
 
       {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[2fr,1fr]">
         {/* Document Checklist */}
         <div className="space-y-6">
           {checklist?.status === 'processing' && (

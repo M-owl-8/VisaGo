@@ -43,11 +43,11 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold shadow-inner shadow-black/20 transition hover:bg-white/15',
+        'flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold shadow-inner shadow-black/20 transition hover:bg-white/15 sm:gap-2 sm:px-3 sm:py-1.5',
         className
       )}
     >
-      <Languages size={14} className="text-white" />
+      <Languages size={12} className="text-white sm:size-4" />
       <select
         value={currentLang}
         onChange={(e) => changeLanguage(e.target.value)}

@@ -231,6 +231,21 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       );
     }
 
+    // Phase 3.1: Trigger document classification (fire-and-forget)
+    try {
+      const { DocumentClassifierService } = await import('../services/document-classifier.service');
+      // Run asynchronously - don't block the response
+      DocumentClassifierService.analyzeAndUpdateDocument(document.id).catch((err) => {
+        console.error('[DocumentClassifier] Background classification failed:', err);
+      });
+    } catch (classificationError: any) {
+      // Log but do NOT fail the upload
+      console.error(
+        '[DocumentClassifier] Failed to trigger classification (non-blocking):',
+        classificationError
+      );
+    }
+
     res.status(201).json({
       success: true,
       data: document, // Includes all new AI fields

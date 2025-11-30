@@ -39,18 +39,18 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         className={cn(
           'flex flex-col gap-1',
           isUser ? 'items-end' : 'items-start',
-          'max-w-[75%] sm:max-w-[80%]'
+          'max-w-[85%] sm:max-w-[75%] md:max-w-[80%]'
         )}
       >
         <div
           className={cn(
-            'rounded-2xl px-4 py-3 shadow-lg',
+            'rounded-2xl px-3 py-2 shadow-lg sm:px-4 sm:py-3',
             isUser
               ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-[0_10px_25px_rgba(62,166,255,0.35)]'
               : 'bg-white/10 text-white border border-white/20 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
           )}
         >
-          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+          <p className="whitespace-pre-wrap break-words text-xs leading-relaxed sm:text-sm">
             {message.content}
           </p>
         </div>

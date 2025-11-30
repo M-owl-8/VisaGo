@@ -123,7 +123,7 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 text-white sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-3 py-6 text-white sm:space-y-8 sm:px-4 sm:py-8 lg:px-8">
       {error && (
         <ErrorBanner
           message={error}
@@ -142,31 +142,31 @@ export default function ApplicationsPage() {
         />
       )}
 
-      <section className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+      <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[2fr,1fr]">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="glass-panel relative overflow-hidden border border-white/10 bg-gradient-to-br from-[#0C1525] to-[#060a18] px-8 py-10 text-white"
+          className="glass-panel relative overflow-hidden border border-white/10 bg-gradient-to-br from-[#0C1525] to-[#060a18] px-4 py-6 text-white sm:px-6 sm:py-8 md:px-8 md:py-10"
         >
           <div className="absolute right-[-10%] top-[-20%] h-60 w-60 rounded-full bg-primary/20 blur-[140px]" />
           <div className="absolute left-[-15%] bottom-[-20%] h-72 w-72 rounded-full bg-[#1D4ED8]/15 blur-[160px]" />
-          <div className="relative space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
-              <Sparkles size={14} className="text-primary" />
+          <div className="relative space-y-4 sm:space-y-6">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-white/70 sm:gap-2 sm:px-4 sm:py-1 sm:text-xs">
+              <Sparkles size={12} className="text-primary sm:size-4" />
               {t('applications.heroBadge', 'Premium workspace')}
             </div>
 
             <div>
-              <p className="text-sm uppercase tracking-[0.4em] text-white/50">
+              <p className="text-xs uppercase tracking-[0.4em] text-white/50 sm:text-sm">
                 {t('applications.heroEyebrow', 'Dashboard')}
               </p>
-              <h1 className="mt-2 font-display text-3xl font-semibold text-white sm:text-4xl">
+              <h1 className="mt-1.5 font-display text-2xl font-semibold text-white sm:mt-2 sm:text-3xl md:text-4xl">
                 {t('applications.heroTitle', {
                   name: user?.firstName || t('applications.heroDefaultName', 'Traveler'),
                 })}
               </h1>
-              <p className="mt-3 max-w-2xl text-base text-white/70">
+              <p className="mt-2 max-w-2xl text-sm text-white/70 sm:mt-3 sm:text-base">
                 {t(
                   'applications.heroSubtitle',
                   'Keep every visa document, AI chat, and payment status perfectly synced with your mobile app.'
@@ -174,29 +174,29 @@ export default function ApplicationsPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href="/questionnaire">
-                <Button className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 text-base shadow-[0_20px_45px_rgba(62,166,255,0.45)]">
-                  <Plus size={18} />
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
+              <Link href="/questionnaire" className="w-full sm:w-auto">
+                <Button className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 text-sm shadow-[0_20px_45px_rgba(62,166,255,0.45)] sm:w-auto sm:px-6 sm:py-3 sm:text-base">
+                  <Plus size={16} className="sm:size-5" />
                   <span className="ml-2">{t('applications.startNewApplication')}</span>
                 </Button>
               </Link>
-              <Link href="/chat">
+              <Link href="/chat" className="w-full sm:w-auto">
                 <Button
                   variant="secondary"
-                  className="rounded-2xl border border-white/10 !bg-transparent px-6 py-3 text-base text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)]"
+                  className="w-full rounded-2xl border border-white/10 !bg-transparent px-4 py-2.5 text-sm text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)] sm:w-auto sm:px-6 sm:py-3 sm:text-base"
                 >
-                  <MessageCircle size={18} />
+                  <MessageCircle size={16} className="sm:size-5" />
                   <span className="ml-2">{t('applications.heroAiCta', 'Open AI assistant')}</span>
                 </Button>
               </Link>
               <Button
                 variant="ghost"
-                className="rounded-2xl border border-white/10 px-4 text-white/70 hover:bg-white/5"
+                className="w-full rounded-2xl border border-white/10 px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 sm:w-auto"
                 onClick={refetch}
                 disabled={isRefreshing}
               >
-                <RefreshCcw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                <RefreshCcw size={14} className={isRefreshing ? 'animate-spin' : ''} />
                 <span className="ml-2">{t('applications.refresh', 'Refresh')}</span>
               </Button>
             </div>
@@ -207,7 +207,7 @@ export default function ApplicationsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="glass-panel grid gap-4 border border-white/10 bg-white/[0.04] px-6 py-6 text-white"
+          className="glass-panel grid grid-cols-1 gap-3 border border-white/10 bg-white/[0.04] px-4 py-4 text-white sm:gap-4 sm:px-6 sm:py-6"
         >
           <Metric
             label={t('applications.metrics.active', 'Active applications')}
@@ -230,28 +230,28 @@ export default function ApplicationsPage() {
       {totalApplications === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[2fr,1fr]">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="glass-panel border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
+            className="glass-panel border border-white/10 bg-white/[0.03] px-4 py-4 text-white sm:px-6 sm:py-6"
           >
-            <div className="mb-5 flex items-center justify-between">
+            <div className="mb-4 flex flex-col gap-2 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-display text-xl text-white">
+                <h2 className="font-display text-lg text-white sm:text-xl">
                   {t('applications.activeSectionTitle', 'Active journeys')}
                 </h2>
-                <p className="text-sm text-white/60">
+                <p className="text-xs text-white/60 sm:text-sm">
                   {t('applications.activeSectionSubtitle', 'Continue where you left off')}
                 </p>
               </div>
-              <Link href="/questionnaire" className="text-sm text-primary hover:underline">
+              <Link href="/questionnaire" className="text-xs text-primary hover:underline sm:text-sm">
                 {t('applications.startNewApplication')}
               </Link>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
               {userApplications.map((app) => (
                 <ApplicationCard
                   key={app.id}

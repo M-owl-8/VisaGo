@@ -393,3 +393,7 @@ const AI_SERVICE_BASE_URL = getAiServiceBaseUrl(); // Line 72 - called at module
 ---
 
 **Next Steps:** Apply fixes to make API URL resolution non-fatal, then rebuild APK with proper env vars set.
+
+
+
+

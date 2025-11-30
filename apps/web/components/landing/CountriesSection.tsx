@@ -20,25 +20,25 @@ export function CountriesSection() {
   const { t } = useTranslation();
 
   return (
-    <section className="px-4 py-20 sm:px-6 lg:px-8">
+    <section className="px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
-          <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">
+          <h2 className="font-display text-2xl font-bold text-white sm:text-3xl md:text-4xl">
             {t('landing.countriesTitle', 'Supported Countries')}
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-white/60">
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-white/60 sm:mt-4 sm:text-base md:text-lg">
             {t('landing.countriesSubtitle', 'We support visa applications for these popular destinations')}
           </p>
         </div>
 
-        <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-12 sm:grid-cols-3 sm:gap-4 md:grid-cols-5">
           {countries.map((country) => (
             <Card
               key={country.code}
-              className="glass-panel flex flex-col items-center justify-center border border-white/10 bg-white/[0.03] p-6 text-center transition hover:border-white/20 hover:bg-white/[0.05]"
+              className="glass-panel flex flex-col items-center justify-center border border-white/10 bg-white/[0.03] p-4 text-center transition hover:border-white/20 hover:bg-white/[0.05] sm:p-6"
             >
-              <div className="mb-2 text-4xl">{country.flag}</div>
-              <div className="text-sm font-medium text-white">{country.name}</div>
+              <div className="mb-2 text-3xl sm:text-4xl">{country.flag}</div>
+              <div className="text-xs font-medium text-white sm:text-sm">{country.name}</div>
             </Card>
           ))}
         </div>

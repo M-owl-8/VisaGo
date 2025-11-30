@@ -11,23 +11,23 @@ export function LandingHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-lg">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
+        {/* Logo - Smaller on mobile */}
+        <Link href="/" className="flex items-center gap-2 sm:gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 sm:h-10 sm:w-10">
             <Image
               src="/images/ketdik-icon.jpg"
               alt="Ketdik"
               width={32}
               height={32}
-              className="h-8 w-8 rounded-lg object-cover"
+              className="h-6 w-6 rounded-lg object-cover sm:h-8 sm:w-8"
               priority
             />
           </div>
-          <span className="font-display text-xl font-semibold text-white">Ketdik</span>
+          <span className="font-display text-lg font-semibold text-white sm:text-xl">Ketdik</span>
         </Link>
 
-        {/* Navigation */}
+        {/* Navigation - Hidden on mobile */}
         <nav className="hidden items-center gap-6 md:flex">
           <a href="#how-it-works" className="text-sm text-white/60 transition hover:text-white">
             {t('landing.navHowItWorks', 'How It Works')}
@@ -40,19 +40,26 @@ export function LandingHeader() {
           </Link>
         </nav>
 
-        {/* Actions */}
-        <div className="flex items-center gap-3">
-          <LanguageSwitcher />
-          <Link href="/login">
+        {/* Actions - Responsive layout */}
+        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
+          {/* Language switcher - Hidden on very small screens, visible from sm */}
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
+          
+          {/* Sign In - Hidden on mobile, visible from md */}
+          <Link href="/login" className="hidden md:block">
             <Button
               variant="ghost"
-              className="rounded-xl border border-white/10 bg-transparent px-4 py-2 text-sm text-white hover:bg-white/10"
+              className="rounded-xl border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white hover:bg-white/10 sm:px-4 sm:py-2 sm:text-sm"
             >
               {t('landing.navSignIn', 'Sign In')}
             </Button>
           </Link>
+          
+          {/* Get Started - Primary CTA, always visible but smaller on mobile */}
           <Link href="/register">
-            <Button className="rounded-xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-sm shadow-[0_10px_25px_rgba(62,166,255,0.35)]">
+            <Button className="rounded-xl bg-gradient-to-r from-primary to-primary-dark px-3 py-1.5 text-xs font-semibold shadow-[0_10px_25px_rgba(62,166,255,0.35)] sm:px-4 sm:py-2 sm:text-sm">
               {t('landing.navGetStarted', 'Get Started')}
             </Button>
           </Link>

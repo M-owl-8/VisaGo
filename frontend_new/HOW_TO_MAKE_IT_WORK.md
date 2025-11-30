@@ -212,3 +212,7 @@ https://visabuddy-backend-production.up.railway.app/api/health
 ```
 
 If you see a response (not an error), the backend is online and the app will work!
+
+
+
+

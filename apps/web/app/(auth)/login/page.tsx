@@ -37,7 +37,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayout formTitle={t('auth.signIn')} formSubtitle={t('auth.subtitle')}>
-      <form className="space-y-6" onSubmit={handleSubmit}>
+      <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit}>
         {error && (
           <div
             className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200"
@@ -96,7 +96,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#3EA6FF] to-[#4A9EFF] py-3 text-base font-semibold text-white shadow-[0_15px_30px_rgba(62,166,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814]"
+          className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#3EA6FF] to-[#4A9EFF] py-3 text-sm font-semibold text-white shadow-[0_15px_30px_rgba(62,166,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814] sm:py-3 sm:text-base"
         >
           {isSubmitting ? t('common.loading') : t('auth.signInButton')}
         </button>
@@ -129,7 +129,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="text-center text-sm text-white/70">
+        <div className="text-center text-xs text-white/70 sm:text-sm">
           <span>{t('auth.dontHaveAccount')}</span>{' '}
           <Link href="/register" className="font-semibold text-white hover:text-[#4A9EFF]">
             {t('auth.signUp')}
@@ -137,7 +137,7 @@ export default function LoginPage() {
         </div>
 
         {/* Terms & Privacy */}
-        <p className="text-center text-xs text-white/50">
+        <p className="text-center text-[10px] leading-relaxed text-white/50 sm:text-xs">
           {t('auth.termsAgreement', 'By continuing, you agree to our')}{' '}
           <Link href="/terms" className="underline hover:text-white">
             {t('auth.terms', 'Terms')}
