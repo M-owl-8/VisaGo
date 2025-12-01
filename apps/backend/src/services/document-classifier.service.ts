@@ -1,8 +1,8 @@
 /**
  * Document Classifier Service
- * 
+ *
  * Phase 3.1: Classifies uploaded documents by type using AI.
- * 
+ *
  * This service:
  * - Classifies document types using DeepSeek or existing AI service
  * - Extracts text from documents (placeholder for now)
@@ -18,7 +18,7 @@ const prisma = new PrismaClient();
 export class DocumentClassifierService {
   /**
    * Classify a document type using AI (DeepSeek or existing model).
-   * 
+   *
    * @param fileMeta - Info about the uploaded file
    * @param sampleText - Optional extracted text
    * @returns Classification result with type and confidence
@@ -33,10 +33,10 @@ export class DocumentClassifierService {
     try {
       // Use existing AI service (gpt-4o-mini) for classification
       // TODO: Consider using DeepSeek or a cheaper model for classification if available
-      
+
       const fileName = fileMeta.fileName.toLowerCase();
       const mimeType = fileMeta.mimeType.toLowerCase();
-      
+
       // Build classification prompt
       const classificationPrompt = `You are a document classifier for visa applications.
 
@@ -77,7 +77,8 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
       // Use AI service to classify
       // For now, use the existing chat completion method
       // TODO: Create a dedicated classification method if needed
-      const response = await AIOpenAIService.openai.chat.completions.create({
+      const openaiClient = AIOpenAIService.getOpenAIClient();
+      const response = await openaiClient.chat.completions.create({
         model: AIOpenAIService.MODEL,
         messages: [
           {
@@ -152,10 +153,10 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
   /**
    * Fallback classification using simple heuristics.
    */
-  private static fallbackClassification(fileMeta: {
-    fileName: string;
-    mimeType: string;
-  }): { type: string; confidence: number } {
+  private static fallbackClassification(fileMeta: { fileName: string; mimeType: string }): {
+    type: string;
+    confidence: number;
+  } {
     const fileName = fileMeta.fileName.toLowerCase();
 
     // Simple keyword matching
@@ -168,7 +169,11 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
     if (fileName.includes('employment') || fileName.includes('ish') || fileName.includes('work')) {
       return { type: 'employment_letter', confidence: 0.6 };
     }
-    if (fileName.includes('income') || fileName.includes('salary') || fileName.includes('daromad')) {
+    if (
+      fileName.includes('income') ||
+      fileName.includes('salary') ||
+      fileName.includes('daromad')
+    ) {
       return { type: 'income_certificate', confidence: 0.6 };
     }
     if (fileName.includes('i20') || fileName.includes('i-20')) {
@@ -189,9 +194,9 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
 
   /**
    * Extract text from a document.
-   * 
+   *
    * For now, this is a placeholder. Real OCR/PDF extraction should be integrated later.
-   * 
+   *
    * @param doc - Document record from Prisma
    * @returns Extracted text or null
    */
@@ -203,12 +208,12 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
   }): Promise<string | null> {
     // TODO: Integrate real OCR/PDF text extraction
     // For now, return null with a clear TODO comment
-    
+
     // Potential integrations:
     // - PDF.js for PDF text extraction
     // - Tesseract.js for image OCR
     // - Cloud OCR services (Google Vision, AWS Textract, etc.)
-    
+
     logInfo('[DocumentClassifier] Text extraction not yet implemented', {
       documentId: doc.id,
       fileName: doc.fileName,
@@ -219,9 +224,9 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
 
   /**
    * High-level: classify & update a document record.
-   * 
+   *
    * This is the main entry point called after document upload.
-   * 
+   *
    * @param documentId - Document ID to analyze
    */
   static async analyzeAndUpdateDocument(documentId: string): Promise<void> {
@@ -253,13 +258,14 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
       );
 
       // 4) Update document row with classification results
+      // Note: classifiedType doesn't exist in schema, using documentType instead
       await prisma.userDocument.update({
         where: { id: documentId },
         data: {
-          classifiedType: classification.type,
-          classificationSource: 'ai',
-          classificationScore: classification.confidence,
-          extractedText: extractedText,
+          documentType: classification.type, // classifiedType field doesn't exist
+          // classificationSource: 'ai', // Field doesn't exist
+          // classificationScore: classification.confidence, // Field doesn't exist
+          // extractedText: extractedText, // Field doesn't exist
         },
       });
 
@@ -276,5 +282,3 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
     }
   }
 }
-
-

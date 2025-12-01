@@ -536,7 +536,11 @@ BASE DOCUMENT LIST (you MUST enrich these exact documents, no additions or remov
 ${JSON.stringify(
   baseChecklist.map((item) => ({
     documentType: item.documentType,
-    category: item.category,
+    category: (item.category === 'required' ||
+    item.category === 'highly_recommended' ||
+    item.category === 'optional'
+      ? item.category
+      : 'optional') as 'required' | 'highly_recommended' | 'optional',
     required: item.required,
   })),
   null,
@@ -705,10 +709,14 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
    * Infer priority from category
    */
   private static inferPriorityFromCategory(
-    category?: 'required' | 'highly_recommended' | 'optional'
+    category?: 'required' | 'highly_recommended' | 'optional' | string
   ): 'high' | 'medium' | 'low' {
-    if (category === 'required') return 'high';
-    if (category === 'highly_recommended') return 'medium';
+    const normalized =
+      category === 'required' || category === 'highly_recommended' || category === 'optional'
+        ? category
+        : 'optional';
+    if (normalized === 'required') return 'high';
+    if (normalized === 'highly_recommended') return 'medium';
     return 'low';
   }
 
@@ -1168,7 +1176,11 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                 name: docName.en || item.documentType,
                 nameUz: docName.uz || item.documentType,
                 nameRu: docName.ru || item.documentType,
-                category: item.category,
+                category: (item.category === 'required' ||
+                item.category === 'highly_recommended' ||
+                item.category === 'optional'
+                  ? item.category
+                  : 'optional') as 'required' | 'highly_recommended' | 'optional',
                 required: item.required,
                 description: docName.description || `Required document: ${item.documentType}`,
                 descriptionUz:
@@ -1822,7 +1834,11 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       const enrichedChecklist = parsed.checklist.map((item: any) => {
         // Ensure category consistency (handle both new format with category and old format)
         const { category, required, priority } = ensureCategoryConsistency({
-          category: item.category,
+          category: (item.category === 'required' ||
+          item.category === 'highly_recommended' ||
+          item.category === 'optional'
+            ? item.category
+            : 'optional') as 'required' | 'highly_recommended' | 'optional',
           required: item.required,
           priority: item.priority || (item.required ? 'high' : 'medium'),
         });

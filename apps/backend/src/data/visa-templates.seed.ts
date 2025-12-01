@@ -1,8 +1,8 @@
 /**
  * Initial Visa Templates Seed for Phase 2
- * 
+ *
  * NOTE: This is NOT automatically executed. It is a source of truth for manual/one-time seeding.
- * 
+ *
  * To seed the database, you would:
  * 1. Import this function
  * 2. Map each template to Prisma create operations
@@ -13,7 +13,7 @@ import type { VisaTemplate } from '../types/visa-brain';
 
 /**
  * Get initial visa templates seed data
- * 
+ *
  * @returns Array of VisaTemplate objects ready for seeding
  */
 export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
@@ -48,7 +48,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
       },
       {
         id: 'financial_capacity',
-        description: 'Must demonstrate sufficient financial resources to cover tuition and living expenses.',
+        description:
+          'Must demonstrate sufficient financial resources to cover tuition and living expenses.',
         critical: true,
       },
     ],
@@ -248,8 +249,7 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'loa',
         name: 'Letter of Acceptance (LOA)',
         whoNeedsIt: 'school',
-        description:
-          'Letter of Acceptance from a Designated Learning Institution (DLI).',
+        description: 'Letter of Acceptance from a Designated Learning Institution (DLI).',
         isCoreRequired: true,
       },
       {
@@ -282,8 +282,7 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         type: 'annual_cost',
         currency: 'CAD',
         amount: undefined,
-        description:
-          'Funds to cover tuition fees + CAD $10,000+ per year for living expenses.',
+        description: 'Funds to cover tuition fees + CAD $10,000+ per year for living expenses.',
       },
     ],
     processingTime: {
@@ -403,12 +402,14 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
     eligibilityRules: [
       {
         id: 'cas_letter',
-        description: 'Must have a Confirmation of Acceptance for Studies (CAS) from a licensed sponsor.',
+        description:
+          'Must have a Confirmation of Acceptance for Studies (CAS) from a licensed sponsor.',
         critical: true,
       },
       {
         id: 'financial_capacity',
-        description: 'Must demonstrate sufficient funds for tuition and living expenses (28-day rule).',
+        description:
+          'Must demonstrate sufficient funds for tuition and living expenses (28-day rule).',
         critical: true,
       },
     ],
@@ -464,7 +465,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
     processingTime: {
       minDays: 15,
       maxDays: 60,
-      notes: 'Standard processing: 15 working days. Priority services available for faster processing.',
+      notes:
+        'Standard processing: 15 working days. Priority services available for faster processing.',
     },
     officialLinks: [
       {
@@ -599,7 +601,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'acceptance_letter',
         name: 'Acceptance Letter from Educational Institution',
         whoNeedsIt: 'school',
-        description: 'Official acceptance letter from a recognized Spanish educational institution.',
+        description:
+          'Official acceptance letter from a recognized Spanish educational institution.',
         isCoreRequired: true,
       },
       {
@@ -688,7 +691,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'passport',
         name: 'Valid Passport',
         whoNeedsIt: 'applicant',
-        description: 'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
+        description:
+          'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
         isCoreRequired: true,
       },
       {
@@ -737,7 +741,7 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
     ],
     financialRequirements: [
       {
-        type: 'daily_cost',
+        type: 'other',
         currency: 'EUR',
         amount: undefined,
         description:
@@ -798,7 +802,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'acceptance_letter',
         name: 'Acceptance Letter from University/School',
         whoNeedsIt: 'school',
-        description: 'Official acceptance letter (Zulassungsbescheid) from a recognized German educational institution.',
+        description:
+          'Official acceptance letter (Zulassungsbescheid) from a recognized German educational institution.',
         isCoreRequired: true,
       },
       {
@@ -891,7 +896,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'passport',
         name: 'Valid Passport',
         whoNeedsIt: 'applicant',
-        description: 'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
+        description:
+          'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
         isCoreRequired: true,
       },
       {
@@ -940,7 +946,7 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
     ],
     financialRequirements: [
       {
-        type: 'daily_cost',
+        type: 'other',
         currency: 'EUR',
         amount: undefined,
         description:
@@ -1354,7 +1360,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
     eligibilityRules: [
       {
         id: 'coe_letter',
-        description: 'Must have a Confirmation of Enrolment (COE) from a registered Australian educational institution.',
+        description:
+          'Must have a Confirmation of Enrolment (COE) from a registered Australian educational institution.',
         critical: true,
       },
       {
@@ -1644,7 +1651,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'passport',
         name: 'Valid Passport',
         whoNeedsIt: 'applicant',
-        description: 'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
+        description:
+          'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
         isCoreRequired: true,
       },
       {
@@ -1693,7 +1701,7 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
     ],
     financialRequirements: [
       {
-        type: 'daily_cost',
+        type: 'other',
         currency: 'EUR',
         amount: undefined,
         description:
@@ -1754,7 +1762,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'acceptance_letter',
         name: 'Acceptance Letter from Educational Institution',
         whoNeedsIt: 'school',
-        description: 'Official acceptance letter from a recognized Italian educational institution.',
+        description:
+          'Official acceptance letter from a recognized Italian educational institution.',
         isCoreRequired: true,
       },
       {
@@ -1843,7 +1852,8 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
         id: 'passport',
         name: 'Valid Passport',
         whoNeedsIt: 'applicant',
-        description: 'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
+        description:
+          'Passport valid at least 3 months beyond intended stay with at least 2 blank pages.',
         isCoreRequired: true,
       },
       {
@@ -1892,7 +1902,7 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
     ],
     financialRequirements: [
       {
-        type: 'daily_cost',
+        type: 'other',
         currency: 'EUR',
         amount: undefined,
         description:
@@ -1920,4 +1930,3 @@ export function getInitialVisaTemplatesSeed(): VisaTemplate[] {
 
   return templates;
 }
-

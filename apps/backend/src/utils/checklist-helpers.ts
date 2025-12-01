@@ -59,7 +59,7 @@ export function inferCategory(item: {
  * Normalize category value
  */
 export function normalizeCategory(
-  category: string | undefined
+  category: string | undefined | null
 ): 'required' | 'highly_recommended' | 'optional' {
   if (category === 'required' || category === 'highly_recommended' || category === 'optional') {
     return category;
@@ -68,11 +68,23 @@ export function normalizeCategory(
 }
 
 /**
+ * Infer priority from category (accepts string for flexibility)
+ */
+export function inferPriorityFromCategory(
+  category?: 'required' | 'highly_recommended' | 'optional' | string
+): 'high' | 'medium' | 'low' {
+  const normalized = normalizeCategory(category);
+  if (normalized === 'required') return 'high';
+  if (normalized === 'highly_recommended') return 'medium';
+  return 'low';
+}
+
+/**
  * Ensure category, required, and priority are consistent
  * Priority: category > required/priority (for backward compatibility)
  */
 export function ensureCategoryConsistency(item: {
-  category?: 'required' | 'highly_recommended' | 'optional';
+  category?: 'required' | 'highly_recommended' | 'optional' | string;
   required?: boolean;
   priority?: string;
 }): {
@@ -80,7 +92,7 @@ export function ensureCategoryConsistency(item: {
   required: boolean;
   priority: ChecklistPriority;
 } {
-  let category = item.category;
+  let category = normalizeCategory(item.category);
   let required = item.required;
   let priority: string | undefined = item.priority;
 
@@ -106,5 +118,9 @@ export function ensureCategoryConsistency(item: {
   // Ensure priority is always set and normalized
   const normalizedPriority = normalizePriority(priority);
 
-  return { category, required: !!required, priority: normalizedPriority };
+  // Ensure category is always the correct union type
+  const normalizedCategory: 'required' | 'highly_recommended' | 'optional' =
+    normalizeCategory(category);
+
+  return { category: normalizedCategory, required: !!required, priority: normalizedPriority };
 }
