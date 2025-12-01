@@ -185,21 +185,22 @@ model UserDocument {
   aiNotesRu         String?
   aiNotesEn         String?
   // Phase 3: Document classification fields
-  classifiedType        String?   // e.g. "passport", "bank_statement", "employment_letter"
-  classificationSource  String?   // e.g. "ai", "manual"
-  classificationScore   Float?    // confidence score 0-1
-  extractedText         String?   // extracted/ocr text (for doc-check)
+  // TODO: classification fields were removed from DB; reintroduce carefully with a proper migration if needed.
+  // classifiedType        String?   // e.g. "passport", "bank_statement", "employment_letter"
+  // classificationSource  String?   // e.g. "ai", "manual"
+  // classificationScore   Float?    // confidence score 0-1
+  // extractedText         String?   // extracted/ocr text (for doc-check)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  checkResults      DocumentCheckResult[] // Phase 3: Document check results
+  // checkResults      DocumentCheckResult[] // Phase 3: Document check results - commented out as model doesn't exist
 
   @@index([userId])
   @@index([applicationId])
   @@index([status])
-  @@index([classifiedType])
+  // @@index([classifiedType]) // Removed - column doesn't exist in DB
 }
 
 model Payment {

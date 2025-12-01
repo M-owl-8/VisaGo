@@ -271,7 +271,7 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
 
       logInfo('[DocumentClassifier] Document analyzed and updated', {
         documentId,
-        classifiedType: classification.type,
+        documentType: classification.type, // Using documentType instead of classifiedType
         confidence: classification.confidence,
       });
     } catch (error: any) {

@@ -191,7 +191,8 @@ export class DocCheckService {
       };
 
       // 4) Get extractedText from document
-      const documentText = document?.extractedText || null;
+      // TODO: extractedText field was removed from DB; classification is disabled for now
+      const documentText = null; // document?.extractedText || null;
 
       // 5) Call AIOpenAIService.checkDocument
       // TODO: checkDocument method doesn't exist - need to implement or use alternative
