@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+﻿import OpenAI from 'openai';
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 
@@ -480,13 +480,13 @@ You MUST return valid JSON with this exact structure:
       "required": true,            // MUST match input exactly
       "name": "Valid Passport",
       "nameUz": "Yaroqli Pasport",
-      "nameRu": "Действительный Паспорт",
+      "nameRu": "╨Ф╨╡╨╣╤Б╤В╨▓╨╕╤В╨╡╨╗╤М╨╜╤Л╨╣ ╨Я╨░╤Б╨┐╨╛╤А╤В",
       "description": "Passport valid for at least 6 months beyond intended stay",
       "descriptionUz": "Kamida 6 oy muddati qolgan yaroqli pasport",
-      "descriptionRu": "Действительный паспорт со сроком действия не менее 6 месяцев",
+      "descriptionRu": "╨Ф╨╡╨╣╤Б╤В╨▓╨╕╤В╨╡╨╗╤М╨╜╤Л╨╣ ╨┐╨░╤Б╨┐╨╛╤А╤В ╤Б╨╛ ╤Б╤А╨╛╨║╨╛╨╝ ╨┤╨╡╨╣╤Б╤В╨▓╨╕╤П ╨╜╨╡ ╨╝╨╡╨╜╨╡╨╡ 6 ╨╝╨╡╤Б╤П╤Ж╨╡╨▓",
       "whereToObtain": "Apply at migration service or internal affairs office",
       "whereToObtainUz": "Migratsiya xizmatiga yoki Ichki ishlar organlariga murojaat qiling",
-      "whereToObtainRu": "Обратитесь в службу миграции или органы внутренних дел"
+      "whereToObtainRu": "╨Ю╨▒╤А╨░╤В╨╕╤В╨╡╤Б╤М ╨▓ ╤Б╨╗╤Г╨╢╨▒╤Г ╨╝╨╕╨│╤А╨░╤Ж╨╕╨╕ ╨╕╨╗╨╕ ╨╛╤А╨│╨░╨╜╤Л ╨▓╨╜╤Г╤В╤А╨╡╨╜╨╜╨╕╤Е ╨┤╨╡╨╗"
     }
   ]
 }
@@ -730,120 +730,120 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
   } {
     // Basic document name mappings
     const docNames: Record<string, { en: string; uz: string; ru: string }> = {
-      passport: { en: 'Passport', uz: 'Pasport', ru: 'Паспорт' },
-      passport_photo: { en: 'Passport Photo', uz: 'Pasport surati', ru: 'Фотография на паспорт' },
-      bank_statement_main: { en: 'Bank Statement', uz: 'Bank hisoboti', ru: 'Выписка из банка' },
-      i20_form: { en: 'Form I-20', uz: 'I-20 formasi', ru: 'Форма I-20' },
+      passport: { en: 'Passport', uz: 'Pasport', ru: '╨Я╨░╤Б╨┐╨╛╤А╤В' },
+      passport_photo: { en: 'Passport Photo', uz: 'Pasport surati', ru: '╨д╨╛╤В╨╛╨│╤А╨░╤Д╨╕╤П ╨╜╨░ ╨┐╨░╤Б╨┐╨╛╤А╤В' },
+      bank_statement_main: { en: 'Bank Statement', uz: 'Bank hisoboti', ru: '╨Т╤Л╨┐╨╕╤Б╨║╨░ ╨╕╨╖ ╨▒╨░╨╜╨║╨░' },
+      i20_form: { en: 'Form I-20', uz: 'I-20 formasi', ru: '╨д╨╛╤А╨╝╨░ I-20' },
       sevis_fee_receipt: {
         en: 'SEVIS Fee Receipt',
         uz: "SEVIS to'lov kvitansiyasi",
-        ru: 'Квитанция об оплате SEVIS',
+        ru: '╨Ъ╨▓╨╕╤В╨░╨╜╤Ж╨╕╤П ╨╛╨▒ ╨╛╨┐╨╗╨░╤В╨╡ SEVIS',
       },
       ds160_confirmation: {
         en: 'DS-160 Confirmation',
         uz: 'DS-160 tasdiqlash',
-        ru: 'Подтверждение DS-160',
+        ru: '╨Я╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╨╡ DS-160',
       },
       loa_letter: {
         en: 'Letter of Acceptance (LOA)',
         uz: 'Qabul qilish xati (LOA)',
-        ru: 'Письмо о зачислении (LOA)',
+        ru: '╨Я╨╕╤Б╤М╨╝╨╛ ╨╛ ╨╖╨░╤З╨╕╤Б╨╗╨╡╨╜╨╕╨╕ (LOA)',
       },
-      cas_letter: { en: 'CAS Letter', uz: 'CAS xati', ru: 'Письмо CAS' },
+      cas_letter: { en: 'CAS Letter', uz: 'CAS xati', ru: '╨Я╨╕╤Б╤М╨╝╨╛ CAS' },
       coe_letter: {
         en: 'Confirmation of Enrolment (COE)',
         uz: "Ro'yxatdan o'tish tasdiqlovchisi (COE)",
-        ru: 'Подтверждение о зачислении (COE)',
+        ru: '╨Я╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╨╡ ╨╛ ╨╖╨░╤З╨╕╤Б╨╗╨╡╨╜╨╕╨╕ (COE)',
       },
       travel_insurance: {
         en: 'Travel Insurance',
         uz: "Sayohat sug'urtasi",
-        ru: 'Страховка для путешествий',
+        ru: '╨б╤В╤А╨░╤Е╨╛╨▓╨║╨░ ╨┤╨╗╤П ╨┐╤Г╤В╨╡╤И╨╡╤Б╤В╨▓╨╕╨╣',
       },
       accommodation_proof: {
         en: 'Accommodation Proof',
         uz: 'Yashash joyi hujjati',
-        ru: 'Подтверждение проживания',
+        ru: '╨Я╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╨╡ ╨┐╤А╨╛╨╢╨╕╨▓╨░╨╜╨╕╤П',
       },
       round_trip_ticket: {
         en: 'Round Trip Ticket',
         uz: 'Ikki tomonlama chipta',
-        ru: 'Билет туда и обратно',
+        ru: '╨С╨╕╨╗╨╡╤В ╤В╤Г╨┤╨░ ╨╕ ╨╛╨▒╤А╨░╤В╨╜╨╛',
       },
       employment_letter: {
         en: 'Employment Letter',
         uz: 'Ish joyi xati',
-        ru: 'Справка с места работы',
+        ru: '╨б╨┐╤А╨░╨▓╨║╨░ ╤Б ╨╝╨╡╤Б╤В╨░ ╤А╨░╨▒╨╛╤В╤Л',
       },
       sponsor_bank_statement: {
         en: 'Sponsor Bank Statement',
         uz: 'Homiylik bank hisoboti',
-        ru: 'Выписка из банка спонсора',
+        ru: '╨Т╤Л╨┐╨╕╤Б╨║╨░ ╨╕╨╖ ╨▒╨░╨╜╨║╨░ ╤Б╨┐╨╛╨╜╤Б╨╛╤А╨░',
       },
       sponsor_employment_letter: {
         en: 'Sponsor Employment Letter',
         uz: 'Homiylik ish joyi xati',
-        ru: 'Справка с места работы спонсора',
+        ru: '╨б╨┐╤А╨░╨▓╨║╨░ ╤Б ╨╝╨╡╤Б╤В╨░ ╤А╨░╨▒╨╛╤В╤Л ╤Б╨┐╨╛╨╜╤Б╨╛╤А╨░',
       },
       property_documents: {
         en: 'Property Documents',
         uz: 'Mulk hujjatlari',
-        ru: 'Документы на недвижимость',
+        ru: '╨Ф╨╛╨║╤Г╨╝╨╡╨╜╤В╤Л ╨╜╨░ ╨╜╨╡╨┤╨▓╨╕╨╢╨╕╨╝╨╛╤Б╤В╤М',
       },
       family_ties_proof: {
         en: 'Family Ties Proof',
         uz: 'Oila aloqalari hujjati',
-        ru: 'Подтверждение семейных связей',
+        ru: '╨Я╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╨╡ ╤Б╨╡╨╝╨╡╨╣╨╜╤Л╤Е ╤Б╨▓╤П╨╖╨╡╨╣',
       },
       refusal_explanation_letter: {
         en: 'Refusal Explanation Letter',
         uz: 'Rad etish tushuntirish xati',
-        ru: 'Письмо с объяснением отказа',
+        ru: '╨Я╨╕╤Б╤М╨╝╨╛ ╤Б ╨╛╨▒╤К╤П╤Б╨╜╨╡╨╜╨╕╨╡╨╝ ╨╛╤В╨║╨░╨╖╨░',
       },
-      travel_itinerary: { en: 'Travel Itinerary', uz: 'Sayohat rejasi', ru: 'Маршрут поездки' },
+      travel_itinerary: { en: 'Travel Itinerary', uz: 'Sayohat rejasi', ru: '╨Ь╨░╤А╤И╤А╤Г╤В ╨┐╨╛╨╡╨╖╨┤╨║╨╕' },
       visa_application_form: {
         en: 'Visa Application Form',
         uz: 'Viza ariza formasi',
-        ru: 'Форма заявления на визу',
+        ru: '╨д╨╛╤А╨╝╨░ ╨╖╨░╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╜╨░ ╨▓╨╕╨╖╤Г',
       },
       schengen_visa_form: {
         en: 'Schengen Visa Form',
         uz: 'Shengen viza formasi',
-        ru: 'Форма заявления на шенгенскую визу',
+        ru: '╨д╨╛╤А╨╝╨░ ╨╖╨░╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╜╨░ ╤И╨╡╨╜╨│╨╡╨╜╤Б╨║╤Г╤О ╨▓╨╕╨╖╤Г',
       },
-      daily_itinerary: { en: 'Daily Itinerary', uz: 'Kunlik reja', ru: 'Ежедневный маршрут' },
+      daily_itinerary: { en: 'Daily Itinerary', uz: 'Kunlik reja', ru: '╨Х╨╢╨╡╨┤╨╜╨╡╨▓╨╜╤Л╨╣ ╨╝╨░╤А╤И╤А╤Г╤В' },
       travel_history_proof: {
         en: 'Travel History Proof',
         uz: 'Sayohat tarixi hujjati',
-        ru: 'Подтверждение истории поездок',
+        ru: '╨Я╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╨╡ ╨╕╤Б╤В╨╛╤А╨╕╨╕ ╨┐╨╛╨╡╨╖╨┤╨╛╨║',
       },
-      gic_certificate: { en: 'GIC Certificate', uz: 'GIC sertifikati', ru: 'Сертификат GIC' },
+      gic_certificate: { en: 'GIC Certificate', uz: 'GIC sertifikati', ru: '╨б╨╡╤А╤В╨╕╤Д╨╕╨║╨░╤В GIC' },
       tuition_payment_proof: {
         en: 'Tuition Payment Proof',
         uz: "To'lov hujjati",
-        ru: 'Подтверждение оплаты обучения',
+        ru: '╨Я╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╨╡ ╨╛╨┐╨╗╨░╤В╤Л ╨╛╨▒╤Г╤З╨╡╨╜╨╕╤П',
       },
       health_insurance: {
         en: 'Health Insurance (OSHC)',
         uz: "Sog'liqni saqlash sug'urtasi (OSHC)",
-        ru: 'Медицинская страховка (OSHC)',
+        ru: '╨Ь╨╡╨┤╨╕╤Ж╨╕╨╜╤Б╨║╨░╤П ╤Б╤В╤А╨░╤Е╨╛╨▓╨║╨░ (OSHC)',
       },
-      sop: { en: 'Statement of Purpose', uz: 'Maqsad deklaratsiyasi', ru: 'Заявление о целях' },
-      tuberculosis_test: { en: 'Tuberculosis Test', uz: 'Sil testi', ru: 'Тест на туберкулез' },
+      sop: { en: 'Statement of Purpose', uz: 'Maqsad deklaratsiyasi', ru: '╨Ч╨░╤П╨▓╨╗╨╡╨╜╨╕╨╡ ╨╛ ╤Ж╨╡╨╗╤П╤Е' },
+      tuberculosis_test: { en: 'Tuberculosis Test', uz: 'Sil testi', ru: '╨в╨╡╤Б╤В ╨╜╨░ ╤В╤Г╨▒╨╡╤А╨║╤Г╨╗╨╡╨╖' },
       academic_records: {
         en: 'Academic Records',
         uz: 'Akademik yozuvlar',
-        ru: 'Академические записи',
+        ru: '╨Р╨║╨░╨┤╨╡╨╝╨╕╤З╨╡╤Б╨║╨╕╨╡ ╨╖╨░╨┐╨╕╤Б╨╕',
       },
       language_certificate: {
         en: 'Language Certificate',
         uz: 'Til sertifikati',
-        ru: 'Сертификат о знании языка',
+        ru: '╨б╨╡╤А╤В╨╕╤Д╨╕╨║╨░╤В ╨╛ ╨╖╨╜╨░╨╜╨╕╨╕ ╤П╨╖╤Л╨║╨░',
       },
       english_test_proof: {
         en: 'English Test Proof',
         uz: 'Ingliz tili testi hujjati',
-        ru: 'Подтверждение теста по английскому языку',
+        ru: '╨Я╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╕╨╡ ╤В╨╡╤Б╤В╨░ ╨┐╨╛ ╨░╨╜╨│╨╗╨╕╨╣╤Б╨║╨╛╨╝╤Г ╤П╨╖╤Л╨║╤Г',
       },
     };
 
@@ -859,7 +859,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       ru: defaultName.ru,
       description: `Required document for ${country} ${visaType} visa application.`,
       descriptionUz: `${country} ${visaType} viza arizasi uchun talab qilinadigan hujjat.`,
-      descriptionRu: `Требуемый документ для заявления на визу ${country} ${visaType}.`,
+      descriptionRu: `╨в╤А╨╡╨▒╤Г╨╡╨╝╤Л╨╣ ╨┤╨╛╨║╤Г╨╝╨╡╨╜╤В ╨┤╨╗╤П ╨╖╨░╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╜╨░ ╨▓╨╕╨╖╤Г ${country} ${visaType}.`,
     };
   }
 
@@ -867,7 +867,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
    * Generate document checklist for visa application
    * Enhanced with visa knowledge base and document guides
    *
-   * FULL HYBRID COVERAGE for 8 countries × visa types:
+   * FULL HYBRID COVERAGE for 8 countries ├Ч visa types:
    * - USA: student, tourist
    * - Canada: student, tourist
    * - UK: student, tourist
@@ -1102,12 +1102,14 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
 
               // Convert to internal format
               const enrichedChecklist = parsed.checklist.map((item: any) => {
-                const baseItem = baseChecklist.find((b) => b.documentType === item.documentType);
+                const baseItem = baseChecklist.find(
+                  (b: any) => b.documentType === item.documentType
+                );
                 return {
                   document: item.documentType || item.document || 'Unknown',
                   name: item.name || item.documentType || 'Unknown',
                   nameUz: item.nameUz || item.name || item.documentType || "Noma'lum",
-                  nameRu: item.nameRu || item.name || item.documentType || 'Неизвестно',
+                  nameRu: item.nameRu || item.name || item.documentType || '╨Э╨╡╨╕╨╖╨▓╨╡╤Б╤В╨╜╨╛',
                   category: baseItem?.category || item.category || 'optional',
                   required:
                     baseItem?.required !== undefined ? baseItem.required : item.required !== false,
@@ -1155,7 +1157,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
             );
 
             // Build minimal fallback checklist using ruleSet only
-            const fallbackChecklist = baseChecklist.map((item) => {
+            const fallbackChecklist = baseChecklist.map((item: any) => {
               // Get basic descriptions from knowledge base
               const docName = this.getDocumentNameFromKB(
                 item.documentType,
@@ -1173,13 +1175,13 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                 description: docName.description || `Required document: ${item.documentType}`,
                 descriptionUz:
                   docName.descriptionUz || `Talab qilinadigan hujjat: ${item.documentType}`,
-                descriptionRu: docName.descriptionRu || `Требуемый документ: ${item.documentType}`,
+                descriptionRu: docName.descriptionRu || `╨в╤А╨╡╨▒╤Г╨╡╨╝╤Л╨╣ ╨┤╨╛╨║╤Г╨╝╨╡╨╜╤В: ${item.documentType}`,
                 priority: this.inferPriorityFromCategory(item.category),
                 whereToObtain: 'Contact embassy or visa application center for details.',
                 whereToObtainUz:
                   'Tafsilotlar uchun elchixona yoki viza ariza markaziga murojaat qiling.',
                 whereToObtainRu:
-                  'Обратитесь в посольство или центр подачи заявлений на визу для получения подробной информации.',
+                  '╨Ю╨▒╤А╨░╤В╨╕╤В╨╡╤Б╤М ╨▓ ╨┐╨╛╤Б╨╛╨╗╤М╤Б╤В╨▓╨╛ ╨╕╨╗╨╕ ╤Ж╨╡╨╜╤В╤А ╨┐╨╛╨┤╨░╤З╨╕ ╨╖╨░╤П╨▓╨╗╨╡╨╜╨╕╨╣ ╨╜╨░ ╨▓╨╕╨╖╤Г ╨┤╨╗╤П ╨┐╨╛╨╗╤Г╤З╨╡╨╜╨╕╤П ╨┐╨╛╨┤╤А╨╛╨▒╨╜╨╛╨╣ ╨╕╨╜╤Д╨╛╤А╨╝╨░╤Ж╨╕╨╕.',
               };
             });
 
@@ -1232,7 +1234,7 @@ Analyze ALL context and produce a COMPLETE, CONSISTENT, ACCURATE 3-category chec
 3) optional
 
 GENERAL RULES:
-- ALWAYS output 8–15 total documents.
+- ALWAYS output 8тАУ15 total documents.
 - ALWAYS include ALL THREE categories.
 - ALWAYS put every document in exactly one category.
 - EACH ITEM MUST have:
@@ -1313,7 +1315,7 @@ Australia:
   - GTE-related documents (if relevant)
 
 Schengen:
-  - Insurance with €30,000 coverage
+  - Insurance with тВм30,000 coverage
   - Passport photos (biometric)
 
 Japan:
@@ -1391,13 +1393,13 @@ RULES FOR required, priority, AND category:
 
 FINAL INSTRUCTIONS:
 - ALWAYS return clean JSON in schema EXACTLY as required.
-- If questionnaire data is incomplete or contradictory → resolve logically using Uzbek context.
+- If questionnaire data is incomplete or contradictory тЖТ resolve logically using Uzbek context.
 - NEVER output fewer than 8 items.
 - NEVER output only "required".
 - NO HALLUCINATIONS: Only use real document types, real embassy requirements, real terminology.
 - NO FAKE DOCUMENTS: Do not invent document names that don't exist.
 - NO FAKE EMBASSIES: Do not invent embassy procedures or requirements.
-- If unsure about a document requirement → mark as "optional" rather than inventing.
+- If unsure about a document requirement тЖТ mark as "optional" rather than inventing.
 
 Your goal: produce the most reliable, accurate, embassy-ready checklist every time.`;
 
@@ -1831,7 +1833,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           document: item.document || item.name || 'Unknown',
           name: item.name || item.document || 'Unknown',
           nameUz: item.nameUz || item.name || item.document || "Noma'lum",
-          nameRu: item.nameRu || item.name || item.document || 'Неизвестно',
+          nameRu: item.nameRu || item.name || item.document || '╨Э╨╡╨╕╨╖╨▓╨╡╤Б╤В╨╜╨╛',
           category, // NEW: Explicit category field
           required, // Derived from category or kept from AI response
           description: item.description || '',
@@ -1879,57 +1881,57 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           document: 'passport',
           name: 'Passport',
           nameUz: 'Pasport',
-          nameRu: 'Паспорт',
+          nameRu: '╨Я╨░╤Б╨┐╨╛╤А╤В',
           required: true,
           description: 'Valid passport with at least 6 months validity',
           descriptionUz: 'Kamida 6 oy muddati qolgan yaroqli pasport',
-          descriptionRu: 'Действительный паспорт со сроком действия не менее 6 месяцев',
+          descriptionRu: '╨Ф╨╡╨╣╤Б╤В╨▓╨╕╤В╨╡╨╗╤М╨╜╤Л╨╣ ╨┐╨░╤Б╨┐╨╛╤А╤В ╤Б╨╛ ╤Б╤А╨╛╨║╨╛╨╝ ╨┤╨╡╨╣╤Б╤В╨▓╨╕╤П ╨╜╨╡ ╨╝╨╡╨╜╨╡╨╡ 6 ╨╝╨╡╤Б╤П╤Ж╨╡╨▓',
           priority: 'high' as const,
           whereToObtain: 'Apply at migration service or internal affairs office',
           whereToObtainUz: 'Migratsiya xizmatiga yoki Ichki ishlar organlariga murojaat qiling',
-          whereToObtainRu: 'Обратитесь в службу миграции или органы внутренних дел',
+          whereToObtainRu: '╨Ю╨▒╤А╨░╤В╨╕╤В╨╡╤Б╤М ╨▓ ╤Б╨╗╤Г╨╢╨▒╤Г ╨╝╨╕╨│╤А╨░╤Ж╨╕╨╕ ╨╕╨╗╨╕ ╨╛╤А╨│╨░╨╜╤Л ╨▓╨╜╤Г╤В╤А╨╡╨╜╨╜╨╕╤Е ╨┤╨╡╨╗',
         },
         {
           document: 'passport_photo',
           name: 'Passport Photo',
           nameUz: 'Pasport Fotosi',
-          nameRu: 'Фото на Паспорт',
+          nameRu: '╨д╨╛╤В╨╛ ╨╜╨░ ╨Я╨░╤Б╨┐╨╛╤А╤В',
           required: true,
           description: '2x2 inch photo with white background',
           descriptionUz: '2x2 dyuymli foto, oq fon',
-          descriptionRu: 'Фото 2x2 дюйма на белом фоне',
+          descriptionRu: '╨д╨╛╤В╨╛ 2x2 ╨┤╤О╨╣╨╝╨░ ╨╜╨░ ╨▒╨╡╨╗╨╛╨╝ ╤Д╨╛╨╜╨╡',
           priority: 'high' as const,
           whereToObtain: 'Take at photo studio',
           whereToObtainUz: 'Foto studiyada oling',
-          whereToObtainRu: 'Сделайте в фотостудии',
+          whereToObtainRu: '╨б╨┤╨╡╨╗╨░╨╣╤В╨╡ ╨▓ ╤Д╨╛╤В╨╛╤Б╤В╤Г╨┤╨╕╨╕',
         },
         {
           document: 'visa_application_form',
           name: 'Visa Application Form',
           nameUz: 'Viza ariza formasi',
-          nameRu: 'Форма заявления на визу',
+          nameRu: '╨д╨╛╤А╨╝╨░ ╨╖╨░╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╜╨░ ╨▓╨╕╨╖╤Г',
           required: true,
           description: 'Completed and signed visa application form',
           descriptionUz: "To'ldirilgan va imzolangan viza ariza formasi",
-          descriptionRu: 'Заполненная и подписанная форма заявления на визу',
+          descriptionRu: '╨Ч╨░╨┐╨╛╨╗╨╜╨╡╨╜╨╜╨░╤П ╨╕ ╨┐╨╛╨┤╨┐╨╕╤Б╨░╨╜╨╜╨░╤П ╤Д╨╛╤А╨╝╨░ ╨╖╨░╤П╨▓╨╗╨╡╨╜╨╕╤П ╨╜╨░ ╨▓╨╕╨╖╤Г',
           priority: 'high' as const,
           whereToObtain: 'Download from embassy/consulate website or VFS center',
           whereToObtainUz: 'Elchixona/konsullik veb-saytidan yoki VFS markazidan yuklab oling',
-          whereToObtainRu: 'Скачайте с веб-сайта посольства/консульства или центра VFS',
+          whereToObtainRu: '╨б╨║╨░╤З╨░╨╣╤В╨╡ ╤Б ╨▓╨╡╨▒-╤Б╨░╨╣╤В╨░ ╨┐╨╛╤Б╨╛╨╗╤М╤Б╤В╨▓╨░/╨║╨╛╨╜╤Б╤Г╨╗╤М╤Б╤В╨▓╨░ ╨╕╨╗╨╕ ╤Ж╨╡╨╜╤В╤А╨░ VFS',
         },
         {
           document: 'bank_statement',
           name: 'Bank Statement',
           nameUz: 'Bank Hisobi',
-          nameRu: 'Банковская Выписка',
+          nameRu: '╨С╨░╨╜╨║╨╛╨▓╤Б╨║╨░╤П ╨Т╤Л╨┐╨╕╤Б╨║╨░',
           required: true,
           description: 'Recent bank statement showing sufficient funds',
           descriptionUz: "Yeterli mablag'ni ko'rsatadigan so'nggi bank hisobi",
-          descriptionRu: 'Недавняя банковская выписка, показывающая достаточные средства',
+          descriptionRu: '╨Э╨╡╨┤╨░╨▓╨╜╤П╤П ╨▒╨░╨╜╨║╨╛╨▓╤Б╨║╨░╤П ╨▓╤Л╨┐╨╕╤Б╨║╨░, ╨┐╨╛╨║╨░╨╖╤Л╨▓╨░╤О╤Й╨░╤П ╨┤╨╛╤Б╤В╨░╤В╨╛╤З╨╜╤Л╨╡ ╤Б╤А╨╡╨┤╤Б╤В╨▓╨░',
           priority: 'high' as const,
           whereToObtain: 'Obtain from your bank',
           whereToObtainUz: 'Bankingizdan oling',
-          whereToObtainRu: 'Получите в вашем банке',
+          whereToObtainRu: '╨Я╨╛╨╗╤Г╤З╨╕╤В╨╡ ╨▓ ╨▓╨░╤И╨╡╨╝ ╨▒╨░╨╜╨║╨╡',
         },
       ];
 
@@ -1939,15 +1941,15 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           document: 'acceptance_letter',
           name: 'Acceptance Letter',
           nameUz: 'Qabul Xati',
-          nameRu: 'Письмо о Зачислении',
+          nameRu: '╨Я╨╕╤Б╤М╨╝╨╛ ╨╛ ╨Ч╨░╤З╨╕╤Б╨╗╨╡╨╜╨╕╨╕',
           required: true,
           description: 'Official acceptance letter from educational institution',
           descriptionUz: "Ta'lim muassasasidan rasmiy qabul xati",
-          descriptionRu: 'Официальное письмо о зачислении от учебного заведения',
+          descriptionRu: '╨Ю╤Д╨╕╤Ж╨╕╨░╨╗╤М╨╜╨╛╨╡ ╨┐╨╕╤Б╤М╨╝╨╛ ╨╛ ╨╖╨░╤З╨╕╤Б╨╗╨╡╨╜╨╕╨╕ ╨╛╤В ╤Г╤З╨╡╨▒╨╜╨╛╨│╨╛ ╨╖╨░╨▓╨╡╨┤╨╡╨╜╨╕╤П',
           priority: 'high' as const,
           whereToObtain: 'Request from your school or university',
           whereToObtainUz: "Maktabingiz yoki universitetingizdan so'rang",
-          whereToObtainRu: 'Запросите в вашей школе или университете',
+          whereToObtainRu: '╨Ч╨░╨┐╤А╨╛╤Б╨╕╤В╨╡ ╨▓ ╨▓╨░╤И╨╡╨╣ ╤И╨║╨╛╨╗╨╡ ╨╕╨╗╨╕ ╤Г╨╜╨╕╨▓╨╡╤А╤Б╨╕╤В╨╡╤В╨╡',
         });
       }
 

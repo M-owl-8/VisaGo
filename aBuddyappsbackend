@@ -1,0 +1,63 @@
+[33mcommit 082f35a621d9d29f93d97a68e8ec08fa2e88c261[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: M-owl-8 <m-owl-8@github.com>
+Date:   Mon Dec 1 01:03:36 2025 +0500
+
+    fix: Attempt to resolve TypeScript syntax error - needs further investigation
+
+[33mcommit 09361c05206d353d0fca00ddcf9fc77e523d9d01[m
+Author: M-owl-8 <m-owl-8@github.com>
+Date:   Mon Dec 1 00:58:36 2025 +0500
+
+    feat: Implement Phase 3 - Document Checking & Wow Factor
+
+[33mcommit 0922f95dea73455ea70af64073d1f4a28c599e54[m
+Author: M-owl-8 <m-owl-8@github.com>
+Date:   Sun Nov 30 19:18:16 2025 +0500
+
+    fix: Add missing hybrid checklist files and fix TypeScript errors
+    
+    - Add visaDocumentRules.ts and checklist-rules.service.ts to git (were missing)
+    - Fix TypeScript implicit any errors in ai-openai.service.ts
+    - These files are required for hybrid checklist system to work
+
+[33mcommit 8b014e3746fe3db41c61f260ad89d454042827b7[m
+Author: M-owl-8 <m-owl-8@github.com>
+Date:   Sun Nov 30 19:09:16 2025 +0500
+
+    fix: Improve error handling, timeouts, and fallback checklists
+    
+    - Fix 409 Conflict handling: Preserve 409 status in error handler and routes
+      - /api/applications/ai-generate now returns 409 (not 500) for duplicate applications
+      - Added clear logging: [AI Application Generation] Conflict  active application already exists
+      - Error handler explicitly preserves 409 for ApiError instances
+    
+    - Update API clients to handle 409 gracefully:
+      - Mobile (frontend_new): Treats 409 as validation error with user-friendly message
+      - Web (apps/web): Added 409 handling in API client and error message utility
+      - Both show: 'You already have an active application for this country...'
+    
+    - OpenAI timeout improvements:
+      - Timeout set to 35s (within 30-40s range)
+      - Improved logging: [OpenAI][Checklist] Request timed out, using fallback
+      - Timeout errors properly caught and fallback checklist used
+    
+    - Fallback checklist validation:
+      - Ensures 8-15 items (already implemented in generateRobustFallbackChecklist)
+      - Logs warnings if outside range
+      - Tops up items if fewer than 8
+    
+    All changes are backwards-compatible and safe for production.
+
+[33mcommit 85aeff23d77c9835ba889c9a4ea5ec28661cdbb9[m
+Author: M-owl-8 <m-owl-8@github.com>
+Date:   Fri Nov 28 16:50:34 2025 +0500
+
+    feat(checklist): enforce one-time generation and enhance fallback checklists
+    
+    - Add early return check in generateChecklistAsync to prevent duplicate OpenAI calls
+    - Update MIN_ITEMS from 8 to 10 and MAX_ITEMS from 15 to 16 across all validators
+    - Enhance fallback checklists to 12-16 items with proper category distribution
+    - Update AI prompts to require 10-16 documents (aim for 12-14)
+    - Ensure metadata consistency (aiFallbackUsed, aiErrorOccurred) in all responses
+    - Expand US, GB, CA fallback checklists with comprehensive document lists
+    - Short 4-6 item lists now always trigger fallback to comprehensive lists

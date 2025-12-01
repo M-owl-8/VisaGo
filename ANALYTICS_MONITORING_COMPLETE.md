@@ -326,7 +326,3 @@ Before deploying to production:
 - [Sentry Node.js Documentation](https://docs.sentry.io/platforms/node/)
 - [Sentry Performance Monitoring](https://docs.sentry.io/product/performance/)
 - [Sentry Profiling](https://docs.sentry.io/product/profiling/)
-
-
-
-

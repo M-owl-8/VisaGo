@@ -143,7 +143,3 @@ The app now has a **cleaner, more premium UI** with:
 - ✅ Matches Telegram/ChatGPT aesthetic
 - ✅ Consistent design language
 - ✅ Better user experience
-
-
-
-

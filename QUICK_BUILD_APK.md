@@ -76,7 +76,3 @@ cd frontend_new/android
 - Check that your device architecture is supported (ARM64, ARMv7, x86, x86_64)
 
 For more details, see `frontend_new/BUILD_APK_GUIDE.md`
-
-
-
-

@@ -203,7 +203,3 @@
 - **Features**: RAG, Chat, Application Generation, Document Checklist, Form Filling
 
 **To Verify**: Check environment variables and run health checks on both backend and AI service.
-
-
-
-

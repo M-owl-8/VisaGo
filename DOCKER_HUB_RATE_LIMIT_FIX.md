@@ -66,7 +66,3 @@ After switching to Nixpacks:
 - ✅ Python 3.11 built from source via Nix
 - ✅ Dependencies installed via pip
 - ✅ Service starts successfully
-
-
-
-

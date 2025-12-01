@@ -1,6 +1,7 @@
 # Stage 1: Mobile UX Analysis Report
 
 ## Overview
+
 This document analyzes the current mobile browser experience for the Ketdik web app across key routes. **No code changes were made** - this is purely an analysis phase.
 
 ---
@@ -8,9 +9,10 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ## 1. Landing Page (`/`)
 
 ### Main Components
+
 - **Page:** `apps/web/app/page.tsx`
 - **Layout:** `apps/web/components/landing/LandingHeader.tsx`
-- **Sections:** 
+- **Sections:**
   - `HeroSection.tsx`
   - `HowItWorksSection.tsx`
   - `FeaturesSection.tsx`
@@ -19,6 +21,7 @@ This document analyzes the current mobile browser experience for the Ketdik web 
   - `LandingFooter.tsx`
 
 ### Current Responsive Styles
+
 - Header uses: `px-4 sm:px-6 lg:px-8` (horizontal padding scales up)
 - Navigation hidden on mobile: `hidden md:flex` (nav links only visible ≥768px)
 - Hero title: `text-4xl sm:text-5xl lg:text-6xl` (scales up)
@@ -29,7 +32,9 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ### Mobile Behavior Analysis
 
 #### ~375px (Small Phone, Portrait)
+
 **Issues Identified:**
+
 - ✅ Header has `px-4` padding (good)
 - ⚠️ **Header actions may overflow:** Logo + Language switcher + "Sign In" + "Get Started" buttons all in one row - likely to overflow on 375px
 - ✅ Hero title scales down to `text-4xl` (readable)
@@ -38,11 +43,13 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 - ✅ Sections have `px-4` padding (no horizontal scroll expected)
 
 #### ~414-430px (Modern Phone)
+
 - Similar to 375px, but more breathing room
 - Header actions still potentially cramped
 - All other elements should fit comfortably
 
 #### ~768px (Small Tablet)
+
 - Navigation becomes visible (`md:flex`)
 - CTAs switch to horizontal (`sm:flex-row`)
 - Better spacing overall
@@ -52,11 +59,13 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ## 2. Auth Pages (`/login`, `/register`)
 
 ### Main Components
+
 - **Login:** `apps/web/app/(auth)/login/page.tsx`
 - **Register:** `apps/web/app/(auth)/register/page.tsx`
 - **Layout:** `apps/web/components/layout/AuthLayout.tsx`
 
 ### Current Responsive Styles
+
 - AuthLayout: `px-6 py-12` (no mobile-specific padding reduction)
 - Form container: `p-8 sm:p-10` (padding scales up)
 - Register form: `grid gap-4 sm:grid-cols-2` (first/last name side-by-side on desktop)
@@ -65,7 +74,9 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ### Mobile Behavior Analysis
 
 #### ~375px (Small Phone)
+
 **Issues Identified:**
+
 - ⚠️ **Top padding may be excessive:** `py-12` + icon + title + subtitle + form = potentially pushes form down
 - ✅ Form uses `w-full` (no overflow)
 - ✅ Inputs use `w-full` (good)
@@ -74,10 +85,12 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 - ⚠️ **Language switcher** in top-right may overlap with form on very small screens
 
 #### ~414-430px (Modern Phone)
+
 - Better spacing, but still may feel cramped at top
 - Form should fit comfortably
 
 #### ~768px (Small Tablet)
+
 - First/Last name fields become side-by-side (`sm:grid-cols-2`)
 - More comfortable spacing
 
@@ -86,11 +99,13 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ## 3. Dashboard - Applications List (`/applications`)
 
 ### Main Components
+
 - **Page:** `apps/web/app/(dashboard)/applications/page.tsx`
 - **Layout:** `apps/web/components/layout/AppShell.tsx`
 - **Card:** `apps/web/components/applications/ApplicationCard.tsx`
 
 ### Current Responsive Styles
+
 - AppShell nav: `px-4 sm:px-6 lg:px-8` (padding scales)
 - Main content: `px-4 pb-16 pt-4 sm:px-6 lg:px-8` (consistent padding)
 - Nav links: `hidden md:flex` (hidden on mobile, hamburger menu shown)
@@ -101,7 +116,9 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ### Mobile Behavior Analysis
 
 #### ~375px (Small Phone)
+
 **Issues Identified:**
+
 - ✅ Hamburger menu exists (`md:hidden` on button, `hidden md:flex` on nav) - good
 - ✅ Mobile menu slides down with nav links - good UX
 - ⚠️ **ApplicationCard actions:** Two buttons side-by-side (`flex items-center gap-3`) - may be cramped
@@ -111,9 +128,11 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 - ⚠️ **Metrics cards:** Stack vertically (`grid` without `md:grid-cols-3`) - good, but may need better spacing
 
 #### ~414-430px (Modern Phone)
+
 - More comfortable, but card actions still potentially cramped
 
 #### ~768px (Small Tablet)
+
 - Metrics become 3-column (`md:grid-cols-3`)
 - Better overall layout
 
@@ -122,11 +141,13 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ## 4. Application Detail (`/applications/[id]`)
 
 ### Main Components
+
 - **Page:** `apps/web/app/(dashboard)/applications/[id]/page.tsx`
 - **Checklist:** `apps/web/components/checklist/DocumentChecklist.tsx`
 - **Summary:** `apps/web/components/checklist/ChecklistSummary.tsx`
 
 ### Current Responsive Styles
+
 - Page: `px-4 py-8 sm:px-6 lg:px-8` (consistent padding)
 - Layout: `grid gap-6 lg:grid-cols-[2fr,1fr]` (stacks on mobile, 2-column on desktop)
 - Checklist items: Individual items in `DocumentChecklistItem.tsx` - need to check
@@ -134,16 +155,20 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ### Mobile Behavior Analysis
 
 #### ~375px (Small Phone)
+
 **Issues Identified:**
+
 - ✅ Main layout stacks (`grid` without `lg:grid-cols-[2fr,1fr]` on mobile) - good
 - ⚠️ **Checklist items:** Need to verify if document items wrap properly
 - ⚠️ **Summary sidebar:** Stacks below checklist on mobile - good, but may need spacing adjustments
 - ⚠️ **Action buttons** in checklist items may overflow if text is long
 
 #### ~414-430px (Modern Phone)
+
 - Better spacing, but checklist items still need verification
 
 #### ~768px (Small Tablet)
+
 - Layout remains stacked until `lg:` breakpoint (1024px)
 - Better for tablet portrait
 
@@ -152,6 +177,7 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ## 5. AI Assistant Chat (`/chat`)
 
 ### Main Components
+
 - **Page:** `apps/web/app/(dashboard)/chat/page.tsx`
 - **Header:** `apps/web/components/chat/ChatHeader.tsx`
 - **Input:** `apps/web/components/chat/ChatInput.tsx`
@@ -159,6 +185,7 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 - **Messages:** `apps/web/components/chat/ChatMessageBubble.tsx`
 
 ### Current Responsive Styles
+
 - Chat container: `max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8` (centered, padding scales)
 - Card: `flex flex-1 flex-col` (full height flex container)
 - Messages area: `flex-1 overflow-y-auto p-6` (scrollable)
@@ -169,7 +196,9 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ### Mobile Behavior Analysis
 
 #### ~375px (Small Phone)
+
 **Issues Identified:**
+
 - ⚠️ **Chat container height:** Uses `flex-1` but parent may not have fixed height - may not use full viewport
 - ⚠️ **Message bubbles:** `max-w-[75%] sm:max-w-[80%]` - good, but need to verify padding from screen edges
 - ✅ Input area has `p-4` padding (good)
@@ -178,9 +207,11 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 - ⚠️ **Quick actions:** Grid layout in `QuickActions.tsx` - need to verify mobile stacking
 
 #### ~414-430px (Modern Phone)
+
 - Better spacing, but height/keyboard issues remain
 
 #### ~768px (Small Tablet)
+
 - More comfortable, but still may need height adjustments
 
 ---
@@ -188,9 +219,11 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ## 6. Global Layout Shell (`AppShell`)
 
 ### Main Component
+
 - **Shell:** `apps/web/components/layout/AppShell.tsx`
 
 ### Current Responsive Styles
+
 - Nav: `px-4 py-6 sm:px-6 lg:px-8` (padding scales)
 - Nav links: `hidden md:flex` (desktop only)
 - Hamburger: `md:hidden` (mobile only)
@@ -201,7 +234,9 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ### Mobile Behavior Analysis
 
 #### ~375px (Small Phone)
+
 **Issues Identified:**
+
 - ✅ Hamburger menu works (good UX)
 - ✅ Mobile menu includes all nav links (good)
 - ✅ Language switcher in mobile menu (good)
@@ -209,9 +244,11 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 - ⚠️ **Logo size:** `h-12 w-12` may be large for small screens
 
 #### ~414-430px (Modern Phone)
+
 - Better spacing
 
 #### ~768px (Small Tablet)
+
 - Full navigation becomes visible
 - Better overall layout
 
@@ -220,6 +257,7 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ## Summary of Key Issues by Screen Size
 
 ### ~375px (Small Phone) - Critical Issues
+
 1. **Landing Header:** Actions (logo + language + Sign In + Get Started) may overflow
 2. **Auth Pages:** Top padding may push form too far down
 3. **Application Cards:** Action buttons may be cramped
@@ -227,16 +265,19 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 5. **AppShell:** Nav padding may be tight
 
 ### ~414-430px (Modern Phone) - Moderate Issues
+
 - Similar to 375px but with more breathing room
 - Most issues are less severe
 
 ### ~768px (Small Tablet) - Minor Issues
+
 - Most layouts switch to desktop patterns
 - Generally better experience
 
 ---
 
 ## Responsive Breakpoints Used
+
 - `sm:` = 640px
 - `md:` = 768px
 - `lg:` = 1024px
@@ -245,6 +286,7 @@ This document analyzes the current mobile browser experience for the Ketdik web 
 ---
 
 ## Next Steps (Stage 2-7)
+
 Based on this analysis, the following improvements are needed:
 
 1. **Stage 2:** Fix header/nav overflow on mobile, improve hamburger menu
@@ -257,8 +299,3 @@ Based on this analysis, the following improvements are needed:
 ---
 
 **Analysis Complete - Ready for Stage 2 Implementation**
-
-
-
-
-

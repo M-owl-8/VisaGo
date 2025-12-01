@@ -335,7 +335,3 @@ When you first open the app, test:
 5. ⚠️ Google OAuth configured (for Google Sign-In - optional)
 
 **The standalone APK is fully functional** - it just needs the backend services to be available for most features to work.
-
-
-
-

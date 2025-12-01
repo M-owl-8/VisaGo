@@ -168,7 +168,3 @@ const styles = StyleSheet.create({
 });
 
 export default AppIcon;
-
-
-
-

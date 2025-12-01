@@ -130,7 +130,6 @@ model VisaApplication {
   documents         UserDocument[]
   payment           Payment?
   checkpoints       Checkpoint[]
-  checkResults      DocumentCheckResult[] // Phase 3: Document check results
 
   @@unique([userId, countryId, visaTypeId])
   @@index([userId])
@@ -185,22 +184,15 @@ model UserDocument {
   aiNotesUz         String?
   aiNotesRu         String?
   aiNotesEn         String?
-  // Phase 3: Document classification fields
-  classifiedType        String?   // e.g. "passport", "bank_statement", "employment_letter"
-  classificationSource  String?   // e.g. "ai", "manual"
-  classificationScore   Float?    // confidence score 0-1
-  extractedText         String?   // extracted/ocr text (for doc-check)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  checkResults      DocumentCheckResult[] // Phase 3: Document check results
 
   @@index([userId])
   @@index([applicationId])
   @@index([status])
-  @@index([classifiedType])
 }
 
 model Payment {
@@ -529,86 +521,6 @@ model DocumentChecklist {
 
   @@index([applicationId])
   @@index([status])
-}
-
-// ============================================================================
-// VISA TEMPLATE MODELS (Phase 2)
-// ============================================================================
-
-model VisaTemplate {
-  id                       String   @id @default(cuid())
-  countryCode              String   // "US", "CA", "DE", "KR", ...
-  countryName              String
-  visaTypeCode             String   // "student_long_stay", "tourist_short", etc.
-  visaTypeLabel            String   // "Long-stay Student Visa"
-  version                  String   // e.g. "2025-01-27"
-  coverageLevel            String   // "CORE" | "GOOD" | "BETA"
-  notes                    String?  // optional free-form notes
-
-  eligibilityJson          String?  // JSON array of VisaEligibilityRule
-  financialRequirementsJson String?  // JSON array of VisaFinancialRequirement
-  processingTimeJson       String?  // JSON VisaProcessingTime
-  officialLinksJson        String?  // JSON array of VisaOfficialLink
-  specialNotesJson         String?  // JSON array of VisaSpecialNote
-
-  documents                VisaTemplateDocument[]
-
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-
-  @@index([countryCode, visaTypeCode])
-  @@unique([countryCode, visaTypeCode])
-}
-
-model VisaTemplateDocument {
-  id                  String        @id @default(cuid())
-  visaTemplateId      String
-  visaTemplate        VisaTemplate  @relation(fields: [visaTemplateId], references: [id], onDelete: Cascade)
-
-  docKey              String        // e.g. "passport", "i20", "loa", "bank_statement"
-  name                String
-  whoNeedsIt          String        // "applicant", "sponsor", "family_member", etc.
-  description         String
-  isCoreRequired      Boolean
-  isConditional       Boolean       @default(false)
-  conditionDescription String?
-
-  extraJson           String?       // optional extra per-doc fields (JSON)
-
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  @@index([visaTemplateId])
-  @@index([docKey])
-}
-
-// ============================================================================
-// DOCUMENT CHECK RESULT MODELS (Phase 3)
-// ============================================================================
-
-model DocumentCheckResult {
-  id              String   @id @default(cuid())
-  applicationId   String
-  checklistItemId String   // ID of checklist item in DocumentChecklist
-  documentId      String?  // ID of matched uploaded document (nullable if missing)
-
-  status          String   // 'OK' | 'MISSING' | 'PROBLEM' | 'UNCERTAIN'
-  problemsJson    String?  // JSON array of DocCheckProblem
-  suggestionsJson String?  // JSON array of DocCheckSuggestion
-  confidence      Float?   // optional AI confidence
-  notes           String?  // optional human/AI notes
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  application     VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  document        UserDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
-
-  @@index([applicationId])
-  @@index([checklistItemId])
-  @@index([documentId])
-  @@index([status])
-  @@unique([applicationId, checklistItemId])
 }
 
 

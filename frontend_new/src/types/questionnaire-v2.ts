@@ -145,7 +145,3 @@ export interface QuestionnaireV2 {
     hasCriminalRecord: boolean;
   };
 }
-
-
-
-

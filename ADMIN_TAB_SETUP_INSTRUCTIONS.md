@@ -116,7 +116,3 @@ If you want to use a different email that already exists:
 2. Edit `apps/backend/scripts/make-super-admin.ts`
 3. Change the email on line 17 to your existing email
 4. Run `npm run make-super-admin` again
-
-
-
-

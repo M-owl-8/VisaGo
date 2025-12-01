@@ -72,7 +72,3 @@ export const cacheControl = (req: Request, res: Response, next: NextFunction) =>
 
   next();
 };
-
-
-
-

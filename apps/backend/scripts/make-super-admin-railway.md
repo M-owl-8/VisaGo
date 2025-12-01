@@ -54,7 +54,3 @@ node prisma/schema-selector.js
 npx prisma generate
 npm run make-super-admin
 ```
-
-
-
-

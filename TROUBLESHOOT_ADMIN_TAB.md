@@ -70,7 +70,3 @@ The frontend should:
 2. **Check backend logs** to see if role is being returned
 3. **Verify backend is running** and connected to the same database
 4. **Clear app data** and log in again (to clear cached user data)
-
-
-
-

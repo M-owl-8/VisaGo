@@ -256,7 +256,3 @@ After applying fixes, verify:
 **Last Updated:** Based on commit `24a23ab` (Husky fix applied)
 **Repository:** `M-owl-8/VisaGo`
 **Branch:** `main`
-
-
-
-

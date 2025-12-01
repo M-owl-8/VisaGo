@@ -191,7 +191,3 @@ open ios/frontend_new.xcworkspace
 ---
 
 **Note**: The iOS icons are already generated and ready. You just need to build the app!
-
-
-
-
