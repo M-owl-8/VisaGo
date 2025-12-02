@@ -25,15 +25,22 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Copy package files (repo root context required)
+# IMPORTANT: Copy ALL package.json files BEFORE npm install so workspace dependencies are installed
 COPY package.json ./
 COPY package-lock.json ./
 COPY apps/backend/package*.json ./apps/backend/
 COPY apps/backend/tsconfig.json ./apps/backend/
 COPY apps/backend/prisma ./apps/backend/prisma/
-COPY apps/backend/src ./apps/backend/src/
+# Note: src is copied later to allow better caching
+
+# Verify backend package.json was copied and contains cheerio
+RUN echo "Verifying backend package.json..." && \
+    test -f /app/apps/backend/package.json || (echo "ERROR: backend package.json not found" && exit 1) && \
+    grep -q "cheerio" /app/apps/backend/package.json && echo "✓ cheerio found in backend package.json" || (echo "✗ cheerio NOT in backend package.json" && cat /app/apps/backend/package.json | grep -A 5 -B 5 "dependencies" && exit 1)
 
 # Install all dependencies (including dev)
 # Use npm install to ensure all workspace dependencies are resolved
+# This must happen AFTER backend package.json is copied
 RUN npm install
 
 # Generate Prisma client (will use PostgreSQL schema on Railway)
