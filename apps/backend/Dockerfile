@@ -40,6 +40,8 @@ RUN npm install
 WORKDIR /app/apps/backend
 # Force PostgreSQL schema for production build
 RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma || echo "PostgreSQL schema already selected"
+# Verify schema has required models
+RUN grep -q "model EmbassySource" prisma/schema.prisma && grep -q "model VisaRuleSet" prisma/schema.prisma && grep -q "model VisaRuleVersion" prisma/schema.prisma || (echo "ERROR: Required models missing from schema" && exit 1)
 # Set DATABASE_URL to PostgreSQL format to prevent schema-selector.js from switching to SQLite
 ENV DATABASE_URL=postgresql://placeholder
 # Generate Prisma client with the correct schema (must happen before TypeScript compilation)
