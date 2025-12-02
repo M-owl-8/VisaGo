@@ -40,9 +40,14 @@ RUN npm install
 WORKDIR /app/apps/backend
 # Verify PostgreSQL schema file exists and has required models BEFORE copying
 RUN test -f prisma/schema.postgresql.prisma || (echo "ERROR: schema.postgresql.prisma not found" && ls -la prisma/ && exit 1)
-RUN grep -q "model EmbassySource" prisma/schema.postgresql.prisma || (echo "ERROR: EmbassySource model missing from schema.postgresql.prisma" && exit 1)
-RUN grep -q "model VisaRuleSet" prisma/schema.postgresql.prisma || (echo "ERROR: VisaRuleSet model missing from schema.postgresql.prisma" && exit 1)
-RUN grep -q "model VisaRuleVersion" prisma/schema.postgresql.prisma || (echo "ERROR: VisaRuleVersion model missing from schema.postgresql.prisma" && exit 1)
+# Debug: show file info and search for models
+RUN echo "=== Schema file check ===" && \
+    echo "File exists: $(test -f prisma/schema.postgresql.prisma && echo 'YES' || echo 'NO')" && \
+    echo "File size: $(wc -l < prisma/schema.postgresql.prisma) lines" && \
+    echo "Searching for models..." && \
+    (grep -q "model EmbassySource" prisma/schema.postgresql.prisma && echo "✓ EmbassySource found" || (echo "✗ EmbassySource NOT FOUND" && grep -i "embassy" prisma/schema.postgresql.prisma | head -3 && exit 1)) && \
+    (grep -q "model VisaRuleSet" prisma/schema.postgresql.prisma && echo "✓ VisaRuleSet found" || (echo "✗ VisaRuleSet NOT FOUND" && exit 1)) && \
+    (grep -q "model VisaRuleVersion" prisma/schema.postgresql.prisma && echo "✓ VisaRuleVersion found" || (echo "✗ VisaRuleVersion NOT FOUND" && exit 1))
 # Force PostgreSQL schema for production build
 RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma || (echo "ERROR: Failed to copy schema" && exit 1)
 # Verify copied schema has required models
