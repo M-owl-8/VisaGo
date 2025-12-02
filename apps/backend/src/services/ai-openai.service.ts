@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+﻿import OpenAI from 'openai';
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 
@@ -429,9 +429,12 @@ If you don't know something, say so clearly and suggest how to find the informat
    * Hybrid mode: Rule engine decides documents, GPT-4 only enriches
    * Legacy mode: GPT-4 decides everything (old behavior)
    */
-  private static isHybridChecklistEnabled(countryCode: string, visaType: string): boolean {
-    const { findVisaDocumentRuleSet } = require('../data/visaDocumentRules');
-    const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
+  private static async isHybridChecklistEnabled(
+    countryCode: string,
+    visaType: string
+  ): Promise<boolean> {
+    const { findVisaDocumentRuleSet } = await import('../data/visaDocumentRules');
+    const ruleSet = await findVisaDocumentRuleSet(countryCode, visaType);
     return !!ruleSet;
   }
 
@@ -945,7 +948,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
         countryCodeMap[normalizedCountry] || country.substring(0, 2).toUpperCase();
 
       // Check if hybrid mode is enabled
-      const isHybrid = this.isHybridChecklistEnabled(countryCode, visaType);
+      const isHybrid = await this.isHybridChecklistEnabled(countryCode, visaType);
 
       if (isHybrid) {
         // ========================================================================
@@ -960,8 +963,9 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
         const { findVisaDocumentRuleSet } = await import('../data/visaDocumentRules');
         const { buildBaseChecklistFromRules } = await import('./checklist-rules.service');
 
-        const ruleSet = findVisaDocumentRuleSet(countryCode, visaType);
-        if (!ruleSet) {
+        const { VisaRulesService } = await import('./visa-rules.service');
+        const ruleSetData = await VisaRulesService.getActiveRuleSet(countryCode, visaType);
+        if (!ruleSetData) {
           logWarn('[OpenAI][Checklist] Rule set not found, falling back to legacy mode', {
             country,
             visaType,
@@ -970,7 +974,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           // Fall through to legacy mode
         } else {
           // Build base checklist from rules
-          const baseChecklist = buildBaseChecklistFromRules(userContext, ruleSet);
+          const baseChecklist = buildBaseChecklistFromRules(userContext, ruleSetData);
 
           if (baseChecklist.length === 0) {
             logWarn('[OpenAI][Checklist] Base checklist is empty, falling back to legacy mode', {
@@ -1026,7 +1030,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                   country,
                   visaType,
                   countryCode,
-                  ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+                  ruleSet: `${countryCode}-${visaType}`,
                   attempt,
                   responseLength: rawContent.length,
                   baseChecklistCount: baseChecklist.length,
@@ -1134,7 +1138,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                 country,
                 visaType,
                 countryCode,
-                ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+                ruleSet: `${countryCode}-${visaType}`,
                 itemCount: enrichedChecklist.length,
                 baseChecklistCount: baseChecklist.length,
                 responseTimeMs: responseTime,
@@ -1157,7 +1161,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                 country,
                 visaType,
                 countryCode,
-                ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+                ruleSet: `${countryCode}-${visaType}`,
                 baseChecklistCount: baseChecklist.length,
               }
             );
@@ -1199,7 +1203,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
               country,
               visaType,
               countryCode,
-              ruleSet: `${ruleSet.countryCode}-${ruleSet.visaType}`,
+              ruleSet: `${countryCode}-${visaType}`,
               itemCount: fallbackChecklist.length,
               mode: 'fallback',
             });

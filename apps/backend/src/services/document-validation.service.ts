@@ -9,7 +9,10 @@ import { AIOpenAIService } from './ai-openai.service';
 import { getVisaKnowledgeBase } from '../data/visaKnowledgeBase';
 import { getRelevantDocumentGuides } from '../data/documentGuides';
 import { buildAIUserContext } from './ai-context.service';
-import { logError, logInfo } from '../middleware/logger';
+import { VisaRulesService } from './visa-rules.service';
+import { VisaDocCheckerService } from './visa-doc-checker.service';
+import { DocumentClassifierService } from './document-classifier.service';
+import { logError, logInfo, logWarn } from '../middleware/logger';
 
 const prisma = new PrismaClient();
 
@@ -59,6 +62,124 @@ export async function validateDocumentWithAI(params: {
 }): Promise<AIDocumentValidationResult> {
   try {
     const { document, checklistItem, application, countryName, visaTypeName } = params;
+
+    // Try to use new VisaDocCheckerService if VisaRuleSet is available
+    try {
+      const ruleSet = await VisaRulesService.getActiveRuleSet(
+        application.country.code.toUpperCase(),
+        visaTypeName.toLowerCase()
+      );
+
+      if (ruleSet) {
+        // Find matching required document from rule set
+        const matchingRule = ruleSet.requiredDocuments?.find(
+          (reqDoc: any) =>
+            reqDoc.documentType?.toLowerCase() === document.documentType.toLowerCase() ||
+            reqDoc.name?.toLowerCase().includes(document.documentType.toLowerCase())
+        );
+
+        if (matchingRule) {
+          logInfo('[DocValidation] Using VisaDocCheckerService', {
+            documentType: document.documentType,
+            applicationId: application.id,
+          });
+
+          // Try to extract OCR text if document ID is available
+          let ocrText = '';
+          if (document.id) {
+            try {
+              const docRecord = await prisma.userDocument.findUnique({
+                where: { id: document.id },
+              });
+              if (docRecord) {
+                const extractedText = await DocumentClassifierService.extractTextForDocument({
+                  id: docRecord.id,
+                  fileName: docRecord.fileName,
+                  fileUrl: docRecord.fileUrl,
+                  mimeType: undefined, // Could be added if available
+                });
+                if (extractedText) {
+                  ocrText = extractedText;
+                }
+              }
+            } catch (ocrError) {
+              logWarn('[DocValidation] OCR extraction failed, continuing without text', {
+                documentId: document.id,
+                error: ocrError instanceof Error ? ocrError.message : String(ocrError),
+              });
+            }
+          }
+
+          // Build user context for conditional requirements
+          let userContext: any = {};
+          try {
+            const app = await prisma.visaApplication.findUnique({
+              where: { id: application.id },
+              include: { user: true },
+            });
+            if (app) {
+              userContext = await buildAIUserContext(app.userId, application.id);
+            }
+          } catch (error) {
+            // Continue without user context
+          }
+
+          // Use new checker service
+          const checkResult = await VisaDocCheckerService.checkDocument(
+            matchingRule,
+            ocrText || document.documentName || '', // Fallback to document name if no OCR
+            userContext,
+            {
+              fileType: document.fileName.split('.').pop()?.toLowerCase(),
+              expiryDate: document.expiryDate?.toISOString(),
+            }
+          );
+
+          // Convert to AIDocumentValidationResult format
+          const result: AIDocumentValidationResult = {
+            status:
+              checkResult.status === 'APPROVED'
+                ? 'verified'
+                : checkResult.status === 'REJECTED'
+                  ? 'rejected'
+                  : 'needs_review',
+            verifiedByAI:
+              checkResult.status === 'APPROVED' && checkResult.embassy_risk_level === 'LOW',
+            confidence:
+              checkResult.status === 'APPROVED'
+                ? checkResult.embassy_risk_level === 'LOW'
+                  ? 0.9
+                  : checkResult.embassy_risk_level === 'MEDIUM'
+                    ? 0.7
+                    : 0.5
+                : checkResult.status === 'NEED_FIX'
+                  ? checkResult.embassy_risk_level === 'HIGH'
+                    ? 0.3
+                    : 0.5
+                  : 0.2,
+            notesUz: checkResult.short_reason || 'Hujjat tekshirildi.',
+            notesRu: checkResult.short_reason || 'Документ проверен.',
+            notesEn: checkResult.short_reason || 'Document checked.',
+          };
+
+          logInfo('[DocValidation] VisaDocChecker result', {
+            documentType: document.documentType,
+            applicationId: application.id,
+            status: result.status,
+            verifiedByAI: result.verifiedByAI,
+          });
+
+          return result;
+        }
+      }
+    } catch (checkerError) {
+      logWarn('[DocValidation] VisaDocChecker failed, falling back to legacy validation', {
+        documentType: document.documentType,
+        applicationId: application.id,
+        error: checkerError instanceof Error ? checkerError.message : String(checkerError),
+      });
+      // Fall through to legacy validation
+    }
     const isCanada = countryName.toLowerCase().includes('canada');
 
     // Normalize visa type
