@@ -72,8 +72,12 @@ RUN rm -rf node_modules/.prisma node_modules/@prisma/client 2>/dev/null || true
 WORKDIR /app/apps/backend
 RUN npx prisma generate --schema=prisma/schema.prisma
 
+# Copy src directory BEFORE TypeScript compilation
+COPY apps/backend/src ./apps/backend/src/
+
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
-# Verify cheerio is installed before compilation
+# Verify src directory exists and cheerio is installed before compilation
+RUN test -d /app/apps/backend/src || (echo "ERROR: src directory not found" && ls -la /app/apps/backend/ && exit 1)
 RUN echo "=== Checking npm installation ===" && \
     echo "Root node_modules exists: $(test -d /app/node_modules && echo 'YES' || echo 'NO')" && \
     echo "Backend node_modules exists: $(test -d /app/apps/backend/node_modules && echo 'YES' || echo 'NO')" && \
