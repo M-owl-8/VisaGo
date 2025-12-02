@@ -67,9 +67,13 @@ RUN npx prisma generate --schema=prisma/schema.prisma
 
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
 # Verify cheerio is installed before compilation
-RUN test -d /app/node_modules/cheerio || test -d /app/apps/backend/node_modules/cheerio || (echo "ERROR: cheerio not found in node_modules" && find /app -name "cheerio" -type d 2>/dev/null | head -5 && exit 1)
+RUN echo "Checking for cheerio..." && \
+    (test -d /app/node_modules/cheerio && echo "✓ cheerio found in /app/node_modules") || \
+    (test -d /app/apps/backend/node_modules/cheerio && echo "✓ cheerio found in /app/apps/backend/node_modules") || \
+    (echo "✗ cheerio NOT FOUND" && find /app -name "cheerio" -type d 2>/dev/null | head -5 && exit 1)
 # Prisma client is already generated above, so just compile TypeScript
-RUN npx tsc && npx tsc prisma/seed.ts
+# Set NODE_PATH to help TypeScript resolve modules from root node_modules
+RUN NODE_PATH=/app/node_modules:/app/apps/backend/node_modules npx tsc && NODE_PATH=/app/node_modules:/app/apps/backend/node_modules npx tsc prisma/seed.ts
 
 # Copy static data files from src/data into dist/data (needed at runtime)
 RUN mkdir -p /app/apps/backend/dist/data && cp -R /app/apps/backend/src/data/. /app/apps/backend/dist/data/
