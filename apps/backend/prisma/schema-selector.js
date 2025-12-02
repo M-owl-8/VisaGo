@@ -45,6 +45,17 @@ try {
   // Copy the schema file
   fs.copyFileSync(sourceSchema, targetSchema);
   console.log(` Schema file updated successfully\n`);
+
+  // Update migration_lock.toml to match the database provider
+  const migrationLockPath = path.join(__dirname, 'migrations', 'migration_lock.toml');
+  if (fs.existsSync(migrationLockPath)) {
+    let lockContent = fs.readFileSync(migrationLockPath, 'utf8');
+    const provider = isPostgres ? 'postgresql' : 'sqlite';
+    // Update provider in migration_lock.toml
+    lockContent = lockContent.replace(/provider\s*=\s*["']?[\w]+["']?/i, `provider = "${provider}"`);
+    fs.writeFileSync(migrationLockPath, lockContent);
+    console.log(` Migration lock file updated to ${provider}\n`);
+  }
 } catch (error) {
   console.error(` Error updating schema: ${error.message}`);
   console.error(`   Source: ${sourceSchema}`);
