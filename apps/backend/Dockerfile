@@ -46,7 +46,10 @@ RUN grep -q "model EmbassySource" prisma/schema.prisma && grep -q "model VisaRul
 ENV DATABASE_URL=postgresql://placeholder
 # Generate Prisma client with the correct schema (must happen before TypeScript compilation)
 # Clear any existing Prisma client cache and regenerate
+# In monorepo, Prisma client is generated at root node_modules, so we need to be at root
+WORKDIR /app
 RUN rm -rf node_modules/.prisma node_modules/@prisma/client 2>/dev/null || true
+WORKDIR /app/apps/backend
 RUN npx prisma generate --schema=prisma/schema.prisma
 
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
