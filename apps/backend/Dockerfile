@@ -38,16 +38,19 @@ RUN npm install
 
 # Generate Prisma client (will use PostgreSQL schema on Railway)
 WORKDIR /app/apps/backend
-# Verify PostgreSQL schema file exists and has required models BEFORE copying
-RUN test -f prisma/schema.postgresql.prisma || (echo "ERROR: schema.postgresql.prisma not found" && ls -la prisma/ && exit 1)
-# Debug: show file info and search for models
-RUN echo "=== Schema file check ===" && \
-    echo "File exists: $(test -f prisma/schema.postgresql.prisma && echo 'YES' || echo 'NO')" && \
-    echo "File size: $(wc -l < prisma/schema.postgresql.prisma) lines" && \
-    echo "Searching for models..." && \
-    (grep -q "model EmbassySource" prisma/schema.postgresql.prisma && echo "✓ EmbassySource found" || (echo "✗ EmbassySource NOT FOUND" && grep -i "embassy" prisma/schema.postgresql.prisma | head -3 && exit 1)) && \
-    (grep -q "model VisaRuleSet" prisma/schema.postgresql.prisma && echo "✓ VisaRuleSet found" || (echo "✗ VisaRuleSet NOT FOUND" && exit 1)) && \
-    (grep -q "model VisaRuleVersion" prisma/schema.postgresql.prisma && echo "✓ VisaRuleVersion found" || (echo "✗ VisaRuleVersion NOT FOUND" && exit 1))
+# Verify PostgreSQL schema file exists and list all schema files
+RUN echo "=== Checking Prisma directory ===" && \
+    ls -la prisma/ && \
+    echo "=== Checking for schema.postgresql.prisma ===" && \
+    test -f prisma/schema.postgresql.prisma || (echo "ERROR: schema.postgresql.prisma not found" && exit 1) && \
+    echo "File found, checking contents..." && \
+    echo "File has $(wc -l < prisma/schema.postgresql.prisma) lines" && \
+    echo "=== Searching for all model definitions ===" && \
+    grep "^model " prisma/schema.postgresql.prisma | tail -5 && \
+    echo "=== Verifying required models ===" && \
+    (grep -c "model EmbassySource" prisma/schema.postgresql.prisma | grep -q "1" && echo "✓ EmbassySource: FOUND" || (echo "✗ EmbassySource: NOT FOUND" && echo "Searching for 'Embassy'..." && grep -i embassy prisma/schema.postgresql.prisma | head -3 && exit 1)) && \
+    (grep -c "model VisaRuleSet" prisma/schema.postgresql.prisma | grep -q "1" && echo "✓ VisaRuleSet: FOUND" || (echo "✗ VisaRuleSet: NOT FOUND" && exit 1)) && \
+    (grep -c "model VisaRuleVersion" prisma/schema.postgresql.prisma | grep -q "1" && echo "✓ VisaRuleVersion: FOUND" || (echo "✗ VisaRuleVersion: NOT FOUND" && exit 1))
 # Force PostgreSQL schema for production build
 RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma || (echo "ERROR: Failed to copy schema" && exit 1)
 # Verify copied schema has required models
