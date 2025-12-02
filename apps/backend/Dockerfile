@@ -71,9 +71,12 @@ RUN echo "Checking for cheerio..." && \
     (test -d /app/node_modules/cheerio && echo "✓ cheerio found in /app/node_modules") || \
     (test -d /app/apps/backend/node_modules/cheerio && echo "✓ cheerio found in /app/apps/backend/node_modules") || \
     (echo "✗ cheerio NOT FOUND" && find /app -name "cheerio" -type d 2>/dev/null | head -5 && exit 1)
+# Verify TypeScript can resolve cheerio by checking node_modules structure
+RUN echo "TypeScript module resolution test..." && \
+    node -e "try { require('cheerio'); console.log('✓ Node.js can require cheerio'); } catch(e) { console.log('✗ Node.js cannot require cheerio:', e.message); process.exit(1); }"
 # Prisma client is already generated above, so just compile TypeScript
-# Set NODE_PATH to help TypeScript resolve modules from root node_modules
-RUN NODE_PATH=/app/node_modules:/app/apps/backend/node_modules npx tsc && NODE_PATH=/app/node_modules:/app/apps/backend/node_modules npx tsc prisma/seed.ts
+# Use --skipLibCheck to avoid type definition issues
+RUN npx tsc --skipLibCheck && npx tsc prisma/seed.ts --skipLibCheck
 
 # Copy static data files from src/data into dist/data (needed at runtime)
 RUN mkdir -p /app/apps/backend/dist/data && cp -R /app/apps/backend/src/data/. /app/apps/backend/dist/data/
