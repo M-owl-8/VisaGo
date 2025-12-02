@@ -4,7 +4,6 @@
  */
 
 import axios, { AxiosError } from 'axios';
-import * as cheerio from 'cheerio';
 import { load } from 'cheerio';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 
