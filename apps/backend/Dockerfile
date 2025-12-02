@@ -66,6 +66,8 @@ WORKDIR /app/apps/backend
 RUN npx prisma generate --schema=prisma/schema.prisma
 
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
+# Verify cheerio is installed before compilation
+RUN test -d /app/node_modules/cheerio || test -d /app/apps/backend/node_modules/cheerio || (echo "ERROR: cheerio not found in node_modules" && find /app -name "cheerio" -type d 2>/dev/null | head -5 && exit 1)
 # Prisma client is already generated above, so just compile TypeScript
 RUN npx tsc && npx tsc prisma/seed.ts
 
