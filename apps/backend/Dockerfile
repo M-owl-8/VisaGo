@@ -45,7 +45,9 @@ RUN grep -q "model EmbassySource" prisma/schema.prisma && grep -q "model VisaRul
 # Set DATABASE_URL to PostgreSQL format to prevent schema-selector.js from switching to SQLite
 ENV DATABASE_URL=postgresql://placeholder
 # Generate Prisma client with the correct schema (must happen before TypeScript compilation)
-RUN npx prisma generate
+# Clear any existing Prisma client cache and regenerate
+RUN rm -rf node_modules/.prisma node_modules/@prisma/client 2>/dev/null || true
+RUN npx prisma generate --schema=prisma/schema.prisma
 
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
 # Prisma client is already generated above, so just compile TypeScript
