@@ -67,10 +67,20 @@ RUN npx prisma generate --schema=prisma/schema.prisma
 
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
 # Verify cheerio is installed before compilation
-RUN echo "Checking for cheerio..." && \
-    (test -d /app/node_modules/cheerio && echo "✓ cheerio found in /app/node_modules") || \
-    (test -d /app/apps/backend/node_modules/cheerio && echo "✓ cheerio found in /app/apps/backend/node_modules") || \
-    (echo "✗ cheerio NOT FOUND" && find /app -name "cheerio" -type d 2>/dev/null | head -5 && exit 1)
+RUN echo "=== Checking npm installation ===" && \
+    echo "Root node_modules exists: $(test -d /app/node_modules && echo 'YES' || echo 'NO')" && \
+    echo "Backend node_modules exists: $(test -d /app/apps/backend/node_modules && echo 'YES' || echo 'NO')" && \
+    echo "=== Searching for cheerio ===" && \
+    (test -d /app/node_modules/cheerio && echo "✓ cheerio found in /app/node_modules" && ls -la /app/node_modules/cheerio | head -3) || \
+    (test -d /app/apps/backend/node_modules/cheerio && echo "✓ cheerio found in /app/apps/backend/node_modules" && ls -la /app/apps/backend/node_modules/cheerio | head -3) || \
+    (echo "✗ cheerio NOT FOUND in expected locations" && \
+     echo "Searching entire /app directory..." && \
+     find /app -name "cheerio" -type d 2>/dev/null | head -10 && \
+     echo "Checking if cheerio is in package.json..." && \
+     grep -q "cheerio" /app/apps/backend/package.json && echo "✓ cheerio is in package.json" || echo "✗ cheerio NOT in package.json" && \
+     echo "Listing some root node_modules..." && \
+     ls /app/node_modules 2>/dev/null | head -20 && \
+     exit 1)
 # Verify TypeScript can resolve cheerio by checking node_modules structure
 RUN echo "TypeScript module resolution test..." && \
     node -e "try { require('cheerio'); console.log('✓ Node.js can require cheerio'); } catch(e) { console.log('✗ Node.js cannot require cheerio:', e.message); process.exit(1); }"
