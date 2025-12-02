@@ -73,7 +73,10 @@ WORKDIR /app/apps/backend
 RUN npx prisma generate --schema=prisma/schema.prisma
 
 # Copy src directory BEFORE TypeScript compilation
+# WORKDIR is /app/apps/backend, so copy to ./src/ (not ./apps/backend/src/)
+WORKDIR /app
 COPY apps/backend/src ./apps/backend/src/
+WORKDIR /app/apps/backend
 
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
 # Verify src directory exists and cheerio is installed before compilation
