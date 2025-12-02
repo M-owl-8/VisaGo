@@ -42,11 +42,12 @@ WORKDIR /app/apps/backend
 RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma || echo "PostgreSQL schema already selected"
 # Set DATABASE_URL to PostgreSQL format to prevent schema-selector.js from switching to SQLite
 ENV DATABASE_URL=postgresql://placeholder
+# Generate Prisma client with the correct schema (must happen before TypeScript compilation)
 RUN npx prisma generate
 
 # Build TypeScript (skip prebuild hook since we've already set the schema correctly)
-# Use prisma generate && tsc directly to bypass prebuild hook
-RUN npx prisma generate && npx tsc && npx tsc prisma/seed.ts
+# Prisma client is already generated above, so just compile TypeScript
+RUN npx tsc && npx tsc prisma/seed.ts
 
 # Copy static data files from src/data into dist/data (needed at runtime)
 RUN mkdir -p /app/apps/backend/dist/data && cp -R /app/apps/backend/src/data/. /app/apps/backend/dist/data/
