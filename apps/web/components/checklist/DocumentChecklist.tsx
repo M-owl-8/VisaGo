@@ -22,9 +22,12 @@ export interface ChecklistItem {
   commonMistakes?: string;
   commonMistakesUz?: string;
   commonMistakesRu?: string;
-  status?: 'pending' | 'verified' | 'rejected' | 'not_uploaded';
+  status?: 'missing' | 'pending' | 'verified' | 'rejected';
   fileUrl?: string;
   documentId?: string;
+  aiVerified?: boolean;
+  aiConfidence?: number;
+  verificationNotes?: string;
 }
 
 interface DocumentChecklistProps {

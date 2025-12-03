@@ -234,6 +234,9 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
       // 1) Load document from DB
       const document = await prisma.userDocument.findUnique({
         where: { id: documentId },
+        include: {
+          application: true,
+        },
       });
 
       if (!document) {
@@ -245,28 +248,60 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
       const currentType = document.documentType;
 
       // Generic types that can be replaced by classification
-      const GENERIC_TYPES = new Set(['document', 'other', null, undefined, '']);
+      const GENERIC_TYPES = ['document', 'other', null, undefined, ''];
 
       // Check if current type is generic (can be replaced)
-      const isGenericType = !currentType || GENERIC_TYPES.has(currentType);
+      const isGenericType = !currentType || GENERIC_TYPES.includes(currentType);
 
       if (!isGenericType) {
         // Document already has a specific type - don't override it
-        logInfo('[DocumentClassifier] Skipped because type is explicit', {
+        logInfo('[DocumentClassifier] Skipping classification - explicit type', {
           documentId,
           documentType: currentType,
         });
         return;
       }
 
-      // 3) Extract text (or null for now)
+      // 3) Additional check: If documentType matches any checklist item type for this application,
+      // treat it as explicit and skip classification
+      try {
+        const { DocumentChecklistService } = await import('./document-checklist.service');
+        const checklist = await DocumentChecklistService.generateChecklist(
+          document.applicationId,
+          document.userId
+        );
+
+        if (checklist && 'items' in checklist && Array.isArray(checklist.items)) {
+          const checklistItemTypes = checklist.items.map((item: any) =>
+            (item.documentType || '').trim().toLowerCase()
+          );
+          const normalizedCurrentType = (currentType || '').trim().toLowerCase();
+
+          if (checklistItemTypes.includes(normalizedCurrentType)) {
+            logInfo('[DocumentClassifier] Skipping classification - type matches checklist item', {
+              documentId,
+              documentType: currentType,
+              applicationId: document.applicationId,
+            });
+            return;
+          }
+        }
+      } catch (checklistError) {
+        // Checklist lookup is optional - continue with classification if it fails
+        logWarn('[DocumentClassifier] Checklist lookup failed, continuing with classification', {
+          documentId,
+          error: checklistError instanceof Error ? checklistError.message : String(checklistError),
+        });
+      }
+
+      // 4) Extract text (or null for now)
       const extractedText = await this.extractTextForDocument({
         id: document.id,
         fileName: document.fileName,
         fileUrl: document.fileUrl,
       });
 
-      // 4) Classify document type
+      // 5) Classify document type
       const classification = await this.classifyDocumentType(
         {
           fileName: document.fileName,
@@ -275,7 +310,7 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
         extractedText || undefined
       );
 
-      // 5) Only update if confidence is reasonably high (>= 0.6)
+      // 6) Only update if confidence is reasonably high (>= 0.6)
       if (classification.confidence < 0.6) {
         logInfo('[DocumentClassifier] Classification confidence too low, skipping update', {
           documentId,
@@ -287,7 +322,7 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
         return;
       }
 
-      // 6) Never change back to "document" (that's pointless)
+      // 7) Never change back to "document" (that's pointless)
       if (classification.type === 'document') {
         logInfo(
           '[DocumentClassifier] Classifier returned generic "document" type, skipping update',
@@ -301,7 +336,43 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
         return;
       }
 
-      // 7) Update document row with classification results
+      // 8) Final check: Ensure we don't overwrite an explicit checklist type
+      // Even if classifier suggests a type, if it matches a checklist item, preserve it
+      try {
+        const { DocumentChecklistService } = await import('./document-checklist.service');
+        const checklist = await DocumentChecklistService.generateChecklist(
+          document.applicationId,
+          document.userId
+        );
+
+        if (checklist && 'items' in checklist && Array.isArray(checklist.items)) {
+          const checklistItemTypes = checklist.items.map((item: any) =>
+            (item.documentType || '').trim().toLowerCase()
+          );
+          const normalizedClassifiedType = (classification.type || '').trim().toLowerCase();
+
+          // If classified type matches a checklist item, but current type is generic,
+          // it's safe to update. But if current type already matches a checklist item, don't change.
+          const currentMatchesChecklist = checklistItemTypes.includes(
+            (currentType || '').trim().toLowerCase()
+          );
+          if (currentMatchesChecklist) {
+            logInfo('[DocumentClassifier] Skipping update - current type matches checklist item', {
+              documentId,
+              currentType,
+              classifiedType: classification.type,
+            });
+            return;
+          }
+        }
+      } catch (checklistError) {
+        // Continue with update if checklist lookup fails
+        logWarn('[DocumentClassifier] Checklist lookup failed during final check, proceeding', {
+          documentId,
+        });
+      }
+
+      // 9) Update document row with classification results
       const previousType = currentType;
       await prisma.userDocument.update({
         where: { id: documentId },

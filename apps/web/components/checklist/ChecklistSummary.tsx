@@ -5,11 +5,15 @@ import { Card } from '@/components/ui/Card';
 import { useTranslation } from 'react-i18next';
 
 export interface ChecklistItem {
-  document: string;
+  document?: string;
+  documentType?: string;
   name: string;
   category: 'required' | 'highly_recommended' | 'optional';
   required: boolean;
-  status?: 'pending' | 'verified' | 'rejected' | 'not_uploaded';
+  status?: 'missing' | 'pending' | 'verified' | 'rejected';
+  aiVerified?: boolean;
+  aiConfidence?: number;
+  verificationNotes?: string;
 }
 
 interface ChecklistSummaryProps {
@@ -23,9 +27,9 @@ export function ChecklistSummary({ items, className }: ChecklistSummaryProps) {
   // Calculate stats
   const requiredItems = items.filter((item) => item.category === 'required');
   const totalRequired = requiredItems.length;
-  const uploadedCount = items.filter(
-    (item) => item.status === 'verified' || item.status === 'pending'
-  ).length;
+  // Uploaded = items with status !== 'missing'
+  const uploadedCount = items.filter((item) => item.status !== 'missing').length;
+  // Verified = items with status === 'verified'
   const verifiedCount = items.filter((item) => item.status === 'verified').length;
   const completionPercentage =
     totalRequired > 0 ? Math.round((verifiedCount / totalRequired) * 100) : 0;

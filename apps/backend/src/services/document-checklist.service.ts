@@ -174,25 +174,30 @@ export class DocumentChecklistService {
               }))
             );
 
+            // Normalize documentType keys for consistent matching
             const existingDocumentsMap = new Map(
-              application.documents.map((doc: any) => [
-                doc.documentType,
-                {
-                  type: doc.documentType,
-                  status: doc.status,
-                  id: doc.id,
-                  fileUrl: doc.fileUrl,
-                  fileName: doc.fileName,
-                  fileSize: doc.fileSize,
-                  uploadedAt: doc.uploadedAt,
-                  verificationNotes: doc.verificationNotes,
-                  verifiedByAI: doc.verifiedByAI ?? false,
-                  aiConfidence: doc.aiConfidence ?? null,
-                  aiNotesUz: doc.aiNotesUz ?? null,
-                  aiNotesRu: doc.aiNotesRu ?? null,
-                  aiNotesEn: doc.aiNotesEn ?? null,
-                },
-              ])
+              application.documents.map((doc: any) => {
+                const normalizedType = (doc.documentType || '').trim().toLowerCase();
+                return [
+                  normalizedType,
+                  {
+                    type: normalizedType,
+                    originalType: doc.documentType,
+                    status: doc.status,
+                    id: doc.id,
+                    fileUrl: doc.fileUrl,
+                    fileName: doc.fileName,
+                    fileSize: doc.fileSize,
+                    uploadedAt: doc.uploadedAt,
+                    verificationNotes: doc.verificationNotes,
+                    verifiedByAI: doc.verifiedByAI ?? false,
+                    aiConfidence: doc.aiConfidence ?? null,
+                    aiNotesUz: doc.aiNotesUz ?? null,
+                    aiNotesRu: doc.aiNotesRu ?? null,
+                    aiNotesEn: doc.aiNotesEn ?? null,
+                  },
+                ];
+              })
             );
 
             const enrichedItems = this.mergeChecklistItemsWithDocuments(
@@ -301,25 +306,30 @@ export class DocumentChecklistService {
       }
 
       // Get existing documents with full data
+      // Normalize documentType keys to handle whitespace and case differences
       const existingDocumentsMap = new Map(
-        application.documents.map((doc: any) => [
-          doc.documentType,
-          {
-            type: doc.documentType,
-            status: doc.status,
-            id: doc.id,
-            fileUrl: doc.fileUrl,
-            fileName: doc.fileName,
-            fileSize: doc.fileSize,
-            uploadedAt: doc.uploadedAt,
-            verificationNotes: doc.verificationNotes,
-            verifiedByAI: doc.verifiedByAI ?? false,
-            aiConfidence: doc.aiConfidence ?? null,
-            aiNotesUz: doc.aiNotesUz ?? null,
-            aiNotesRu: doc.aiNotesRu ?? null,
-            aiNotesEn: doc.aiNotesEn ?? null,
-          },
-        ])
+        application.documents.map((doc: any) => {
+          const normalizedType = (doc.documentType || '').trim().toLowerCase();
+          return [
+            normalizedType,
+            {
+              type: normalizedType,
+              originalType: doc.documentType,
+              status: doc.status,
+              id: doc.id,
+              fileUrl: doc.fileUrl,
+              fileName: doc.fileName,
+              fileSize: doc.fileSize,
+              uploadedAt: doc.uploadedAt,
+              verificationNotes: doc.verificationNotes,
+              verifiedByAI: doc.verifiedByAI ?? false,
+              aiConfidence: doc.aiConfidence ?? null,
+              aiNotesUz: doc.aiNotesUz ?? null,
+              aiNotesRu: doc.aiNotesRu ?? null,
+              aiNotesEn: doc.aiNotesEn ?? null,
+            },
+          ];
+        })
       );
 
       let items: ChecklistItem[] = [];
@@ -670,25 +680,30 @@ export class DocumentChecklistService {
         );
 
         // Merge with documents
+        // Normalize documentType keys for consistent matching
         const existingDocumentsMap = new Map(
-          (application.documents || []).map((doc: any) => [
-            doc.documentType,
-            {
-              type: doc.documentType,
-              status: doc.status,
-              id: doc.id,
-              fileUrl: doc.fileUrl,
-              fileName: doc.fileName,
-              fileSize: doc.fileSize,
-              uploadedAt: doc.uploadedAt,
-              verificationNotes: doc.verificationNotes,
-              verifiedByAI: doc.verifiedByAI ?? false,
-              aiConfidence: doc.aiConfidence ?? null,
-              aiNotesUz: doc.aiNotesUz ?? null,
-              aiNotesRu: doc.aiNotesRu ?? null,
-              aiNotesEn: doc.aiNotesEn ?? null,
-            },
-          ])
+          (application.documents || []).map((doc: any) => {
+            const normalizedType = (doc.documentType || '').trim().toLowerCase();
+            return [
+              normalizedType,
+              {
+                type: normalizedType,
+                originalType: doc.documentType,
+                status: doc.status,
+                id: doc.id,
+                fileUrl: doc.fileUrl,
+                fileName: doc.fileName,
+                fileSize: doc.fileSize,
+                uploadedAt: doc.uploadedAt,
+                verificationNotes: doc.verificationNotes,
+                verifiedByAI: doc.verifiedByAI ?? false,
+                aiConfidence: doc.aiConfidence ?? null,
+                aiNotesUz: doc.aiNotesUz ?? null,
+                aiNotesRu: doc.aiNotesRu ?? null,
+                aiNotesEn: doc.aiNotesEn ?? null,
+              },
+            ];
+          })
         );
 
         const enrichedItems = this.mergeChecklistItemsWithDocuments(
@@ -748,25 +763,30 @@ export class DocumentChecklistService {
     aiErrorOccurred: boolean = false
   ): DocumentChecklist {
     // Merge with current document status
+    // Normalize documentType keys to handle whitespace and case differences
     const existingDocumentsMap = new Map(
-      documents.map((doc: any) => [
-        doc.documentType,
-        {
-          type: doc.documentType,
-          status: doc.status,
-          id: doc.id,
-          fileUrl: doc.fileUrl,
-          fileName: doc.fileName,
-          fileSize: doc.fileSize,
-          uploadedAt: doc.uploadedAt,
-          verificationNotes: doc.verificationNotes,
-          verifiedByAI: doc.verifiedByAI ?? false,
-          aiConfidence: doc.aiConfidence ?? null,
-          aiNotesUz: doc.aiNotesUz ?? null,
-          aiNotesRu: doc.aiNotesRu ?? null,
-          aiNotesEn: doc.aiNotesEn ?? null,
-        },
-      ])
+      documents.map((doc: any) => {
+        const normalizedType = (doc.documentType || '').trim().toLowerCase();
+        return [
+          normalizedType,
+          {
+            type: normalizedType,
+            originalType: doc.documentType,
+            status: doc.status,
+            id: doc.id,
+            fileUrl: doc.fileUrl,
+            fileName: doc.fileName,
+            fileSize: doc.fileSize,
+            uploadedAt: doc.uploadedAt,
+            verificationNotes: doc.verificationNotes,
+            verifiedByAI: doc.verifiedByAI ?? false,
+            aiConfidence: doc.aiConfidence ?? null,
+            aiNotesUz: doc.aiNotesUz ?? null,
+            aiNotesRu: doc.aiNotesRu ?? null,
+            aiNotesEn: doc.aiNotesEn ?? null,
+          },
+        ];
+      })
     );
 
     const enrichedItems = this.mergeChecklistItemsWithDocuments(
@@ -1201,36 +1221,32 @@ Only return the JSON object, no other text.`;
 
     // Enhanced debug logging at start
     if (applicationId) {
+      const normalizedMapKeys = Array.from(existingDocumentsMap.keys());
+      const normalizedItemTypes = items.map((i) => (i.documentType || '').trim().toLowerCase());
       console.log('[CHECKLIST_MERGE_DEBUG_START]', {
         applicationId,
-        documentsMapKeys: Array.from(existingDocumentsMap.keys()),
-        checklistItemTypes: items.map((i) => i.documentType),
+        documentsMapKeys: normalizedMapKeys,
+        checklistItemTypes: normalizedItemTypes,
         documentsCount: existingDocumentsMap.size,
         itemCount: items.length,
       });
     }
 
     const mergedItems = items.map((item) => {
-      // Match by documentType (stable key, not AI-generated name)
-      const doc = existingDocumentsMap.get(item.documentType);
+      // Normalize checklist item documentType for matching
+      const normalizedItemType = (item.documentType || '').trim().toLowerCase();
+      // Match by normalized documentType
+      const doc = existingDocumentsMap.get(normalizedItemType);
 
       // Enhanced debug logging for each item
       if (applicationId) {
         console.log('[CHECKLIST_MERGE_DEBUG_ITEM]', {
           applicationId,
           checklistItemDocumentType: item.documentType,
+          normalizedItemType,
           docFound: !!doc,
           docType: doc?.type,
           docStatus: doc?.status,
-          // Show exact string comparison details
-          documentTypeLength: item.documentType?.length,
-          docTypeLength: doc?.type?.length,
-          documentTypeCharCodes: item.documentType
-            ? item.documentType.split('').map((c) => c.charCodeAt(0))
-            : null,
-          docTypeCharCodes: doc?.type
-            ? doc.type.split('').map((c: string) => c.charCodeAt(0))
-            : null,
         });
       }
 
@@ -1391,7 +1407,7 @@ Only return the JSON object, no other text.`;
           application.country,
           application.visaType,
           Array.from(existingDocumentsMap.values()).map((doc: any) => ({
-            type: doc.type,
+            type: doc.originalType || doc.type, // Use originalType if available for fallback
             status: doc.status,
             id: doc.id,
             fileUrl: doc.fileUrl,

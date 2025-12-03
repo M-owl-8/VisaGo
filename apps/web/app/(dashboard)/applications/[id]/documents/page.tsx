@@ -52,10 +52,10 @@ export default function DocumentsPage() {
       const response = await apiClient.uploadDocument(params.id as string, effectiveDocumentType, file);
 
       if (response.success) {
-        setSuccess(t('documents.uploadSuccess'));
+        setSuccess(t('documents.uploadSuccess', 'Document uploaded successfully. AI is reviewing it...'));
         setTimeout(() => {
           router.push(`/applications/${params.id}`);
-          router.refresh();
+          router.refresh(); // Refetch checklist data
         }, 2000);
       } else {
         const errorMsg = getErrorMessage(response.error || {}, t, i18n.language);

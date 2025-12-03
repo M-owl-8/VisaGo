@@ -26,9 +26,12 @@ interface DocumentChecklistItemProps {
     commonMistakes?: string;
     commonMistakesUz?: string;
     commonMistakesRu?: string;
-    status?: 'pending' | 'verified' | 'rejected' | 'not_uploaded';
+    status?: 'missing' | 'pending' | 'verified' | 'rejected';
     fileUrl?: string;
     documentId?: string;
+    aiVerified?: boolean;
+    aiConfidence?: number;
+    verificationNotes?: string;
   };
   applicationId: string;
   language?: string;
@@ -41,7 +44,7 @@ export function DocumentChecklistItem({
   language = 'en',
   t,
 }: DocumentChecklistItemProps) {
-  const status = item.status || 'not_uploaded';
+  const status = item.status || 'missing';
   const isVerified = status === 'verified';
   const isRejected = status === 'rejected';
   const isPending = status === 'pending';
@@ -72,25 +75,31 @@ export function DocumentChecklistItem({
   };
 
   const getStatusLabel = () => {
-    if (isVerified) {
-      // Check if AI verified
-      const aiVerified = (item as any).aiVerified;
-      if (aiVerified) {
-        return t('documents.statusVerifiedByAI', 'Verified by AI ✅');
-      }
-      return t('documents.statusVerified', 'Verified');
+    // Status mapping: missing → "Not uploaded", pending → "Uploaded, awaiting AI review", etc.
+    let statusLabel = t('documents.statusNotUploaded', 'Not uploaded');
+    
+    switch (status) {
+      case 'missing':
+        statusLabel = t('documents.statusNotUploaded', 'Not uploaded');
+        break;
+      case 'pending':
+        statusLabel = t('documents.statusPendingReview', 'Uploaded, awaiting AI review');
+        break;
+      case 'verified':
+        // Check if AI verified
+        const aiVerified = (item as any).aiVerified;
+        statusLabel = aiVerified
+          ? t('documents.statusVerifiedByAI', 'Verified by AI ✅')
+          : t('documents.statusVerified', 'Verified');
+        break;
+      case 'rejected':
+        statusLabel = t('documents.statusRejectedByAI', 'AI found problems ❌');
+        break;
+      default:
+        statusLabel = t('documents.statusNotUploaded', 'Not uploaded');
     }
-    if (isRejected) {
-      const aiVerified = (item as any).aiVerified;
-      if (aiVerified !== undefined) {
-        return t('documents.statusRejectedByAI', 'AI found problems ❌');
-      }
-      return t('documents.statusRejected', 'Rejected');
-    }
-    if (isPending) {
-      return t('documents.statusPendingReview', 'Uploaded, awaiting AI review');
-    }
-    return t('documents.statusNotUploaded', 'Not uploaded');
+    
+    return statusLabel;
   };
 
   const categoryColors = {
@@ -141,6 +150,12 @@ export function DocumentChecklistItem({
               </>
             )}
           </div>
+          {/* Show AI explanation if document is rejected */}
+          {isRejected && item.verificationNotes && (
+            <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-2">
+              <p className="text-xs text-red-300">{item.verificationNotes}</p>
+            </div>
+          )}
         </div>
       </div>
 

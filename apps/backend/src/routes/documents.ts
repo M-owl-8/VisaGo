@@ -81,6 +81,16 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       fileSize: req.file.size,
     });
 
+    // Ensure documentType is not defaulted to 'document' if a non-empty value is present
+    if (!documentType || documentType.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'documentType is required and cannot be empty',
+        },
+      });
+    }
+
     // Upload file using storage adapter (local or Firebase)
     const uploadResult = await StorageAdapter.uploadFile(
       req.file.buffer,
@@ -154,12 +164,13 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     }
 
     // Create document record in database first
+    // Use documentType directly from request body (must be the value sent by frontend)
     const document = await prisma.userDocument.create({
       data: {
         userId,
         applicationId,
         documentName: req.file.originalname,
-        documentType,
+        documentType: documentType.trim(), // Use the value sent by frontend, trimmed
         fileUrl: uploadResult.fileUrl,
         fileName: uploadResult.fileName,
         fileSize: uploadResult.fileSize,
