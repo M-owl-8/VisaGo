@@ -58,7 +58,7 @@ export function ApplicationCard({
           <span>{t('applications.progress', 'Progress')}</span>
           <span className="font-semibold text-white">{application.progressPercentage ?? 0}%</span>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-white/20 border border-white/10 sm:h-2">
+        <div className="h-1.5 w-full rounded-full bg-white/25 border-2 border-white/20 sm:h-2">
           <div
             className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width] shadow-[0_0_6px_rgba(62,166,255,0.4)]"
             style={{ width: `${application.progressPercentage || 0}%` }}

@@ -196,7 +196,7 @@ export default function ApplicationDetailPage() {
             <span>{t('applications.overallProgress', 'Overall Progress')}</span>
             <span className="font-semibold text-white">{application.progressPercentage || 0}%</span>
           </div>
-          <div className="h-3 w-full rounded-full bg-white/20 border border-white/10">
+          <div className="h-3 w-full rounded-full bg-white/25 border-2 border-white/20">
             <div
               className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width] shadow-[0_0_8px_rgba(62,166,255,0.5)]"
               style={{ width: `${application.progressPercentage || 0}%` }}
