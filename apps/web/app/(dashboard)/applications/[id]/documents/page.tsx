@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
 // Force dynamic rendering to prevent build-time evaluation
@@ -15,6 +15,9 @@ export default function DocumentsPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const documentTypeFromQuery = searchParams.get('documentType') ?? 'document';
+  const documentNameFromQuery = searchParams.get('name') ?? 'Document';
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -33,12 +36,13 @@ export default function DocumentsPage() {
     setSuccess('');
 
     try {
-      const response = await apiClient.uploadDocument(params.id as string, 'document', file);
+      const response = await apiClient.uploadDocument(params.id as string, documentTypeFromQuery, file);
 
       if (response.success) {
         setSuccess(t('documents.uploadSuccess'));
         setTimeout(() => {
           router.push(`/applications/${params.id}`);
+          router.refresh();
         }, 2000);
       } else {
         const errorMsg = getErrorMessage(response.error || {}, t, i18n.language);
@@ -54,14 +58,16 @@ export default function DocumentsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 text-white sm:px-6 lg:px-8">
-      <h1 className="mb-6 text-2xl font-bold">{t('documents.title')}</h1>
+      <h1 className="mb-6 text-2xl font-bold">
+        {t('documents.uploadDocumentTitle', `Upload ${documentNameFromQuery}`, { name: documentNameFromQuery })}
+      </h1>
 
       {error && <ErrorBanner message={error} onClose={() => setError('')} />}
       {success && <SuccessBanner message={success} />}
 
       <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_25px_55px_rgba(1,7,17,0.65)]">
         <label className="block text-sm font-medium text-white/80">
-          {t('documents.selectDocument')}
+          {t('documents.selectDocument', 'Select Document')} - {documentNameFromQuery}
         </label>
         <input
           type="file"

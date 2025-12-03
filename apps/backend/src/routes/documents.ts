@@ -73,6 +73,14 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       });
     }
 
+    // Log upload request for debugging
+    console.log('[UPLOAD_DEBUG] Received upload request', {
+      applicationId,
+      documentType,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+    });
+
     // Upload file using storage adapter (local or Firebase)
     const uploadResult = await StorageAdapter.uploadFile(
       req.file.buffer,
@@ -126,11 +134,23 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
             item.documentType === documentType ||
             item.documentType?.toLowerCase() === documentType.toLowerCase()
         );
+
+        // Log checklist item lookup for debugging
+        console.log('[UPLOAD_DEBUG] Checklist item lookup', {
+          documentType,
+          checklistItemFound: !!checklistItem,
+          checklistItemDocumentType: checklistItem?.documentType,
+          allChecklistItemTypes: checklist.items.map((i: any) => i.documentType),
+        });
       }
       // If checklist is a status object (processing/failed), we skip the lookup
       // This is expected and not an error - checklist lookup is optional
     } catch (error) {
       // Checklist lookup is optional, continue without it
+      console.log('[UPLOAD_DEBUG] Checklist lookup failed (non-blocking)', {
+        documentType,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     // Create document record in database first (before AI validation)
@@ -145,6 +165,14 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         fileSize: uploadResult.fileSize,
         status: 'pending', // Will be updated after AI validation
       },
+    });
+
+    // Log document creation for debugging
+    console.log('[UPLOAD_DEBUG] Created UserDocument', {
+      documentId: document.id,
+      documentType: document.documentType,
+      status: document.status,
+      applicationId: document.applicationId,
     });
 
     // Perform AI validation for ALL document types (non-blocking)

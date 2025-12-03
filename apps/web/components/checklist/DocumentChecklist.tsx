@@ -5,7 +5,8 @@ import { DocumentChecklistItem } from '@/components/applications/DocumentCheckli
 import { useTranslation } from 'react-i18next';
 
 export interface ChecklistItem {
-  document: string;
+  document?: string;
+  documentType?: string;
   name: string;
   nameUz?: string;
   nameRu?: string;
@@ -82,7 +83,7 @@ export function DocumentChecklist({
             <div className="space-y-3">
               {requiredItems.map((item, index) => (
                 <DocumentChecklistItem
-                  key={item.document || index}
+                  key={item.documentType || item.document || `item-${index}`}
                   item={item}
                   applicationId={applicationId}
                   language={language}
@@ -107,7 +108,7 @@ export function DocumentChecklist({
             <div className="space-y-3">
               {highlyRecommendedItems.map((item, index) => (
                 <DocumentChecklistItem
-                  key={item.document || index}
+                  key={item.documentType || item.document || `item-${index}`}
                   item={item}
                   applicationId={applicationId}
                   language={language}
@@ -132,7 +133,7 @@ export function DocumentChecklist({
             <div className="space-y-3">
               {optionalItems.map((item, index) => (
                 <DocumentChecklistItem
-                  key={item.document || index}
+                  key={item.documentType || item.document || `item-${index}`}
                   item={item}
                   applicationId={applicationId}
                   language={language}

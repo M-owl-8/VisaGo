@@ -8,7 +8,7 @@ import { PrismaClient } from '@prisma/client';
 import { getEnvConfig } from '../config/env';
 import { errors } from '../utils/errors';
 import { logError, logInfo, logWarn } from '../middleware/logger';
-import AIOpenAIService from './ai-openai.service';
+import { AIOpenAIService } from './ai-openai.service';
 import { getDocumentTranslation } from '../data/document-translations';
 import { buildAIUserContext } from './ai-context.service';
 import { inferCategory, normalizePriority } from '../utils/checklist-helpers';
@@ -343,11 +343,67 @@ export class DocumentChecklistService {
         let aiError: Error | null = null;
 
         try {
-          aiChecklist = await AIOpenAIService.generateChecklist(
-            userContext,
-            application.country.name,
-            application.visaType.name
-          );
+          // Try new VisaChecklistEngine first (uses VisaRuleSet from database)
+          const { VisaChecklistEngineService } = await import('./visa-checklist-engine.service');
+
+          // Get previous checklist if exists (for stable IDs)
+          const previousChecklistData = storedChecklist?.checklistData;
+          let previousChecklist: any[] | undefined;
+          if (previousChecklistData) {
+            try {
+              const parsed = JSON.parse(previousChecklistData);
+              previousChecklist = Array.isArray(parsed) ? parsed : parsed.items || [];
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+
+          try {
+            aiChecklist = await VisaChecklistEngineService.generateChecklist(
+              application.country.code, // Use country code instead of name
+              application.visaType.name.toLowerCase(),
+              userContext,
+              previousChecklist
+            );
+
+            // Convert to old format for compatibility
+            const convertedChecklist = {
+              type: application.visaType.name,
+              checklist: aiChecklist.checklist.map((item: any) => ({
+                document: item.documentType,
+                name: item.name,
+                nameUz: item.nameUz,
+                nameRu: item.nameRu,
+                category: item.category,
+                required: item.required,
+                description: item.description || '',
+                descriptionUz: item.description || '',
+                descriptionRu: item.description || '',
+                priority: item.priority === 1 ? 'high' : item.priority === 2 ? 'medium' : 'low',
+                whereToObtain: item.reasonIfApplies || item.description || '',
+                whereToObtainUz: item.reasonIfApplies || item.description || '',
+                whereToObtainRu: item.reasonIfApplies || item.description || '',
+              })),
+            };
+            aiChecklist = convertedChecklist;
+
+            logInfo('[Checklist][Engine] Used VisaChecklistEngineService', {
+              applicationId,
+              country: application.country.name,
+              visaType: application.visaType.name,
+            });
+          } catch (engineError: any) {
+            // Fall back to old AIOpenAIService if new engine fails
+            logWarn('[Checklist][Engine] VisaChecklistEngine failed, falling back to legacy', {
+              applicationId,
+              error: engineError.message,
+            });
+            aiChecklist = await AIOpenAIService.generateChecklist(
+              userContext,
+              application.country.name,
+              application.visaType.name
+            );
+          }
           const aiDurationMs = Date.now() - aiStart;
           if (aiDurationMs > 30000) {
             logWarn('[Checklist][AI] Slow checklist generation', {
@@ -1143,11 +1199,30 @@ Only return the JSON object, no other text.`;
     const documentsFound = existingDocumentsMap.size;
     let merged = 0;
 
+    // Log merge debug info
+    if (applicationId) {
+      console.log('[CHECKLIST_MERGE_DEBUG] Starting merge', {
+        applicationId,
+        documentsMapKeys: Array.from(existingDocumentsMap.keys()),
+        checklistItemTypes: items.map((i) => i.documentType),
+        totalItems: items.length,
+      });
+    }
+
     const mergedItems = items.map((item) => {
       // Match by documentType (stable key, not AI-generated name)
       const doc = existingDocumentsMap.get(item.documentType);
       if (doc) {
         merged++;
+        if (applicationId) {
+          console.log('[CHECKLIST_MERGE_DEBUG] Matched document', {
+            applicationId,
+            checklistItemDocumentType: item.documentType,
+            documentDocumentType: doc.type,
+            documentStatus: doc.status,
+            documentId: doc.id,
+          });
+        }
         return {
           ...item,
           status: doc.status as any,

@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils/cn';
 
 interface DocumentChecklistItemProps {
   item: {
-    document: string;
+    document?: string;
+    documentType?: string;
     name: string;
     nameUz?: string;
     nameRu?: string;
@@ -71,9 +72,24 @@ export function DocumentChecklistItem({
   };
 
   const getStatusLabel = () => {
-    if (isVerified) return t('documents.statusVerified', 'Verified');
-    if (isRejected) return t('documents.statusRejected', 'Rejected');
-    if (isPending) return t('documents.statusPending', 'Pending');
+    if (isVerified) {
+      // Check if AI verified
+      const aiVerified = (item as any).aiVerified;
+      if (aiVerified) {
+        return t('documents.statusVerifiedByAI', 'Verified by AI ✅');
+      }
+      return t('documents.statusVerified', 'Verified');
+    }
+    if (isRejected) {
+      const aiVerified = (item as any).aiVerified;
+      if (aiVerified !== undefined) {
+        return t('documents.statusRejectedByAI', 'AI found problems ❌');
+      }
+      return t('documents.statusRejected', 'Rejected');
+    }
+    if (isPending) {
+      return t('documents.statusPendingReview', 'Uploaded, awaiting AI review');
+    }
     return t('documents.statusNotUploaded', 'Not uploaded');
   };
 
@@ -166,7 +182,7 @@ export function DocumentChecklistItem({
           </Link>
         ) : (
           <Link
-            href={`/applications/${applicationId}/documents?upload=${item.document}`}
+            href={`/applications/${applicationId}/documents?documentType=${encodeURIComponent(item.documentType || item.document || 'document')}&name=${encodeURIComponent(name)}`}
             className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
           >
             <Upload size={14} />
