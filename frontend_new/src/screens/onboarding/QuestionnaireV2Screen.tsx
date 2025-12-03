@@ -281,12 +281,62 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 
         const responseData = response.data;
 
-        if (responseData?.success && responseData?.data?.application?.id) {
-          navigation.navigate('ApplicationDetail', {
-            applicationId: responseData.data.application.id,
-          });
+        // DEBUG: Log full response to help diagnose issues
+        console.log('[QuestionnaireV2] AI generation response:', {
+          success: responseData?.success,
+          hasData: !!responseData?.data,
+          dataKeys: responseData?.data ? Object.keys(responseData.data) : [],
+          applicationId: responseData?.data?.application?.id,
+          fullResponse: JSON.stringify(responseData, null, 2),
+        });
+
+        // Check for success and valid application ID
+        if (responseData?.success) {
+          const applicationId = responseData?.data?.application?.id;
+
+          if (applicationId) {
+            // Success: Navigate to application detail
+            navigation.navigate('ApplicationDetail', {
+              applicationId: applicationId,
+            });
+          } else {
+            // Success but missing application ID - show error
+            console.error(
+              '[QuestionnaireV2] Success response but missing application ID:',
+              responseData,
+            );
+            Alert.alert(
+              t('common.error') || 'Error',
+              t('questionnaire.applicationCreatedButMissingId') ||
+                "Application was created but we couldn't retrieve its ID. Please check your applications list.",
+              [
+                {
+                  text: t('common.ok'),
+                  onPress: () =>
+                    navigation.navigate('MainTabs', {screen: 'Applications'}),
+                },
+              ],
+            );
+          }
         } else {
-          navigation.navigate('MainTabs', {screen: 'Applications'});
+          // Not successful - show error message
+          const errorMessage =
+            responseData?.error?.message ||
+            t('questionnaire.failedToCreateApplication') ||
+            'Failed to create application';
+
+          console.error('[QuestionnaireV2] Application creation failed:', {
+            success: responseData?.success,
+            error: responseData?.error,
+          });
+
+          Alert.alert(t('common.error') || 'Error', errorMessage, [
+            {
+              text: t('common.ok'),
+              onPress: () =>
+                navigation.navigate('MainTabs', {screen: 'Applications'}),
+            },
+          ]);
         }
       } catch (error: any) {
         console.error('AI generation failed:', error);

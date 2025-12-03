@@ -276,6 +276,8 @@
     "success": "Sizning viza rejangiz tayyor!",
     "failed": "Viza rejasini yaratishda xato",
     "saveError": "Savolnomaniz saqlandi. Biroq, biz avtomatik ravishda ariza yarata olmadik.\n\nXato: {error}\n\nSiz Arizalar sahifasidan qo'lda arizalar yaratishingiz mumkin.",
+    "failedToCreateApplication": "Ariza yaratib bo'lmadi",
+    "applicationCreatedButMissingId": "Ariza yaratildi, lekin uning ID raqamini olishning imkoni bo'lmadi. Iltimos, arizalar ro'yxatini tekshiring.",
     "questions": {
       "purpose": {
         "title": "Sayohat maqsadingiz nima?",

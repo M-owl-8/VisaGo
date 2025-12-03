@@ -276,6 +276,8 @@
     "success": "Your visa plan is ready!",
     "failed": "Failed to create visa plan",
     "saveError": "Your questionnaire has been saved. However, we couldn't create an application automatically.\n\nError: {error}\n\nYou can create applications manually from the Applications page.",
+    "failedToCreateApplication": "Failed to create application",
+    "applicationCreatedButMissingId": "Application was created but we couldn't retrieve its ID. Please check your applications list.",
     "questions": {
       "purpose": {
         "title": "What is your purpose of travel?",

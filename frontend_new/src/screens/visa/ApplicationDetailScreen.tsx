@@ -308,6 +308,73 @@ export default function ApplicationDetailScreen({
     });
   };
 
+  const handleDeleteApplication = () => {
+    Alert.alert(
+      t('common.delete') || 'Delete Application',
+      language === 'uz'
+        ? "Bu arizani o'chirishni xohlaysizmi? Bu amalni bekor qilib bo'lmaydi."
+        : language === 'ru'
+          ? 'Вы уверены, что хотите удалить это заявление? Это действие нельзя отменить.'
+          : 'Are you sure you want to delete this application? This action cannot be undone.',
+      [
+        {
+          text: t('common.cancel') || 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: t('common.delete') || 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              const response = await apiClient.deleteApplication(applicationId);
+
+              if (response.success) {
+                Alert.alert(
+                  t('common.success') || 'Success',
+                  language === 'uz'
+                    ? "Ariza muvaffaqiyatli o'chirildi"
+                    : language === 'ru'
+                      ? 'Заявление успешно удалено'
+                      : 'Application deleted successfully',
+                  [
+                    {
+                      text: t('common.ok'),
+                      onPress: () => {
+                        // Navigate back to applications list
+                        navigation.navigate('MainTabs', {
+                          screen: 'Applications',
+                        });
+                      },
+                    },
+                  ],
+                );
+              } else {
+                throw new Error(
+                  response.error?.message || 'Failed to delete application',
+                );
+              }
+            } catch (error: any) {
+              console.error('Error deleting application:', error);
+              const errorMessage =
+                error?.response?.data?.error?.message ||
+                error?.message ||
+                (language === 'uz'
+                  ? "Arizani o'chirishda xatolik yuz berdi"
+                  : language === 'ru'
+                    ? 'Произошла ошибка при удалении заявления'
+                    : 'Failed to delete application');
+
+              Alert.alert(t('common.error') || 'Error', errorMessage);
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const getLocalizedText = (
     item: DocumentChecklistItem,
     field: 'name' | 'description',
@@ -473,7 +540,12 @@ export default function ApplicationDetailScreen({
           <Text style={styles.headerTitle}>
             {t('visa.applicationDetail.title')}
           </Text>
-          <View style={{width: 40}} />
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleDeleteApplication}
+            disabled={isLoading}>
+            <Icon name="trash-outline" size={24} color="#EF4444" />
+          </TouchableOpacity>
         </View>
 
         {/* Application Header Card */}
@@ -875,6 +947,14 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(74, 158, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
