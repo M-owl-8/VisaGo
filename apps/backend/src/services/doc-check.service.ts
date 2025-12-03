@@ -15,6 +15,12 @@ import { logInfo, logWarn, logError } from '../middleware/logger';
 import { AIOpenAIService } from './ai-openai.service';
 import { buildApplicantProfile } from './ai-context.service';
 import type { ApplicantProfile, ChecklistBrainItem } from '../types/visa-brain';
+import type { DocumentValidationResultAI } from '../types/ai-responses';
+import {
+  DOCUMENT_VALIDATION_SYSTEM_PROMPT,
+  buildDocumentValidationUserPrompt,
+} from '../config/ai-prompts';
+import { DocumentClassifierService } from './document-classifier.service';
 
 const prisma = new PrismaClient();
 
@@ -190,41 +196,266 @@ export class DocCheckService {
         isCoreRequired: checklistItem.category === 'required',
       };
 
-      // 4) Get extractedText from document
-      // TODO: extractedText field was removed from DB; classification is disabled for now
-      const documentText = null; // document?.extractedText || null;
+      // 4) Get extracted text from document (if available)
+      let documentText = '';
+      if (document) {
+        try {
+          const extractedText = await DocumentClassifierService.extractTextForDocument({
+            id: document.id,
+            fileName: document.fileName,
+            fileUrl: document.fileUrl,
+            mimeType: undefined, // Could be added if available
+          });
+          if (extractedText) {
+            documentText = extractedText;
+          }
+        } catch (ocrError) {
+          logWarn('[DocCheck] OCR extraction failed, continuing without text', {
+            documentId: document.id,
+            error: ocrError instanceof Error ? ocrError.message : String(ocrError),
+          });
+        }
+      }
 
-      // 5) Call AIOpenAIService.checkDocument
-      // TODO: checkDocument method doesn't exist - need to implement or use alternative
-      // For now, create a mock result
-      const checkResult = {
-        status: document ? 'OK' : 'MISSING',
-        problems: [] as any[],
-        suggestions: [] as any[],
-      };
-      // const checkResult = await AIOpenAIService.checkDocument(...);
+      // 5) Call GPT-4 for document validation using unified system
+      let validationResult: DocumentValidationResultAI;
 
-      // 6) Save result in DocumentCheckResult table
-      // TODO: documentCheckResult model doesn't exist in schema - need to implement or use DocumentChecklist
-      // For now, just return the check result without persisting
-      const finalResult = {
-        id: `${applicationId}-${checklistItem.id}`,
+      if (!document) {
+        // No document uploaded - return MISSING status
+        validationResult = {
+          status: 'uncertain', // Will map to MISSING
+          confidence: 0.0,
+          verifiedByAI: false,
+          problems: [
+            {
+              code: 'MISSING_DOCUMENT',
+              message: 'Document not uploaded',
+              userMessage: 'Hujjat yuklanmagan',
+            },
+          ],
+          suggestions: [],
+          notes: {
+            uz: 'Hujjat yuklanmagan. Iltimos, hujjatni yuklang.',
+            ru: 'Документ не загружен. Пожалуйста, загрузите документ.',
+            en: 'Document not uploaded. Please upload the document.',
+          },
+          rawJson: JSON.stringify({ error: 'fallback_used', reason: 'Document not uploaded' }),
+        };
+      } else {
+        // Document exists - validate using GPT-4
+        if (!AIOpenAIService.isInitialized()) {
+          logWarn('[DocCheck] OpenAI service not initialized, using fallback', {
+            applicationId,
+            checklistItemId: checklistItem.id,
+          });
+          validationResult = {
+            status: 'uncertain',
+            confidence: 0.0,
+            verifiedByAI: false,
+            problems: [],
+            suggestions: [],
+            notes: {
+              uz: "Hujjat tekshirilmadi. Qo'lda tekshirish kerak.",
+              ru: 'Документ не проверен. Требуется ручная проверка.',
+              en: 'Document not checked. Manual review required.',
+            },
+            rawJson: JSON.stringify({
+              error: 'fallback_used',
+              reason: 'OpenAI service not initialized',
+            }),
+          };
+        } else {
+          try {
+            const openaiClient = AIOpenAIService.getOpenAIClient();
+
+            // Build user prompt for document validation
+            const userPrompt = buildDocumentValidationUserPrompt({
+              document: {
+                documentType: checklistItem.document || checklistItem.id,
+                fileName: document.fileName,
+                fileUrl: document.fileUrl,
+                uploadedAt: document.uploadedAt,
+                expiryDate: null, // Could be added if available
+              },
+              checklistItem: {
+                documentType: checklistItem.document || checklistItem.id,
+                name: checklistItem.name,
+                description: checklistItem.description,
+                whereToObtain: undefined, // Could be added if available
+              },
+              application: {
+                country: application.country.name || application.country.code,
+                visaType: application.visaType.name,
+              },
+            });
+
+            // Add document text if available
+            const enhancedPrompt = documentText
+              ? `${userPrompt}\n\nDOCUMENT TEXT CONTENT:\n${documentText.substring(0, 2000)}`
+              : userPrompt;
+
+            const response = await openaiClient.chat.completions.create({
+              model: AIOpenAIService.MODEL,
+              messages: [
+                { role: 'system', content: DOCUMENT_VALIDATION_SYSTEM_PROMPT },
+                { role: 'user', content: enhancedPrompt },
+              ],
+              max_tokens: 1500,
+              temperature: 0.2,
+              response_format: { type: 'json_object' },
+            });
+
+            const content = response.choices[0]?.message?.content || '{}';
+            let parsed: any;
+
+            try {
+              parsed = JSON.parse(content);
+            } catch (parseError) {
+              logError('[DocCheck] Failed to parse GPT-4 response', parseError as Error, {
+                applicationId,
+                checklistItemId: checklistItem.id,
+                rawContent: content.substring(0, 200),
+              });
+              throw new Error('Failed to parse GPT-4 response');
+            }
+
+            // Normalize to DocumentValidationResultAI format
+            const status = ['verified', 'rejected', 'needs_review', 'uncertain'].includes(
+              parsed.status
+            )
+              ? (parsed.status as 'verified' | 'rejected' | 'needs_review' | 'uncertain')
+              : 'uncertain';
+
+            const confidence =
+              typeof parsed.confidence === 'number'
+                ? Math.max(0, Math.min(1, parsed.confidence))
+                : 0.5;
+
+            const verifiedByAI = status === 'verified' && confidence >= 0.7;
+
+            const problems = Array.isArray(parsed.problems)
+              ? parsed.problems.map((p: any) => ({
+                  code: p.code || 'UNKNOWN_PROBLEM',
+                  message: p.message || 'Unknown problem',
+                  userMessage: p.userMessage,
+                }))
+              : [];
+
+            const suggestions = Array.isArray(parsed.suggestions)
+              ? parsed.suggestions.map((s: any) => ({
+                  code: s.code || 'UNKNOWN_SUGGESTION',
+                  message: s.message || 'Unknown suggestion',
+                }))
+              : [];
+
+            const notes = {
+              uz: parsed.notes?.uz || parsed.notesUz || 'Hujjat tekshirildi.',
+              ru: parsed.notes?.ru || parsed.notesRu,
+              en: parsed.notes?.en || parsed.notesEn,
+            };
+
+            validationResult = {
+              status,
+              confidence,
+              verifiedByAI,
+              problems,
+              suggestions,
+              notes,
+              rawJson: content,
+            };
+
+            logInfo('[DocCheck] GPT-4 validation completed', {
+              applicationId,
+              checklistItemId: checklistItem.id,
+              status: validationResult.status,
+              confidence: validationResult.confidence,
+              problemsCount: validationResult.problems.length,
+            });
+          } catch (gptError: any) {
+            logError('[DocCheck] GPT-4 validation failed', gptError as Error, {
+              applicationId,
+              checklistItemId: checklistItem.id,
+            });
+            // Fallback result
+            validationResult = {
+              status: 'uncertain',
+              confidence: 0.0,
+              verifiedByAI: false,
+              problems: [],
+              suggestions: [],
+              notes: {
+                uz: "Hujjat tekshirilmadi. Qo'lda tekshirish kerak.",
+                ru: 'Документ не проверен. Требуется ручная проверка.',
+                en: 'Document not checked. Manual review required.',
+              },
+              rawJson: JSON.stringify({
+                error: 'fallback_used',
+                reason: gptError instanceof Error ? gptError.message : String(gptError),
+              }),
+            };
+          }
+        }
+      }
+
+      // 6) Map DocumentValidationResultAI to DocumentCheckResult status
+      let docCheckStatus: 'OK' | 'MISSING' | 'PROBLEM' | 'UNCERTAIN';
+      if (!document) {
+        docCheckStatus = 'MISSING';
+      } else {
+        switch (validationResult.status) {
+          case 'verified':
+            docCheckStatus = 'OK';
+            break;
+          case 'rejected':
+          case 'needs_review':
+            docCheckStatus = 'PROBLEM';
+            break;
+          case 'uncertain':
+          default:
+            docCheckStatus = 'UNCERTAIN';
+            break;
+        }
+      }
+
+      // 7) Save result in DocumentCheckResult table
+      // Prepare rawJson: use validationResult.rawJson if available, otherwise stringify the validationResult
+      const rawJsonValue = validationResult.rawJson
+        ? validationResult.rawJson
+        : JSON.stringify(validationResult);
+
+      const finalResult = await prisma.documentCheckResult.upsert({
+        where: {
+          applicationId_checklistItemId: {
+            applicationId,
+            checklistItemId: checklistItem.id,
+          },
+        },
+        update: {
+          documentId: document?.id || null,
+          status: docCheckStatus,
+          problemsJson: JSON.stringify(validationResult.problems),
+          suggestionsJson: JSON.stringify(validationResult.suggestions),
+          confidence: validationResult.confidence,
+          notes: validationResult.notes.uz, // Store Uzbek notes as primary
+          rawJson: rawJsonValue,
+        },
+        create: {
+          applicationId,
+          checklistItemId: checklistItem.id,
+          documentId: document?.id || null,
+          status: docCheckStatus,
+          problemsJson: JSON.stringify(validationResult.problems),
+          suggestionsJson: JSON.stringify(validationResult.suggestions),
+          confidence: validationResult.confidence,
+          notes: validationResult.notes.uz,
+          rawJson: rawJsonValue,
+        },
+      });
+
+      logInfo('[DocCheck] Single item checked and saved', {
         applicationId,
         checklistItemId: checklistItem.id,
-        documentId: document?.id || null,
-        status: checkResult.status,
-        problemsJson: JSON.stringify(checkResult.problems),
-        suggestionsJson: JSON.stringify(checkResult.suggestions),
-        notes:
-          checkResult.problems.length > 0
-            ? checkResult.problems.map((p: any) => p.message).join('; ')
-            : null,
-      };
-
-      logInfo('[DocCheck] Single item checked', {
-        applicationId,
-        checklistItemId: checklistItem.id,
-        status: checkResult.status,
+        status: docCheckStatus,
         documentId: document?.id || null,
       });
 
@@ -328,8 +559,9 @@ export class DocCheckService {
   }> {
     try {
       // Load DocumentCheckResult rows for application
-      // TODO: documentCheckResult model doesn't exist in schema
-      const results: any[] = []; // await prisma.documentCheckResult.findMany({ where: { applicationId } });
+      const results = await prisma.documentCheckResult.findMany({
+        where: { applicationId },
+      });
 
       // Load checklist to get total items and categories
       const { DocumentChecklistService } = await import('./document-checklist.service');

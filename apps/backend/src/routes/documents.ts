@@ -6,6 +6,7 @@ import StorageAdapter from '../services/storage-adapter';
 import { authenticateToken } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
 import { DocumentChecklist } from '../services/document-checklist.service';
+import type { DocumentValidationResultAI } from '../types/ai-responses';
 
 /**
  * Type guard to check if a value is a DocumentChecklist (not a status object)
@@ -132,35 +133,45 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       // Checklist lookup is optional, continue without it
     }
 
+    // Create document record in database first (before AI validation)
+    const document = await prisma.userDocument.create({
+      data: {
+        userId,
+        applicationId,
+        documentName: req.file.originalname,
+        documentType,
+        fileUrl: uploadResult.fileUrl,
+        fileName: uploadResult.fileName,
+        fileSize: uploadResult.fileSize,
+        status: 'pending', // Will be updated after AI validation
+      },
+    });
+
     // Perform AI validation for ALL document types (non-blocking)
-    let aiResult: {
-      status: 'verified' | 'rejected' | 'needs_review';
-      verifiedByAI: boolean;
-      confidence?: number;
-      notesUz: string;
-      notesRu?: string;
-      notesEn?: string;
-    } | null = null;
+    let aiResult: DocumentValidationResultAI | null = null;
 
     try {
-      const { validateDocumentWithAI } = await import('../services/document-validation.service');
+      const { validateDocumentWithAI, saveValidationResultToDocument } = await import(
+        '../services/document-validation.service'
+      );
 
-      // Run AI validation with new interface
+      // Run AI validation with unified interface
       aiResult = await validateDocumentWithAI({
         document: {
+          id: document.id,
           documentType,
           documentName: req.file.originalname,
           fileName: uploadResult.fileName,
           fileUrl: uploadResult.fileUrl,
-          uploadedAt: new Date(),
+          uploadedAt: document.uploadedAt,
+          expiryDate: null, // Could be extracted if available
         },
         checklistItem: checklistItem
           ? {
+              documentType: checklistItem.documentType || documentType,
               name: checklistItem.name,
-              nameUz: checklistItem.nameUz,
               description: checklistItem.description,
-              descriptionUz: checklistItem.descriptionUz,
-              required: checklistItem.required,
+              whereToObtain: checklistItem.whereToObtain,
             }
           : undefined,
         application: {
@@ -176,6 +187,19 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         countryName: application.country.name,
         visaTypeName: application.visaType.name,
       });
+
+      // Save validation result to UserDocument
+      await saveValidationResultToDocument(document.id, aiResult);
+
+      // Reload document to get updated fields
+      const updatedDocument = await prisma.userDocument.findUnique({
+        where: { id: document.id },
+      });
+
+      if (updatedDocument) {
+        // Update document reference for response
+        Object.assign(document, updatedDocument);
+      }
     } catch (validationError: any) {
       // Log error but don't fail the upload
       console.error(
@@ -183,41 +207,20 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         validationError
       );
       aiResult = null;
-    }
 
-    // Map AI status to document status
-    let initialStatus = 'pending';
-    if (aiResult) {
-      if (aiResult.status === 'verified') {
-        initialStatus = 'verified';
-      } else if (aiResult.status === 'rejected') {
-        initialStatus = 'rejected';
-      } else {
-        initialStatus = 'pending'; // needs_review maps to pending
-      }
+      // Set fallback status
+      await prisma.userDocument.update({
+        where: { id: document.id },
+        data: {
+          status: 'pending',
+          verifiedByAI: false,
+          aiConfidence: 0.0,
+          aiNotesUz: "Hujjatni tekshirishning imkoni bo'lmadi. Iltimos yana yuklang.",
+          aiNotesRu: 'Не удалось проверить документ. Пожалуйста, загрузите снова.',
+          aiNotesEn: 'Could not validate document. Please upload again.',
+        },
+      });
     }
-
-    // Create document record in database with AI results
-    const document = await prisma.userDocument.create({
-      data: {
-        userId,
-        applicationId,
-        documentName: req.file.originalname,
-        documentType,
-        fileUrl: uploadResult.fileUrl,
-        fileName: uploadResult.fileName,
-        fileSize: uploadResult.fileSize,
-        status: initialStatus,
-        verificationNotes: aiResult?.notesUz || null, // Backward compatibility
-        ...(aiResult && {
-          verifiedByAI: aiResult.verifiedByAI || false,
-          aiConfidence: aiResult.confidence || null,
-          aiNotesUz: aiResult.notesUz || null,
-          aiNotesRu: aiResult.notesRu || null,
-          aiNotesEn: aiResult.notesEn || null,
-        }),
-      } as any, // Type assertion for AI fields that may not be in Prisma types during build
-    });
 
     // Update application progress based on documents (non-blocking)
     try {
