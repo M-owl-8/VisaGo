@@ -138,7 +138,7 @@ export class DocumentProcessingQueueService {
               documentId,
               status: aiResult.status,
               verifiedByAI: aiResult.verifiedByAI,
-              confidence: aiResult.aiConfidence,
+              confidence: aiResult.confidence,
             });
           } catch (validationError: any) {
             // Log but continue - validation failure shouldn't block other processing
