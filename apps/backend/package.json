@@ -31,7 +31,9 @@
     "make-super-admin": "ts-node --project scripts/tsconfig.json scripts/make-super-admin.ts",
     "list-users": "ts-node --project scripts/tsconfig.json scripts/list-users.ts",
     "verify-admin-data": "ts-node --project scripts/tsconfig.json scripts/verify-admin-data.ts",
-    "generate-admin-token": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/generate-admin-token.ts"
+    "debug:documents": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/debug-documents.ts",
+    "generate-admin-token": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/generate-admin-token.ts",
+    "seed:embassy-sources": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-embassy-sources.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.21.1",

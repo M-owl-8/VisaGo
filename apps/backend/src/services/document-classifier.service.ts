@@ -241,14 +241,32 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
         return;
       }
 
-      // 2) Extract text (or null for now)
+      // 2) Check if document already has a specific type that should NOT be overwritten
+      const currentType = document.documentType;
+
+      // Generic types that can be replaced by classification
+      const GENERIC_TYPES = new Set(['document', 'other', null, undefined, '']);
+
+      // Check if current type is generic (can be replaced)
+      const isGenericType = !currentType || GENERIC_TYPES.has(currentType);
+
+      if (!isGenericType) {
+        // Document already has a specific type - don't override it
+        logInfo('[DocumentClassifier] Skipped because type is explicit', {
+          documentId,
+          documentType: currentType,
+        });
+        return;
+      }
+
+      // 3) Extract text (or null for now)
       const extractedText = await this.extractTextForDocument({
         id: document.id,
         fileName: document.fileName,
         fileUrl: document.fileUrl,
       });
 
-      // 3) Classify document type
+      // 4) Classify document type
       const classification = await this.classifyDocumentType(
         {
           fileName: document.fileName,
@@ -257,21 +275,45 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
         extractedText || undefined
       );
 
-      // 4) Update document row with classification results
-      // Note: classifiedType doesn't exist in schema, using documentType instead
+      // 5) Only update if confidence is reasonably high (>= 0.6)
+      if (classification.confidence < 0.6) {
+        logInfo('[DocumentClassifier] Classification confidence too low, skipping update', {
+          documentId,
+          currentType,
+          classifiedType: classification.type,
+          confidence: classification.confidence,
+          threshold: 0.6,
+        });
+        return;
+      }
+
+      // 6) Never change back to "document" (that's pointless)
+      if (classification.type === 'document') {
+        logInfo(
+          '[DocumentClassifier] Classifier returned generic "document" type, skipping update',
+          {
+            documentId,
+            currentType,
+            classifiedType: classification.type,
+            confidence: classification.confidence,
+          }
+        );
+        return;
+      }
+
+      // 7) Update document row with classification results
+      const previousType = currentType;
       await prisma.userDocument.update({
         where: { id: documentId },
         data: {
-          documentType: classification.type, // classifiedType field doesn't exist
-          // classificationSource: 'ai', // Field doesn't exist
-          // classificationScore: classification.confidence, // Field doesn't exist
-          // extractedText: extractedText, // Field doesn't exist
+          documentType: classification.type,
         },
       });
 
-      logInfo('[DocumentClassifier] Document analyzed and updated', {
+      logInfo('[DocumentClassifier] Updated documentType from generic to classified', {
         documentId,
-        documentType: classification.type, // Using documentType instead of classifiedType
+        from: previousType,
+        to: classification.type,
         confidence: classification.confidence,
       });
     } catch (error: any) {

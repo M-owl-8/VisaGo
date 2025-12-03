@@ -153,7 +153,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       });
     }
 
-    // Create document record in database first (before AI validation)
+    // Create document record in database first
     const document = await prisma.userDocument.create({
       data: {
         userId,
@@ -163,7 +163,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         fileUrl: uploadResult.fileUrl,
         fileName: uploadResult.fileName,
         fileSize: uploadResult.fileSize,
-        status: 'pending', // Will be updated after AI validation
+        status: 'pending', // Will be updated after AI validation in background
       },
     });
 
@@ -175,115 +175,61 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       applicationId: document.applicationId,
     });
 
-    // Perform AI validation for ALL document types (non-blocking)
-    let aiResult: DocumentValidationResultAI | null = null;
-
+    // Enqueue background processing job (AI validation, classification, progress update)
+    // This allows the HTTP response to return immediately
     try {
-      const { validateDocumentWithAI, saveValidationResultToDocument } = await import(
-        '../services/document-validation.service'
+      const { DocumentProcessingQueueService } = await import(
+        '../services/document-processing-queue.service'
       );
-
-      // Run AI validation with unified interface
-      aiResult = await validateDocumentWithAI({
-        document: {
-          id: document.id,
-          documentType,
-          documentName: req.file.originalname,
-          fileName: uploadResult.fileName,
-          fileUrl: uploadResult.fileUrl,
-          uploadedAt: document.uploadedAt,
-          expiryDate: null, // Could be extracted if available
-        },
-        checklistItem: checklistItem
-          ? {
-              documentType: checklistItem.documentType || documentType,
-              name: checklistItem.name,
-              description: checklistItem.description,
-              whereToObtain: checklistItem.whereToObtain,
-            }
-          : undefined,
-        application: {
-          id: application.id,
-          country: {
-            name: application.country.name,
-            code: application.country.code,
-          },
-          visaType: {
-            name: application.visaType.name,
-          },
-        },
-        countryName: application.country.name,
-        visaTypeName: application.visaType.name,
+      await DocumentProcessingQueueService.enqueueDocumentProcessing(
+        document.id,
+        applicationId,
+        userId
+      );
+      console.log('[UPLOAD_DEBUG] Enqueued background processing job', {
+        documentId: document.id,
+        applicationId,
       });
-
-      // Save validation result to UserDocument
-      await saveValidationResultToDocument(document.id, aiResult);
-
-      // Reload document to get updated fields
-      const updatedDocument = await prisma.userDocument.findUnique({
-        where: { id: document.id },
-      });
-
-      if (updatedDocument) {
-        // Update document reference for response
-        Object.assign(document, updatedDocument);
-      }
-    } catch (validationError: any) {
-      // Log error but don't fail the upload
+    } catch (queueError: any) {
+      // Log but don't fail the upload - processing can happen later
       console.error(
-        '[AI_DOC_VALIDATION_ERROR] AI validation failed (non-blocking):',
-        validationError
+        '[UPLOAD_DEBUG] Failed to enqueue processing job (non-blocking):',
+        queueError instanceof Error ? queueError.message : String(queueError)
       );
-      aiResult = null;
-
-      // Set fallback status
-      await prisma.userDocument.update({
-        where: { id: document.id },
-        data: {
-          status: 'pending',
-          verifiedByAI: false,
-          aiConfidence: 0.0,
-          aiNotesUz: "Hujjatni tekshirishning imkoni bo'lmadi. Iltimos yana yuklang.",
-          aiNotesRu: 'Не удалось проверить документ. Пожалуйста, загрузите снова.',
-          aiNotesEn: 'Could not validate document. Please upload again.',
-        },
+      // Fallback: trigger processing in background without queue (fire-and-forget)
+      // This ensures processing still happens even if queue is unavailable
+      setImmediate(async () => {
+        try {
+          const { DocumentProcessingQueueService } = await import(
+            '../services/document-processing-queue.service'
+          );
+          await DocumentProcessingQueueService.enqueueDocumentProcessing(
+            document.id,
+            applicationId,
+            userId
+          );
+        } catch (fallbackError) {
+          console.error('[UPLOAD_DEBUG] Fallback processing enqueue also failed:', fallbackError);
+        }
       });
     }
 
-    // Update application progress based on documents (non-blocking)
-    try {
-      const { ApplicationsService } = await import('../services/applications.service');
-      await ApplicationsService.updateProgressFromDocuments(applicationId);
-    } catch (progressError: any) {
-      // Log but do NOT fail the upload
-      console.error(
-        '[DocumentProgress] Failed to update progress from documents (non-blocking):',
-        progressError
-      );
-    }
-
-    // Phase 3.1: Trigger document classification (fire-and-forget)
-    try {
-      const { DocumentClassifierService } = await import('../services/document-classifier.service');
-      // Run asynchronously - don't block the response
-      DocumentClassifierService.analyzeAndUpdateDocument(document.id).catch((err) => {
-        console.error('[DocumentClassifier] Background classification failed:', err);
-      });
-    } catch (classificationError: any) {
-      // Log but do NOT fail the upload
-      console.error(
-        '[DocumentClassifier] Failed to trigger classification (non-blocking):',
-        classificationError
-      );
-    }
-
+    // Return response immediately - processing happens in background
     res.status(201).json({
       success: true,
-      data: document, // Includes all new AI fields
+      data: {
+        documentId: document.id,
+        documentType: document.documentType,
+        status: document.status,
+        fileUrl: document.fileUrl,
+        fileName: document.fileName,
+        uploadedAt: document.uploadedAt,
+      },
       storage: {
         type: process.env.STORAGE_TYPE || 'local',
         fileUrl: uploadResult.fileUrl,
       },
+      message: 'Document uploaded successfully. Processing in background.',
     });
   } catch (error: any) {
     res.status(400).json({

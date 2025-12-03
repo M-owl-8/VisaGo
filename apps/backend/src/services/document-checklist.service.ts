@@ -1199,19 +1199,41 @@ Only return the JSON object, no other text.`;
     const documentsFound = existingDocumentsMap.size;
     let merged = 0;
 
-    // Log merge debug info
+    // Enhanced debug logging at start
     if (applicationId) {
-      console.log('[CHECKLIST_MERGE_DEBUG] Starting merge', {
+      console.log('[CHECKLIST_MERGE_DEBUG_START]', {
         applicationId,
         documentsMapKeys: Array.from(existingDocumentsMap.keys()),
         checklistItemTypes: items.map((i) => i.documentType),
-        totalItems: items.length,
+        documentsCount: existingDocumentsMap.size,
+        itemCount: items.length,
       });
     }
 
     const mergedItems = items.map((item) => {
       // Match by documentType (stable key, not AI-generated name)
       const doc = existingDocumentsMap.get(item.documentType);
+
+      // Enhanced debug logging for each item
+      if (applicationId) {
+        console.log('[CHECKLIST_MERGE_DEBUG_ITEM]', {
+          applicationId,
+          checklistItemDocumentType: item.documentType,
+          docFound: !!doc,
+          docType: doc?.type,
+          docStatus: doc?.status,
+          // Show exact string comparison details
+          documentTypeLength: item.documentType?.length,
+          docTypeLength: doc?.type?.length,
+          documentTypeCharCodes: item.documentType
+            ? item.documentType.split('').map((c) => c.charCodeAt(0))
+            : null,
+          docTypeCharCodes: doc?.type
+            ? doc.type.split('').map((c: string) => c.charCodeAt(0))
+            : null,
+        });
+      }
+
       if (doc) {
         merged++;
         if (applicationId) {
@@ -1238,6 +1260,17 @@ Only return the JSON object, no other text.`;
       }
       return item;
     });
+
+    // Enhanced debug summary before existing log
+    if (applicationId) {
+      console.log('[CHECKLIST_MERGE_DEBUG_SUMMARY]', {
+        applicationId,
+        documentsFound,
+        merged,
+        unmatchedDocuments: documentsFound - merged,
+        totalItems: items.length,
+      });
+    }
 
     // Log merge statistics for debugging
     if (applicationId) {
@@ -1312,100 +1345,48 @@ Only return the JSON object, no other text.`;
         ])
       );
 
-      // Generate checklist items using same AI-first flow as generateChecklist
+      // CRITICAL FIX: Load existing checklist from DB instead of regenerating with AI
+      // This avoids expensive OpenAI calls on every document upload
       let items: ChecklistItem[] = [];
+      const storedChecklist = await prisma.documentChecklist.findUnique({
+        where: { applicationId },
+      });
 
-      try {
-        // Build AI user context with questionnaire summary
-        const userContext = await buildAIUserContext(application.userId, applicationId);
-
-        // Call AI to generate checklist as primary source
-        const aiChecklist = await AIOpenAIService.generateChecklist(
-          userContext,
-          application.country.name,
-          application.visaType.name
-        );
-
-        // Parse AI response into ChecklistItem[]
-        if (
-          aiChecklist.checklist &&
-          Array.isArray(aiChecklist.checklist) &&
-          aiChecklist.checklist.length > 0
-        ) {
-          items = aiChecklist.checklist.map((aiItem: any, index: number) => {
-            const docType =
-              aiItem.document ||
-              aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
-              `document_${index}`;
-            const existingDoc = existingDocumentsMap.get(docType);
-
-            const item = {
-              id: `checklist-item-${index}`,
-              documentType: docType,
-              name: aiItem.name || aiItem.document || 'Unknown Document',
-              nameUz: aiItem.nameUz || aiItem.name || aiItem.document || "Noma'lum hujjat",
-              nameRu: aiItem.nameRu || aiItem.name || aiItem.document || 'Неизвестный документ',
-              description: aiItem.description || '',
-              descriptionUz: aiItem.descriptionUz || aiItem.description || '',
-              descriptionRu: aiItem.descriptionRu || aiItem.description || '',
-              required: aiItem.required !== undefined ? aiItem.required : true,
-              priority: normalizePriority(aiItem.priority || (aiItem.required ? 'high' : 'medium')),
-              status: existingDoc ? (existingDoc.status as any) : 'missing',
-              userDocumentId: existingDoc?.id,
-              fileUrl: existingDoc?.fileUrl,
-              fileName: existingDoc?.fileName,
-              fileSize: existingDoc?.fileSize,
-              uploadedAt: existingDoc?.uploadedAt?.toISOString(),
-              verificationNotes:
-                existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
-              aiVerified: existingDoc?.verifiedByAI === true,
-              aiConfidence: existingDoc?.aiConfidence || undefined,
-            };
-            return {
-              ...item,
-              category: aiItem.category ?? inferCategory(item),
-            };
-          });
-
-          // Validate AI result - if too few items, use fallback
-          const MIN_AI_ITEMS = 10; // Stricter minimum: 10 items required
-          if (items.length < MIN_AI_ITEMS) {
-            logWarn('[DocumentProgress] Weak AI result - too few items, using fallback', {
-              applicationId,
-              aiItemCount: items.length,
-              reason: 'too_few_items',
-            });
-            items = await this.generateRobustFallbackChecklist(
-              application.country,
-              application.visaType,
-              Array.from(existingDocumentsMap.values()).map((doc: any) => ({
-                type: doc.type,
-                status: doc.status,
-                id: doc.id,
-                fileUrl: doc.fileUrl,
-                fileName: doc.fileName,
-                fileSize: doc.fileSize,
-                uploadedAt: doc.uploadedAt,
-                verificationNotes: doc.verificationNotes,
-                verifiedByAI: doc.verifiedByAI,
-                aiConfidence: doc.aiConfidence,
-                aiNotesUz: doc.aiNotesUz,
-                aiNotesRu: doc.aiNotesRu,
-                aiNotesEn: doc.aiNotesEn,
-              }))
-            );
-          }
-        } else {
-          throw new Error('AI returned empty checklist');
-        }
-      } catch (aiError: any) {
-        // Fallback to robust checklist if AI fails
-        logWarn('[DocumentProgress] AI checklist generation failed, using fallback', {
+      if (storedChecklist && storedChecklist.status === 'ready' && storedChecklist.checklistData) {
+        // Use existing checklist - just parse and merge with documents
+        logInfo('[DocumentProgress] Reusing existing checklist from DB', {
           applicationId,
-          reason: 'ai_error',
-          errorMessage: aiError?.message || String(aiError),
+          status: storedChecklist.status,
         });
 
+        try {
+          const checklistData = JSON.parse(storedChecklist.checklistData);
+          // Handle both old format (array) and new format (object with items)
+          items = Array.isArray(checklistData) ? checklistData : checklistData.items || [];
+
+          if (items.length === 0) {
+            logWarn('[DocumentProgress] Stored checklist has no items, will generate fallback', {
+              applicationId,
+            });
+            throw new Error('Stored checklist has no items');
+          }
+        } catch (parseError: any) {
+          logWarn('[DocumentProgress] Failed to parse stored checklist, using fallback', {
+            applicationId,
+            error: parseError?.message || String(parseError),
+          });
+          // Fall through to generate fallback
+          items = [];
+        }
+      }
+
+      // Only generate new checklist if one doesn't exist or is invalid
+      if (items.length === 0) {
+        logInfo('[DocumentProgress] No existing checklist found, generating fallback', {
+          applicationId,
+        });
+
+        // Use fallback checklist generation (faster than AI, no OpenAI call)
         items = await this.generateRobustFallbackChecklist(
           application.country,
           application.visaType,
@@ -1447,6 +1428,7 @@ Only return the JSON object, no other text.`;
         progress,
         totalRequired: sanitizedItems.filter((i) => i.required).length,
         verified: sanitizedItems.filter((i) => i.required && i.status === 'verified').length,
+        usedExistingChecklist: storedChecklist?.status === 'ready',
       });
 
       return progress;

@@ -21,7 +21,7 @@ import StorageAdapter from './services/storage-adapter';
 import { OptimizedCacheService } from './services/cache.service.optimized';
 import { getCacheInvalidationService } from './services/cache-invalidation.service';
 import { getSlowQueryLogger } from './services/slow-query-logger';
-import AIOpenAIService from './services/ai-openai.service';
+import { AIOpenAIService } from './services/ai-openai.service';
 import db from './db';
 import { getEnvConfig, validateCorsOrigin } from './config/env';
 import { SERVER_CONFIG, RATE_LIMIT_CONFIG, API_MESSAGES, HTTP_STATUS } from './config/constants';
@@ -624,6 +624,50 @@ async function startServer() {
       process.stderr.write(`⚠️  Payment services initialization partial: ${error}\n`);
     }
 
+    // 10. Initialize Embassy Rules Sync Pipeline
+    process.stdout.write('🌐 Initializing Embassy Rules Sync Pipeline...\n');
+    try {
+      const { EmbassySyncJobService } = await import('./services/embassy-sync-job.service');
+      const { EmbassySyncSchedulerService } = await import(
+        './services/embassy-sync-scheduler.service'
+      );
+
+      // Initialize the queue
+      EmbassySyncJobService.initialize();
+      process.stdout.write('✓ Embassy Sync Job Queue initialized\n');
+
+      // Start scheduler if enabled
+      const enableSync = process.env.ENABLE_EMBASSY_SYNC !== 'false';
+      if (enableSync) {
+        EmbassySyncSchedulerService.start();
+        const cronExpression = process.env.EMBASSY_SYNC_CRON || '0 2 * * *';
+        process.stdout.write(`✓ Embassy Sync Scheduler started (runs ${cronExpression})\n`);
+      } else {
+        process.stdout.write(
+          '✓ Embassy Sync Scheduler available (disabled by ENABLE_EMBASSY_SYNC env var)\n'
+        );
+      }
+    } catch (error) {
+      process.stderr.write(`⚠️  Embassy Sync Pipeline initialization partial: ${error}\n`);
+    }
+
+    // 11. Initialize Document Processing Queue (for background document processing)
+    process.stdout.write('📄 Initializing Document Processing Queue...\n');
+    try {
+      const { DocumentProcessingQueueService } = await import(
+        './services/document-processing-queue.service'
+      );
+      DocumentProcessingQueueService.initialize();
+      process.stdout.write('✓ Document Processing Queue initialized\n');
+    } catch (error) {
+      process.stderr.write(
+        `⚠️  Document Processing Queue initialization failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }\n`
+      );
+      process.stderr.write('   Document processing will use fallback mode\n');
+    }
+
     // Get pool statistics
     const poolStats = DatabasePoolService.getPoolStats();
     process.stdout.write('\n📈 Database Pool Stats:\n');
@@ -678,6 +722,12 @@ process.on('SIGINT', async () => {
   } catch (error) {
     process.stderr.write('⚠️  Could not close notification queues\n');
   }
+  try {
+    const { EmbassySyncJobService } = await import('./services/embassy-sync-job.service');
+    await EmbassySyncJobService.close();
+  } catch (error) {
+    process.stderr.write('⚠️  Could not close embassy sync queue\n');
+  }
   await DatabasePoolService.drain();
   await DatabasePoolService.close();
   await prisma.$disconnect();
@@ -694,6 +744,12 @@ process.on('SIGTERM', async () => {
     await notificationSchedulerService.closeQueues();
   } catch (error) {
     process.stderr.write('⚠️  Could not close notification queues\n');
+  }
+  try {
+    const { EmbassySyncJobService } = await import('./services/embassy-sync-job.service');
+    await EmbassySyncJobService.close();
+  } catch (error) {
+    process.stderr.write('⚠️  Could not close embassy sync queue\n');
   }
   await DatabasePoolService.drain();
   await DatabasePoolService.close();

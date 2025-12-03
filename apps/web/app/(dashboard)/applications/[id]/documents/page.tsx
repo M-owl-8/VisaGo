@@ -16,7 +16,8 @@ export default function DocumentsPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const documentTypeFromQuery = searchParams.get('documentType') ?? 'document';
+  // Read documentType from query - support both 'documentType' and 'document_type' for compatibility
+  const documentTypeFromQuery = searchParams.get('documentType') ?? searchParams.get('document_type') ?? 'document';
   const documentNameFromQuery = searchParams.get('name') ?? 'Document';
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -35,8 +36,20 @@ export default function DocumentsPage() {
     setError('');
     setSuccess('');
 
+    // Ensure we use the query param, not hardcoded 'document'
+    const effectiveDocumentType = documentTypeFromQuery || 'document';
+    
+    // Debug logging to verify documentType is being sent correctly
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      console.log('[UPLOAD_UI_DEBUG] Uploading with documentType:', effectiveDocumentType, {
+        fromQuery: searchParams.get('documentType'),
+        fileName: file.name,
+        fileSize: file.size,
+      });
+    }
+
     try {
-      const response = await apiClient.uploadDocument(params.id as string, documentTypeFromQuery, file);
+      const response = await apiClient.uploadDocument(params.id as string, effectiveDocumentType, file);
 
       if (response.success) {
         setSuccess(t('documents.uploadSuccess'));

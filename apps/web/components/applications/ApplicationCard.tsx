@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Upload, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -104,13 +104,6 @@ export function ApplicationCard({
         >
           <span>{t('applications.viewDetails', 'View details')}</span>
           <ArrowUpRight size={14} className="sm:size-4" />
-        </Link>
-        <Link
-          href={`/applications/${application.id}/documents`}
-          className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition hover:bg-primary/20 sm:px-4 sm:text-sm"
-        >
-          <Upload size={14} className="sm:size-4" />
-          <span>{t('applications.uploadDocuments', 'Upload')}</span>
         </Link>
         {isDraft && (
           <button

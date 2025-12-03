@@ -182,7 +182,7 @@ export function DocumentChecklistItem({
           </Link>
         ) : (
           <Link
-            href={`/applications/${applicationId}/documents?documentType=${encodeURIComponent(item.documentType || item.document || 'document')}&name=${encodeURIComponent(name)}`}
+            href={`/applications/${applicationId}/documents?documentType=${encodeURIComponent(item.documentType || 'document')}&name=${encodeURIComponent(name || 'Document')}`}
             className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
           >
             <Upload size={14} />
