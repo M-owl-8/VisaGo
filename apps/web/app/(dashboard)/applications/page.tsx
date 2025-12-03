@@ -259,6 +259,7 @@ export default function ApplicationsPage() {
                   statusStyles={statusStyles}
                   getStatusVariant={getStatusVariant}
                   t={t}
+                  onDelete={refetch}
                 />
               ))}
             </div>

@@ -1,18 +1,21 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Upload } from 'lucide-react';
+import { ArrowUpRight, Upload, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils/cn';
 import type { Application } from '@/lib/hooks/useApplications';
+import { apiClient } from '@/lib/api/client';
 
 interface ApplicationCardProps {
   application: Application;
   statusStyles: Record<string, { label: string; classes: string; chip: string }>;
   getStatusVariant: (status?: string) => { label: string; classes: string; chip: string };
   t: TFunction<'translation', undefined>;
+  onDelete?: () => void;
 }
 
 export function ApplicationCard({
@@ -20,10 +23,37 @@ export function ApplicationCard({
   statusStyles,
   getStatusVariant,
   t,
+  onDelete,
 }: ApplicationCardProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
   const statusVariant = getStatusVariant(application.status);
   const countryCode = application.country?.code?.toLowerCase() || 'xx';
   const flagEmoji = getFlagEmoji(countryCode);
+  const isDraft = application.status?.toLowerCase() === 'draft';
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!confirm(t('applications.deleteConfirm', 'Are you sure you want to delete this application? This action cannot be undone.'))) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await apiClient.deleteApplication(application.id);
+      if (response.success) {
+        onDelete?.();
+      } else {
+        alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+      }
+    } catch (error) {
+      console.error('Delete application error:', error);
+      alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <Card className="group relative overflow-hidden border-white/5 bg-white/[0.04] p-4 transition-all hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_30px_60px_rgba(7,12,30,0.6)] sm:p-6">
@@ -82,6 +112,17 @@ export function ApplicationCard({
           <Upload size={14} className="sm:size-4" />
           <span>{t('applications.uploadDocuments', 'Upload')}</span>
         </Link>
+        {isDraft && (
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-400 transition hover:bg-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:text-sm"
+            title={t('applications.removeApplication', 'Remove application')}
+          >
+            <Trash2 size={14} className="sm:size-4" />
+            <span className="hidden sm:inline">{t('applications.remove', 'Remove')}</span>
+          </button>
+        )}
       </div>
     </Card>
   );
