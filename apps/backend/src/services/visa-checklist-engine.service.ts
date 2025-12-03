@@ -78,9 +78,22 @@ export class VisaChecklistEngineService {
       // Step 3: Build user prompt with context
       const userPrompt = this.buildUserPrompt(aiUserContext, ruleSet, previousChecklist);
 
-      // Step 4: Call GPT-4 with structured output
+      // Step 4: Call GPT-4 with structured output using checklist model
+      const checklistModel = AIOpenAIService.getChecklistModel();
+      console.log(`[Checklist][AI] Using model: ${checklistModel}`, {
+        countryCode,
+        visaType,
+        mode: 'visa-checklist-engine',
+      });
+
+      logInfo('[VisaChecklistEngine] Calling GPT-4 for checklist generation', {
+        model: checklistModel,
+        countryCode,
+        visaType,
+      });
+
       const response = await AIOpenAIService.getOpenAIClient().chat.completions.create({
-        model: AIOpenAIService.MODEL,
+        model: checklistModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -93,6 +106,7 @@ export class VisaChecklistEngineService {
       const rawContent = response.choices[0]?.message?.content || '{}';
 
       logInfo('[VisaChecklistEngine] GPT-4 response received', {
+        model: response?.model || checklistModel,
         countryCode,
         visaType,
         responseLength: rawContent.length,

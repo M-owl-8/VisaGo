@@ -39,8 +39,10 @@ export interface AIResponse {
 export class AIOpenAIService {
   private static openai: OpenAI;
   private static prisma: PrismaClient;
-  // Use gpt-4o-mini for checklist generation and document validation
+  // Default model for general AI tasks (can be gpt-4o-mini for cost efficiency)
   public static readonly MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  // Checklist generation ALWAYS uses GPT-4 (gpt-4o or gpt-4.1) - never falls back to mini
+  public static readonly CHECKLIST_MODEL = process.env.OPENAI_MODEL_CHECKLIST || 'gpt-4o';
   private static readonly MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS || '2000');
 
   /**
@@ -51,6 +53,112 @@ export class AIOpenAIService {
       throw new Error('OpenAI service not initialized. Call initialize() first.');
     }
     return AIOpenAIService.openai;
+  }
+
+  /**
+   * Get checklist model with fallback hierarchy:
+   * 1. OPENAI_MODEL_CHECKLIST env var (if set)
+   * 2. gpt-4o (default)
+   * 3. gpt-4.1 (fallback if gpt-4o fails)
+   *
+   * NEVER falls back to gpt-4o-mini for checklist generation
+   */
+  static getChecklistModel(): string {
+    return this.CHECKLIST_MODEL;
+  }
+
+  /**
+   * Call OpenAI API with checklist model and fallback logic
+   * Tries: OPENAI_MODEL_CHECKLIST → gpt-4o → gpt-4.1
+   */
+  private static async callChecklistAPI(
+    messages: Array<{ role: 'user' | 'system'; content: string }>,
+    options: {
+      temperature?: number;
+      max_completion_tokens?: number;
+      response_format?: { type: 'json_object' };
+    },
+    context: { country: string; visaType: string; mode?: string }
+  ): Promise<any> {
+    const modelsToTry = [this.CHECKLIST_MODEL, 'gpt-4o', 'gpt-4.1'].filter(
+      (model, index, arr) => arr.indexOf(model) === index
+    ); // Remove duplicates
+
+    let lastError: any = null;
+
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const model = modelsToTry[i];
+
+      console.log(
+        `[Checklist][AI] Using model: ${model} (attempt ${i + 1}/${modelsToTry.length})`,
+        {
+          country: context.country,
+          visaType: context.visaType,
+          mode: context.mode || 'unknown',
+        }
+      );
+
+      logInfo('[Checklist][AI] Attempting checklist generation', {
+        model,
+        attempt: i + 1,
+        totalAttempts: modelsToTry.length,
+        country: context.country,
+        visaType: context.visaType,
+        mode: context.mode || 'unknown',
+      });
+
+      try {
+        const response = await AIOpenAIService.openai.chat.completions.create({
+          model,
+          messages,
+          temperature: options.temperature ?? 0.5,
+          max_completion_tokens: options.max_completion_tokens ?? 2000,
+          response_format: options.response_format ?? { type: 'json_object' },
+        });
+
+        logInfo('[Checklist][AI] Successfully generated checklist', {
+          model,
+          country: context.country,
+          visaType: context.visaType,
+          mode: context.mode || 'unknown',
+          inputTokens: response.usage?.prompt_tokens || 0,
+          outputTokens: response.usage?.completion_tokens || 0,
+        });
+
+        return response;
+      } catch (error: any) {
+        lastError = error;
+        const errorMessage = error?.message || String(error);
+        const isTimeout =
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNABORTED') ||
+          errorMessage.includes('Request timed out');
+
+        logWarn('[Checklist][AI] Model attempt failed', {
+          model,
+          attempt: i + 1,
+          totalAttempts: modelsToTry.length,
+          isTimeout,
+          errorMessage: errorMessage.substring(0, 200),
+          country: context.country,
+          visaType: context.visaType,
+          willRetry: i < modelsToTry.length - 1,
+        });
+
+        // If timeout and we have more models to try, continue
+        if (isTimeout && i < modelsToTry.length - 1) {
+          continue;
+        }
+
+        // If not timeout or last attempt, re-throw
+        if (!isTimeout || i >= modelsToTry.length - 1) {
+          throw error;
+        }
+      }
+    }
+
+    // Should never reach here, but just in case
+    throw lastError || new Error('All checklist model attempts failed');
   }
 
   // Pricing per 1K tokens (as of 2024)
@@ -78,13 +186,15 @@ export class AIOpenAIService {
       }
       AIOpenAIService.openai = new OpenAI({
         apiKey,
-        timeout: 35000, // 35 second timeout for checklist generation (within 30-40s range)
+        timeout: 60000, // 60 second timeout for checklist generation (GPT-4 can take longer)
       });
       AIOpenAIService.prisma = prisma;
       logInfo('[OpenAI] Service initialized', {
-        model: AIOpenAIService.MODEL,
+        defaultModel: AIOpenAIService.MODEL,
+        checklistModel: AIOpenAIService.CHECKLIST_MODEL,
         maxTokens: AIOpenAIService.MAX_TOKENS,
         hasApiKey: !!apiKey,
+        timeout: 60000,
       });
     }
   }
@@ -1012,21 +1122,28 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
             while (attempt < maxAttempts) {
               attempt++;
               try {
-                response = await AIOpenAIService.openai.chat.completions.create({
-                  model: this.MODEL,
-                  messages: [
+                response = await this.callChecklistAPI(
+                  [
                     { role: 'system', content: hybridSystemPrompt },
                     { role: 'user', content: hybridUserPrompt },
                   ],
-                  temperature: 0.5,
-                  max_completion_tokens: 2000,
-                  response_format: { type: 'json_object' },
-                });
+                  {
+                    temperature: 0.5,
+                    max_completion_tokens: 2000,
+                    response_format: { type: 'json_object' },
+                  },
+                  {
+                    country,
+                    visaType,
+                    mode: 'hybrid',
+                  }
+                );
 
                 rawContent = response.choices[0]?.message?.content || '{}';
                 const responseTime = Date.now() - startTime;
 
                 logInfo('[OpenAI][Checklist] Hybrid mode GPT-4 response received', {
+                  model: response?.model || this.getChecklistModel(),
                   country,
                   visaType,
                   countryCode,
@@ -1134,7 +1251,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
               });
 
               logInfo('[OpenAI][Checklist] Hybrid mode checklist generation completed', {
-                model: this.MODEL,
+                model: response?.model || this.getChecklistModel(),
                 country,
                 visaType,
                 countryCode,
@@ -1580,7 +1697,7 @@ CRITICAL REMINDERS:
 Return ONLY valid JSON matching the schema, no other text, no markdown, no comments.`;
 
       logInfo('[OpenAI][Checklist] Generating checklist', {
-        model: this.MODEL,
+        model: this.getChecklistModel(),
         country,
         visaType,
         hasVisaKb: !!visaKb,
@@ -1589,34 +1706,32 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
 
       let response;
       try {
-        response = await AIOpenAIService.openai.chat.completions.create({
-          model: this.MODEL,
-          messages: [
+        response = await this.callChecklistAPI(
+          [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          temperature: 0.5, // Increased from 0.1 to 0.5 for more creative but still controlled responses
-          max_completion_tokens: 2000, // Increased from 1200 to 2000 to allow for 8-15 items with full multilingual fields
-          response_format: { type: 'json_object' },
-        });
-      } catch (openaiError: any) {
-        // Catch timeout and other OpenAI API errors early
-        const errorMessage = openaiError?.message || String(openaiError);
-        if (
-          errorMessage.includes('timeout') ||
-          errorMessage.includes('ECONNABORTED') ||
-          errorMessage.includes('Request timed out')
-        ) {
-          logWarn('[OpenAI][Checklist] Request timed out, using fallback', {
+          {
+            temperature: 0.5, // Increased from 0.1 to 0.5 for more creative but still controlled responses
+            max_completion_tokens: 2000, // Increased from 1200 to 2000 to allow for 8-15 items with full multilingual fields
+            response_format: { type: 'json_object' },
+          },
+          {
             country,
             visaType,
-            errorMessage,
-            timeoutMs: 35000,
-          });
-          // Throw a specific timeout error that will be caught by outer catch
-          throw new Error('Request timed out.');
-        }
-        // Re-throw other errors to be handled by outer catch
+            mode: 'legacy',
+          }
+        );
+      } catch (openaiError: any) {
+        // Catch timeout and other OpenAI API errors
+        const errorMessage = openaiError?.message || String(openaiError);
+        logWarn('[OpenAI][Checklist] All checklist model attempts failed', {
+          country,
+          visaType,
+          errorMessage: errorMessage.substring(0, 200),
+          timeoutMs: 60000,
+        });
+        // Re-throw to be handled by outer catch
         throw openaiError;
       }
 
@@ -1637,10 +1752,13 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       const rawContent = response.choices[0]?.message?.content || '{}';
 
       logInfo('[OpenAI][Checklist] Raw GPT-4 response received', {
+        model: response?.model || this.getChecklistModel(),
         country,
         visaType,
         responseLength: rawContent.length,
         responsePreview: rawContent.substring(0, 200),
+        responseTimeMs: responseTime,
+        tokensUsed: totalTokens,
       });
 
       // Use new JSON validator with retry logic
