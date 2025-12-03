@@ -309,6 +309,9 @@
     "completion": "Completion",
     "quickActions": "Quick Actions",
     "checklistProcessing": "This may take a few moments",
+    "deleteApplication": "Delete Application",
+    "deleteConfirm": "Are you sure you want to delete this application? This action cannot be undone.",
+    "deleteError": "Failed to delete application. Please try again.",
     "metrics": {
       "active": "Active applications",
       "documentsReady": "Documents ready",

@@ -81,9 +81,9 @@ export function ChecklistSummary({ items, className }: ChecklistSummaryProps) {
             </span>
             <span className="text-lg font-semibold text-white">{completionPercentage}%</span>
           </div>
-          <div className="h-2 w-full rounded-full bg-white/10">
+          <div className="h-2 w-full rounded-full bg-white/20 border border-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-[width]"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-[width] shadow-[0_0_6px_rgba(16,185,129,0.5)]"
               style={{ width: `${completionPercentage}%` }}
             />
           </div>

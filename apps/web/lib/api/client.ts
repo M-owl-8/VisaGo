@@ -286,6 +286,11 @@ class ApiClient {
     return response.data;
   }
 
+  async deleteApplication(id: string): Promise<ApiResponse> {
+    const response = await this.api.delete(`/applications/${id}`);
+    return response.data;
+  }
+
   async getDocumentChecklist(applicationId: string): Promise<ApiResponse> {
     const response = await this.api.get(`/document-checklist/${applicationId}`);
     return response.data;

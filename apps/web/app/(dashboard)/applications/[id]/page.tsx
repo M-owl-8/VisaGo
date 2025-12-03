@@ -3,7 +3,7 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
-import { ArrowLeft, Upload, MessageCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { ArrowLeft, Upload, MessageCircle, CheckCircle2, Clock, XCircle, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplication } from '@/lib/hooks/useApplication';
 import ErrorBanner from '@/components/ErrorBanner';
@@ -14,6 +14,8 @@ import { DocumentChecklist } from '@/components/checklist/DocumentChecklist';
 import { ChecklistSummary } from '@/components/checklist/ChecklistSummary';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { RefreshCcw } from 'lucide-react';
+import { apiClient } from '@/lib/api/client';
+import { useState } from 'react';
 
 export default function ApplicationDetailPage() {
   const { t, i18n } = useTranslation();
@@ -25,6 +27,8 @@ export default function ApplicationDetailPage() {
     applicationId,
     { autoFetch: isSignedIn }
   );
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Redirect if not signed in
   if (!isSignedIn) {
@@ -88,6 +92,28 @@ export default function ApplicationDetailPage() {
   const countryCode = application.country?.code?.toLowerCase() || 'xx';
   const flagEmoji = getFlagEmoji(countryCode);
 
+  const handleDeleteApplication = async () => {
+    if (!confirm(t('applications.deleteConfirm', 'Are you sure you want to delete this application? This action cannot be undone.'))) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await apiClient.deleteApplication(applicationId);
+      if (response.success) {
+        router.push('/applications');
+      } else {
+        alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+      }
+    } catch (error) {
+      console.error('Delete application error:', error);
+      alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-3 py-6 text-white sm:px-4 sm:py-8 lg:px-8">
       {error && (
@@ -130,6 +156,18 @@ export default function ApplicationDetailPage() {
                 <span className="text-xs text-white/60 sm:text-sm">
                   {t('applications.progress', 'Progress')}: {application.progressPercentage || 0}%
                 </span>
+                {application.status === 'draft' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDeleteApplication}
+                    disabled={isDeleting}
+                    className="h-7 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 text-xs text-rose-300 hover:bg-rose-500/20 hover:text-rose-200"
+                    title={t('applications.deleteApplication', 'Delete Application')}
+                  >
+                    <Trash2 size={12} />
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -158,9 +196,9 @@ export default function ApplicationDetailPage() {
             <span>{t('applications.overallProgress', 'Overall Progress')}</span>
             <span className="font-semibold text-white">{application.progressPercentage || 0}%</span>
           </div>
-          <div className="h-3 w-full rounded-full bg-white/10">
+          <div className="h-3 w-full rounded-full bg-white/20 border border-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width]"
+              className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width] shadow-[0_0_8px_rgba(62,166,255,0.5)]"
               style={{ width: `${application.progressPercentage || 0}%` }}
             />
           </div>

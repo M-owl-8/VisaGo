@@ -10,7 +10,7 @@ interface StatusBadgeProps {
 const statusConfig: Record<string, { label: string; classes: string }> = {
   draft: {
     label: 'Draft',
-    classes: 'bg-white/5 text-white border border-white/10',
+    classes: 'bg-white/15 text-white border border-white/30',
   },
   submitted: {
     label: 'Submitted',

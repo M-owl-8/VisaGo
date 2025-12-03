@@ -86,8 +86,8 @@ export default function ApplicationsPage() {
   const statusStyles: Record<string, { label: string; classes: string; chip: string }> = {
     draft: {
       label: t('applications.statusDraft', 'Draft'),
-      classes: 'bg-white/10 text-white',
-      chip: 'bg-white/5 text-white border border-white/10',
+      classes: 'bg-white/15 text-white',
+      chip: 'bg-white/15 text-white border border-white/30',
     },
     submitted: {
       label: t('applications.statusSubmitted', 'Submitted'),
