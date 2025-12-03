@@ -562,7 +562,7 @@ router.get('/ai-self-check', async (req: Request, res: Response, next: NextFunct
       if (validationResult && validationResult.status) {
         results.docValidationOk = true;
         results.validationStatus = validationResult.status;
-        results.validationNotesUz = validationResult.notes?.uz || validationResult.notesUz || '';
+        results.validationNotesUz = validationResult.notes?.uz || '';
         results.validationConfidence = validationResult.confidence;
         results.verifiedByAI = validationResult.verifiedByAI;
         logInfo('[Dev][AI Self-Check] Document validation successful', {
