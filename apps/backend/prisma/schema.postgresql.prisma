@@ -546,6 +546,7 @@ model DocumentCheckResult {
   suggestionsJson String? // JSON array of DocCheckSuggestion
   confidence      Float? // optional AI confidence
   notes           String? // optional human/AI notes
+  rawJson         String? @db.Text // Raw GPT-4 response JSON for debugging/audit
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
