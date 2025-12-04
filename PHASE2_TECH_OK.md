@@ -116,9 +116,17 @@ All 4 scripts are correctly defined:
 ### Prerequisites
 
 - Ensure `DATABASE_URL` is set to Railway Postgres:
+
   ```powershell
+  # Public URL (for local/remote access)
   $env:DATABASE_URL="postgresql://postgres:ozolgfntMPMGTFZgWTIiqmoaqIKQetVx@gondola.proxy.rlwy.net:31433/railway"
+
+  # OR internal URL (if running from within Railway network)
+  # $env:DATABASE_URL="postgresql://postgres:ozolgfntMPMGTFZgWTIiqmoaqIKQetVx@postgres.railway.internal:5432/railway"
   ```
+
+  **Note:** If you get "Can't reach database server" errors, the database might not be accessible from your local network. See `RAILWAY_SCRIPT_EXECUTION_GUIDE.md` for solutions.
+
 - Ensure `REDIS_URL` is set (for embassy sync queue - required for `embassy:sync`):
 
   ```powershell
