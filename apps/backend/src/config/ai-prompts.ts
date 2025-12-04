@@ -761,8 +761,33 @@ export function buildDocumentValidationUserPrompt(params: {
     country: string;
     visaType: string;
   };
+  visaRuleSet?: {
+    requiredDocuments?: Array<{
+      documentType: string;
+      name?: string;
+      description?: string;
+      category?: string;
+      validityRequirements?: any;
+      financialRequirements?: any;
+    }>;
+    financialRequirements?: {
+      minimumBalance?: number;
+      currency?: string;
+      bankStatementMonths?: number;
+    };
+  };
+  applicantProfile?: {
+    travel?: { duration?: string; purpose?: string };
+    employment?: { currentStatus?: string; hasStableIncome?: boolean };
+    financial?: { financialSituation?: string; isSponsored?: boolean };
+    familyAndTies?: { maritalStatus?: string; hasChildren?: string };
+    ageRange?: 'minor' | 'adult';
+    isRetired?: boolean;
+    hasProperty?: boolean;
+    hasBusiness?: boolean;
+  };
 }): string {
-  const { document, checklistItem, application } = params;
+  const { document, checklistItem, application, visaRuleSet, applicantProfile } = params;
 
   let prompt = `Validate the following uploaded document:\n\n`;
 
@@ -781,8 +806,109 @@ export function buildDocumentValidationUserPrompt(params: {
   }
   prompt += `\n`;
 
-  // Expected document requirements (from checklist)
-  if (checklistItem) {
+  // Visa application context
+  if (application) {
+    prompt += `VISA APPLICATION CONTEXT:\n`;
+    prompt += `- Destination Country: ${application.country}\n`;
+    prompt += `- Visa Type: ${application.visaType}\n`;
+    prompt += `\n`;
+  }
+
+  // Official visa rules (from VisaRuleSet)
+  if (visaRuleSet) {
+    prompt += `OFFICIAL VISA RULES (from embassy/government source):\n`;
+
+    // Find matching document rule
+    const matchingRule = visaRuleSet.requiredDocuments?.find(
+      (doc) => doc.documentType?.toLowerCase() === document.documentType.toLowerCase()
+    );
+
+    if (matchingRule) {
+      prompt += `- Document Type: ${matchingRule.documentType}\n`;
+      if (matchingRule.name) {
+        prompt += `- Official Name: ${matchingRule.name}\n`;
+      }
+      if (matchingRule.description) {
+        prompt += `- Official Description: ${matchingRule.description}\n`;
+      }
+      if (matchingRule.category) {
+        prompt += `- Category: ${matchingRule.category}\n`;
+      }
+      if (matchingRule.validityRequirements) {
+        prompt += `- Validity Requirements: ${JSON.stringify(matchingRule.validityRequirements)}\n`;
+      }
+      if (matchingRule.financialRequirements) {
+        prompt += `- Financial Requirements: ${JSON.stringify(matchingRule.financialRequirements)}\n`;
+      }
+    } else {
+      prompt += `- No specific rule found for ${document.documentType} in official rules.\n`;
+    }
+
+    // Financial requirements from rules
+    if (visaRuleSet.financialRequirements) {
+      prompt += `\nFINANCIAL REQUIREMENTS (from official rules):\n`;
+      if (visaRuleSet.financialRequirements.minimumBalance) {
+        prompt += `- Minimum Balance: ${visaRuleSet.financialRequirements.minimumBalance} ${visaRuleSet.financialRequirements.currency || 'USD'}\n`;
+      }
+      if (visaRuleSet.financialRequirements.bankStatementMonths) {
+        prompt += `- Bank Statement: Last ${visaRuleSet.financialRequirements.bankStatementMonths} months required\n`;
+      }
+    }
+    prompt += `\n`;
+  }
+
+  // Applicant profile (for personalized validation)
+  if (applicantProfile) {
+    prompt += `APPLICANT PROFILE (for context-aware validation):\n`;
+    if (applicantProfile.travel) {
+      if (applicantProfile.travel.duration) {
+        prompt += `- Travel Duration: ${applicantProfile.travel.duration}\n`;
+      }
+      if (applicantProfile.travel.purpose) {
+        prompt += `- Travel Purpose: ${applicantProfile.travel.purpose}\n`;
+      }
+    }
+    if (applicantProfile.employment) {
+      if (applicantProfile.employment.currentStatus) {
+        prompt += `- Employment Status: ${applicantProfile.employment.currentStatus}\n`;
+      }
+      if (applicantProfile.employment.hasStableIncome !== undefined) {
+        prompt += `- Has Stable Income: ${applicantProfile.employment.hasStableIncome}\n`;
+      }
+    }
+    if (applicantProfile.financial) {
+      if (applicantProfile.financial.financialSituation) {
+        prompt += `- Financial Situation: ${applicantProfile.financial.financialSituation}\n`;
+      }
+      if (applicantProfile.financial.isSponsored !== undefined) {
+        prompt += `- Is Sponsored: ${applicantProfile.financial.isSponsored}\n`;
+      }
+    }
+    if (applicantProfile.familyAndTies) {
+      if (applicantProfile.familyAndTies.maritalStatus) {
+        prompt += `- Marital Status: ${applicantProfile.familyAndTies.maritalStatus}\n`;
+      }
+      if (applicantProfile.familyAndTies.hasChildren) {
+        prompt += `- Has Children: ${applicantProfile.familyAndTies.hasChildren}\n`;
+      }
+    }
+    if (applicantProfile.ageRange) {
+      prompt += `- Age Range: ${applicantProfile.ageRange}\n`;
+    }
+    if (applicantProfile.isRetired !== undefined) {
+      prompt += `- Is Retired: ${applicantProfile.isRetired}\n`;
+    }
+    if (applicantProfile.hasProperty !== undefined) {
+      prompt += `- Has Property: ${applicantProfile.hasProperty}\n`;
+    }
+    if (applicantProfile.hasBusiness !== undefined) {
+      prompt += `- Has Business: ${applicantProfile.hasBusiness}\n`;
+    }
+    prompt += `\n`;
+  }
+
+  // Expected document requirements (from checklist - fallback if no rules)
+  if (checklistItem && !visaRuleSet) {
     prompt += `EXPECTED DOCUMENT REQUIREMENTS:\n`;
     prompt += `- Document Type: ${checklistItem.documentType}\n`;
     if (checklistItem.name) {
@@ -795,22 +921,19 @@ export function buildDocumentValidationUserPrompt(params: {
       prompt += `- Where to Obtain: ${checklistItem.whereToObtain}\n`;
     }
     prompt += `\n`;
-  } else {
+  } else if (!checklistItem && !visaRuleSet) {
     prompt += `EXPECTED DOCUMENT REQUIREMENTS:\n`;
-    prompt += `- No specific checklist item provided. Validate based on document type and visa requirements.\n\n`;
-  }
-
-  // Visa application context
-  if (application) {
-    prompt += `VISA APPLICATION CONTEXT:\n`;
-    prompt += `- Destination Country: ${application.country}\n`;
-    prompt += `- Visa Type: ${application.visaType}\n`;
-    prompt += `\n`;
+    prompt += `- No specific checklist item or rules provided. Validate based on document type and visa requirements.\n\n`;
   }
 
   // Instructions
   prompt += `INSTRUCTIONS:\n`;
-  prompt += `Based on the document metadata, expected requirements, and visa context, validate this document.\n\n`;
+  prompt += `Based on the document metadata, official visa rules (if available), applicant profile, and visa context, validate this document.\n\n`;
+
+  if (visaRuleSet) {
+    prompt += `IMPORTANT: Use the official visa rules as the primary source of truth. The applicant profile helps you understand context (e.g., if they're self-employed, require business docs; if sponsored, require sponsor docs).\n\n`;
+  }
+
   prompt += `Return ONLY valid JSON matching the DocumentValidationResultAI schema:\n`;
   prompt += `- Determine status (verified/rejected/needs_review/uncertain)\n`;
   prompt += `- Assign confidence score (0.0-1.0)\n`;

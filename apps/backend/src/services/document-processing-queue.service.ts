@@ -98,6 +98,21 @@ export class DocumentProcessingQueueService {
               });
             }
 
+            // Increment rate limit counter for document validation
+            try {
+              const { incrementDocumentValidationCount } = await import(
+                '../middleware/checklist-rate-limit'
+              );
+              await incrementDocumentValidationCount(userId);
+            } catch (rateLimitError) {
+              // Non-blocking: log but continue
+              logWarn('[DocumentProcessingQueue] Rate limit increment failed (non-blocking)', {
+                documentId,
+                error:
+                  rateLimitError instanceof Error ? rateLimitError.message : String(rateLimitError),
+              });
+            }
+
             // Run AI validation
             const aiResult = await validateDocumentWithAI({
               document: {

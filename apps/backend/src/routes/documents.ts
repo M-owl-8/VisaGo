@@ -7,6 +7,10 @@ import { authenticateToken } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
 import { DocumentChecklist } from '../services/document-checklist.service';
 import type { DocumentValidationResultAI } from '../types/ai-responses';
+import {
+  documentValidationRateLimitMiddleware,
+  incrementDocumentValidationCount,
+} from '../middleware/checklist-rate-limit';
 
 /**
  * Type guard to check if a value is a DocumentChecklist (not a status object)
@@ -49,6 +53,9 @@ const upload = multer({
 
 // Require authentication for all document routes
 router.use(authenticateToken);
+
+// Apply rate limiting to document validation operations
+router.use(documentValidationRateLimitMiddleware);
 
 // ============================================================================
 // ROUTES

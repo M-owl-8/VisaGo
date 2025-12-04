@@ -33,7 +33,11 @@
     "verify-admin-data": "ts-node --project scripts/tsconfig.json scripts/verify-admin-data.ts",
     "debug:documents": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/debug-documents.ts",
     "generate-admin-token": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/generate-admin-token.ts",
-    "seed:embassy-sources": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-embassy-sources.ts"
+    "seed:embassy-sources": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-embassy-sources.ts",
+    "coverage:report": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/visa-coverage-report.ts",
+    "embassy:sync": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/run-embassy-sync.ts",
+    "approve:visarules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/approve-visarules.ts",
+    "check:launch-readiness": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/check-launch-readiness.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.21.1",

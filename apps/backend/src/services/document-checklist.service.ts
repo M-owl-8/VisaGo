@@ -67,6 +67,18 @@ export interface DocumentChecklist {
  */
 export class DocumentChecklistService {
   /**
+   * Normalize visa type name to match VisaRuleSet format
+   * Strips "visa" suffix and converts to lowercase
+   * Examples: "Tourist Visa" -> "tourist", "Student Visa" -> "student", "F-1 Student Visa" -> "f-1 student"
+   */
+  private static normalizeVisaType(visaTypeName: string): string {
+    return visaTypeName
+      .toLowerCase()
+      .trim()
+      .replace(/\s+visa\s*$/i, '')
+      .trim();
+  }
+  /**
    * Generate document checklist for an application
    * Now uses persistent DB storage to avoid re-calling OpenAI on every GET
    *
@@ -105,12 +117,23 @@ export class DocumentChecklistService {
       }
 
       // CRITICAL FIX: Check for existing stored checklist first
+      // BUT: Also check if a new approved ruleset exists that should invalidate the cache
       if (storedChecklist) {
-        // If checklist is ready, return it immediately without calling OpenAI
-        if (storedChecklist.status === 'ready') {
-          logInfo('[Checklist][Cache] Returning stored checklist', {
+        // Check if an approved ruleset exists for this country/visa type
+        const countryCode = (application.country.code || '').toUpperCase();
+        const visaType = this.normalizeVisaType(application.visaType.name);
+
+        const { VisaRulesService } = await import('./visa-rules.service');
+        const approvedRuleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaType);
+
+        // If checklist is ready AND no approved ruleset exists, return cached version
+        // If an approved ruleset exists, regenerate to use it
+        if (storedChecklist.status === 'ready' && !approvedRuleSet) {
+          logInfo('[Checklist][Cache] Returning stored checklist (no ruleset available)', {
             applicationId,
             status: storedChecklist.status,
+            countryCode,
+            visaType,
           });
 
           if (!storedChecklist.checklistData) {
@@ -135,6 +158,15 @@ export class DocumentChecklistService {
               aiErrorOccurred
             );
           }
+        } else if (storedChecklist.status === 'ready' && approvedRuleSet) {
+          // Approved ruleset exists - invalidate cache and regenerate
+          logInfo('[Checklist][Cache] Invalidating cached checklist - approved ruleset found', {
+            applicationId,
+            countryCode,
+            visaType,
+            rulesetDocumentsCount: approvedRuleSet.requiredDocuments?.length || 0,
+          });
+          // Fall through to regenerate with ruleset
         }
 
         // If checklist is pending, return status
@@ -339,7 +371,9 @@ export class DocumentChecklistService {
 
       // Extract countryCode and visaType from application
       const countryCode = (application.country.code || '').toUpperCase();
-      const visaType = application.visaType.name.toLowerCase();
+      // Normalize visaType: strip "visa" suffix and convert to lowercase
+      // e.g., "Tourist Visa" -> "tourist", "Student Visa" -> "student"
+      const visaType = this.normalizeVisaType(application.visaType.name);
       const countryName = application.country.name;
 
       // STEP 1: DB lookup for VisaRules BEFORE calling OpenAI
@@ -347,31 +381,64 @@ export class DocumentChecklistService {
         applicationId,
         countryCode,
         visaType,
+        visaTypeRaw: application.visaType.name,
         countryName,
       });
 
       const { VisaRulesService } = await import('./visa-rules.service');
       const approvedRuleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaType);
 
+      // Log ruleset lookup result
+      if (approvedRuleSet) {
+        logInfo('[Checklist][Mode] Found approved VisaRuleSet', {
+          applicationId,
+          countryCode,
+          visaType,
+          requiredDocumentsCount: approvedRuleSet.requiredDocuments?.length || 0,
+        });
+      } else {
+        logWarn('[Checklist][Mode] No approved VisaRuleSet found', {
+          applicationId,
+          countryCode,
+          visaType,
+          reason: 'no_approved_ruleset',
+        });
+      }
+
       // Determine mode based on approved rules
       let mode: 'RULES' | 'LEGACY' = approvedRuleSet ? 'RULES' : 'LEGACY';
 
-      // Log mode clearly
+      // Log mode clearly with strong logging
       if (mode === 'RULES') {
-        logInfo('[OpenAI][Checklist] Using RULES mode', {
+        // Get ruleset record to log ruleSetId
+        const rulesetRecord = await prisma.visaRuleSet.findFirst({
+          where: {
+            countryCode: countryCode.toUpperCase(),
+            visaType: visaType.toLowerCase(),
+            isApproved: true,
+          },
+          orderBy: { version: 'desc' },
+          select: { id: true, version: true },
+        });
+
+        logInfo('[Checklist][Mode] Using RULES mode', {
           countryCode,
           visaType,
           countryName,
-          ruleSetVersion: 'latest', // Could add version tracking if needed
+          ruleSetId: rulesetRecord?.id || 'unknown',
+          ruleSetVersion: rulesetRecord?.version || 'unknown',
           applicationId,
+          requiredDocumentsCount: approvedRuleSet?.requiredDocuments?.length || 0,
         });
       } else {
-        logInfo('[OpenAI][Checklist] Using LEGACY mode', {
+        logWarn('[Checklist][Mode] Using LEGACY mode', {
           countryCode,
           visaType,
           countryName,
           reason: 'no_approved_rules',
           applicationId,
+          queriedCountryCode: countryCode,
+          queriedVisaType: visaType,
         });
       }
 
@@ -442,9 +509,12 @@ export class DocumentChecklistService {
             }
 
             try {
+              // Normalize visaType for engine (strip "visa" suffix)
+              const normalizedVisaType = this.normalizeVisaType(application.visaType.name);
+
               aiChecklist = await VisaChecklistEngineService.generateChecklist(
                 application.country.code, // Use country code instead of name
-                application.visaType.name.toLowerCase(),
+                normalizedVisaType,
                 userContext,
                 previousChecklist
               );
@@ -563,13 +633,14 @@ export class DocumentChecklistService {
           // STEP 2: Validate AI result - if too few items, treat as weak result and use fallback
           const MIN_AI_ITEMS = 10; // Stricter minimum: 10 items required
           if (items.length < MIN_AI_ITEMS) {
-            logWarn('[OpenAI][Checklist] Using FALLBACK template', {
+            logWarn('[Checklist][Mode] Using FALLBACK checklist', {
               countryCode,
               visaType,
               reason: 'too_few_items',
               aiItemCount: items.length,
               threshold: MIN_AI_ITEMS,
               applicationId,
+              mode: mode,
             });
 
             // Use fallback instead of weak AI result
@@ -605,13 +676,15 @@ export class DocumentChecklistService {
           }
         } else {
           // AI returned empty or invalid checklist - use fallback
-          logWarn('[OpenAI][Checklist] Using FALLBACK template', {
+          logWarn('[Checklist][Mode] Using FALLBACK checklist', {
             countryCode,
             visaType,
             reason: 'empty_or_invalid_checklist',
             hasChecklist: !!aiChecklist,
             checklistLength: aiChecklist?.checklist?.length || 0,
             applicationId,
+            mode: mode,
+            itemCount: 0,
           });
           items = await this.generateRobustFallbackChecklist(
             application.country,
@@ -1259,12 +1332,12 @@ You MUST:
     return `You are a visa document checklist generator for ${countryName} ${visaType} visas.
 
 CRITICAL INSTRUCTIONS - FOLLOW STRICTLY:
-1. You MUST use ONLY the official visa rules provided below. Do NOT invent or add documents that are not in the rules.
-2. Do not invent extra categories that are not supported by rules unless clearly standard practice (e.g., passport is always required).
+1. You MUST include ALL documents from the official visa rules provided below.
+2. You MAY also include standard, globally common supporting documents (like self-employment proof, marriage certificate, previous visa copies, property ownership) if they are consistent with the rules and the applicant profile and do not contradict official requirements.
 3. Always prioritize the rules' content and reconcile it with the official URLs provided.
 4. If a document is listed in the rules, it MUST appear in your checklist.
-5. If a document is NOT in the rules, do NOT add it unless it's a universally standard document (e.g., passport, passport photo).
-6. Cross-reference your generated checklist against the official URLs to ensure accuracy.
+5. Cross-reference your generated checklist against the official URLs to ensure accuracy.
+6. Use the ApplicantProfile to determine which documents are required vs highly_recommended vs optional.
 
 APPLICANT PROFILE USAGE:
 You will receive an APPLICANT PROFILE object in the user prompt. Use it to personalize the checklist while strictly following the visa rules.
@@ -1359,15 +1432,60 @@ VISA TYPE: ${visaType}${conditionalDocsText}
 PERSONALIZATION INSTRUCTIONS:
 Use the APPLICANT PROFILE to decide which documents are required vs highly_recommended vs optional.
 
-1. If the applicant is sponsored (applicantProfile.financial.isSponsored = true), include sponsor-related documents as required (e.g., sponsor_bank_statement, sponsor_employment_letter).
+1. SPONSORED APPLICANTS:
+   If applicantProfile.financial.isSponsored = true, include sponsor-related documents as required:
+   - sponsor_bank_statement
+   - sponsor_employment_letter
+   - sponsor_identity_document
+   - sponsor_relationship_proof
 
-2. If the applicant is a student (applicantProfile.employment.currentStatus = 'student'), include student enrollment / study documents (e.g., acceptance_letter, academic_records, proof_of_tuition_payment).
+2. SELF-EMPLOYED APPLICANTS:
+   If applicantProfile.employment.currentStatus == 'self_employed' OR applicantProfile.hasBusiness == true:
+   - Require: business_registration, tax_returns, recent_invoices, business_bank_statements
+   - These prove legal, stable self-employment
 
-3. If the applicant has strong ties (applicantProfile.familyAndTies.hasStrongTies = true), include tie documents (e.g., property_documents, family_ties_proof) as highly_recommended to strengthen the application.
+3. STUDENT APPLICANTS:
+   If applicantProfile.employment.currentStatus == 'student':
+   - Include: acceptance_letter, academic_records, proof_of_tuition_payment
+   - Country-specific: US (SEVIS/I-20), UK (CAS), AU (COE), CA (DLI), NZ (NZQA)
 
-4. If the applicant has previous travel (applicantProfile.travel.previousTravel = true), include previous_visa_copies as highly_recommended.
+4. MARRIED APPLICANTS:
+   If applicantProfile.familyAndTies.maritalStatus == 'married':
+   - Include: marriage_certificate
+   - If applicantProfile.familyAndTies.hasChildren != 'no': include children's birth_certificates
+   - These strengthen family ties to home country
 
-5. If the applicant has stable income (applicantProfile.employment.hasStableIncome = true), employment_verification documents should be required.
+5. LONG STAY APPLICANTS:
+   If applicantProfile.travel.duration is '3_6_months' or '6_12_months' or 'more_than_1_year':
+   - Emphasize stronger financial proof (6+ months bank statements)
+   - Require detailed travel_itinerary
+   - Include accommodation_proof for entire stay
+
+6. RETIRED APPLICANTS:
+   If applicantProfile.isRetired == true:
+   - Include: pension_statements, retirement_income_proof
+   - Include: proof_of_retirement_status
+
+7. MINORS:
+   If applicantProfile.ageRange == 'minor':
+   - Include: parental_consent, birth_certificate
+   - Include: guardian_documents (if traveling without parents)
+   - These are critical for minor applicants
+
+8. PROPERTY OWNERS:
+   If applicantProfile.hasProperty == true:
+   - Include: property_documents, property_ownership_proof
+   - Mark as highly_recommended to show strong ties
+
+9. PREVIOUS TRAVEL:
+   If applicantProfile.travel.previousTravel == true:
+   - Include: previous_visa_copies as highly_recommended
+   - Shows good travel history
+
+10. STABLE INCOME:
+    If applicantProfile.employment.hasStableIncome == true:
+    - employment_verification documents should be required
+    - Include: employment_letter, salary_statements
 
 STRICT REQUIREMENTS:
 1. Include ALL required documents from the official rules (system prompt)

@@ -192,18 +192,73 @@ export async function validateDocumentWithAI(params: {
       throw new Error('OpenAI service not initialized');
     }
 
+    // Load VisaRuleSet and ApplicantProfile for enhanced validation
+    let visaRuleSetData: any = null;
+    let applicantProfileData: any = null;
+
+    try {
+      // Load approved VisaRuleSet
+      const ruleSet = await VisaRulesService.getActiveRuleSet(
+        application.country.code.toUpperCase(),
+        visaTypeName.toLowerCase()
+      );
+      if (ruleSet) {
+        visaRuleSetData = ruleSet;
+        logInfo('[OpenAI][DocValidation] Loaded VisaRuleSet for validation', {
+          documentType: document.documentType,
+          applicationId: application.id,
+          countryCode: application.country.code,
+          visaType: visaTypeName,
+        });
+      }
+    } catch (ruleSetError) {
+      logWarn('[OpenAI][DocValidation] Failed to load VisaRuleSet (non-blocking)', {
+        documentType: document.documentType,
+        applicationId: application.id,
+        error: ruleSetError instanceof Error ? ruleSetError.message : String(ruleSetError),
+      });
+    }
+
+    try {
+      // Load ApplicantProfile
+      const app = await prisma.visaApplication.findUnique({
+        where: { id: application.id },
+        include: { user: true },
+      });
+      if (app) {
+        const { buildApplicantProfileFromQuestionnaire } = await import('./ai-context.service');
+        const questionnaireData = app.questionnaireData as any;
+        applicantProfileData = buildApplicantProfileFromQuestionnaire(questionnaireData, {
+          country: { code: application.country.code },
+          visaType: { name: application.visaType.name },
+        });
+        logInfo('[OpenAI][DocValidation] Loaded ApplicantProfile for validation', {
+          documentType: document.documentType,
+          applicationId: application.id,
+        });
+      }
+    } catch (profileError) {
+      logWarn('[OpenAI][DocValidation] Failed to load ApplicantProfile (non-blocking)', {
+        documentType: document.documentType,
+        applicationId: application.id,
+        error: profileError instanceof Error ? profileError.message : String(profileError),
+      });
+    }
+
     logInfo('[OpenAI][DocValidation] Validating document with unified GPT-4', {
       model: AIOpenAIService.MODEL,
       documentType: document.documentType,
       country: countryName,
       visaType: visaTypeName,
       applicationId: application.id,
+      hasRuleSet: !!visaRuleSetData,
+      hasApplicantProfile: !!applicantProfileData,
     });
 
     const startTime = Date.now();
     const openaiClient = AIOpenAIService.getOpenAIClient();
 
-    // Build user prompt using centralized function
+    // Build user prompt using centralized function (now with VisaRuleSet and ApplicantProfile)
     const userPrompt = buildDocumentValidationUserPrompt({
       document: {
         documentType: document.documentType,
@@ -224,6 +279,8 @@ export async function validateDocumentWithAI(params: {
         country: countryName,
         visaType: visaTypeName,
       },
+      visaRuleSet: visaRuleSetData || undefined,
+      applicantProfile: applicantProfileData || undefined,
     });
 
     let validationResult: DocumentValidationResultAI;

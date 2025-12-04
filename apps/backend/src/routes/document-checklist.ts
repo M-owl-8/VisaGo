@@ -9,11 +9,18 @@ import { DocumentChecklistService } from '../services/document-checklist.service
 import { successResponse, errorResponse } from '../utils/response';
 import { HTTP_STATUS, ERROR_CODES } from '../config/constants';
 import { logWarn } from '../middleware/logger';
+import {
+  checklistRateLimitMiddleware,
+  incrementChecklistGenerationCount,
+} from '../middleware/checklist-rate-limit';
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(authenticateToken);
+
+// Apply rate limiting to POST/PUT operations (checklist generation)
+router.use(checklistRateLimitMiddleware);
 
 /**
  * GET /api/document-checklist/:applicationId
@@ -35,6 +42,11 @@ router.get('/:applicationId', async (req: Request, res: Response, next: NextFunc
     }
 
     const { applicationId } = req.params;
+
+    // Increment rate limit counter for checklist generation (only for POST/PUT, not GET)
+    if (req.method !== 'GET') {
+      await incrementChecklistGenerationCount(req.userId);
+    }
 
     const result = await DocumentChecklistService.generateChecklist(applicationId, req.userId);
 
