@@ -37,6 +37,7 @@
     "coverage:report": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/visa-coverage-report.ts",
     "embassy:sync": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/run-embassy-sync.ts",
     "approve:visarules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/approve-visarules.ts",
+    "approve:all-rulesets": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/approve-all-rulesets.ts",
     "check:launch-readiness": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/check-launch-readiness.ts"
   },
   "dependencies": {
