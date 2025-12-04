@@ -1,8 +1,12 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
+    "rootDir": "./",
+    "outDir": "../dist/scripts",
     "lib": ["ES2020"],
-    "types": ["node"]
+    "types": ["node"],
+    "skipLibCheck": true
   },
-  "include": ["*.ts"]
+  "include": ["*.ts"],
+  "exclude": ["../src/middleware/logger.ts"]
 }

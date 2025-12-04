@@ -10,13 +10,19 @@ import { getLogWriter } from '../utils/log-writer';
 import { sendToIntegrations } from '../utils/log-integrations';
 
 /**
- * Extended request with request ID
+ * Extended request with request ID and user info
  */
 declare global {
   namespace Express {
     interface Request {
       requestId?: string;
       startTime?: number;
+      userId?: string;
+      user?: {
+        id: string;
+        email: string;
+        role?: string;
+      };
     }
   }
 }

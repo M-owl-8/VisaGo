@@ -12,7 +12,6 @@
 import { PrismaClient } from '@prisma/client';
 import { EmbassySyncJobService } from '../src/services/embassy-sync-job.service';
 import { EmbassySourceService } from '../src/services/embassy-source.service';
-import { logInfo, logError } from '../src/middleware/logger';
 
 const prisma = new PrismaClient();
 
@@ -30,6 +29,14 @@ async function main() {
   const args = process.argv.slice(2);
 
   try {
+    // Check if Redis is available
+    if (!process.env.REDIS_URL) {
+      console.error('❌ REDIS_URL is not set. Embassy sync requires Redis for the Bull queue.');
+      console.error('   Please set REDIS_URL environment variable.');
+      console.error('   Example: $env:REDIS_URL="redis://localhost:6379"');
+      process.exit(1);
+    }
+
     // Initialize queue
     EmbassySyncJobService.initialize();
 
@@ -37,7 +44,7 @@ async function main() {
     const sourceIdIndex = args.indexOf('--source-id');
     if (sourceIdIndex !== -1 && args[sourceIdIndex + 1]) {
       const sourceId = args[sourceIdIndex + 1];
-      logInfo('[EmbassySync] Syncing specific source by ID', { sourceId });
+      console.log(`[EmbassySync] Syncing specific source by ID: ${sourceId}`);
       await EmbassySyncJobService.enqueueSync(sourceId);
       console.log(`✅ Enqueued sync job for source: ${sourceId}`);
       return;
@@ -48,10 +55,7 @@ async function main() {
       const countryCode = args[0].toUpperCase();
       const visaType = normalizeVisaType(args[1]);
 
-      logInfo('[EmbassySync] Syncing specific country/visaType', {
-        countryCode,
-        visaType,
-      });
+      console.log(`[EmbassySync] Syncing specific country/visaType: ${countryCode} ${visaType}`);
 
       // Find matching source
       const sources = await EmbassySourceService.listSources({
@@ -74,7 +78,7 @@ async function main() {
     }
 
     // Option 3: Sync all active sources
-    logInfo('[EmbassySync] Syncing all active sources');
+    console.log('[EmbassySync] Syncing all active sources');
     const count = await EmbassySyncJobService.enqueueAllPendingSyncs();
     console.log(`✅ Enqueued ${count} sync jobs for all active sources`);
 
@@ -86,8 +90,10 @@ async function main() {
     console.log(`   Completed: ${stats.completed}`);
     console.log(`   Failed: ${stats.failed}`);
   } catch (error) {
-    logError('[EmbassySync] Script error', error as Error);
-    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
+    console.error('[EmbassySync] Script error:', error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.stack) {
+      console.error('Stack:', error.stack);
+    }
     process.exit(1);
   } finally {
     await prisma.$disconnect();
