@@ -120,9 +120,15 @@ All 4 scripts are correctly defined:
   $env:DATABASE_URL="postgresql://postgres:ozolgfntMPMGTFZgWTIiqmoaqIKQetVx@gondola.proxy.rlwy.net:31433/railway"
   ```
 - Ensure `REDIS_URL` is set (for embassy sync queue - required for `embassy:sync`):
+
   ```powershell
-  $env:REDIS_URL="your-redis-url"
+  # Use public URL for local/remote access
+  $env:REDIS_URL="redis://default:cSzxbqwnZUiPjWQCsMaZGWLXJpLvLXXH@turntable.proxy.rlwy.net:12571"
+
+  # OR use internal URL if running from within Railway network
+  # $env:REDIS_URL="redis://default:cSzxbqwnZUiPjWQCsMaZGWLXJpLvLXXH@redis.railway.internal:6379"
   ```
+
   **Note:** If REDIS_URL is not set, `embassy:sync` will fail with a clear error message. This is expected - the Bull queue requires Redis.
 
 ### Step 1: Check Current Status
@@ -304,6 +310,8 @@ npm run check:launch-readiness
 
 1. **`run-embassy-sync.ts`**: Removed logger imports, replaced with console.log to prevent TypeScript errors in CLI context
 2. **`document-validation.service.ts`**: Already fixed - uses `User.bio` instead of non-existent `questionnaireData` field
+3. **`logger.ts`**: Added `userId` to Express Request interface to fix TypeScript errors
+4. **`scripts/tsconfig.json`**: Added `skipLibCheck: true` for better CLI compatibility
 
 ---
 
