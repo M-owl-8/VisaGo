@@ -337,14 +337,53 @@ export class DocumentChecklistService {
       let aiFallbackUsed = false;
       let aiErrorOccurred = false;
 
+      // Extract countryCode and visaType from application
+      const countryCode = (application.country.code || '').toUpperCase();
+      const visaType = application.visaType.name.toLowerCase();
+      const countryName = application.country.name;
+
+      // STEP 1: DB lookup for VisaRules BEFORE calling OpenAI
+      logInfo('[Checklist][Mode] Checking for approved VisaRules', {
+        applicationId,
+        countryCode,
+        visaType,
+        countryName,
+      });
+
+      const { VisaRulesService } = await import('./visa-rules.service');
+      const approvedRuleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaType);
+
+      // Determine mode based on approved rules
+      let mode: 'RULES' | 'LEGACY' = approvedRuleSet ? 'RULES' : 'LEGACY';
+
+      // Log mode clearly
+      if (mode === 'RULES') {
+        logInfo('[OpenAI][Checklist] Using RULES mode', {
+          countryCode,
+          visaType,
+          countryName,
+          ruleSetVersion: 'latest', // Could add version tracking if needed
+          applicationId,
+        });
+      } else {
+        logInfo('[OpenAI][Checklist] Using LEGACY mode', {
+          countryCode,
+          visaType,
+          countryName,
+          reason: 'no_approved_rules',
+          applicationId,
+        });
+      }
+
       try {
         // Build AI user context with questionnaire summary
         const userContext = await buildAIUserContext(userId, applicationId);
 
         logInfo('[Checklist][AI] Requesting OpenAI checklist', {
           applicationId,
-          country: application.country.name,
+          country: countryName,
           visaType: application.visaType.name,
+          mode,
         });
         const aiStart = Date.now();
 
@@ -353,22 +392,53 @@ export class DocumentChecklistService {
         let aiError: Error | null = null;
 
         try {
-          // Try new VisaChecklistEngine first (uses VisaRuleSet from database)
-          const { VisaChecklistEngineService } = await import('./visa-checklist-engine.service');
-
-          // Get previous checklist if exists (for stable IDs)
-          const previousChecklistData = storedChecklist?.checklistData;
-          let previousChecklist: any[] | undefined;
-          if (previousChecklistData) {
+          // RULES MODE: Use dedicated rules-based path
+          if (mode === 'RULES' && approvedRuleSet) {
             try {
-              const parsed = JSON.parse(previousChecklistData);
-              previousChecklist = Array.isArray(parsed) ? parsed : parsed.items || [];
-            } catch (e) {
-              // Ignore parse errors
+              aiChecklist = await this.generateChecklistFromRules(
+                approvedRuleSet,
+                userContext,
+                countryCode,
+                visaType,
+                countryName,
+                application
+              );
+              logInfo('[Checklist][RULES] Successfully generated checklist from rules', {
+                applicationId,
+                countryCode,
+                visaType,
+                itemCount: aiChecklist?.checklist?.length || 0,
+              });
+            } catch (rulesError: any) {
+              logWarn('[Checklist][RULES] Rules mode failed, falling back to legacy', {
+                applicationId,
+                countryCode,
+                visaType,
+                error: rulesError instanceof Error ? rulesError.message : String(rulesError),
+              });
+              // Fall through to legacy mode
+              mode = 'LEGACY' as const;
             }
           }
 
-          try {
+          // LEGACY MODE: Use existing VisaChecklistEngine or AIOpenAIService
+          if (mode === 'LEGACY' || !aiChecklist) {
+            // Try new VisaChecklistEngine first (uses VisaRuleSet from database)
+            const { VisaChecklistEngineService } = await import('./visa-checklist-engine.service');
+
+            // Get previous checklist if exists (for stable IDs)
+            const previousChecklistData = storedChecklist?.checklistData;
+            let previousChecklist: any[] | undefined;
+            if (previousChecklistData) {
+              try {
+                const parsed = JSON.parse(previousChecklistData);
+                previousChecklist = Array.isArray(parsed) ? parsed : parsed.items || [];
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+
+            try {
             aiChecklist = await VisaChecklistEngineService.generateChecklist(
               application.country.code, // Use country code instead of name
               application.visaType.name.toLowerCase(),
@@ -413,6 +483,7 @@ export class DocumentChecklistService {
               application.country.name,
               application.visaType.name
             );
+          }
           }
           const aiDurationMs = Date.now() - aiStart;
           if (aiDurationMs > 30000) {
@@ -489,13 +560,13 @@ export class DocumentChecklistService {
           // STEP 2: Validate AI result - if too few items, treat as weak result and use fallback
           const MIN_AI_ITEMS = 10; // Stricter minimum: 10 items required
           if (items.length < MIN_AI_ITEMS) {
-            logWarn('[Checklist][AI] Weak AI result - too few items, using fallback', {
-              applicationId,
-              country: application.country.name,
-              visaType: application.visaType.name,
-              aiItemCount: items.length,
+            logWarn('[OpenAI][Checklist] Using FALLBACK template', {
+              countryCode,
+              visaType,
               reason: 'too_few_items',
+              aiItemCount: items.length,
               threshold: MIN_AI_ITEMS,
+              applicationId,
             });
 
             // Use fallback instead of weak AI result
@@ -531,12 +602,13 @@ export class DocumentChecklistService {
           }
         } else {
           // AI returned empty or invalid checklist - use fallback
-          logWarn('[Checklist][AI] AI returned empty or invalid checklist, using fallback', {
-            applicationId,
-            country: application.country.name,
-            visaType: application.visaType.name,
+          logWarn('[OpenAI][Checklist] Using FALLBACK template', {
+            countryCode,
+            visaType,
+            reason: 'empty_or_invalid_checklist',
             hasChecklist: !!aiChecklist,
             checklistLength: aiChecklist?.checklist?.length || 0,
+            applicationId,
           });
           items = await this.generateRobustFallbackChecklist(
             application.country,
@@ -817,7 +889,467 @@ export class DocumentChecklistService {
   }
 
   /**
-   * Generate robust fallback checklist with 7-10 items based on country/visa type
+   * Generate checklist from approved VisaRules (RULES mode)
+   * 
+   * @param ruleSet - Approved VisaRuleSetData from database
+   * @param userContext - AIUserContext with questionnaire summary
+   * @param countryCode - ISO country code (e.g., 'DE', 'US')
+   * @param visaType - Visa type (e.g., 'tourist', 'student')
+   * @param countryName - Human-readable country name
+   * @param application - Application object with related data
+   * @returns Checklist response in legacy format
+   */
+  private static async generateChecklistFromRules(
+    ruleSet: any, // VisaRuleSetData
+    userContext: any,
+    countryCode: string,
+    visaType: string,
+    countryName: string,
+    application: any
+  ): Promise<{
+    type: string;
+    checklist: Array<{
+      document: string;
+      name?: string;
+      nameUz?: string;
+      nameRu?: string;
+      category: 'required' | 'highly_recommended' | 'optional';
+      required: boolean;
+      description?: string;
+      descriptionUz?: string;
+      descriptionRu?: string;
+      priority?: 'high' | 'medium' | 'low';
+      whereToObtain?: string;
+      whereToObtainUz?: string;
+      whereToObtainRu?: string;
+    }>;
+  }> {
+    try {
+      logInfo('[Checklist][RULES] Generating checklist from approved rules', {
+        countryCode,
+        visaType,
+        requiredDocsCount: ruleSet.requiredDocuments?.length || 0,
+      });
+
+      // Extract unique embassy/visa center URLs from multiple sources
+      const embassyUrls = await this.extractEmbassyUrls(countryCode, visaType, ruleSet);
+
+      // Build system prompt with rules content
+      const systemPrompt = this.buildRulesModeSystemPrompt(
+        countryCode,
+        visaType,
+        countryName,
+        ruleSet,
+        embassyUrls
+      );
+
+      // Build user prompt with application context
+      const userPrompt = this.buildRulesModeUserPrompt(userContext, ruleSet, countryCode, visaType);
+
+      // Call AIOpenAIService with checklist model (gpt-4o)
+      const checklistModel = (await import('./ai-openai.service')).AIOpenAIService.getChecklistModel();
+      
+      logInfo('[Checklist][RULES] Calling GPT-4 with rules-based prompt', {
+        model: checklistModel,
+        countryCode,
+        visaType,
+        embassyUrlsCount: embassyUrls.length,
+      });
+
+      const openaiClient = (await import('./ai-openai.service')).AIOpenAIService.getOpenAIClient();
+      
+      // ATTEMPT 1: Call GPT with rules/legacy prompt
+      logInfo('[Checklist][RULES] Attempt 1: Calling GPT-4 for checklist generation', {
+        model: checklistModel,
+        countryCode,
+        visaType,
+      });
+
+      let response = await openaiClient.chat.completions.create({
+        model: checklistModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.5,
+        max_completion_tokens: 2000,
+        response_format: { type: 'json_object' },
+      });
+
+      const rawContent = response.choices[0]?.message?.content || '{}';
+      
+      // Parse and validate JSON response
+      const { parseAndValidateChecklistResponse } = await import('../utils/json-validator');
+      let validationResult = parseAndValidateChecklistResponse(
+        rawContent,
+        countryName,
+        visaType,
+        1 // attempt 1
+      );
+
+      let parsed = validationResult.parsed;
+
+      // If validator fails → log validation error + reason, then retry
+      if (!validationResult.validation.isValid) {
+        logWarn('[Checklist][RULES] Attempt 1 failed validation', {
+          countryCode,
+          visaType,
+          errors: validationResult.validation.errors,
+          warnings: validationResult.validation.warnings,
+          reason: validationResult.validation.errors.join('; '),
+        });
+
+        // ATTEMPT 2: Call GPT again with stronger JSON warning
+        logInfo('[Checklist][RULES] Attempt 2: Retrying with stricter JSON requirements', {
+          countryCode,
+          visaType,
+          previousErrors: validationResult.validation.errors,
+        });
+
+        const retryUserPrompt = `${userPrompt}
+
+CRITICAL: Your previous response was invalid JSON or failed validation. You MUST return strictly valid JSON now.
+
+Previous validation errors:
+${validationResult.validation.errors.map((e) => `- ${e}`).join('\n')}
+
+You MUST:
+1. Return ONLY valid JSON matching the exact schema in the system prompt
+2. Include ALL required fields for every checklist item
+3. Ensure "checklist" is an array with 10-16 items
+4. Include all three categories: required, highly_recommended, optional
+5. No markdown, no comments, no extra text outside JSON`;
+
+        response = await openaiClient.chat.completions.create({
+          model: checklistModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: retryUserPrompt },
+          ],
+          temperature: 0.3, // Lower temperature for more consistent output
+          max_completion_tokens: 2000,
+          response_format: { type: 'json_object' },
+        });
+
+        const retryRawContent = response.choices[0]?.message?.content || '{}';
+        validationResult = parseAndValidateChecklistResponse(
+          retryRawContent,
+          countryName,
+          visaType,
+          2 // attempt 2
+        );
+
+        parsed = validationResult.parsed;
+
+        // If attempt 2 still fails → trigger fallback
+        if (!validationResult.validation.isValid) {
+          logError('[Checklist][RULES] Attempt 2 also failed validation, triggering fallback', new Error('Validation failed after retry'), {
+            countryCode,
+            visaType,
+            errors: validationResult.validation.errors,
+            warnings: validationResult.validation.warnings,
+            reason: validationResult.validation.errors.join('; '),
+          });
+          throw new Error(`Validation failed after 2 attempts: ${validationResult.validation.errors.join('; ')}`);
+        } else {
+          logInfo('[Checklist][RULES] Attempt 2 succeeded after retry', {
+            countryCode,
+            visaType,
+            itemCount: parsed?.checklist?.length || 0,
+          });
+        }
+      }
+
+      // Validate and convert to legacy format
+      if (!parsed || !parsed.checklist || !Array.isArray(parsed.checklist)) {
+        throw new Error('Invalid checklist structure in AI response');
+      }
+
+      logInfo('[Checklist][RULES] Successfully generated checklist from rules', {
+        countryCode,
+        visaType,
+        itemCount: parsed.checklist.length,
+      });
+
+      return {
+        type: visaType,
+        checklist: parsed.checklist,
+      };
+    } catch (error) {
+      logError('[Checklist][RULES] Error generating checklist from rules', error as Error, {
+        countryCode,
+        visaType,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Extract unique embassy/visa center URLs from multiple sources
+   */
+  private static async extractEmbassyUrls(
+    countryCode: string,
+    visaType: string,
+    ruleSet: any
+  ): Promise<string[]> {
+    const urls = new Set<string>();
+
+    try {
+      // 1. Extract URL from ruleSet.sourceInfo.extractedFrom (if exists)
+      if (ruleSet.sourceInfo?.extractedFrom) {
+        urls.add(ruleSet.sourceInfo.extractedFrom);
+      }
+
+      // 2. Get URL from the VisaRuleSet's related EmbassySource (via sourceId)
+      const ruleSetRecord = await prisma.visaRuleSet.findFirst({
+        where: {
+          countryCode: countryCode.toUpperCase(),
+          visaType: visaType.toLowerCase(),
+          isApproved: true,
+        },
+        include: {
+          source: {
+            select: {
+              url: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          version: 'desc',
+        },
+      });
+
+      if (ruleSetRecord?.source?.url) {
+        urls.add(ruleSetRecord.source.url);
+      }
+
+      // 3. Get all active embassy sources for this country/visa type
+      const { EmbassySourceService } = await import('./embassy-source.service');
+      const sources = await EmbassySourceService.listSources({
+        countryCode: countryCode.toUpperCase(),
+        visaType: visaType.toLowerCase(),
+        isActive: true,
+      });
+      
+      sources.sources.forEach((s: any) => {
+        if (s.url) {
+          urls.add(s.url);
+        }
+      });
+
+      logInfo('[Checklist][RULES] Extracted embassy URLs', {
+        countryCode,
+        visaType,
+        urlCount: urls.size,
+        urls: Array.from(urls),
+      });
+    } catch (urlError) {
+      logWarn('[Checklist][RULES] Failed to fetch embassy URLs (non-blocking)', {
+        countryCode,
+        visaType,
+        error: urlError instanceof Error ? urlError.message : String(urlError),
+      });
+    }
+
+    return Array.from(urls);
+  }
+
+  /**
+   * Build system prompt for RULES mode
+   */
+  private static buildRulesModeSystemPrompt(
+    countryCode: string,
+    visaType: string,
+    countryName: string,
+    ruleSet: any,
+    embassyUrls: string[]
+  ): string {
+    // Format official URLs list
+    const embassyUrlsText = embassyUrls.length > 0
+      ? `\n\nOFFICIAL SOURCES:\nThese are the official sources for the requirements. Cross-check your checklist against them:\n${embassyUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')}`
+      : '';
+
+    // Format rules content per document type
+    const requiredDocsText = ruleSet.requiredDocuments?.length > 0
+      ? `\n\nREQUIRED DOCUMENTS (from official rules):\n${ruleSet.requiredDocuments.map((doc: any, i: number) => 
+          `${i + 1}. ${doc.documentType} (${doc.category})\n   ${doc.description || 'No description'}\n   ${doc.validityRequirements ? `Validity: ${doc.validityRequirements}` : ''}\n   ${doc.formatRequirements ? `Format: ${doc.formatRequirements}` : ''}`
+        ).join('\n\n')}`
+      : '';
+
+    const financialReqsText = ruleSet.financialRequirements
+      ? `\n\nFINANCIAL REQUIREMENTS:\n${JSON.stringify(ruleSet.financialRequirements, null, 2)}`
+      : '';
+
+    const additionalReqsText = ruleSet.additionalRequirements
+      ? `\n\nADDITIONAL REQUIREMENTS:\n${JSON.stringify(ruleSet.additionalRequirements, null, 2)}`
+      : '';
+
+    return `You are a visa document checklist generator for ${countryName} ${visaType} visas.
+
+CRITICAL INSTRUCTIONS - FOLLOW STRICTLY:
+1. You MUST use ONLY the official visa rules provided below. Do NOT invent or add documents that are not in the rules.
+2. Do not invent extra categories that are not supported by rules unless clearly standard practice (e.g., passport is always required).
+3. Always prioritize the rules' content and reconcile it with the official URLs provided.
+4. If a document is listed in the rules, it MUST appear in your checklist.
+5. If a document is NOT in the rules, do NOT add it unless it's a universally standard document (e.g., passport, passport photo).
+6. Cross-reference your generated checklist against the official URLs to ensure accuracy.
+
+OFFICIAL VISA RULES:
+${requiredDocsText}${financialReqsText}${additionalReqsText}${embassyUrlsText}
+
+REQUIRED JSON SCHEMA:
+You MUST return ONLY valid JSON matching this exact schema. No comments, no explanations, no extra keys.
+
+{
+  "type": string,           // Visa type (e.g., "tourist", "student")
+  "country": string,       // Country name (e.g., "Germany", "United States")
+  "checklist": [
+    {
+      "document": string,              // REQUIRED: Document type slug (e.g., "passport", "bank_statement")
+      "name": string,                  // REQUIRED: English name (2-5 words)
+      "nameUz": string,                // REQUIRED: Uzbek translation
+      "nameRu": string,                // REQUIRED: Russian translation
+      "category": string,              // REQUIRED: One of "required", "highly_recommended", "optional"
+      "required": boolean,             // REQUIRED: true if category is "required", false otherwise
+      "description": string,           // REQUIRED: English description (1-2 sentences)
+      "descriptionUz": string,         // REQUIRED: Uzbek translation of description
+      "descriptionRu": string,        // REQUIRED: Russian translation of description
+      "priority": string,              // REQUIRED: One of "high", "medium", "low"
+      "whereToObtain": string,        // REQUIRED: English instructions for obtaining in Uzbekistan
+      "whereToObtainUz": string,      // REQUIRED: Uzbek translation
+      "whereToObtainRu": string       // REQUIRED: Russian translation
+    }
+  ]
+}
+
+VALIDATION RULES:
+- "checklist" must be an array with 10-16 items
+- All three categories (required, highly_recommended, optional) must be present
+- Every item MUST have all required fields listed above
+- "category" must match "required" field: if category="required" then required=true, else required=false
+- "priority" must be consistent: "required" items should have priority="high"
+
+Return ONLY valid JSON. No comments, no explanations, no extra keys.`;
+  }
+
+  /**
+   * Build user prompt for RULES mode
+   */
+  private static buildRulesModeUserPrompt(
+    userContext: any,
+    ruleSet: any,
+    countryCode: string,
+    visaType: string
+  ): string {
+    // Extract conditional requirements from rules
+    const conditionalDocs: string[] = [];
+    if (ruleSet.financialRequirements?.sponsorRequirements?.allowed) {
+      conditionalDocs.push('sponsor_documents');
+    }
+    if (ruleSet.additionalRequirements?.accommodationProof?.required) {
+      conditionalDocs.push('accommodation_proof');
+    }
+    if (ruleSet.additionalRequirements?.travelInsurance?.required) {
+      conditionalDocs.push('travel_insurance');
+    }
+
+    const conditionalDocsText = conditionalDocs.length > 0
+      ? `\n\nCONDITIONAL DOCUMENTS (include if applicable to applicant):\n${conditionalDocs.join(', ')}`
+      : '';
+
+    return `Generate a personalized document checklist for this applicant:
+
+APPLICANT CONTEXT:
+${JSON.stringify(userContext, null, 2)}
+
+COUNTRY: ${countryCode}
+VISA TYPE: ${visaType}${conditionalDocsText}
+
+STRICT REQUIREMENTS:
+1. Include ALL required documents from the official rules (system prompt)
+2. Include conditional documents ONLY if they apply to this applicant (e.g., sponsor documents if applicant has a sponsor)
+3. Include highly recommended documents from the rules based on applicant's risk profile
+4. Do NOT add documents that are not in the official rules
+5. Cross-check against the official URLs provided in the system prompt
+6. Provide clear, accurate multilingual descriptions (EN, UZ, RU)
+7. Ensure category matches the rules' category field exactly
+
+Return ONLY valid JSON matching the schema specified in the system prompt.`;
+  }
+
+  /**
+   * Build country-aware fallback checklist factory
+   * Returns a comprehensive fallback checklist based on country code and visa type
+   */
+  private static buildFallbackChecklist(
+    countryCode: string,
+    visaType: string
+  ): Array<{
+    documentType: string;
+    category: 'required' | 'highly_recommended' | 'optional';
+    priority: 'high' | 'medium' | 'low';
+  }> {
+    const visaTypeLower = visaType.toLowerCase();
+    const isTourist = visaTypeLower.includes('tourist') || visaTypeLower.includes('tourism');
+    const isStudent = visaTypeLower.includes('student') || visaTypeLower.includes('study');
+    
+    const schengenCountries = [
+      'ES', 'DE', 'IT', 'FR', 'AT', 'BE', 'CH', 'CZ', 'DK', 'EE', 'FI', 'GR', 'HU',
+      'IS', 'LV', 'LI', 'LT', 'LU', 'MT', 'NL', 'NO', 'PL', 'PT', 'SE', 'SK', 'SI',
+    ];
+    const isSchengen = schengenCountries.includes(countryCode.toUpperCase());
+
+    // Schengen Tourist Visa Fallback (≥ 10 items)
+    if (isSchengen && isTourist) {
+      return [
+        // Required documents
+        { documentType: 'passport', category: 'required', priority: 'high' },
+        { documentType: 'passport_photo', category: 'required', priority: 'high' },
+        { documentType: 'visa_application_form', category: 'required', priority: 'high' },
+        { documentType: 'travel_insurance', category: 'required', priority: 'high' },
+        { documentType: 'flight_reservation', category: 'required', priority: 'high' },
+        { documentType: 'hotel_reservations', category: 'required', priority: 'high' },
+        { documentType: 'bank_statement', category: 'required', priority: 'high' },
+        { documentType: 'employment_verification', category: 'required', priority: 'high' },
+        { documentType: 'proof_of_residence', category: 'required', priority: 'high' },
+        { documentType: 'travel_itinerary', category: 'highly_recommended', priority: 'medium' },
+        { documentType: 'cover_letter', category: 'highly_recommended', priority: 'medium' },
+        { documentType: 'previous_visa_copies', category: 'optional', priority: 'low' },
+      ];
+    }
+
+    // Default fallback (for non-Schengen or other visa types)
+    const defaultDocs: Array<{
+      documentType: string;
+      category: 'required' | 'highly_recommended' | 'optional';
+      priority: 'high' | 'medium' | 'low';
+    }> = [
+      { documentType: 'passport', category: 'required', priority: 'high' },
+      { documentType: 'passport_photo', category: 'required', priority: 'high' },
+      { documentType: 'visa_application_form', category: 'required', priority: 'high' },
+      { documentType: 'bank_statement', category: 'required', priority: 'high' },
+    ];
+
+    if (isStudent) {
+      defaultDocs.push(
+        { documentType: 'acceptance_letter', category: 'required', priority: 'high' },
+        { documentType: 'academic_records', category: 'highly_recommended', priority: 'medium' },
+        { documentType: 'proof_of_tuition_payment', category: 'highly_recommended', priority: 'medium' }
+      );
+    } else if (isTourist) {
+      defaultDocs.push(
+        { documentType: 'travel_itinerary', category: 'required', priority: 'high' },
+        { documentType: 'hotel_reservations', category: 'required', priority: 'high' },
+        { documentType: 'employment_verification', category: 'highly_recommended', priority: 'medium' }
+      );
+    }
+
+    return defaultDocs;
+  }
+
+  /**
+   * Generate robust fallback checklist with country-aware factory
    * This is used when AI fails or returns too few items
    */
   private static async generateRobustFallbackChecklist(
@@ -839,82 +1371,77 @@ export class DocumentChecklistService {
       aiNotesEn?: string | null;
     }>
   ): Promise<ChecklistItem[]> {
-    const items: ChecklistItem[] = [];
-    const countryName = (country?.name || '').toLowerCase();
     const countryCode = (country?.code || '').toUpperCase();
     const visaTypeName = (visaType?.name || '').toLowerCase();
-    const isStudent = visaTypeName.includes('student') || visaTypeName.includes('study');
-    const isTourist = visaTypeName.includes('tourist') || visaTypeName.includes('tourism');
-    const isSchengen = [
-      'ES',
-      'DE',
-      'IT',
-      'FR',
-      'AT',
-      'BE',
-      'CH',
-      'CZ',
-      'DK',
-      'EE',
-      'FI',
-      'GR',
-      'HU',
-      'IS',
-      'LV',
-      'LI',
-      'LT',
-      'LU',
-      'MT',
-      'NL',
-      'NO',
-      'PL',
-      'PT',
-      'SE',
-      'SK',
-      'SI',
-    ].includes(countryCode);
-    const isCanada = countryCode === 'CA';
-    const isUnitedStates = countryCode === 'US';
 
-    // Core documents (always included)
-    const coreDocs = ['passport', 'passport_photo', 'visa_application_form', 'bank_statement'];
+    // Build fallback checklist using factory
+    const fallbackDocTypes = this.buildFallbackChecklist(countryCode, visaTypeName);
 
-    // Additional documents based on visa type and country
-    const additionalDocs: string[] = [];
+    logInfo(`[OpenAI][Checklist] Using FALLBACK checklist (${countryCode}, ${visaTypeName}, items: ${fallbackDocTypes.length})`, {
+      countryCode,
+      visaType: visaTypeName,
+      items: fallbackDocTypes.length,
+    });
 
-    if (isStudent) {
-      if (isCanada) {
-        additionalDocs.push('acceptance_letter'); // LOA for Canada
-      } else if (isUnitedStates) {
-        additionalDocs.push('i20_form');
-      } else {
-        additionalDocs.push('acceptance_letter');
-      }
-      additionalDocs.push('academic_records', 'proof_of_tuition_payment');
-    }
+    const items: ChecklistItem[] = [];
 
-    if (isTourist || !isStudent) {
-      additionalDocs.push('travel_itinerary', 'hotel_reservations');
-    }
-
-    // Country-specific additions
-    if (isSchengen) {
-      // Schengen requires travel medical insurance (use medical_certificate as proxy)
-      additionalDocs.push('medical_certificate');
-    }
-
-    // Combine all document types
-    const allDocTypes = [...coreDocs, ...additionalDocs];
-
-    // Create checklist items
-    for (let i = 0; i < allDocTypes.length; i++) {
-      const docType = allDocTypes[i];
+    // Create checklist items from fallback template
+    for (let i = 0; i < fallbackDocTypes.length; i++) {
+      const fallbackDoc = fallbackDocTypes[i];
+      const docType = fallbackDoc.documentType;
       const existingDoc = existingDocuments.find((d) => d.type === docType);
-      const translation = getDocumentTranslation(docType);
+      
+      // Get translation or create fallback translation for missing document types
+      let translation = getDocumentTranslation(docType);
+      
+      // Handle special document types that might not be in translations
+      // Check if translation is the default fallback (when nameEn === docType)
+      const isDefaultFallback = translation.nameEn === docType && translation.nameUz === docType && translation.nameRu === docType;
+      
+      if (isDefaultFallback) {
+        // Create inline translation for missing types
+        const specialTranslations: Record<string, any> = {
+          travel_insurance: {
+            type: 'travel_insurance',
+            nameEn: 'Travel Health Insurance',
+            nameUz: "Sayohat Tibbiy Sug'urtasi",
+            nameRu: 'Медицинская Страховка для Путешествий',
+            descriptionEn: 'Travel health insurance covering at least €30,000 medical expenses, valid for entire Schengen stay',
+            descriptionUz: "Kamida 30,000 EUR tibbiy xarajatlarni qoplaydigan sayohat tibbiy sug'urtasi, butun Shengen bo'ylab amal qiladi",
+            descriptionRu: 'Медицинская страховка для путешествий, покрывающая не менее 30,000 EUR медицинских расходов, действительна на весь период пребывания в Шенгене',
+          },
+          flight_reservation: {
+            type: 'flight_reservation',
+            nameEn: 'Flight Reservation / Itinerary',
+            nameUz: 'Parvoz Bron / Marshrut',
+            nameRu: 'Бронирование Рейса / Маршрут',
+            descriptionEn: 'Round-trip flight reservation showing entry and exit from Schengen area',
+            descriptionUz: 'Shengen hududiga kirish va chiqishni ko\'rsatuvchi ikki tomonlama parvoz bron',
+            descriptionRu: 'Бронирование рейса туда и обратно, показывающее въезд и выезд из Шенгенской зоны',
+          },
+          cover_letter: {
+            type: 'cover_letter',
+            nameEn: 'Cover Letter / Travel Plan',
+            nameUz: 'Qo\'shimcha Xat / Sayohat Rejasi',
+            nameRu: 'Сопроводительное Письмо / План Поездки',
+            descriptionEn: 'Personal cover letter explaining the purpose of your trip and travel itinerary',
+            descriptionUz: 'Sayohat maqsadini va sayohat rejasini tushuntiruvchi shaxsiy qo\'shimcha xat',
+            descriptionRu: 'Личное сопроводительное письмо, объясняющее цель поездки и маршрут путешествия',
+          },
+          previous_visa_copies: {
+            type: 'previous_visa_copies',
+            nameEn: 'Proof of Previous Travels',
+            nameUz: 'Oldingi Sayohatlar Isboti',
+            nameRu: 'Подтверждение Предыдущих Поездок',
+            descriptionEn: 'Copies of previous Schengen or other visas (if applicable)',
+            descriptionUz: 'Oldingi Shengen yoki boshqa vizalar nusxalari (agar mavjud bo\'lsa)',
+            descriptionRu: 'Копии предыдущих шенгенских или других виз (если применимо)',
+          },
+        };
 
-      // Skip if translation not available (shouldn't happen, but safety check)
-      if (!translation) {
-        continue;
+        if (specialTranslations[docType]) {
+          translation = specialTranslations[docType];
+        }
       }
 
       const item = {
@@ -926,8 +1453,8 @@ export class DocumentChecklistService {
         description: translation.descriptionEn,
         descriptionUz: translation.descriptionUz,
         descriptionRu: translation.descriptionRu,
-        required: true, // All fallback items are required
-        priority: i < coreDocs.length ? 'high' : 'medium',
+        required: fallbackDoc.category === 'required',
+        priority: fallbackDoc.priority,
         status: existingDoc ? (existingDoc.status as any) : 'missing',
         userDocumentId: existingDoc?.id,
         fileUrl: existingDoc?.fileUrl,
@@ -940,7 +1467,7 @@ export class DocumentChecklistService {
       };
       items.push({
         ...item,
-        category: inferCategory(item),
+        category: fallbackDoc.category,
       });
     }
 

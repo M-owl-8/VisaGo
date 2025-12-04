@@ -108,13 +108,13 @@ export function validateChecklistResponse(
 
   // Check top-level structure
   if (!parsed || typeof parsed !== 'object') {
-    errors.push('Response is not a valid object');
+    errors.push('Root: Response is not a valid object');
     return { isValid: false, errors, warnings };
   }
 
   // Check checklist array
   if (!Array.isArray(parsed.checklist)) {
-    errors.push('Missing or invalid checklist array');
+    errors.push('checklist: Missing or invalid (must be an array)');
     return { isValid: false, errors, warnings };
   }
 
@@ -137,19 +137,19 @@ export function validateChecklistResponse(
   };
 
   items.forEach((item: any, index: number) => {
-    // Check required fields
+    // Check required fields with specific field names
     if (!item.document) {
-      errors.push(`Item ${index + 1}: Missing document field`);
+      errors.push(`checklist[${index}].document: Missing field`);
     }
     if (!item.name) {
-      errors.push(`Item ${index + 1}: Missing name field`);
+      errors.push(`checklist[${index}].name: Missing field`);
     }
 
     // Validate category
     if (!item.category) {
-      errors.push(`Item ${index + 1}: Missing category field`);
+      errors.push(`checklist[${index}].category: Missing field`);
     } else if (!['required', 'highly_recommended', 'optional'].includes(item.category)) {
-      errors.push(`Item ${index + 1}: Invalid category "${item.category}"`);
+      errors.push(`checklist[${index}].category: Invalid value "${item.category}" (must be one of: required, highly_recommended, optional)`);
     } else {
       categories.add(item.category);
       categoryCounts[item.category]++;
@@ -157,33 +157,33 @@ export function validateChecklistResponse(
 
     // Validate required boolean matches category
     if (item.category === 'required' && item.required !== true) {
-      warnings.push(`Item ${index + 1}: category is "required" but required is not true`);
+      warnings.push(`checklist[${index}].required: Should be true when category is "required"`);
     }
     if (
       (item.category === 'highly_recommended' || item.category === 'optional') &&
       item.required === true
     ) {
-      warnings.push(`Item ${index + 1}: category is "${item.category}" but required is true`);
+      warnings.push(`checklist[${index}].required: Should be false when category is "${item.category}"`);
     }
 
-    // Check translations
+    // Check translations (warnings, not errors)
     if (!item.nameUz) {
-      warnings.push(`Item ${index + 1}: Missing nameUz translation`);
+      warnings.push(`checklist[${index}].nameUz: Missing field`);
     }
     if (!item.nameRu) {
-      warnings.push(`Item ${index + 1}: Missing nameRu translation`);
+      warnings.push(`checklist[${index}].nameRu: Missing field`);
     }
     if (!item.descriptionUz) {
-      warnings.push(`Item ${index + 1}: Missing descriptionUz translation`);
+      warnings.push(`checklist[${index}].descriptionUz: Missing field`);
     }
     if (!item.descriptionRu) {
-      warnings.push(`Item ${index + 1}: Missing descriptionRu translation`);
+      warnings.push(`checklist[${index}].descriptionRu: Missing field`);
     }
     if (!item.whereToObtainUz) {
-      warnings.push(`Item ${index + 1}: Missing whereToObtainUz translation`);
+      warnings.push(`checklist[${index}].whereToObtainUz: Missing field`);
     }
     if (!item.whereToObtainRu) {
-      warnings.push(`Item ${index + 1}: Missing whereToObtainRu translation`);
+      warnings.push(`checklist[${index}].whereToObtainRu: Missing field`);
     }
   });
 
@@ -363,15 +363,17 @@ export function parseAndValidateChecklistResponse(
   try {
     parsed = JSON.parse(jsonString);
   } catch (error) {
-    logError('[JSON Validator] Failed to parse extracted JSON', error as Error, {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logError('[JSON Validator] Validation failed (invalid JSON parse error)', error as Error, {
       attempt,
+      reason: `JSON parse error: ${errorMessage}`,
       jsonPreview: jsonString.substring(0, 200),
     });
     return {
       parsed: null,
       validation: {
         isValid: false,
-        errors: ['Failed to parse JSON'],
+        errors: [`Invalid JSON parse error: ${errorMessage}`],
         warnings: [],
       },
       needsRetry: attempt < 2,
@@ -382,10 +384,23 @@ export function parseAndValidateChecklistResponse(
   const validation = validateChecklistResponse(parsed, country, visaType);
 
   if (!validation.isValid) {
-    logWarn('[JSON Validator] Validation failed', {
+    // Log each validation error with specific field information
+    validation.errors.forEach((error) => {
+      logError('[JSON Validator] Validation failed', new Error(error), {
+        attempt,
+        reason: error,
+        country,
+        visaType,
+      });
+    });
+    
+    logWarn('[JSON Validator] Validation failed (summary)', {
       attempt,
+      errorCount: validation.errors.length,
       errors: validation.errors,
       warnings: validation.warnings,
+      country,
+      visaType,
     });
     return {
       parsed: null,

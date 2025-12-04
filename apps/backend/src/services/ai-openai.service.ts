@@ -1487,29 +1487,37 @@ TERMINOLOGY RULES (STRICTLY ENFORCED):
   * Travel: Travel itinerary, accommodation proof, travel insurance (if required)
   * Ties: Employment letter, property documents, family ties proof
 
-DOCUMENT STRUCTURE:
-Reply ONLY with valid JSON matching this exact schema:
+REQUIRED JSON SCHEMA:
+You MUST return ONLY valid JSON matching this exact schema. No comments, no explanations, no extra keys.
+
 {
-  "type": "${visaType}",
-  "country": "${country}",
-  "checklist": [
+  "type": string,           // REQUIRED: Visa type (e.g., "tourist", "student")
+  "country": string,       // REQUIRED: Country name (e.g., "Germany", "United States")
+  "checklist": [           // REQUIRED: Array of checklist items (10-16 items)
     {
-      "document": "internal_key_underscore_format",
-      "name": "Short English name (2-5 words)",
-      "nameUz": "Uzbek name",
-      "nameRu": "Russian name",
-      "category": "required" | "highly_recommended" | "optional",
-      "description": "1-2 sentences in neutral, simple English explaining what this document is and why it's needed",
-      "descriptionUz": "Uzbek translation of description",
-      "descriptionRu": "Russian translation of description",
-      "required": true,
-      "priority": "high" | "medium" | "low",
-      "whereToObtain": "Clear English instructions for obtaining this document in Uzbekistan",
-      "whereToObtainUz": "Uzbek translation",
-      "whereToObtainRu": "Russian translation"
+      "document": string,              // REQUIRED: Document type slug (e.g., "passport", "bank_statement")
+      "name": string,                  // REQUIRED: English name (2-5 words)
+      "nameUz": string,                // REQUIRED: Uzbek translation
+      "nameRu": string,                // REQUIRED: Russian translation
+      "category": string,              // REQUIRED: One of "required", "highly_recommended", "optional"
+      "required": boolean,             // REQUIRED: true if category is "required", false otherwise
+      "description": string,           // REQUIRED: English description (1-2 sentences)
+      "descriptionUz": string,         // REQUIRED: Uzbek translation of description
+      "descriptionRu": string,         // REQUIRED: Russian translation of description
+      "priority": string,              // REQUIRED: One of "high", "medium", "low"
+      "whereToObtain": string,         // REQUIRED: English instructions for obtaining in Uzbekistan
+      "whereToObtainUz": string,       // REQUIRED: Uzbek translation
+      "whereToObtainRu": string        // REQUIRED: Russian translation
     }
   ]
 }
+
+VALIDATION RULES:
+- "checklist" must be an array with 10-16 items
+- All three categories (required, highly_recommended, optional) must be present
+- Every item MUST have all required fields listed above
+- "category" must match "required" field: if category="required" then required=true, else required=false
+- "priority" must be consistent: "required" items should have priority="high"
 
 RULES FOR required, priority, AND category:
 - If category = "required":
@@ -1523,10 +1531,11 @@ RULES FOR required, priority, AND category:
   * priority = "low"
 
 FINAL INSTRUCTIONS:
+- Return ONLY valid JSON. No comments, no explanations, no extra keys.
 - ALWAYS return clean JSON in schema EXACTLY as required.
 - If questionnaire data is incomplete or contradictory → resolve logically using Uzbek context.
-- NEVER output fewer than 8 items.
-- NEVER output only "required".
+- NEVER output fewer than 10 items.
+- NEVER output only "required" category.
 - NO HALLUCINATIONS: Only use real document types, real embassy requirements, real terminology.
 - NO FAKE DOCUMENTS: Do not invent document names that don't exist.
 - NO FAKE EMBASSIES: Do not invent embassy procedures or requirements.
@@ -1783,20 +1792,39 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       validationResult = firstAttempt.validation;
       needsRetry = firstAttempt.needsRetry;
 
-      // Retry if needed
-      if (needsRetry && attempt < 2) {
-        logWarn('[OpenAI][Checklist] First attempt failed, retrying with stricter instructions', {
+      // ATTEMPT 1: Log validation error + reason if failed
+      if (!validationResult.isValid) {
+        logWarn('[OpenAI][Checklist] Attempt 1 failed validation', {
           country,
           visaType,
           errors: validationResult.errors,
+          warnings: validationResult.warnings,
+          reason: validationResult.errors.join('; '),
+        });
+      }
+
+      // ATTEMPT 2: Retry if needed
+      if (needsRetry && attempt < 2) {
+        logInfo('[OpenAI][Checklist] Attempt 2: Retrying with stricter JSON requirements', {
+          country,
+          visaType,
+          previousErrors: validationResult.errors,
         });
 
         attempt = 2;
-        const retryPrompt = `${userPrompt}\n\nCRITICAL: Your previous response was invalid. You MUST return ONLY valid JSON with:
-- Exactly 8-15 items
-- ALL THREE categories (required, highly_recommended, optional)
-- Complete UZ and RU translations for every field
-- Valid JSON structure with no markdown or extra text`;
+        const retryPrompt = `${userPrompt}
+
+CRITICAL: Your previous response was invalid JSON or failed validation. You MUST return strictly valid JSON now.
+
+Previous validation errors:
+${validationResult.errors.map((e: string) => `- ${e}`).join('\n')}
+
+You MUST:
+1. Return ONLY valid JSON matching the exact schema in the system prompt
+2. Include ALL required fields for every checklist item
+3. Ensure "checklist" is an array with 10-16 items
+4. Include all three categories: required, highly_recommended, optional
+5. No markdown, no comments, no extra text outside JSON`;
 
         const retryResponse = await AIOpenAIService.openai.chat.completions.create({
           model: this.MODEL,
@@ -1820,6 +1848,23 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
         parsed = retryAttempt.parsed;
         validationResult = retryAttempt.validation;
         needsRetry = retryAttempt.needsRetry;
+
+        // If attempt 2 still fails → log and trigger fallback
+        if (!validationResult.isValid) {
+          logError('[OpenAI][Checklist] Attempt 2 also failed validation, triggering fallback', new Error('Validation failed after retry'), {
+            country,
+            visaType,
+            errors: validationResult.errors,
+            warnings: validationResult.warnings,
+            reason: validationResult.errors.join('; '),
+          });
+        } else {
+          logInfo('[OpenAI][Checklist] Attempt 2 succeeded after retry', {
+            country,
+            visaType,
+            itemCount: parsed?.checklist?.length || 0,
+          });
+        }
       }
 
       // If still invalid after retry, use fallback
