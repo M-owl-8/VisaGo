@@ -1,144 +1,77 @@
 /**
- * Script to generate a JWT token for an admin user
+ * Generate JWT Token for Admin User
+ * 
+ * Generates a JWT token for a user by email with specified role
  * 
  * Usage:
- *   cd apps/backend
- *   npm run generate-admin-token
- * 
- * To use production database:
- *   DATABASE_URL="your-production-database-url" npm run generate-admin-token
- * 
- * Or directly:
- *   ts-node --project scripts/tsconfig.json scripts/generate-admin-token.ts
+ *   npm run generate-admin-token -- yeger9889@gmail.com super_admin
+ *   npm run generate-admin-token -- user@example.com admin
  */
 
 import { PrismaClient } from '@prisma/client';
-import * as dotenv from 'dotenv';
 import { generateToken } from '../src/middleware/auth';
 
-// Load environment variables
-dotenv.config();
-
-// Determine which database to use
-const databaseUrl = process.env.DATABASE_URL || 'file:./prisma/dev.db';
-const isProduction = databaseUrl.includes('postgres') || databaseUrl.includes('railway') || databaseUrl.includes('gondola');
-
-console.log('\n📊 Database Configuration:');
-console.log(`   Type: ${isProduction ? 'PostgreSQL (Production)' : 'SQLite (Local)'}`);
-console.log(`   URL: ${databaseUrl.substring(0, 50)}${databaseUrl.length > 50 ? '...' : ''}\n`);
-
-// Warn if using SQLite when PostgreSQL is expected
-if (!isProduction && databaseUrl.includes('file:')) {
-  console.log('⚠️  WARNING: Using SQLite database. If you need PostgreSQL, set DATABASE_URL:');
-  console.log('   PowerShell: $env:DATABASE_URL="postgresql://user:pass@host:port/db"');
-  console.log('   Then run: npm run generate-admin-token\n');
-}
-
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: databaseUrl,
-    },
-  },
-});
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🔍 Looking for admin users...\n');
+  const args = process.argv.slice(2);
 
-  // First, try to find the specific superadmin email
-  const targetEmail = 'yeger9889@gmail.com';
-  let adminUser = await prisma.user.findUnique({
-    where: { email: targetEmail },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-    },
-  });
-
-  // If not found, search for any admin users
-  if (!adminUser) {
-    const adminUsers = await prisma.user.findMany({
-      where: {
-        role: {
-          in: ['admin', 'super_admin'],
-        },
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-      take: 10,
-    });
-
-    if (adminUsers.length === 0) {
-      console.log('❌ No admin users found in database.');
-      console.log(`   Also checked for: ${targetEmail}`);
-      console.log('\n📋 Next steps:');
-      console.log('   1. Make sure DATABASE_URL points to PostgreSQL (not SQLite)');
-      console.log('   2. If using PostgreSQL, verify the user exists: npm run list-users');
-      console.log('   3. If user exists but not admin, run: npm run make-super-admin');
-      console.log('   4. Then run this script again: npm run generate-admin-token\n');
-      return;
-    }
-
-    adminUser = adminUsers[0];
-    console.log(`⚠️  ${targetEmail} not found, using first admin user found: ${adminUser.email}\n`);
-  } else {
-    if (adminUser.role !== 'admin' && adminUser.role !== 'super_admin') {
-      console.log(`⚠️  Found ${targetEmail} but role is "${adminUser.role}", not admin.`);
-      console.log('   Run: npm run make-super-admin to set role to super_admin\n');
-      return;
-    }
-    console.log(`✅ Found ${targetEmail} with role: ${adminUser.role}\n`);
+  if (args.length < 1) {
+    console.error('Usage: npm run generate-admin-token -- <email> [role]');
+    console.error('Example: npm run generate-admin-token -- yeger9889@gmail.com super_admin');
+    process.exit(1);
   }
 
-  console.log(`\n🔑 Generating token for: ${adminUser.email} (${adminUser.role})\n`);
+  const email = args[0].toLowerCase().trim();
+  const role = args[1] || 'super_admin';
 
   try {
-    // Generate the JWT token
-    const token = generateToken(adminUser.id, adminUser.email, adminUser.role || undefined);
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
 
-    console.log('✅ Admin token generated successfully!\n');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('\n📋 Token Information:');
-    console.log(`   User: ${adminUser.email}`);
-    console.log(`   Role: ${adminUser.role}`);
-    console.log(`   User ID: ${adminUser.id}`);
-    console.log('\n🔐 JWT Token:');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(token);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('\n💡 Usage:');
-    console.log('   Add this header to your API requests:');
-    console.log(`   Authorization: Bearer ${token.substring(0, 50)}...`);
-    console.log('\n');
-  } catch (error) {
-    console.error('❌ Error generating token:', error);
-    if (error instanceof Error) {
-      if (error.message.includes('JWT_SECRET')) {
-        console.error('\n⚠️  Make sure JWT_SECRET is set in your .env file');
-        console.error('   It must be at least 32 characters long');
-      }
+    if (!user) {
+      console.error(`❌ User not found with email: ${email}`);
+      console.error('   Please create the user first or check the email address.');
+      process.exit(1);
     }
+
+    // Update user role if different
+    if (user.role !== role) {
+      console.log(`⚠️  User role is currently "${user.role}", updating to "${role}"...`);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { role },
+      });
+      console.log(`✅ User role updated to "${role}"`);
+    }
+
+    // Generate JWT token
+    const token = generateToken(user.id, user.email, role);
+
+    console.log('\n✅ JWT Token Generated Successfully!\n');
+    console.log('='.repeat(80));
+    console.log('User Information:');
+    console.log(`  Email: ${user.email}`);
+    console.log(`  User ID: ${user.id}`);
+    console.log(`  Role: ${role}`);
+    console.log(`  First Name: ${user.firstName || 'N/A'}`);
+    console.log(`  Last Name: ${user.lastName || 'N/A'}`);
+    console.log('='.repeat(80));
+    console.log('\nJWT Token:');
+    console.log(token);
+    console.log('\n' + '='.repeat(80));
+    console.log('\n📝 Usage:');
+    console.log('  Add this token to your Authorization header:');
+    console.log(`  Authorization: Bearer ${token.substring(0, 50)}...`);
+    console.log('\n⚠️  Keep this token secure! Do not share it publicly.');
+  } catch (error) {
+    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Error:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
-
+main();

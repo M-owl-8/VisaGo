@@ -220,22 +220,40 @@ export async function validateDocumentWithAI(params: {
     }
 
     try {
-      // Load ApplicantProfile
+      // Load ApplicantProfile from User.bio (questionnaire data is stored there)
       const app = await prisma.visaApplication.findUnique({
         where: { id: application.id },
-        include: { user: true },
+        include: {
+          user: {
+            select: {
+              id: true,
+              bio: true,
+            },
+          },
+        },
       });
-      if (app) {
+      if (app && app.user?.bio) {
         const { buildApplicantProfileFromQuestionnaire } = await import('./ai-context.service');
-        const questionnaireData = app.questionnaireData as any;
-        applicantProfileData = buildApplicantProfileFromQuestionnaire(questionnaireData, {
-          country: { code: application.country.code },
-          visaType: { name: application.visaType.name },
-        });
-        logInfo('[OpenAI][DocValidation] Loaded ApplicantProfile for validation', {
-          documentType: document.documentType,
-          applicationId: application.id,
-        });
+        let questionnaireData: any = null;
+        try {
+          questionnaireData = JSON.parse(app.user.bio);
+        } catch (e) {
+          // If parsing fails, skip ApplicantProfile
+          logWarn('[OpenAI][DocValidation] Failed to parse user bio as JSON (non-blocking)', {
+            documentType: document.documentType,
+            applicationId: application.id,
+          });
+        }
+        if (questionnaireData) {
+          applicantProfileData = buildApplicantProfileFromQuestionnaire(questionnaireData, {
+            country: { code: application.country.code },
+            visaType: { name: application.visaType.name },
+          });
+          logInfo('[OpenAI][DocValidation] Loaded ApplicantProfile for validation', {
+            documentType: document.documentType,
+            applicationId: application.id,
+          });
+        }
       }
     } catch (profileError) {
       logWarn('[OpenAI][DocValidation] Failed to load ApplicantProfile (non-blocking)', {
