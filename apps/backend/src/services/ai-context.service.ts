@@ -11,7 +11,39 @@ import {
   VisaQuestionnaireSummary,
   VisaProbabilityResult,
 } from '../types/ai-context';
-import type { ApplicantProfile } from '../types/visa-brain';
+import type { ApplicantProfile as VisaBrainApplicantProfile } from '../types/visa-brain';
+
+/**
+ * Structured Applicant Profile for Checklist Personalization
+ * Built from questionnaire data and application metadata
+ */
+export interface ApplicantProfile {
+  travel: {
+    purpose: string; // tourism, study, work, business, etc.
+    duration: string; // less_than_1, 1_3_months, 3_6_months, 6_12_months, more_than_1_year
+    previousTravel: boolean;
+  };
+  employment: {
+    currentStatus: string; // student, employee, entrepreneur, unemployed, other
+    hasStableIncome: boolean;
+  };
+  financial: {
+    financialSituation: string; // stable_income, sponsor, savings, preparing
+    isSponsored: boolean;
+  };
+  familyAndTies: {
+    maritalStatus: string; // single, married, divorced
+    hasChildren: string; // no, one, two_plus
+    hasStrongTies: boolean;
+  };
+  language: {
+    englishLevel: string; // beginner, intermediate, advanced, native
+  };
+  meta: {
+    countryCode: string; // e.g., "DE", "US"
+    visaType: string; // e.g., "tourist", "student"
+  };
+}
 
 const prisma = new PrismaClient();
 
@@ -182,6 +214,17 @@ export async function buildAIUserContext(
     // Extract questionnaire summary from user bio
     const questionnaireSummary = extractQuestionnaireSummary(application.user.bio);
 
+    // Also extract raw questionnaire data for ApplicantProfile
+    let rawQuestionnaireData: any = null;
+    if (application.user.bio) {
+      try {
+        rawQuestionnaireData = JSON.parse(application.user.bio);
+      } catch (e) {
+        // If parsing fails, use questionnaireSummary as fallback
+        rawQuestionnaireData = questionnaireSummary;
+      }
+    }
+
     // Determine visa type from application or summary
     let visaType: 'student' | 'tourist' = 'tourist';
     if (questionnaireSummary) {
@@ -322,16 +365,17 @@ function mapDurationCategory(
   if (!duration) return undefined;
 
   // Map from questionnaire format to profile format
-  const mapping: Record<string, '<90_days' | '90_to_180_days' | '>180_days' | 'more_than_1_year'> = {
-    'less_than_1_month': '<90_days',
-    '1_3_months': '90_to_180_days',
-    '3_6_months': '90_to_180_days',
-    '6_12_months': '>180_days',
-    'more_than_1_year': 'more_than_1_year',
-    'less_than_15_days': '<90_days',
-    '15_30_days': '<90_days',
-    'more_than_6_months': 'more_than_1_year',
-  };
+  const mapping: Record<string, '<90_days' | '90_to_180_days' | '>180_days' | 'more_than_1_year'> =
+    {
+      less_than_1_month: '<90_days',
+      '1_3_months': '90_to_180_days',
+      '3_6_months': '90_to_180_days',
+      '6_12_months': '>180_days',
+      more_than_1_year: 'more_than_1_year',
+      less_than_15_days: '<90_days',
+      '15_30_days': '<90_days',
+      more_than_6_months: 'more_than_1_year',
+    };
 
   return mapping[duration] || undefined;
 }
@@ -357,26 +401,26 @@ function mapSponsorType(
 
 /**
  * Build ApplicantProfile from AIUserContext
- * 
+ *
  * This function maps the existing AIUserContext structure to the new canonical ApplicantProfile schema.
  * It serves as the bridge between legacy data structures and the frozen canonical types defined in visa-brain.ts.
- * 
+ *
  * The function extracts and normalizes data from:
  * - userProfile: Basic user information (userId, citizenship, age, appLanguage)
  * - application: Visa application details (country, visaType)
  * - questionnaireSummary: Detailed questionnaire responses (financial info, travel history, ties, etc.)
- * 
+ *
  * All field mappings are designed to handle missing or incomplete data gracefully, with sensible defaults
  * for Uzbekistan-based applicants (default nationality: UZ, default residence: Uzbekistan).
- * 
+ *
  * This function is used by ai-openai.service.ts when generating checklist prompts, ensuring that GPT-4
  * receives structured, canonical input data via ApplicantProfile rather than ad-hoc field extraction.
- * 
+ *
  * @param ctx - AIUserContext from buildAIUserContext(), containing userProfile, application, questionnaireSummary, and riskScore
  * @param countryName - Full country name (e.g., "United States") - required for canonical profile's destinationCountryName field
  * @param visaTypeLabel - Full visa type label (e.g., "Student Visa") - required for canonical profile's visaTypeLabel field
  * @returns ApplicantProfile with normalized values, ready for use in GPT-4 prompts and internal processing
- * 
+ *
  * @example
  * ```typescript
  * const userContext = await buildAIUserContext(userId, applicationId);
@@ -403,16 +447,135 @@ function normalizeCountryCodeFromName(name: string): string | null {
   return null;
 }
 
+/**
+ * Build structured ApplicantProfile from questionnaire data and application
+ * This is the new helper function for checklist personalization
+ *
+ * @param questionnaireData - Raw questionnaire data (from User.bio or QuestionnaireData)
+ * @param application - Application object with country and visaType
+ * @returns Structured ApplicantProfile
+ */
+export function buildApplicantProfileFromQuestionnaire(
+  questionnaireData: any,
+  application: {
+    country: { code: string };
+    visaType: { name: string };
+  }
+): ApplicantProfile {
+  // Extract questionnaire fields with defaults
+  const purpose =
+    questionnaireData?.purpose ||
+    questionnaireData?.summary?.purpose ||
+    questionnaireData?.travelInfo?.purpose ||
+    'tourism';
+  const duration =
+    questionnaireData?.duration ||
+    questionnaireData?.summary?.duration ||
+    questionnaireData?.travelInfo?.duration ||
+    '1_3_months';
+  const traveledBefore =
+    questionnaireData?.traveledBefore ??
+    questionnaireData?.summary?.previousTravels ??
+    questionnaireData?.travelHistory?.traveledBefore ??
+    questionnaireData?.summary?.hasInternationalTravel ??
+    false;
+  const currentStatus =
+    questionnaireData?.currentStatus ||
+    questionnaireData?.summary?.currentStatus ||
+    questionnaireData?.employment?.currentStatus ||
+    'employee';
+  const financialSituation =
+    questionnaireData?.financialSituation ||
+    questionnaireData?.summary?.financialSituation ||
+    questionnaireData?.travelInfo?.funding ||
+    'stable_income';
+  const maritalStatus =
+    questionnaireData?.maritalStatus || questionnaireData?.summary?.maritalStatus || 'single';
+  const hasChildren =
+    questionnaireData?.hasChildren || questionnaireData?.summary?.hasChildren || 'no';
+  const englishLevel =
+    questionnaireData?.englishLevel ||
+    questionnaireData?.summary?.englishLevel ||
+    questionnaireData?.summary?.englishLevel ||
+    'intermediate';
+
+  // Derive boolean flags
+  const isSponsored =
+    financialSituation === 'sponsor' ||
+    financialSituation === 'mix' ||
+    questionnaireData?.summary?.sponsorType !== undefined ||
+    questionnaireData?.financialInfo?.sponsorDetails !== undefined;
+
+  const hasStableIncome =
+    currentStatus === 'employee' ||
+    currentStatus === 'employed' ||
+    currentStatus === 'entrepreneur' ||
+    currentStatus === 'self_employed' ||
+    financialSituation === 'stable_income';
+
+  // Derive strong ties (married + children OR property OR family)
+  const hasStrongTies =
+    maritalStatus === 'married' ||
+    hasChildren !== 'no' ||
+    questionnaireData?.summary?.hasPropertyInUzbekistan === true ||
+    questionnaireData?.summary?.hasFamilyInUzbekistan === true ||
+    questionnaireData?.ties?.propertyDocs === true ||
+    questionnaireData?.ties?.familyTies === true;
+
+  // Extract country code and visa type from application
+  const countryCode = application.country.code.toUpperCase();
+  const visaTypeName = application.visaType.name.toLowerCase();
+  const visaType =
+    visaTypeName.includes('student') || visaTypeName.includes('study')
+      ? 'student'
+      : visaTypeName.includes('tourist') || visaTypeName.includes('tourism')
+        ? 'tourist'
+        : visaTypeName;
+
+  return {
+    travel: {
+      purpose,
+      duration,
+      previousTravel: traveledBefore,
+    },
+    employment: {
+      currentStatus,
+      hasStableIncome,
+    },
+    financial: {
+      financialSituation,
+      isSponsored,
+    },
+    familyAndTies: {
+      maritalStatus,
+      hasChildren,
+      hasStrongTies,
+    },
+    language: {
+      englishLevel,
+    },
+    meta: {
+      countryCode,
+      visaType,
+    },
+  };
+}
+
+/**
+ * Legacy function - kept for backward compatibility with visa-brain types
+ * @deprecated Use buildApplicantProfileFromQuestionnaire() for checklist personalization
+ */
 export function buildApplicantProfile(
   ctx: AIUserContext,
   countryName: string,
   visaTypeLabel: string
-): ApplicantProfile {
+): VisaBrainApplicantProfile {
   const { userProfile, application, questionnaireSummary } = ctx;
 
   // Extract nationality/citizenship (default to UZ for Uzbekistan-based applicants)
   const nationality = questionnaireSummary?.citizenship || userProfile.citizenship || 'UZ';
-  const residenceCountry = questionnaireSummary?.personalInfo?.currentResidenceCountry || 'Uzbekistan';
+  const residenceCountry =
+    questionnaireSummary?.personalInfo?.currentResidenceCountry || 'Uzbekistan';
 
   // Extract trip purpose from questionnaire
   const tripPurpose = questionnaireSummary?.travelInfo?.purpose || questionnaireSummary?.notes;
@@ -427,15 +590,19 @@ export function buildApplicantProfile(
 
   // Extract sponsor information
   const sponsorType = mapSponsorType(
-    questionnaireSummary?.sponsorType || questionnaireSummary?.financialInfo?.sponsorDetails?.relationship
+    questionnaireSummary?.sponsorType ||
+      questionnaireSummary?.financialInfo?.sponsorDetails?.relationship
   );
-  const sponsorDescription = sponsorType === 'other' 
-    ? questionnaireSummary?.financialInfo?.sponsorDetails?.relationship 
-    : undefined;
+  const sponsorDescription =
+    sponsorType === 'other'
+      ? questionnaireSummary?.financialInfo?.sponsorDetails?.relationship
+      : undefined;
 
   // Extract financial information
-  const bankBalanceUSD = questionnaireSummary?.bankBalanceUSD || questionnaireSummary?.financialInfo?.selfFundsUSD;
-  const monthlyIncomeUSD = questionnaireSummary?.monthlyIncomeUSD || questionnaireSummary?.employment?.monthlySalaryUSD;
+  const bankBalanceUSD =
+    questionnaireSummary?.bankBalanceUSD || questionnaireSummary?.financialInfo?.selfFundsUSD;
+  const monthlyIncomeUSD =
+    questionnaireSummary?.monthlyIncomeUSD || questionnaireSummary?.employment?.monthlySalaryUSD;
 
   // Extract travel history
   const hasTravelHistory =
@@ -445,15 +612,18 @@ export function buildApplicantProfile(
 
   // Extract property and family ties
   const hasPropertyInHomeCountry =
-    questionnaireSummary?.hasPropertyInUzbekistan ?? questionnaireSummary?.ties?.propertyDocs ?? false;
+    questionnaireSummary?.hasPropertyInUzbekistan ??
+    questionnaireSummary?.ties?.propertyDocs ??
+    false;
   const hasFamilyInHomeCountry =
     questionnaireSummary?.hasFamilyInUzbekistan ?? questionnaireSummary?.ties?.familyTies ?? false;
 
   // Normalize destination country code for template lookup
-  const normalizedCountryCode = normalizeCountryCodeFromName(countryName) || application.country || nationality;
+  const normalizedCountryCode =
+    normalizeCountryCodeFromName(countryName) || application.country || nationality;
 
   // Build the profile
-  const profile: ApplicantProfile = {
+  const profile: VisaBrainApplicantProfile = {
     userId: userProfile.userId,
     nationality,
     residenceCountry,
@@ -462,12 +632,17 @@ export function buildApplicantProfile(
     visaTypeCode: application.visaType,
     visaTypeLabel,
     tripPurpose,
-    durationCategory: mapDurationCategory(questionnaireSummary?.duration || questionnaireSummary?.travelInfo?.duration),
+    durationCategory: mapDurationCategory(
+      questionnaireSummary?.duration || questionnaireSummary?.travelInfo?.duration
+    ),
     plannedTravelDates,
     sponsorType,
     sponsorDescription,
     hasTravelHistory,
-    previousVisaRefusals: questionnaireSummary?.previousVisaRejections ?? questionnaireSummary?.travelHistory?.hasRefusals ?? false,
+    previousVisaRefusals:
+      questionnaireSummary?.previousVisaRejections ??
+      questionnaireSummary?.travelHistory?.hasRefusals ??
+      false,
     previousOverstays: questionnaireSummary?.previousOverstay ?? false,
     hasPropertyInHomeCountry,
     hasFamilyInHomeCountry,

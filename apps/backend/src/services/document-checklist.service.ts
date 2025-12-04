@@ -395,13 +395,16 @@ export class DocumentChecklistService {
           // RULES MODE: Use dedicated rules-based path
           if (mode === 'RULES' && approvedRuleSet) {
             try {
+              // Build ApplicantProfile will be done inside generateChecklistFromRules
+              // Pass null for now, will be built inside
               aiChecklist = await this.generateChecklistFromRules(
                 approvedRuleSet,
                 userContext,
                 countryCode,
                 visaType,
                 countryName,
-                application
+                application,
+                null // Will be built inside generateChecklistFromRules
               );
               logInfo('[Checklist][RULES] Successfully generated checklist from rules', {
                 applicationId,
@@ -905,7 +908,8 @@ export class DocumentChecklistService {
     countryCode: string,
     visaType: string,
     countryName: string,
-    application: any
+    application: any,
+    applicantProfile: any | null // ApplicantProfile - will be built if null
   ): Promise<{
     type: string;
     checklist: Array<{
@@ -931,6 +935,32 @@ export class DocumentChecklistService {
         requiredDocsCount: ruleSet.requiredDocuments?.length || 0,
       });
 
+      // Build ApplicantProfile from questionnaire data and application (if not provided)
+      let profileToUse = applicantProfile;
+      if (!profileToUse) {
+        const { buildApplicantProfileFromQuestionnaire } = await import('./ai-context.service');
+        let rawQuestionnaireData: any = null;
+        if (application.user?.bio) {
+          try {
+            rawQuestionnaireData = JSON.parse(application.user.bio);
+          } catch (e) {
+            // If parsing fails, use userContext.questionnaireSummary as fallback
+            rawQuestionnaireData = userContext.questionnaireSummary;
+          }
+        } else {
+          rawQuestionnaireData = userContext.questionnaireSummary;
+        }
+
+        profileToUse = buildApplicantProfileFromQuestionnaire(rawQuestionnaireData, application);
+      }
+
+      // Log ApplicantProfile for debugging
+      logInfo('[Checklist][ApplicantProfile]', {
+        applicantProfile: profileToUse,
+        countryCode,
+        visaType,
+      });
+
       // Extract unique embassy/visa center URLs from multiple sources
       const embassyUrls = await this.extractEmbassyUrls(countryCode, visaType, ruleSet);
 
@@ -943,8 +973,14 @@ export class DocumentChecklistService {
         embassyUrls
       );
 
-      // Build user prompt with application context
-      const userPrompt = this.buildRulesModeUserPrompt(userContext, ruleSet, countryCode, visaType);
+      // Build user prompt with application context and applicant profile
+      const userPrompt = this.buildRulesModeUserPrompt(
+        userContext,
+        ruleSet,
+        countryCode,
+        visaType,
+        profileToUse
+      );
 
       // Call AIOpenAIService with checklist model (gpt-4o)
       const checklistModel = (
@@ -1230,6 +1266,23 @@ CRITICAL INSTRUCTIONS - FOLLOW STRICTLY:
 5. If a document is NOT in the rules, do NOT add it unless it's a universally standard document (e.g., passport, passport photo).
 6. Cross-reference your generated checklist against the official URLs to ensure accuracy.
 
+APPLICANT PROFILE USAGE:
+You will receive an APPLICANT PROFILE object in the user prompt. Use it to personalize the checklist while strictly following the visa rules.
+
+Rules:
+- VisaRules are HARD CONSTRAINTS - you cannot contradict them.
+- ApplicantProfile helps you determine which documents are required vs highly_recommended vs optional.
+- You can add extra documents ONLY if they are consistent with both the rules and the profile.
+
+Examples:
+- If ApplicantProfile.financial.isSponsored = true, then sponsor-related documents from the rules must be included and usually marked as required.
+- If ApplicantProfile.employment.currentStatus = 'student', include student-related documents (e.g., acceptance_letter, academic_records) where applicable from the rules.
+- If ApplicantProfile.familyAndTies.hasStrongTies = true, include tie documents (property_documents, family_ties_proof) as highly_recommended to strengthen the application.
+- If ApplicantProfile.travel.previousTravel = true, include previous_visa_copies as highly_recommended if available in rules.
+- If ApplicantProfile.employment.hasStableIncome = true, employment_verification documents should be required.
+
+Remember: Rules define WHAT documents exist. Profile determines HOW IMPORTANT they are for this specific applicant.
+
 OFFICIAL VISA RULES:
 ${requiredDocsText}${financialReqsText}${additionalReqsText}${embassyUrlsText}
 
@@ -1275,7 +1328,8 @@ Return ONLY valid JSON. No comments, no explanations, no extra keys.`;
     userContext: any,
     ruleSet: any,
     countryCode: string,
-    visaType: string
+    visaType: string,
+    applicantProfile: any // ApplicantProfile
   ): string {
     // Extract conditional requirements from rules
     const conditionalDocs: string[] = [];
@@ -1296,16 +1350,29 @@ Return ONLY valid JSON. No comments, no explanations, no extra keys.`;
 
     return `Generate a personalized document checklist for this applicant:
 
-APPLICANT CONTEXT:
-${JSON.stringify(userContext, null, 2)}
+APPLICANT PROFILE:
+${JSON.stringify(applicantProfile, null, 2)}
 
 COUNTRY: ${countryCode}
 VISA TYPE: ${visaType}${conditionalDocsText}
 
+PERSONALIZATION INSTRUCTIONS:
+Use the APPLICANT PROFILE to decide which documents are required vs highly_recommended vs optional.
+
+1. If the applicant is sponsored (applicantProfile.financial.isSponsored = true), include sponsor-related documents as required (e.g., sponsor_bank_statement, sponsor_employment_letter).
+
+2. If the applicant is a student (applicantProfile.employment.currentStatus = 'student'), include student enrollment / study documents (e.g., acceptance_letter, academic_records, proof_of_tuition_payment).
+
+3. If the applicant has strong ties (applicantProfile.familyAndTies.hasStrongTies = true), include tie documents (e.g., property_documents, family_ties_proof) as highly_recommended to strengthen the application.
+
+4. If the applicant has previous travel (applicantProfile.travel.previousTravel = true), include previous_visa_copies as highly_recommended.
+
+5. If the applicant has stable income (applicantProfile.employment.hasStableIncome = true), employment_verification documents should be required.
+
 STRICT REQUIREMENTS:
 1. Include ALL required documents from the official rules (system prompt)
-2. Include conditional documents ONLY if they apply to this applicant (e.g., sponsor documents if applicant has a sponsor)
-3. Include highly recommended documents from the rules based on applicant's risk profile
+2. Include conditional documents ONLY if they apply to this applicant based on APPLICANT PROFILE
+3. Include highly recommended documents from the rules based on applicant's profile
 4. Do NOT add documents that are not in the official rules
 5. Cross-check against the official URLs provided in the system prompt
 6. Provide clear, accurate multilingual descriptions (EN, UZ, RU)
