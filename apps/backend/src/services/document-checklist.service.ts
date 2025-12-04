@@ -439,51 +439,51 @@ export class DocumentChecklistService {
             }
 
             try {
-            aiChecklist = await VisaChecklistEngineService.generateChecklist(
-              application.country.code, // Use country code instead of name
-              application.visaType.name.toLowerCase(),
-              userContext,
-              previousChecklist
-            );
+              aiChecklist = await VisaChecklistEngineService.generateChecklist(
+                application.country.code, // Use country code instead of name
+                application.visaType.name.toLowerCase(),
+                userContext,
+                previousChecklist
+              );
 
-            // Convert to old format for compatibility
-            const convertedChecklist = {
-              type: application.visaType.name,
-              checklist: aiChecklist.checklist.map((item: any) => ({
-                document: item.documentType,
-                name: item.name,
-                nameUz: item.nameUz,
-                nameRu: item.nameRu,
-                category: item.category,
-                required: item.required,
-                description: item.description || '',
-                descriptionUz: item.description || '',
-                descriptionRu: item.description || '',
-                priority: item.priority === 1 ? 'high' : item.priority === 2 ? 'medium' : 'low',
-                whereToObtain: item.reasonIfApplies || item.description || '',
-                whereToObtainUz: item.reasonIfApplies || item.description || '',
-                whereToObtainRu: item.reasonIfApplies || item.description || '',
-              })),
-            };
-            aiChecklist = convertedChecklist;
+              // Convert to old format for compatibility
+              const convertedChecklist = {
+                type: application.visaType.name,
+                checklist: aiChecklist.checklist.map((item: any) => ({
+                  document: item.documentType,
+                  name: item.name,
+                  nameUz: item.nameUz,
+                  nameRu: item.nameRu,
+                  category: item.category,
+                  required: item.required,
+                  description: item.description || '',
+                  descriptionUz: item.description || '',
+                  descriptionRu: item.description || '',
+                  priority: item.priority === 1 ? 'high' : item.priority === 2 ? 'medium' : 'low',
+                  whereToObtain: item.reasonIfApplies || item.description || '',
+                  whereToObtainUz: item.reasonIfApplies || item.description || '',
+                  whereToObtainRu: item.reasonIfApplies || item.description || '',
+                })),
+              };
+              aiChecklist = convertedChecklist;
 
-            logInfo('[Checklist][Engine] Used VisaChecklistEngineService', {
-              applicationId,
-              country: application.country.name,
-              visaType: application.visaType.name,
-            });
-          } catch (engineError: any) {
-            // Fall back to old AIOpenAIService if new engine fails
-            logWarn('[Checklist][Engine] VisaChecklistEngine failed, falling back to legacy', {
-              applicationId,
-              error: engineError.message,
-            });
-            aiChecklist = await AIOpenAIService.generateChecklist(
-              userContext,
-              application.country.name,
-              application.visaType.name
-            );
-          }
+              logInfo('[Checklist][Engine] Used VisaChecklistEngineService', {
+                applicationId,
+                country: application.country.name,
+                visaType: application.visaType.name,
+              });
+            } catch (engineError: any) {
+              // Fall back to old AIOpenAIService if new engine fails
+              logWarn('[Checklist][Engine] VisaChecklistEngine failed, falling back to legacy', {
+                applicationId,
+                error: engineError.message,
+              });
+              aiChecklist = await AIOpenAIService.generateChecklist(
+                userContext,
+                application.country.name,
+                application.visaType.name
+              );
+            }
           }
           const aiDurationMs = Date.now() - aiStart;
           if (aiDurationMs > 30000) {
@@ -890,7 +890,7 @@ export class DocumentChecklistService {
 
   /**
    * Generate checklist from approved VisaRules (RULES mode)
-   * 
+   *
    * @param ruleSet - Approved VisaRuleSetData from database
    * @param userContext - AIUserContext with questionnaire summary
    * @param countryCode - ISO country code (e.g., 'DE', 'US')
@@ -947,8 +947,10 @@ export class DocumentChecklistService {
       const userPrompt = this.buildRulesModeUserPrompt(userContext, ruleSet, countryCode, visaType);
 
       // Call AIOpenAIService with checklist model (gpt-4o)
-      const checklistModel = (await import('./ai-openai.service')).AIOpenAIService.getChecklistModel();
-      
+      const checklistModel = (
+        await import('./ai-openai.service')
+      ).AIOpenAIService.getChecklistModel();
+
       logInfo('[Checklist][RULES] Calling GPT-4 with rules-based prompt', {
         model: checklistModel,
         countryCode,
@@ -957,7 +959,7 @@ export class DocumentChecklistService {
       });
 
       const openaiClient = (await import('./ai-openai.service')).AIOpenAIService.getOpenAIClient();
-      
+
       // ATTEMPT 1: Call GPT with rules/legacy prompt
       logInfo('[Checklist][RULES] Attempt 1: Calling GPT-4 for checklist generation', {
         model: checklistModel,
@@ -977,7 +979,7 @@ export class DocumentChecklistService {
       });
 
       const rawContent = response.choices[0]?.message?.content || '{}';
-      
+
       // Parse and validate JSON response
       const { parseAndValidateChecklistResponse } = await import('../utils/json-validator');
       let validationResult = parseAndValidateChecklistResponse(
@@ -1043,14 +1045,20 @@ You MUST:
 
         // If attempt 2 still fails → trigger fallback
         if (!validationResult.validation.isValid) {
-          logError('[Checklist][RULES] Attempt 2 also failed validation, triggering fallback', new Error('Validation failed after retry'), {
-            countryCode,
-            visaType,
-            errors: validationResult.validation.errors,
-            warnings: validationResult.validation.warnings,
-            reason: validationResult.validation.errors.join('; '),
-          });
-          throw new Error(`Validation failed after 2 attempts: ${validationResult.validation.errors.join('; ')}`);
+          logError(
+            '[Checklist][RULES] Attempt 2 also failed validation, triggering fallback',
+            new Error('Validation failed after retry'),
+            {
+              countryCode,
+              visaType,
+              errors: validationResult.validation.errors,
+              warnings: validationResult.validation.warnings,
+              reason: validationResult.validation.errors.join('; '),
+            }
+          );
+          throw new Error(
+            `Validation failed after 2 attempts: ${validationResult.validation.errors.join('; ')}`
+          );
         } else {
           logInfo('[Checklist][RULES] Attempt 2 succeeded after retry', {
             countryCode,
@@ -1071,9 +1079,31 @@ You MUST:
         itemCount: parsed.checklist.length,
       });
 
+      // Map ChecklistItem[] to the expected return format, ensuring category is always present
+      const mappedChecklist = parsed.checklist.map((item: any) => ({
+        document: item.document,
+        name: item.name,
+        nameUz: item.nameUz,
+        nameRu: item.nameRu,
+        category:
+          item.category ||
+          ((item.required ? 'required' : 'highly_recommended') as
+            | 'required'
+            | 'highly_recommended'
+            | 'optional'),
+        required: item.required ?? item.category === 'required',
+        description: item.description,
+        descriptionUz: item.descriptionUz,
+        descriptionRu: item.descriptionRu,
+        priority: item.priority,
+        whereToObtain: item.whereToObtain,
+        whereToObtainUz: item.whereToObtainUz,
+        whereToObtainRu: item.whereToObtainRu,
+      }));
+
       return {
         type: visaType,
-        checklist: parsed.checklist,
+        checklist: mappedChecklist,
       };
     } catch (error) {
       logError('[Checklist][RULES] Error generating checklist from rules', error as Error, {
@@ -1131,7 +1161,7 @@ You MUST:
         visaType: visaType.toLowerCase(),
         isActive: true,
       });
-      
+
       sources.sources.forEach((s: any) => {
         if (s.url) {
           urls.add(s.url);
@@ -1166,16 +1196,21 @@ You MUST:
     embassyUrls: string[]
   ): string {
     // Format official URLs list
-    const embassyUrlsText = embassyUrls.length > 0
-      ? `\n\nOFFICIAL SOURCES:\nThese are the official sources for the requirements. Cross-check your checklist against them:\n${embassyUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')}`
-      : '';
+    const embassyUrlsText =
+      embassyUrls.length > 0
+        ? `\n\nOFFICIAL SOURCES:\nThese are the official sources for the requirements. Cross-check your checklist against them:\n${embassyUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')}`
+        : '';
 
     // Format rules content per document type
-    const requiredDocsText = ruleSet.requiredDocuments?.length > 0
-      ? `\n\nREQUIRED DOCUMENTS (from official rules):\n${ruleSet.requiredDocuments.map((doc: any, i: number) => 
-          `${i + 1}. ${doc.documentType} (${doc.category})\n   ${doc.description || 'No description'}\n   ${doc.validityRequirements ? `Validity: ${doc.validityRequirements}` : ''}\n   ${doc.formatRequirements ? `Format: ${doc.formatRequirements}` : ''}`
-        ).join('\n\n')}`
-      : '';
+    const requiredDocsText =
+      ruleSet.requiredDocuments?.length > 0
+        ? `\n\nREQUIRED DOCUMENTS (from official rules):\n${ruleSet.requiredDocuments
+            .map(
+              (doc: any, i: number) =>
+                `${i + 1}. ${doc.documentType} (${doc.category})\n   ${doc.description || 'No description'}\n   ${doc.validityRequirements ? `Validity: ${doc.validityRequirements}` : ''}\n   ${doc.formatRequirements ? `Format: ${doc.formatRequirements}` : ''}`
+            )
+            .join('\n\n')}`
+        : '';
 
     const financialReqsText = ruleSet.financialRequirements
       ? `\n\nFINANCIAL REQUIREMENTS:\n${JSON.stringify(ruleSet.financialRequirements, null, 2)}`
@@ -1254,9 +1289,10 @@ Return ONLY valid JSON. No comments, no explanations, no extra keys.`;
       conditionalDocs.push('travel_insurance');
     }
 
-    const conditionalDocsText = conditionalDocs.length > 0
-      ? `\n\nCONDITIONAL DOCUMENTS (include if applicable to applicant):\n${conditionalDocs.join(', ')}`
-      : '';
+    const conditionalDocsText =
+      conditionalDocs.length > 0
+        ? `\n\nCONDITIONAL DOCUMENTS (include if applicable to applicant):\n${conditionalDocs.join(', ')}`
+        : '';
 
     return `Generate a personalized document checklist for this applicant:
 
@@ -1293,10 +1329,34 @@ Return ONLY valid JSON matching the schema specified in the system prompt.`;
     const visaTypeLower = visaType.toLowerCase();
     const isTourist = visaTypeLower.includes('tourist') || visaTypeLower.includes('tourism');
     const isStudent = visaTypeLower.includes('student') || visaTypeLower.includes('study');
-    
+
     const schengenCountries = [
-      'ES', 'DE', 'IT', 'FR', 'AT', 'BE', 'CH', 'CZ', 'DK', 'EE', 'FI', 'GR', 'HU',
-      'IS', 'LV', 'LI', 'LT', 'LU', 'MT', 'NL', 'NO', 'PL', 'PT', 'SE', 'SK', 'SI',
+      'ES',
+      'DE',
+      'IT',
+      'FR',
+      'AT',
+      'BE',
+      'CH',
+      'CZ',
+      'DK',
+      'EE',
+      'FI',
+      'GR',
+      'HU',
+      'IS',
+      'LV',
+      'LI',
+      'LT',
+      'LU',
+      'MT',
+      'NL',
+      'NO',
+      'PL',
+      'PT',
+      'SE',
+      'SK',
+      'SI',
     ];
     const isSchengen = schengenCountries.includes(countryCode.toUpperCase());
 
@@ -1335,13 +1395,21 @@ Return ONLY valid JSON matching the schema specified in the system prompt.`;
       defaultDocs.push(
         { documentType: 'acceptance_letter', category: 'required', priority: 'high' },
         { documentType: 'academic_records', category: 'highly_recommended', priority: 'medium' },
-        { documentType: 'proof_of_tuition_payment', category: 'highly_recommended', priority: 'medium' }
+        {
+          documentType: 'proof_of_tuition_payment',
+          category: 'highly_recommended',
+          priority: 'medium',
+        }
       );
     } else if (isTourist) {
       defaultDocs.push(
         { documentType: 'travel_itinerary', category: 'required', priority: 'high' },
         { documentType: 'hotel_reservations', category: 'required', priority: 'high' },
-        { documentType: 'employment_verification', category: 'highly_recommended', priority: 'medium' }
+        {
+          documentType: 'employment_verification',
+          category: 'highly_recommended',
+          priority: 'medium',
+        }
       );
     }
 
@@ -1377,11 +1445,14 @@ Return ONLY valid JSON matching the schema specified in the system prompt.`;
     // Build fallback checklist using factory
     const fallbackDocTypes = this.buildFallbackChecklist(countryCode, visaTypeName);
 
-    logInfo(`[OpenAI][Checklist] Using FALLBACK checklist (${countryCode}, ${visaTypeName}, items: ${fallbackDocTypes.length})`, {
-      countryCode,
-      visaType: visaTypeName,
-      items: fallbackDocTypes.length,
-    });
+    logInfo(
+      `[OpenAI][Checklist] Using FALLBACK checklist (${countryCode}, ${visaTypeName}, items: ${fallbackDocTypes.length})`,
+      {
+        countryCode,
+        visaType: visaTypeName,
+        items: fallbackDocTypes.length,
+      }
+    );
 
     const items: ChecklistItem[] = [];
 
@@ -1390,14 +1461,17 @@ Return ONLY valid JSON matching the schema specified in the system prompt.`;
       const fallbackDoc = fallbackDocTypes[i];
       const docType = fallbackDoc.documentType;
       const existingDoc = existingDocuments.find((d) => d.type === docType);
-      
+
       // Get translation or create fallback translation for missing document types
       let translation = getDocumentTranslation(docType);
-      
+
       // Handle special document types that might not be in translations
       // Check if translation is the default fallback (when nameEn === docType)
-      const isDefaultFallback = translation.nameEn === docType && translation.nameUz === docType && translation.nameRu === docType;
-      
+      const isDefaultFallback =
+        translation.nameEn === docType &&
+        translation.nameUz === docType &&
+        translation.nameRu === docType;
+
       if (isDefaultFallback) {
         // Create inline translation for missing types
         const specialTranslations: Record<string, any> = {
@@ -1406,27 +1480,36 @@ Return ONLY valid JSON matching the schema specified in the system prompt.`;
             nameEn: 'Travel Health Insurance',
             nameUz: "Sayohat Tibbiy Sug'urtasi",
             nameRu: 'Медицинская Страховка для Путешествий',
-            descriptionEn: 'Travel health insurance covering at least €30,000 medical expenses, valid for entire Schengen stay',
-            descriptionUz: "Kamida 30,000 EUR tibbiy xarajatlarni qoplaydigan sayohat tibbiy sug'urtasi, butun Shengen bo'ylab amal qiladi",
-            descriptionRu: 'Медицинская страховка для путешествий, покрывающая не менее 30,000 EUR медицинских расходов, действительна на весь период пребывания в Шенгене',
+            descriptionEn:
+              'Travel health insurance covering at least €30,000 medical expenses, valid for entire Schengen stay',
+            descriptionUz:
+              "Kamida 30,000 EUR tibbiy xarajatlarni qoplaydigan sayohat tibbiy sug'urtasi, butun Shengen bo'ylab amal qiladi",
+            descriptionRu:
+              'Медицинская страховка для путешествий, покрывающая не менее 30,000 EUR медицинских расходов, действительна на весь период пребывания в Шенгене',
           },
           flight_reservation: {
             type: 'flight_reservation',
             nameEn: 'Flight Reservation / Itinerary',
             nameUz: 'Parvoz Bron / Marshrut',
             nameRu: 'Бронирование Рейса / Маршрут',
-            descriptionEn: 'Round-trip flight reservation showing entry and exit from Schengen area',
-            descriptionUz: 'Shengen hududiga kirish va chiqishni ko\'rsatuvchi ikki tomonlama parvoz bron',
-            descriptionRu: 'Бронирование рейса туда и обратно, показывающее въезд и выезд из Шенгенской зоны',
+            descriptionEn:
+              'Round-trip flight reservation showing entry and exit from Schengen area',
+            descriptionUz:
+              "Shengen hududiga kirish va chiqishni ko'rsatuvchi ikki tomonlama parvoz bron",
+            descriptionRu:
+              'Бронирование рейса туда и обратно, показывающее въезд и выезд из Шенгенской зоны',
           },
           cover_letter: {
             type: 'cover_letter',
             nameEn: 'Cover Letter / Travel Plan',
-            nameUz: 'Qo\'shimcha Xat / Sayohat Rejasi',
+            nameUz: "Qo'shimcha Xat / Sayohat Rejasi",
             nameRu: 'Сопроводительное Письмо / План Поездки',
-            descriptionEn: 'Personal cover letter explaining the purpose of your trip and travel itinerary',
-            descriptionUz: 'Sayohat maqsadini va sayohat rejasini tushuntiruvchi shaxsiy qo\'shimcha xat',
-            descriptionRu: 'Личное сопроводительное письмо, объясняющее цель поездки и маршрут путешествия',
+            descriptionEn:
+              'Personal cover letter explaining the purpose of your trip and travel itinerary',
+            descriptionUz:
+              "Sayohat maqsadini va sayohat rejasini tushuntiruvchi shaxsiy qo'shimcha xat",
+            descriptionRu:
+              'Личное сопроводительное письмо, объясняющее цель поездки и маршрут путешествия',
           },
           previous_visa_copies: {
             type: 'previous_visa_copies',
@@ -1434,7 +1517,7 @@ Return ONLY valid JSON matching the schema specified in the system prompt.`;
             nameUz: 'Oldingi Sayohatlar Isboti',
             nameRu: 'Подтверждение Предыдущих Поездок',
             descriptionEn: 'Copies of previous Schengen or other visas (if applicable)',
-            descriptionUz: 'Oldingi Shengen yoki boshqa vizalar nusxalari (agar mavjud bo\'lsa)',
+            descriptionUz: "Oldingi Shengen yoki boshqa vizalar nusxalari (agar mavjud bo'lsa)",
             descriptionRu: 'Копии предыдущих шенгенских или других виз (если применимо)',
           },
         };
