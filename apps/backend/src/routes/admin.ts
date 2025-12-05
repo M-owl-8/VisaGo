@@ -7,6 +7,9 @@ import { VisaRulesService } from '../services/visa-rules.service';
 import { EmbassySourceService } from '../services/embassy-source.service';
 import { EmbassySyncJobService } from '../services/embassy-sync-job.service';
 import { EmbassySyncSchedulerService } from '../services/embassy-sync-scheduler.service';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const router = express.Router();
 
@@ -335,7 +338,7 @@ router.get(
 /**
  * GET /api/admin/visa-rules
  * List visa rule sets with filtering
- * 
+ *
  * CHANGED: Returns data formatted for admin panel with summary fields
  */
 router.get('/visa-rules', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
@@ -358,7 +361,7 @@ router.get('/visa-rules', authenticateToken, requireAdmin, async (req: Request, 
     const formattedRuleSets = result.ruleSets.map((ruleSet) => {
       // Parse data if it's a string (SQLite) or use directly (PostgreSQL)
       const data = typeof ruleSet.data === 'string' ? JSON.parse(ruleSet.data) : ruleSet.data;
-      
+
       // Extract summary information
       const requiredDocsCount = data.requiredDocuments?.length || 0;
       const summary = {
@@ -379,11 +382,13 @@ router.get('/visa-rules', authenticateToken, requireAdmin, async (req: Request, 
         approvedAt: ruleSet.approvedAt,
         approvedBy: ruleSet.approvedBy,
         sourceSummary: ruleSet.sourceSummary,
-        source: ruleSet.source ? {
-          id: ruleSet.source.id,
-          url: ruleSet.source.url,
-          name: ruleSet.source.name,
-        } : null,
+        source: ruleSet.source
+          ? {
+              id: ruleSet.source.id,
+              url: ruleSet.source.url,
+              name: ruleSet.source.name,
+            }
+          : null,
         summary,
         // Include full data if needed (can be large)
         data: data,
@@ -411,7 +416,7 @@ router.get('/visa-rules', authenticateToken, requireAdmin, async (req: Request, 
 /**
  * GET /api/admin/visa-rules/:id
  * Get visa rule set by ID
- * 
+ *
  * CHANGED: Returns data formatted for admin panel with summary fields
  */
 router.get(
@@ -431,7 +436,7 @@ router.get(
 
       // Parse data if it's a string (SQLite) or use directly (PostgreSQL)
       const data = typeof ruleSet.data === 'string' ? JSON.parse(ruleSet.data) : ruleSet.data;
-      
+
       // Extract summary information
       const requiredDocsCount = data.requiredDocuments?.length || 0;
       const summary = {
@@ -467,10 +472,10 @@ router.get(
           approvedBy: ruleSet.approvedBy,
           rejectionReason: ruleSet.rejectionReason,
           sourceSummary: ruleSet.sourceSummary,
-          extractionMetadata: ruleSet.extractionMetadata 
-            ? (typeof ruleSet.extractionMetadata === 'string' 
-                ? JSON.parse(ruleSet.extractionMetadata) 
-                : ruleSet.extractionMetadata)
+          extractionMetadata: ruleSet.extractionMetadata
+            ? typeof ruleSet.extractionMetadata === 'string'
+              ? JSON.parse(ruleSet.extractionMetadata)
+              : ruleSet.extractionMetadata
             : null,
           source: ruleSet.source,
           summary,
@@ -554,6 +559,43 @@ router.post(
 );
 
 /**
+ * PATCH /api/admin/visa-rules/:id
+ * Update visa rule set data (e.g., edit conditions)
+ */
+router.patch(
+  '/visa-rules/:id',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const { data } = req.body;
+
+      if (!data) {
+        return res.status(400).json({
+          success: false,
+          error: 'Data is required',
+        });
+      }
+
+      const result = await VisaRulesService.updateRuleSetData(req.params.id, data, userId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Rule set updated successfully',
+      });
+    } catch (error: any) {
+      console.error('[AdminRoute] Error updating visa rule set:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to update visa rule set',
+      });
+    }
+  }
+);
+
+/**
  * GET /api/admin/visa-rules/:id1/compare/:id2
  * Compare two visa rule sets
  */
@@ -574,6 +616,369 @@ router.get(
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to compare visa rule sets',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/visa-rule-candidates
+ * List visa rule set candidates
+ */
+router.get(
+  '/visa-rule-candidates',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const countryCode = req.query.countryCode as string | undefined;
+      const visaType = req.query.visaType as string | undefined;
+      const status = req.query.status as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const where: any = {};
+      if (countryCode) where.countryCode = countryCode.toUpperCase();
+      if (visaType) where.visaType = visaType.toLowerCase();
+      if (status) where.status = status;
+
+      const [candidates, total] = await Promise.all([
+        prisma.visaRuleSetCandidate.findMany({
+          where,
+          include: {
+            source: {
+              select: {
+                id: true,
+                name: true,
+                url: true,
+              },
+            },
+            pageContent: {
+              select: {
+                id: true,
+                url: true,
+                title: true,
+                fetchedAt: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.visaRuleSetCandidate.count({ where }),
+      ]);
+
+      // Parse data if it's a string (SQLite) or use directly (PostgreSQL)
+      const formattedCandidates = candidates.map((candidate: any) => ({
+        id: candidate.id,
+        countryCode: candidate.countryCode,
+        visaType: candidate.visaType,
+        confidence: candidate.confidence,
+        status: candidate.status,
+        reviewedBy: candidate.reviewedBy,
+        reviewedAt: candidate.reviewedAt,
+        reviewNotes: candidate.reviewNotes,
+        createdAt: candidate.createdAt,
+        updatedAt: candidate.updatedAt,
+        source: candidate.source,
+        pageContent: candidate.pageContent,
+        data: typeof candidate.data === 'string' ? JSON.parse(candidate.data) : candidate.data,
+        extractionMetadata:
+          typeof candidate.extractionMetadata === 'string'
+            ? JSON.parse(candidate.extractionMetadata)
+            : candidate.extractionMetadata,
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          candidates: formattedCandidates,
+          total,
+          limit,
+          offset,
+        },
+      });
+
+      await prisma.$disconnect();
+    } catch (error: any) {
+      console.error('[AdminRoute] Error listing candidates:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to list candidates',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/visa-rule-candidates/:id
+ * Get candidate detail with diff
+ */
+router.get(
+  '/visa-rule-candidates/:id',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const candidate = await prisma.visaRuleSetCandidate.findUnique({
+        where: { id: req.params.id },
+        include: {
+          source: true,
+          pageContent: true,
+        },
+      });
+
+      if (!candidate) {
+        return res.status(404).json({
+          success: false,
+          error: 'Candidate not found',
+        });
+      }
+
+      // Parse data
+      const candidateData =
+        typeof candidate.data === 'string' ? JSON.parse(candidate.data) : candidate.data;
+      const extractionMetadata =
+        typeof candidate.extractionMetadata === 'string'
+          ? JSON.parse(candidate.extractionMetadata)
+          : candidate.extractionMetadata;
+
+      // Get existing approved rule set for comparison
+      let existingRuleSet = null;
+      try {
+        existingRuleSet = await VisaRulesService.getActiveRuleSet(
+          candidate.countryCode,
+          candidate.visaType
+        );
+      } catch (error) {
+        // No existing rule set is fine
+      }
+
+      // Get diff from extraction metadata
+      const diff = extractionMetadata?.diff || null;
+
+      res.json({
+        success: true,
+        data: {
+          id: candidate.id,
+          countryCode: candidate.countryCode,
+          visaType: candidate.visaType,
+          confidence: candidate.confidence,
+          status: candidate.status,
+          reviewedBy: candidate.reviewedBy,
+          reviewedAt: candidate.reviewedAt,
+          reviewNotes: candidate.reviewNotes,
+          createdAt: candidate.createdAt,
+          updatedAt: candidate.updatedAt,
+          source: candidate.source,
+          pageContent: candidate.pageContent,
+          data: candidateData,
+          extractionMetadata,
+          existingRuleSet,
+          diff,
+        },
+      });
+
+      await prisma.$disconnect();
+    } catch (error: any) {
+      console.error('[AdminRoute] Error getting candidate:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to get candidate',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/visa-rule-candidates/:id/approve
+ * Approve a candidate and create new VisaRuleSet
+ */
+router.post(
+  '/visa-rule-candidates/:id/approve',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const candidate = await prisma.visaRuleSetCandidate.findUnique({
+        where: { id: req.params.id },
+        include: {
+          source: true,
+        },
+      });
+
+      if (!candidate) {
+        return res.status(404).json({
+          success: false,
+          error: 'Candidate not found',
+        });
+      }
+
+      if (candidate.status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          error: `Candidate is not pending (status: ${candidate.status})`,
+        });
+      }
+
+      // Parse candidate data
+      const candidateData =
+        typeof candidate.data === 'string' ? JSON.parse(candidate.data) : candidate.data;
+
+      // Get latest version number
+      const latest = await prisma.visaRuleSet.findFirst({
+        where: {
+          countryCode: candidate.countryCode,
+          visaType: candidate.visaType,
+        },
+        orderBy: {
+          version: 'desc',
+        },
+      });
+
+      const nextVersion = latest ? latest.version + 1 : 1;
+
+      // Unapprove all other versions for this country/visa type
+      await prisma.visaRuleSet.updateMany({
+        where: {
+          countryCode: candidate.countryCode,
+          visaType: candidate.visaType,
+        },
+        data: {
+          isApproved: false,
+        },
+      });
+
+      // Create new approved rule set
+      const dataSerialized = JSON.stringify(candidateData);
+      const ruleSet = await prisma.visaRuleSet.create({
+        data: {
+          countryCode: candidate.countryCode,
+          visaType: candidate.visaType,
+          data: dataSerialized as any,
+          version: nextVersion,
+          createdBy: userId,
+          sourceSummary: candidate.source?.name || `Extracted from ${candidate.source?.url}`,
+          sourceId: candidate.sourceId,
+          isApproved: true,
+          approvedAt: new Date(),
+          approvedBy: userId,
+        },
+      });
+
+      // Create change log entry
+      const extractionMetadata =
+        typeof candidate.extractionMetadata === 'string'
+          ? JSON.parse(candidate.extractionMetadata)
+          : candidate.extractionMetadata;
+      const diff = extractionMetadata?.diff || null;
+
+      await prisma.visaRuleSetChangeLog.create({
+        data: {
+          ruleSetId: ruleSet.id,
+          changeType: 'created',
+          changedBy: userId,
+          changeDetails: diff ? { diff } : null,
+          description: `Approved candidate ${candidate.id} as version ${nextVersion}`,
+        },
+      });
+
+      // Update candidate status
+      await prisma.visaRuleSetCandidate.update({
+        where: { id: candidate.id },
+        data: {
+          status: 'approved',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+        },
+      });
+
+      res.json({
+        success: true,
+        data: {
+          ruleSetId: ruleSet.id,
+          version: nextVersion,
+          candidateId: candidate.id,
+        },
+        message: 'Candidate approved and rule set created',
+      });
+
+      await prisma.$disconnect();
+    } catch (error: any) {
+      console.error('[AdminRoute] Error approving candidate:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to approve candidate',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/visa-rule-candidates/:id/reject
+ * Reject a candidate
+ */
+router.post(
+  '/visa-rule-candidates/:id/reject',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const { notes } = req.body;
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const candidate = await prisma.visaRuleSetCandidate.findUnique({
+        where: { id: req.params.id },
+      });
+
+      if (!candidate) {
+        return res.status(404).json({
+          success: false,
+          error: 'Candidate not found',
+        });
+      }
+
+      if (candidate.status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          error: `Candidate is not pending (status: ${candidate.status})`,
+        });
+      }
+
+      await prisma.visaRuleSetCandidate.update({
+        where: { id: candidate.id },
+        data: {
+          status: 'rejected',
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          reviewNotes: notes || null,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Candidate rejected',
+      });
+
+      await prisma.$disconnect();
+    } catch (error: any) {
+      console.error('[AdminRoute] Error rejecting candidate:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to reject candidate',
       });
     }
   }
@@ -739,6 +1144,152 @@ router.get(
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to get queue stats',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/checklist-stats
+ * Get checklist generation statistics
+ */
+router.get(
+  '/checklist-stats',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      // Get all checklists from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const checklists = await prisma.documentChecklist.findMany({
+        where: {
+          generatedAt: {
+            gte: thirtyDaysAgo,
+          },
+          status: 'ready',
+        },
+        include: {
+          application: {
+            include: {
+              country: true,
+              visaType: true,
+            },
+          },
+        },
+      });
+
+      // Aggregate by country
+      const countryStats: Record<
+        string,
+        {
+          country: string;
+          countryCode: string;
+          total: number;
+          rulesMode: number;
+          legacyMode: number;
+          fallbackMode: number;
+          totalItems: number;
+          averageItems: number;
+        }
+      > = {};
+
+      for (const checklist of checklists) {
+        const countryCode = checklist.application.country.code.toUpperCase();
+        const countryName = checklist.application.country.name;
+
+        if (!countryStats[countryCode]) {
+          countryStats[countryCode] = {
+            country: countryName,
+            countryCode,
+            total: 0,
+            rulesMode: 0,
+            legacyMode: 0,
+            fallbackMode: 0,
+            totalItems: 0,
+            averageItems: 0,
+          };
+        }
+
+        const stats = countryStats[countryCode];
+        stats.total++;
+
+        // Parse checklist data to determine mode
+        let checklistData: any = {};
+        try {
+          checklistData = JSON.parse(checklist.checklistData || '{}');
+        } catch (e) {
+          // Ignore parse errors
+        }
+
+        // Determine mode from metadata
+        if (checklistData.aiGenerated === true) {
+          // Check if it's rules mode (has specific metadata) or legacy
+          // Rules mode typically has more structured data
+          if (checklistData.mode === 'rules' || checklistData.source === 'visa-checklist-engine') {
+            stats.rulesMode++;
+          } else {
+            stats.legacyMode++;
+          }
+        } else {
+          stats.fallbackMode++;
+        }
+
+        // Count items
+        const itemCount = checklistData.items?.length || 0;
+        stats.totalItems += itemCount;
+      }
+
+      // Calculate averages and percentages
+      const result = Object.values(countryStats).map((stats) => ({
+        ...stats,
+        averageItems: stats.total > 0 ? Math.round((stats.totalItems / stats.total) * 10) / 10 : 0,
+        fallbackPercentage:
+          stats.total > 0 ? Math.round((stats.fallbackMode / stats.total) * 100 * 10) / 10 : 0,
+        rulesPercentage:
+          stats.total > 0 ? Math.round((stats.rulesMode / stats.total) * 100 * 10) / 10 : 0,
+        legacyPercentage:
+          stats.total > 0 ? Math.round((stats.legacyMode / stats.total) * 100 * 10) / 10 : 0,
+      }));
+
+      // Overall statistics
+      const overall = {
+        totalChecklists: checklists.length,
+        totalRulesMode: result.reduce((sum, s) => sum + s.rulesMode, 0),
+        totalLegacyMode: result.reduce((sum, s) => sum + s.legacyMode, 0),
+        totalFallbackMode: result.reduce((sum, s) => sum + s.fallbackMode, 0),
+        overallFallbackPercentage:
+          checklists.length > 0
+            ? Math.round(
+                (result.reduce((sum, s) => sum + s.fallbackMode, 0) / checklists.length) * 100 * 10
+              ) / 10
+            : 0,
+        overallAverageItems:
+          checklists.length > 0
+            ? Math.round(
+                (result.reduce((sum, s) => sum + s.totalItems, 0) / checklists.length) * 10
+              ) / 10
+            : 0,
+      };
+
+      res.json({
+        success: true,
+        data: {
+          byCountry: result.sort((a, b) => b.total - a.total), // Sort by total descending
+          overall,
+          period: {
+            from: thirtyDaysAgo.toISOString(),
+            to: new Date().toISOString(),
+            days: 30,
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error('[AdminRoute] Error getting checklist stats:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to get checklist statistics',
       });
     }
   }

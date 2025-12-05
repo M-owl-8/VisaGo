@@ -8,6 +8,7 @@ import { errors } from '../utils/errors';
 import { logError, logInfo } from '../middleware/logger';
 import {
   AIUserContext,
+  CanonicalAIUserContext,
   VisaQuestionnaireSummary,
   VisaProbabilityResult,
 } from '../types/ai-context';
@@ -121,11 +122,124 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
 }
 
 /**
+ * Convert legacy QuestionnaireData format to VisaQuestionnaireSummary
+ * Handles old format with purpose, country, duration, etc.
+ */
+function convertLegacyQuestionnaireToSummary(
+  legacyData: any,
+  appLanguage: 'uz' | 'ru' | 'en' = 'en',
+  countryCode?: string
+): VisaQuestionnaireSummary {
+  // Determine visa type from purpose
+  const visaType: 'student' | 'tourist' = legacyData.purpose === 'study' ? 'student' : 'tourist';
+
+  // Map country (try to use provided countryCode, or extract from legacy data)
+  let targetCountry = countryCode || 'US';
+  if (legacyData.country) {
+    // If country is already a code (2-3 letters), use it
+    if (typeof legacyData.country === 'string' && legacyData.country.length <= 3) {
+      targetCountry = legacyData.country.toUpperCase();
+    } else if (legacyData.targetCountry) {
+      targetCountry = legacyData.targetCountry;
+    }
+  }
+
+  // Map duration
+  const durationMap: Record<
+    string,
+    'less_than_1_month' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year'
+  > = {
+    less_than_1: 'less_than_1_month',
+    '1_3_months': '1_3_months',
+    '3_6_months': '3_6_months',
+    '6_12_months': '6_12_months',
+    more_than_1_year: 'more_than_1_year',
+  };
+  const duration = durationMap[legacyData.duration] || '1_3_months';
+
+  // Map financial situation to sponsor type
+  let sponsorType: 'self' | 'parent' | 'relative' | 'company' | 'other' = 'self';
+  if (legacyData.financialSituation === 'sponsor') {
+    sponsorType = 'parent'; // Default to parent for legacy sponsor
+  } else if (legacyData.financialSituation === 'stable_income') {
+    sponsorType = 'self';
+  }
+
+  // Map current status
+  let currentStatus: 'student' | 'employed' | 'self_employed' | 'unemployed' | undefined;
+  if (legacyData.currentStatus === 'student') {
+    currentStatus = 'student';
+  } else if (legacyData.currentStatus === 'employee' || legacyData.currentStatus === 'employed') {
+    currentStatus = 'employed';
+  } else if (legacyData.currentStatus === 'entrepreneur') {
+    currentStatus = 'self_employed';
+  } else if (legacyData.currentStatus === 'unemployed') {
+    currentStatus = 'unemployed';
+  }
+
+  // Map hasChildren
+  const hasChildrenValue: 'no' | 'one' | 'two_or_more' =
+    legacyData.hasChildren === 'one'
+      ? 'one'
+      : legacyData.hasChildren === 'two_plus'
+        ? 'two_or_more'
+        : 'no';
+
+  // Build summary
+  const summary: VisaQuestionnaireSummary = {
+    version: '1.0', // Legacy format
+    visaType,
+    targetCountry,
+    appLanguage,
+
+    // Map legacy fields
+    duration,
+    sponsorType,
+    hasInternationalTravel: legacyData.traveledBefore ?? false,
+    maritalStatus: legacyData.maritalStatus as 'single' | 'married' | 'divorced' | undefined,
+    hasChildren: hasChildrenValue,
+    englishLevel: legacyData.englishLevel as 'basic' | 'intermediate' | 'advanced' | undefined,
+    hasUniversityInvitation: visaType === 'student' && legacyData.hasInvitation === true,
+    hasOtherInvitation: visaType === 'tourist' && legacyData.hasInvitation === true,
+
+    // Employment/Education
+    employment: currentStatus
+      ? {
+          currentStatus,
+          isEmployed: currentStatus === 'employed' || currentStatus === 'self_employed',
+        }
+      : undefined,
+    education:
+      visaType === 'student' || currentStatus === 'student'
+        ? {
+            isStudent: true,
+          }
+        : undefined,
+
+    // Documents (default to false for legacy)
+    documents: {
+      hasPassport: false,
+      hasBankStatement: false,
+      hasEmploymentOrStudyProof:
+        legacyData.currentStatus === 'employee' || legacyData.currentStatus === 'student',
+      hasInsurance: false,
+      hasFlightBooking: false,
+      hasHotelBookingOrAccommodation: false,
+    },
+  };
+
+  return summary;
+}
+
+/**
  * Extract VisaQuestionnaireSummary from user bio
  * Handles both legacy and new formats (including QuestionnaireV2)
+ * Now includes legacy format conversion
  */
 function extractQuestionnaireSummary(
-  bio: string | null | undefined
+  bio: string | null | undefined,
+  appLanguage: 'uz' | 'ru' | 'en' = 'en',
+  countryCode?: string
 ): VisaQuestionnaireSummary | null {
   if (!bio) return null;
 
@@ -139,9 +253,9 @@ function extractQuestionnaireSummary(
         validateQuestionnaireV2,
       } = require('./questionnaire-v2-mapper');
       if (validateQuestionnaireV2(parsed)) {
-        // Extract appLanguage from user or default to 'en'
-        const appLanguage = parsed.appLanguage || 'en';
-        return buildSummaryFromQuestionnaireV2(parsed, appLanguage as 'uz' | 'ru' | 'en');
+        // Extract appLanguage from user or default to provided
+        const lang = parsed.appLanguage || appLanguage;
+        return buildSummaryFromQuestionnaireV2(parsed, lang as 'uz' | 'ru' | 'en');
       }
     }
 
@@ -164,9 +278,16 @@ function extractQuestionnaireSummary(
       }
     }
 
-    // Legacy format: try to convert (basic conversion)
-    // For full conversion, we'd need the frontend mapper logic
-    // For now, return null and let AI service handle legacy format
+    // Legacy format: convert to summary
+    if (parsed.purpose || parsed.country || parsed.duration) {
+      logInfo('Converting legacy questionnaire format to summary', {
+        hasPurpose: !!parsed.purpose,
+        hasCountry: !!parsed.country,
+      });
+      return convertLegacyQuestionnaireToSummary(parsed, appLanguage, countryCode);
+    }
+
+    // If we can't identify the format, return null
     return null;
   } catch (error) {
     logError('Failed to extract questionnaire summary from bio', error as Error);
@@ -223,8 +344,16 @@ export async function buildAIUserContext(
       throw errors.forbidden();
     }
 
-    // Extract questionnaire summary from user bio
-    const questionnaireSummary = extractQuestionnaireSummary(application.user.bio);
+    // Get app language from user or default to 'en'
+    const appLanguage = (application.user.language as 'uz' | 'ru' | 'en') || 'en';
+    const countryCode = application.country.code;
+
+    // Extract questionnaire summary from user bio (with context for legacy conversion)
+    const questionnaireSummary = extractQuestionnaireSummary(
+      application.user.bio,
+      appLanguage,
+      countryCode
+    );
 
     // Also extract raw questionnaire data for ApplicantProfile
     let rawQuestionnaireData: any = null;
@@ -281,13 +410,7 @@ export async function buildAIUserContext(
             : ('uploaded' as const),
     }));
 
-    // Get app language from user or summary
-    let appLanguage: 'uz' | 'ru' | 'en' = (application.user.language as 'uz' | 'ru' | 'en') || 'en';
-    if (questionnaireSummary && questionnaireSummary.appLanguage) {
-      appLanguage = questionnaireSummary.appLanguage;
-    }
-
-    // Build user profile
+    // Build user profile (appLanguage already extracted above)
     const userProfile = {
       userId: application.user.id,
       appLanguage,
@@ -343,6 +466,215 @@ export async function buildAIUserContext(
 }
 
 /**
+ * Build Canonical AI User Context
+ * Rock-solid interface with no nullable core fields and explicit defaults
+ * This is the preferred format for GPT services
+ *
+ * @param currentContext - AIUserContext from buildAIUserContext()
+ * @returns CanonicalAIUserContext with all fields filled
+ */
+export function buildCanonicalAIUserContext(currentContext: AIUserContext): CanonicalAIUserContext {
+  const summary = currentContext.questionnaireSummary;
+  const warnings: string[] = [];
+  const fallbacks: string[] = [];
+
+  // Extract citizenship (default: 'UZ')
+  const citizenship =
+    summary?.citizenship ||
+    summary?.personalInfo?.nationality ||
+    currentContext.userProfile.citizenship ||
+    'UZ';
+  if (!summary?.citizenship && !currentContext.userProfile.citizenship) {
+    fallbacks.push('citizenship');
+  }
+
+  // Extract age (can be null)
+  const age = summary?.age || currentContext.userProfile.age || null;
+  if (age === null) {
+    warnings.push('Age is unknown - may miss age-specific documents');
+  }
+
+  // Extract sponsorType (default: 'self')
+  let sponsorType: 'self' | 'parent' | 'relative' | 'company' | 'other' = 'self';
+  if (summary?.sponsorType) {
+    sponsorType = summary.sponsorType;
+  } else if (summary?.financialInfo?.sponsorDetails?.relationship) {
+    const rel = summary.financialInfo.sponsorDetails.relationship;
+    sponsorType =
+      rel === 'parent' ? 'parent' : rel === 'sibling' || rel === 'relative' ? 'relative' : 'other';
+  } else if (summary?.travelInfo?.funding && summary.travelInfo.funding !== 'self') {
+    sponsorType = summary.travelInfo.funding === 'sponsor' ? 'relative' : 'other';
+  } else {
+    fallbacks.push('sponsorType');
+  }
+
+  // Extract currentStatus (default: 'unknown')
+  let currentStatus:
+    | 'student'
+    | 'employed'
+    | 'self_employed'
+    | 'unemployed'
+    | 'retired'
+    | 'unknown' = 'unknown';
+  if (summary?.employment?.currentStatus) {
+    currentStatus =
+      summary.employment.currentStatus === 'retired' ? 'retired' : summary.employment.currentStatus;
+  } else if (summary?.education?.isStudent) {
+    currentStatus = 'student';
+  } else if (summary?.employment?.isEmployed) {
+    currentStatus = 'employed';
+  } else {
+    fallbacks.push('currentStatus');
+  }
+
+  // Extract isStudent and isEmployed
+  const isStudent = currentStatus === 'student' || summary?.education?.isStudent || false;
+  const isEmployed =
+    currentStatus === 'employed' ||
+    currentStatus === 'self_employed' ||
+    summary?.employment?.isEmployed ||
+    false;
+
+  // Extract previousVisaRejections (default: false)
+  const previousVisaRejections =
+    summary?.previousVisaRejections ?? summary?.travelHistory?.hasRefusals ?? false;
+
+  // Extract hasInternationalTravel (default: false)
+  const hasInternationalTravel =
+    summary?.hasInternationalTravel ?? summary?.travelHistory?.traveledBefore ?? false;
+
+  // Extract previousOverstay (default: false)
+  const previousOverstay = summary?.previousOverstay ?? false;
+
+  // Extract bankBalanceUSD (can be null)
+  const bankBalanceUSD = summary?.bankBalanceUSD ?? summary?.financialInfo?.selfFundsUSD ?? null;
+
+  // Extract monthlyIncomeUSD (can be null)
+  const monthlyIncomeUSD =
+    summary?.monthlyIncomeUSD ?? summary?.employment?.monthlySalaryUSD ?? null;
+
+  // Extract duration (default: 'unknown')
+  const duration = summary?.duration ?? summary?.travelInfo?.duration ?? 'unknown';
+
+  // Extract documents (all default to false)
+  const documents = {
+    hasPassport: summary?.documents?.hasPassport ?? false,
+    hasBankStatement: summary?.documents?.hasBankStatement ?? false,
+    hasEmploymentOrStudyProof: summary?.documents?.hasEmploymentOrStudyProof ?? false,
+    hasInsurance:
+      summary?.documents?.hasInsurance ?? summary?.documents?.hasTravelInsurance ?? false,
+    hasFlightBooking: summary?.documents?.hasFlightBooking ?? false,
+    hasHotelBookingOrAccommodation: summary?.documents?.hasHotelBookingOrAccommodation ?? false,
+  };
+
+  // Extract ties
+  const hasPropertyInUzbekistan =
+    summary?.hasPropertyInUzbekistan ?? summary?.ties?.propertyDocs ?? false;
+  const hasFamilyInUzbekistan =
+    summary?.hasFamilyInUzbekistan ?? summary?.ties?.familyTies ?? false;
+
+  // Extract maritalStatus (default: 'unknown')
+  const maritalStatus: 'single' | 'married' | 'divorced' | 'widowed' | 'unknown' =
+    summary?.maritalStatus ?? 'unknown';
+
+  // Extract hasChildren (default: false)
+  const hasChildren = (summary?.hasChildren && summary.hasChildren !== 'no') ?? false;
+
+  // Extract invitations
+  const hasUniversityInvitation = summary?.hasUniversityInvitation ?? false;
+  const hasOtherInvitation = summary?.hasOtherInvitation ?? false;
+
+  // Always calculate risk score (even if questionnaire is missing)
+  let riskScore: CanonicalAIUserContext['riskScore'];
+  if (summary) {
+    const probability = calculateVisaProbability(summary);
+    riskScore = {
+      probabilityPercent: probability.score,
+      level: probability.level,
+      riskFactors: probability.riskFactors,
+      positiveFactors: probability.positiveFactors,
+    };
+  } else {
+    // Default risk score for missing questionnaire
+    riskScore = {
+      probabilityPercent: 70,
+      level: 'medium',
+      riskFactors: ['Questionnaire data incomplete - using default risk assessment'],
+      positiveFactors: [],
+    };
+    warnings.push('Questionnaire missing - using default risk score');
+  }
+
+  // Determine source format
+  let sourceFormat: 'v2' | 'legacy' | 'hybrid' | 'unknown' = 'unknown';
+  if (summary) {
+    if (summary.version === '2.0') {
+      sourceFormat = 'v2';
+    } else if (summary.version === '1.0') {
+      sourceFormat = 'hybrid';
+    } else {
+      sourceFormat = 'legacy';
+    }
+  }
+
+  // Log warnings and fallbacks if any
+  if (warnings.length > 0 || fallbacks.length > 0) {
+    logInfo('Canonical context built with warnings/fallbacks', {
+      warnings,
+      fallbacks,
+      sourceFormat,
+    });
+  }
+
+  return {
+    userProfile: {
+      userId: currentContext.userProfile.userId,
+      appLanguage: currentContext.userProfile.appLanguage,
+      citizenship,
+      age,
+    },
+    application: currentContext.application,
+    applicantProfile: {
+      citizenship,
+      age,
+      visaType: currentContext.application.visaType,
+      targetCountry: currentContext.application.country,
+      duration: duration as
+        | 'less_than_1_month'
+        | '1_3_months'
+        | '3_6_months'
+        | '6_12_months'
+        | 'more_than_1_year'
+        | 'unknown',
+      sponsorType,
+      bankBalanceUSD,
+      monthlyIncomeUSD,
+      currentStatus,
+      isStudent,
+      isEmployed,
+      hasInternationalTravel,
+      previousVisaRejections,
+      previousOverstay,
+      hasPropertyInUzbekistan,
+      hasFamilyInUzbekistan,
+      maritalStatus,
+      hasChildren,
+      hasUniversityInvitation,
+      hasOtherInvitation,
+      documents,
+    },
+    riskScore,
+    uploadedDocuments: currentContext.uploadedDocuments,
+    appActions: currentContext.appActions,
+    metadata: {
+      sourceFormat,
+      extractionWarnings: warnings.length > 0 ? warnings : undefined,
+      fallbackFieldsUsed: fallbacks.length > 0 ? fallbacks : undefined,
+    },
+  };
+}
+
+/**
  * Get questionnaire summary for a user
  *
  * @param userId - User ID
@@ -354,18 +686,35 @@ export async function getQuestionnaireSummary(
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { bio: true },
+      select: { bio: true, language: true },
     });
 
     if (!user || !user.bio) {
       return null;
     }
 
-    return extractQuestionnaireSummary(user.bio);
+    const appLanguage = (user.language as 'uz' | 'ru' | 'en') || 'en';
+    return extractQuestionnaireSummary(user.bio, appLanguage);
   } catch (error) {
     logError('Failed to get questionnaire summary', error as Error, { userId });
     return null;
   }
+}
+
+/**
+ * Build Canonical AI User Context for an application
+ * This is the preferred function for GPT services - always returns canonical format
+ *
+ * @param userId - User ID
+ * @param applicationId - Application ID
+ * @returns CanonicalAIUserContext with all fields filled
+ */
+export async function buildCanonicalAIUserContextForApplication(
+  userId: string,
+  applicationId: string
+): Promise<CanonicalAIUserContext> {
+  const context = await buildAIUserContext(userId, applicationId);
+  return buildCanonicalAIUserContext(context);
 }
 
 /**

@@ -18,6 +18,7 @@ const nullableBool = z.union([z.boolean(), z.null()]).transform((v) => v ?? fals
 
 /**
  * Required Document Schema
+ * Version 2+ supports condition field for conditional logic
  */
 const RequiredDocumentSchema = z.object({
   documentType: z.string(), // Still required - core identifier
@@ -25,6 +26,8 @@ const RequiredDocumentSchema = z.object({
   description: nullableString.optional(),
   validityRequirements: nullableString.optional(),
   formatRequirements: nullableString.optional(),
+  // Condition field (version 2+) - optional for backward compatibility
+  condition: z.string().optional(),
 });
 
 /**
@@ -93,6 +96,8 @@ const AdditionalRequirementsSchema = z.object({
  */
 const VisaRuleSetDataSchema = z
   .object({
+    // Version field for feature flags (default: 1 for backward compatibility)
+    version: z.number().int().min(1).optional(),
     requiredDocuments: z
       .union([z.array(RequiredDocumentSchema), z.null(), z.undefined()])
       .transform((v) => v ?? [])

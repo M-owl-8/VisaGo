@@ -148,3 +148,106 @@ export interface AIUserContext {
     level: 'low' | 'medium' | 'high';
   };
 }
+
+/**
+ * Canonical AI User Context
+ * Rock-solid interface for GPT usage with no nullable core fields
+ * All critical fields have explicit defaults
+ */
+export interface CanonicalAIUserContext {
+  // ✅ REQUIRED - Always present
+  userProfile: {
+    userId: string;
+    appLanguage: 'uz' | 'ru' | 'en';
+    citizenship: string; // Default: 'UZ' (Uzbekistan)
+    age: number | null; // null if unknown, but field always present
+  };
+
+  application: {
+    applicationId: string;
+    visaType: 'student' | 'tourist';
+    country: string; // ISO country code
+    status: 'draft' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
+  };
+
+  // ✅ REQUIRED - Always present (with defaults if missing)
+  applicantProfile: {
+    // Core identity
+    citizenship: string; // Default: 'UZ'
+    age: number | null; // null if unknown
+
+    // Visa details
+    visaType: 'student' | 'tourist';
+    targetCountry: string;
+    duration:
+      | 'less_than_1_month'
+      | '1_3_months'
+      | '3_6_months'
+      | '6_12_months'
+      | 'more_than_1_year'
+      | 'unknown';
+
+    // Financial
+    sponsorType: 'self' | 'parent' | 'relative' | 'company' | 'other'; // Default: 'self'
+    bankBalanceUSD: number | null; // null if unknown
+    monthlyIncomeUSD: number | null; // null if unknown
+
+    // Employment/Education
+    currentStatus: 'student' | 'employed' | 'self_employed' | 'unemployed' | 'retired' | 'unknown'; // Default: 'unknown'
+    isStudent: boolean; // Default: false
+    isEmployed: boolean; // Default: false
+
+    // Travel history
+    hasInternationalTravel: boolean; // Default: false
+    previousVisaRejections: boolean; // Default: false
+    previousOverstay: boolean; // Default: false
+
+    // Ties to home country
+    hasPropertyInUzbekistan: boolean; // Default: false
+    hasFamilyInUzbekistan: boolean; // Default: false
+    maritalStatus: 'single' | 'married' | 'divorced' | 'widowed' | 'unknown'; // Default: 'unknown'
+    hasChildren: boolean; // Default: false
+
+    // Invitations
+    hasUniversityInvitation: boolean; // Default: false
+    hasOtherInvitation: boolean; // Default: false
+
+    // Documents already obtained
+    documents: {
+      hasPassport: boolean;
+      hasBankStatement: boolean;
+      hasEmploymentOrStudyProof: boolean;
+      hasInsurance: boolean;
+      hasFlightBooking: boolean;
+      hasHotelBookingOrAccommodation: boolean;
+    };
+  };
+
+  // ✅ REQUIRED - Always present
+  riskScore: {
+    probabilityPercent: number; // Default: 70 (baseline)
+    level: 'low' | 'medium' | 'high'; // Default: 'medium'
+    riskFactors: string[]; // Default: []
+    positiveFactors: string[]; // Default: []
+  };
+
+  uploadedDocuments: {
+    type: string;
+    fileName: string;
+    url?: string;
+    status: 'uploaded' | 'approved' | 'rejected';
+  }[];
+
+  appActions: {
+    timestamp: string;
+    actionType: string;
+    details?: any;
+  }[];
+
+  // Optional metadata (for debugging/logging)
+  metadata?: {
+    sourceFormat: 'v2' | 'legacy' | 'hybrid' | 'unknown';
+    extractionWarnings?: string[]; // Warnings about missing/incomplete data
+    fallbackFieldsUsed?: string[]; // Fields that used defaults
+  };
+}

@@ -619,15 +619,18 @@ NO markdown, NO extra text, ONLY valid JSON.`;
     visaKb: string,
     documentGuidesText: string
   ): string {
-    const summary = userContext.questionnaireSummary;
-    const riskScore = userContext.riskScore;
+    // Convert to canonical format for consistent GPT input
+    const { buildCanonicalAIUserContext } = require('./ai-context.service');
+    const canonical = buildCanonicalAIUserContext(userContext);
+    const profile = canonical.applicantProfile;
+    const riskScore = canonical.riskScore;
 
-    // Extract key info
-    const sponsorType = summary?.sponsorType || 'self';
-    const duration = summary?.duration || summary?.travelInfo?.duration || 'Not specified';
-    const hasTravelHistory = summary?.hasInternationalTravel ?? false;
-    const previousRefusals = summary?.previousVisaRejections ?? false;
-    const bankBalance = summary?.bankBalanceUSD || summary?.financialInfo?.selfFundsUSD;
+    // Extract key info from canonical format
+    const sponsorType = profile.sponsorType;
+    const duration = profile.duration === 'unknown' ? 'Not specified' : profile.duration;
+    const hasTravelHistory = profile.hasInternationalTravel;
+    const previousRefusals = profile.previousVisaRejections;
+    const bankBalance = profile.bankBalanceUSD;
 
     return `Enrich the following document checklist with names, descriptions, and whereToObtain instructions.
 
@@ -638,7 +641,7 @@ Duration: ${duration}
 Travel History: ${hasTravelHistory ? 'Has previous travel' : 'No previous international travel'}
 Previous Refusals: ${previousRefusals ? 'Yes' : 'No'}
 Financial Capacity: ${bankBalance ? `~$${bankBalance}` : 'Not specified'}
-Risk Score: ${riskScore ? `${riskScore.probabilityPercent}% (${riskScore.level})` : 'Not calculated'}
+Risk Score: ${riskScore.probabilityPercent}% (${riskScore.level})
 
 Knowledge Base Context:
 ${visaKb || 'No specific knowledge base available.'}
@@ -2410,63 +2413,54 @@ You MUST:
       const age = summary?.age || aiUserContext.userProfile?.age;
       const riskScore = aiUserContext.riskScore;
 
-      // Build concise system prompt with structured output schema
-      const systemPrompt = `You are a visa document checklist generator specialized for Uzbek applicants.
+      // Build compact system prompt (COMPACT VERSION)
+      const useCompactPrompts = process.env.USE_COMPACT_CHECKLIST_PROMPTS !== 'false'; // Default: true
 
-Your task: Generate a personalized document checklist using structured JSON output.
+      const systemPrompt = useCompactPrompts
+        ? this.buildLegacySystemPromptCompact(country, visaType, MIN_ITEMS_HARD, IDEAL_MIN_ITEMS)
+        : this.buildLegacySystemPromptLegacy(country, visaType, MIN_ITEMS_HARD, IDEAL_MIN_ITEMS);
 
-OUTPUT SCHEMA (JSON):
-{
-  "checklist": [
-    {
-      "document": "passport",
-      "name": "Valid Passport",
-      "nameUz": "...",
-      "nameRu": "...",
-      "category": "required" | "highly_recommended" | "optional",
-      "required": true,
-      "description": "...",
-      "descriptionUz": "...",
-      "descriptionRu": "...",
-      "priority": "high" | "medium" | "low",
-      "whereToObtain": "...",
-      "whereToObtainUz": "...",
-      "whereToObtainRu": "..."
-    }
-  ]
-}
-
-RULES:
-- Output at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is ideal)
-- Include ALL THREE categories: required, highly_recommended, optional
-- Use country-specific terminology (I-20 for USA, LOA for Canada, CAS for UK, etc.)
-- All items must have complete EN, UZ, RU translations
-- whereToObtain must be realistic for Uzbekistan
-
-Return ONLY valid JSON, no markdown, no comments.`;
-
-      // Build user prompt with explicit questionnaire data
-      const userPrompt = `Generate a personalized visa document checklist.
-
-APPLICANT INFORMATION:
-- Destination: ${country} (${countryCode})
-- Visa Type: ${visaType}
-- Purpose: ${purpose}
-- Stay Duration: ${duration}
-- Employment: ${employmentStatus}
-- Sponsor: ${sponsorType === 'self' ? 'Self-funded' : `Sponsored by ${sponsorType}`}
-- Income/Savings: ${bankBalance ? `~$${bankBalance}` : monthlyIncome ? `~$${monthlyIncome}/month` : 'Not specified'}
-- Has Invitation: ${hasInvitation ? 'Yes' : 'No'}
-- Travel History: ${travelHistory ? 'Has previous international travel' : 'No previous travel'}
-- Previous Refusals: ${previousRefusals ? 'Yes' : 'No'}
-- Ties to Home: ${hasProperty ? 'Has property' : ''}${hasFamily ? (hasProperty ? ', has family' : 'Has family') : ''}${hasChildren ? (hasProperty || hasFamily ? ', has children' : 'Has children') : ''}${!hasProperty && !hasFamily && !hasChildren ? 'Standard ties' : ''}
-- Age: ${age || 'Not specified'}
-- Risk Level: ${riskScore ? `${riskScore.level} (${riskScore.probabilityPercent}%)` : 'Not calculated'}
-
-${visaKb ? `\nKNOWLEDGE BASE:\n${visaKb.substring(0, 1000)}` : ''}
-${documentGuidesText ? `\nDOCUMENT GUIDES:\n${documentGuidesText}` : ''}
-
-Generate checklist with at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is ideal). Return ONLY valid JSON.`;
+      // Build compact user prompt using CanonicalAIUserContext
+      let userPrompt: string;
+      if (useCompactPrompts) {
+        const { buildCanonicalAIUserContext } = await import('./ai-context.service');
+        const canonical = buildCanonicalAIUserContext(aiUserContext);
+        userPrompt = this.buildLegacyUserPromptCompact(
+          canonical,
+          country,
+          countryCode,
+          visaType,
+          visaKb,
+          documentGuidesText,
+          MIN_ITEMS_HARD,
+          IDEAL_MIN_ITEMS
+        );
+      } else {
+        userPrompt = this.buildLegacyUserPromptLegacy(
+          aiUserContext,
+          country,
+          countryCode,
+          visaType,
+          purpose,
+          duration,
+          employmentStatus,
+          sponsorType,
+          bankBalance,
+          monthlyIncome,
+          hasInvitation,
+          travelHistory,
+          previousRefusals,
+          hasProperty,
+          hasFamily,
+          hasChildren,
+          age,
+          riskScore,
+          visaKb,
+          documentGuidesText,
+          MIN_ITEMS_HARD,
+          IDEAL_MIN_ITEMS
+        );
+      }
 
       // Call GPT-4 with structured output
       const response = await this.callChecklistAPI(
@@ -2541,6 +2535,183 @@ Generate checklist with at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is
       // Return null so caller can use fallback
       return null as any;
     }
+  }
+
+  /**
+   * Build compact legacy system prompt (COMPACT VERSION)
+   */
+  private static buildLegacySystemPromptCompact(
+    country: string,
+    visaType: string,
+    minItems: number,
+    idealItems: number
+  ): string {
+    return `Generate visa document checklist for Uzbek applicants.
+
+OUTPUT SCHEMA:
+{
+  "checklist": [
+    {
+      "document": "string",
+      "name": "string",
+      "nameUz": "string",
+      "nameRu": "string",
+      "category": "required" | "highly_recommended" | "optional",
+      "required": boolean,
+      "description": "string",
+      "descriptionUz": "string",
+      "descriptionRu": "string",
+      "priority": "high" | "medium" | "low",
+      "whereToObtain": "string",
+      "whereToObtainUz": "string",
+      "whereToObtainRu": "string"
+    }
+  ]
+}
+
+RULES:
+- Output ${minItems}-${idealItems} items
+- Include all 3 categories
+- Use country-specific terms (I-20/USA, LOA/Canada, CAS/UK)
+- Complete EN/UZ/RU translations
+- whereToObtain: realistic for Uzbekistan
+
+Return ONLY valid JSON.`;
+  }
+
+  /**
+   * Build compact legacy user prompt using CanonicalAIUserContext (COMPACT VERSION)
+   */
+  private static buildLegacyUserPromptCompact(
+    canonical: any,
+    country: string,
+    countryCode: string,
+    visaType: string,
+    visaKb: string,
+    documentGuidesText: string,
+    minItems: number,
+    idealItems: number
+  ): string {
+    const profile = canonical.applicantProfile;
+    const riskScore = canonical.riskScore;
+
+    const context = {
+      country: `${country} (${countryCode})`,
+      visaType,
+      sponsorType: profile.sponsorType,
+      currentStatus: profile.currentStatus,
+      bankBalanceUSD: profile.bankBalanceUSD,
+      monthlyIncomeUSD: profile.monthlyIncomeUSD,
+      hasInternationalTravel: profile.hasInternationalTravel,
+      previousVisaRejections: profile.previousVisaRejections,
+      hasProperty: profile.hasPropertyInUzbekistan,
+      hasFamily: profile.hasFamilyInUzbekistan,
+      hasChildren: profile.hasChildren,
+      riskLevel: riskScore.level,
+      riskProbability: riskScore.probabilityPercent,
+    };
+
+    return `APPLICANT_CONTEXT:
+${JSON.stringify(context, null, 2)}
+
+${visaKb ? `KNOWLEDGE_BASE:\n${visaKb.substring(0, 800)}\n` : ''}
+${documentGuidesText ? `DOCUMENT_GUIDES:\n${documentGuidesText.substring(0, 500)}\n` : ''}
+
+Generate ${minItems}-${idealItems} items. Return ONLY valid JSON.`;
+  }
+
+  /**
+   * OLD LEGACY SYSTEM PROMPT (kept for reference/rollback)
+   */
+  private static buildLegacySystemPromptLegacy(
+    country: string,
+    visaType: string,
+    minItems: number,
+    idealItems: number
+  ): string {
+    return `You are a visa document checklist generator specialized for Uzbek applicants.
+
+Your task: Generate a personalized document checklist using structured JSON output.
+
+OUTPUT SCHEMA (JSON):
+{
+  "checklist": [
+    {
+      "document": "passport",
+      "name": "Valid Passport",
+      "nameUz": "...",
+      "nameRu": "...",
+      "category": "required" | "highly_recommended" | "optional",
+      "required": true,
+      "description": "...",
+      "descriptionUz": "...",
+      "descriptionRu": "...",
+      "priority": "high" | "medium" | "low",
+      "whereToObtain": "...",
+      "whereToObtainUz": "...",
+      "whereToObtainRu": "..."
+    }
+  ]
+}
+
+RULES:
+- Output at least ${minItems} items (${idealItems}+ is ideal)
+- Include ALL THREE categories: required, highly_recommended, optional
+- Use country-specific terminology (I-20 for USA, LOA for Canada, CAS for UK, etc.)
+- All items must have complete EN, UZ, RU translations
+- whereToObtain must be realistic for Uzbekistan
+
+Return ONLY valid JSON, no markdown, no comments.`;
+  }
+
+  /**
+   * OLD LEGACY USER PROMPT (kept for reference/rollback)
+   */
+  private static buildLegacyUserPromptLegacy(
+    aiUserContext: any,
+    country: string,
+    countryCode: string,
+    visaType: string,
+    purpose: string,
+    duration: string,
+    employmentStatus: string,
+    sponsorType: string,
+    bankBalance: number | null,
+    monthlyIncome: number | null,
+    hasInvitation: boolean,
+    travelHistory: boolean,
+    previousRefusals: boolean,
+    hasProperty: boolean,
+    hasFamily: boolean,
+    hasChildren: boolean,
+    age: number | null,
+    riskScore: any,
+    visaKb: string,
+    documentGuidesText: string,
+    minItems: number,
+    idealItems: number
+  ): string {
+    return `Generate a personalized visa document checklist.
+
+APPLICANT INFORMATION:
+- Destination: ${country} (${countryCode})
+- Visa Type: ${visaType}
+- Purpose: ${purpose}
+- Stay Duration: ${duration}
+- Employment: ${employmentStatus}
+- Sponsor: ${sponsorType === 'self' ? 'Self-funded' : `Sponsored by ${sponsorType}`}
+- Income/Savings: ${bankBalance ? `~$${bankBalance}` : monthlyIncome ? `~$${monthlyIncome}/month` : 'Not specified'}
+- Has Invitation: ${hasInvitation ? 'Yes' : 'No'}
+- Travel History: ${travelHistory ? 'Has previous international travel' : 'No previous travel'}
+- Previous Refusals: ${previousRefusals ? 'Yes' : 'No'}
+- Ties to Home: ${hasProperty ? 'Has property' : ''}${hasFamily ? (hasProperty ? ', has family' : 'Has family') : ''}${hasChildren ? (hasProperty || hasFamily ? ', has children' : 'Has children') : ''}${!hasProperty && !hasFamily && !hasChildren ? 'Standard ties' : ''}
+- Age: ${age || 'Not specified'}
+- Risk Level: ${riskScore ? `${riskScore.level} (${riskScore.probabilityPercent}%)` : 'Not calculated'}
+
+${visaKb ? `\nKNOWLEDGE BASE:\n${visaKb.substring(0, 1000)}` : ''}
+${documentGuidesText ? `\nDOCUMENT GUIDES:\n${documentGuidesText}` : ''}
+
+Generate checklist with at least ${minItems} items (${idealItems}+ is ideal). Return ONLY valid JSON.`;
   }
 }
 

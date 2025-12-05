@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 import { getEnvConfig } from '../config/env';
 import { errors } from '../utils/errors';
 import { logError, logInfo, logWarn } from '../middleware/logger';
+import { logChecklistGeneration } from '../utils/gpt-logging';
 import AIOpenAIService from './ai-openai.service';
 import { getDocumentTranslation } from '../data/document-translations';
 import { buildAIUserContext } from './ai-context.service';
@@ -375,6 +376,19 @@ export class DocumentChecklistService {
               existingDocumentsMap
             );
             aiGenerated = true;
+
+            // Log structured checklist generation
+            logChecklistGeneration({
+              applicationId,
+              country: application.country.name,
+              countryCode,
+              visaType: visaTypeName,
+              mode: 'rules',
+              jsonValidationPassed: true, // Rules mode handles validation internally
+              jsonValidationRetries: 0,
+              itemCount: items.length,
+            });
+
             logInfo('[Checklist][Mode] Rules mode succeeded', {
               applicationId,
               itemCount: items.length,
@@ -425,6 +439,19 @@ export class DocumentChecklistService {
               existingDocumentsMap
             );
             aiGenerated = true;
+
+            // Log structured checklist generation (legacy mode)
+            logChecklistGeneration({
+              applicationId,
+              country: application.country.name,
+              countryCode,
+              visaType: visaTypeName,
+              mode: 'legacy',
+              jsonValidationPassed: true, // Legacy mode handles validation internally
+              jsonValidationRetries: 0,
+              itemCount: items.length,
+            });
+
             logInfo('[Checklist][Mode] Legacy mode succeeded', {
               applicationId,
               itemCount: items.length,
@@ -451,6 +478,18 @@ export class DocumentChecklistService {
 
       // STEP 3: If both modes failed, use static fallback
       if (items.length < MIN_ITEMS_HARD) {
+        // Log structured checklist generation (fallback mode)
+        logChecklistGeneration({
+          applicationId,
+          country: application.country.name,
+          countryCode,
+          visaType: visaTypeName,
+          mode: 'fallback',
+          jsonValidationPassed: true, // Fallback doesn't use GPT
+          jsonValidationRetries: 0,
+          itemCount: 0, // Will be set after generation
+        });
+
         logInfo('[Checklist][Mode] Using STATIC FALLBACK mode', {
           applicationId,
           countryCode,
@@ -481,6 +520,18 @@ export class DocumentChecklistService {
         );
         aiGenerated = false;
         aiFallbackUsed = true;
+        // Update log with actual item count
+        logChecklistGeneration({
+          applicationId,
+          country: application.country.name,
+          countryCode,
+          visaType: visaTypeName,
+          mode: 'fallback',
+          jsonValidationPassed: true,
+          jsonValidationRetries: 0,
+          itemCount: items.length,
+        });
+
         logInfo('[Checklist][Mode] Static fallback generated', {
           applicationId,
           itemCount: items.length,

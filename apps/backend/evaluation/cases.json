@@ -1,0 +1,201 @@
+{
+  "cases": [
+    {
+      "id": "case-001",
+      "name": "German Tourist Visa - Self-Funded Employed",
+      "description": "Employed person applying for German tourist visa, self-funded",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": true,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "low",
+          "score": 75
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "bank_statement", "category": "required" },
+          { "documentType": "employment_letter", "category": "required" },
+          { "documentType": "travel_insurance", "category": "required" },
+          { "documentType": "hotel_booking", "category": "highly_recommended" },
+          { "documentType": "flight_reservation", "category": "highly_recommended" }
+        ]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "bank_statement",
+          "text": "BANK STATEMENT\nAccount: John Doe\nPeriod: Jan-Mar 2024\nBalance: $8,500\n3 months history",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-002",
+      "name": "US Student Visa - Sponsored by Parent",
+      "description": "Student applying for US student visa, sponsored by parent",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "parent",
+          "currentStatus": "student",
+          "bankBalanceUSD": 2000,
+          "monthlyIncomeUSD": 0,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "US",
+          "visaType": "student"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 60
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "acceptance_letter", "category": "required" },
+          { "documentType": "i20_form", "category": "required" },
+          { "documentType": "sponsor_letter", "category": "required" },
+          { "documentType": "sponsor_bank_statement", "category": "required" },
+          { "documentType": "sponsor_employment_letter", "category": "required" }
+        ]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "sponsor_bank_statement",
+          "text": "BANK STATEMENT\nAccount: Parent Name\nPeriod: Jan-Mar 2024\nBalance: $45,000\n3 months history",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-003",
+      "name": "UK Tourist Visa - Low Balance",
+      "description": "Tourist visa applicant with low bank balance",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 3000,
+          "monthlyIncomeUSD": 1500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "UK",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 55
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "bank_statement", "category": "required" },
+          { "documentType": "employment_letter", "category": "required" },
+          { "documentType": "travel_insurance", "category": "required" }
+        ]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "bank_statement",
+          "text": "BANK STATEMENT\nAccount: Jane Smith\nPeriod: Jan-Mar 2024\nBalance: $3,000\n3 months history",
+          "expectedVerification": {
+            "status": "NEED_FIX",
+            "embassy_risk_level": "MEDIUM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-004",
+      "name": "Canada Student Visa - Self-Funded",
+      "description": "Student applying for Canada student visa, self-funded",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "student",
+          "bankBalanceUSD": 25000,
+          "monthlyIncomeUSD": 0,
+          "hasPreviousRefusals": false,
+          "hasProperty": true,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "CA",
+          "visaType": "student"
+        },
+        "riskScore": {
+          "level": "low",
+          "score": 80
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "acceptance_letter", "category": "required" },
+          { "documentType": "loa", "category": "required" },
+          { "documentType": "bank_statement", "category": "required" },
+          { "documentType": "tuition_payment_proof", "category": "required" }
+        ]
+      }
+    },
+    {
+      "id": "case-005",
+      "name": "German Tourist Visa - Previous Refusal",
+      "description": "Tourist visa applicant with previous refusal",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 10000,
+          "monthlyIncomeUSD": 3000,
+          "hasPreviousRefusals": true,
+          "hasProperty": true,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "high",
+          "score": 40
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "bank_statement", "category": "required" },
+          { "documentType": "employment_letter", "category": "required" },
+          { "documentType": "travel_insurance", "category": "required" },
+          { "documentType": "refusal_explanation", "category": "highly_recommended" },
+          { "documentType": "additional_supporting_documents", "category": "highly_recommended" }
+        ]
+      }
+    }
+  ]
+}

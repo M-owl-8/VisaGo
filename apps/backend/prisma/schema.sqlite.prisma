@@ -545,6 +545,8 @@ model EmbassySource {
   updatedAt     DateTime  @updatedAt
 
   ruleSets VisaRuleSet[]
+  pageContents EmbassyPageContent[]
+  candidates VisaRuleSetCandidate[]
 
   @@unique([countryCode, visaType, url])
   @@index([countryCode, visaType])
@@ -572,6 +574,7 @@ model VisaRuleSet {
 
   source EmbassySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   versions VisaRuleVersion[]
+  changeLogs VisaRuleSetChangeLog[]
 
   @@unique([countryCode, visaType, version])
   @@index([countryCode, visaType])
@@ -592,5 +595,67 @@ model VisaRuleVersion {
 
   @@index([ruleSetId])
   @@index([version])
+  @@index([createdAt])
+}
+
+model EmbassyPageContent {
+  id            String   @id @default(cuid())
+  sourceId      String
+  url           String
+  cleanedText   String   // Cleaned plain text content
+  html          String?  // Optional: raw HTML (for debugging)
+  title         String?
+  status        String   @default("success")
+  httpStatus    Int?
+  errorMessage  String?
+  metadata      String?  // JSON string for SQLite compatibility
+  fetchedAt     DateTime @default(now())
+
+  source EmbassySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([url])
+  @@index([fetchedAt])
+  @@index([status])
+}
+
+model VisaRuleSetCandidate {
+  id            String   @id @default(cuid())
+  sourceId      String
+  pageContentId String?
+  countryCode   String
+  visaType       String
+  data           String   // JSON string for SQLite compatibility
+  confidence     Real?
+  extractionMetadata String? // JSON string for SQLite compatibility
+  status         String   @default("pending")
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  reviewNotes    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  source EmbassySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  pageContent EmbassyPageContent? @relation(fields: [pageContentId], references: [id], onDelete: SetNull)
+
+  @@index([sourceId])
+  @@index([countryCode, visaType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model VisaRuleSetChangeLog {
+  id            String   @id @default(cuid())
+  ruleSetId     String
+  changeType    String
+  changedBy     String?
+  changeDetails String?  // JSON string for SQLite compatibility
+  description   String?
+  createdAt     DateTime @default(now())
+
+  ruleSet VisaRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@index([ruleSetId])
+  @@index([changeType])
   @@index([createdAt])
 }

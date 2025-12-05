@@ -1,0 +1,250 @@
+# Ketdik – GPT Master Upgrade Agent Configuration
+
+## Agent Identity
+**Name:** Ketdik – GPT Master Upgrade  
+**Purpose:** All GPT-related code changes and improvements for the VisaBuddy/Ketdik platform
+
+---
+
+## Repository Scope
+
+### Primary Directories
+- **Backend:** `apps/backend/` - All backend services, routes, and GPT integration logic
+- **Admin Frontend:** `apps/web/` - Next.js admin panel for managing GPT rules, embassy sources, and evaluation
+
+### Excluded Directories
+- `frontend_new/` - Mobile app (not in scope for this agent)
+- `apps/ai-service/` - Python AI service (separate service, coordinate if needed)
+
+---
+
+## Core Principles
+
+### 1. Incremental & Safe Changes
+- **ALL changes must be incremental** - No big-bang refactors
+- **ALL changes must be safe** - Backward compatible, no breaking changes
+- **Migrations must be explained** - Every database change must include:
+  - Migration file with clear description
+  - Rollback strategy
+  - Data preservation plan
+  - Impact assessment
+
+### 2. Evaluation Dataset & Metrics
+- **Evaluation dataset exists** - Use it to validate all GPT changes
+- **Specific metrics must be tracked:**
+  - Checklist accuracy (matches embassy requirements)
+  - Document relevance (correct documents for applicant profile)
+  - Response quality (JSON validity, completeness)
+  - Token usage (cost optimization)
+  - Response time (performance)
+- **All GPT changes must be evaluated** before merging
+
+### 3. Code Change Governance
+- **ALL GPT code changes go through this agent** - No GPT-related changes outside this agent
+- **GPT-related files include:**
+  - `apps/backend/src/services/ai-*.ts` (all AI services)
+  - `apps/backend/src/services/visa-checklist-*.ts` (checklist generation)
+  - `apps/backend/src/services/document-*.ts` (document verification)
+  - `apps/backend/src/routes/applications.ts` (GPT endpoints)
+  - `apps/backend/src/utils/questionnaire-*.ts` (questionnaire → GPT context)
+  - `apps/web/app/admin/**` (admin UI for GPT management)
+  - Any file that calls OpenAI API or processes GPT responses
+
+---
+
+## Work Tracks (Sequential Execution)
+
+### Track A – Questionnaire & AIUserContext Cleanup
+**Status:** Pending  
+**Goal:** Clean up questionnaire extraction and AIUserContext building  
+**Files:**
+- `apps/backend/src/utils/questionnaire-*.ts`
+- `apps/backend/src/services/ai-openai.service.ts` (buildAIUserContext)
+- `apps/backend/src/types/questionnaire.ts`
+
+**Tasks:**
+1. Improve questionnaire V2 extraction (handle nullable fields)
+2. Enhance buildAIUserContext() to fill all fields
+3. Add validation for questionnaire completeness
+4. Remove legacy format dependencies
+5. Add unit tests for extraction logic
+
+---
+
+### Track B – Rules Engine & Condition Logic
+**Status:** Pending  
+**Goal:** Add conditional logic to VisaRuleSet and rules engine  
+**Files:**
+- `apps/backend/src/services/visa-rules.service.ts`
+- `apps/backend/src/services/visa-checklist-engine.service.ts`
+- `apps/backend/prisma/schema.prisma` (VisaRuleSet model)
+- `apps/backend/src/types/visa-rules.ts`
+
+**Tasks:**
+1. Add `condition` field to VisaRuleSet document structure
+2. Implement `applyConditionalRules()` function
+3. Update rules engine to filter documents by applicant profile
+4. Add condition evaluation logic (sponsorType, employmentStatus, etc.)
+5. Update database schema with migration
+6. Add tests for condition evaluation
+
+---
+
+### Track C – Embassy Auto-Learning Pipeline
+**Status:** Pending  
+**Goal:** Integrate EmbassySource content into GPT prompts  
+**Files:**
+- `apps/backend/src/services/embassy-crawler.service.ts`
+- `apps/backend/src/services/embassy-source.service.ts`
+- `apps/backend/src/services/visa-checklist-engine.service.ts`
+- `apps/backend/src/services/rag.service.ts` (if RAG is implemented)
+
+**Tasks:**
+1. Fetch EmbassySource pages for country/visaType
+2. Extract requirements from embassy pages (RAG or direct text)
+3. Merge embassy requirements with VisaRuleSet
+4. Pass embassy content to GPT-4 prompts
+5. Handle 403/404 errors gracefully
+6. Add caching for embassy content
+7. Add candidate rules generation from embassy pages
+
+---
+
+### Track D – GPT Prompt Refactor + Doc Verification
+**Status:** Pending  
+**Goal:** Simplify and optimize GPT prompts, add document verification  
+**Files:**
+- `apps/backend/src/services/ai-openai.service.ts`
+- `apps/backend/src/services/visa-checklist-engine.service.ts`
+- `apps/backend/src/services/document-verification.service.ts`
+
+**Tasks:**
+1. Refactor legacy GPT-4 prompt (remove redundancy)
+2. Create structured prompt templates
+3. Enforce JSON schema validation in prompts
+4. Add document verification GPT prompt
+5. Implement document verification endpoint
+6. Add multi-language support (EN/UZ/RU) in prompts
+7. Optimize token usage
+
+---
+
+### Track E – Evaluation, Logging & Monitoring
+**Status:** Pending  
+**Goal:** Add evaluation framework, logging, and monitoring  
+**Files:**
+- `apps/backend/src/services/evaluation.service.ts` (new)
+- `apps/backend/src/middleware/gpt-logging.ts` (new)
+- `apps/web/app/admin/evaluation/` (new admin UI)
+- `apps/backend/src/routes/admin/evaluation.ts` (new)
+
+**Tasks:**
+1. Create evaluation service with metrics
+2. Add GPT request/response logging
+3. Create evaluation dashboard in admin panel
+4. Add monitoring for GPT errors and retries
+5. Implement A/B testing framework for prompts
+6. Add alerting for GPT failures
+7. Create evaluation reports
+
+---
+
+## Development Guidelines
+
+### Code Style
+- Follow existing TypeScript patterns in the codebase
+- Use Prisma for database access
+- Use Zod for validation
+- Follow existing error handling patterns
+
+### Testing
+- Write unit tests for all new functions
+- Test GPT integrations with mock responses
+- Validate against evaluation dataset
+- Test edge cases (null values, missing fields, etc.)
+
+### Documentation
+- Document all GPT prompt changes
+- Explain migration strategies
+- Update API documentation
+- Add JSDoc comments for complex functions
+
+### Safety Checks
+- Never break existing functionality
+- Always provide fallback mechanisms
+- Validate all GPT responses before using
+- Handle API errors gracefully
+- Rate limit GPT API calls
+
+---
+
+## Evaluation Metrics
+
+### Checklist Generation Metrics
+- **Accuracy:** % of checklists that match embassy requirements
+- **Completeness:** % of required documents included
+- **Relevance:** % of documents that apply to applicant
+- **JSON Validity:** % of valid JSON responses
+- **Response Time:** Average GPT response time
+
+### Document Verification Metrics
+- **Verification Accuracy:** % of correct verifications
+- **False Positive Rate:** % of invalid docs marked valid
+- **False Negative Rate:** % of valid docs marked invalid
+- **Confidence Score Distribution:** Average confidence scores
+
+### System Metrics
+- **Token Usage:** Tokens per request (track cost)
+- **API Errors:** Rate of GPT API failures
+- **Fallback Rate:** % of requests that fall back to static checklist
+- **Cache Hit Rate:** % of requests served from cache
+
+---
+
+## Migration Strategy
+
+### Database Migrations
+1. Always create Prisma migration files
+2. Test migrations on development database first
+3. Provide rollback instructions
+4. Document data migration steps if needed
+5. Never drop columns without deprecation period
+
+### API Changes
+1. Maintain backward compatibility
+2. Version API endpoints if breaking changes needed
+3. Deprecate old endpoints before removing
+4. Update API documentation
+
+---
+
+## Communication
+
+### Before Starting Work
+- Review current track status
+- Check evaluation dataset
+- Review related files
+- Plan incremental changes
+
+### During Work
+- Make small, testable commits
+- Run tests after each change
+- Validate against evaluation dataset
+- Document decisions
+
+### After Completing Track
+- Run full evaluation suite
+- Update documentation
+- Create summary of changes
+- Mark track as complete
+
+---
+
+## Notes
+
+- This agent is focused ONLY on GPT-related improvements
+- All changes must be incremental and safe
+- Evaluation dataset must be used for validation
+- Migrations must be explained and tested
+- Work proceeds sequentially through tracks A → E
+

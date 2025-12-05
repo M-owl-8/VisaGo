@@ -147,17 +147,26 @@ export async function validateDocumentWithAI(params: {
                   : 0.5
                 : 0.2;
 
+          // Map tri-language notes if available
+          const notes = checkResult.notes
+            ? {
+                en: checkResult.notes.en || checkResult.short_reason || 'Document checked.',
+                uz: checkResult.notes.uz || checkResult.short_reason || 'Hujjat tekshirildi.',
+                ru: checkResult.notes.ru || checkResult.short_reason || 'Документ проверен.',
+              }
+            : {
+                en: checkResult.short_reason || 'Document checked.',
+                uz: checkResult.short_reason || 'Hujjat tekshirildi.',
+                ru: checkResult.short_reason || 'Документ проверен.',
+              };
+
           const result: DocumentValidationResultAI = {
             status,
             confidence,
             verifiedByAI: status === 'verified' && confidence >= 0.7,
             problems: [], // VisaDocChecker doesn't provide structured problems
             suggestions: [], // VisaDocChecker doesn't provide structured suggestions
-            notes: {
-              uz: checkResult.short_reason || 'Hujjat tekshirildi.',
-              ru: checkResult.short_reason || 'Документ проверен.',
-              en: checkResult.short_reason || 'Document checked.',
-            },
+            notes,
           };
 
           logInfo('[DocValidation] VisaDocChecker result', {

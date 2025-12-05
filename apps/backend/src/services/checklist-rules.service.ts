@@ -5,6 +5,9 @@
 
 import { VisaRulesService, VisaRuleSetData } from './visa-rules.service';
 import { logInfo, logWarn } from '../middleware/logger';
+import { evaluateCondition, ConditionResult } from '../utils/condition-evaluator';
+import { CanonicalAIUserContext } from '../types/ai-context';
+import { buildCanonicalAIUserContext } from './ai-context.service';
 
 /**
  * Base checklist item (before GPT-4 enrichment)
@@ -17,6 +20,7 @@ export interface BaseChecklistItem {
 
 /**
  * Build base checklist from VisaRuleSet
+ * Supports conditional logic per document (version 2+)
  */
 export function buildBaseChecklistFromRules(
   userContext: any,
@@ -31,10 +35,57 @@ export function buildBaseChecklistFromRules(
       return [];
     }
 
+    // Check if conditional logic is enabled (version 2+)
+    const ruleSetVersion = ruleSet.version || 1;
+    const conditionalLogicEnabled = ruleSetVersion >= 2;
+
+    // Convert to canonical context for condition evaluation
+    let canonicalContext: CanonicalAIUserContext | null = null;
+    if (conditionalLogicEnabled) {
+      try {
+        canonicalContext = buildCanonicalAIUserContext(userContext);
+      } catch (error) {
+        logWarn('[ChecklistRules] Failed to build canonical context for condition evaluation', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Fall back to non-conditional mode
+      }
+    }
+
     const checklist: Array<BaseChecklistItem> = [];
+    const conditionWarnings: string[] = [];
 
     // Process required documents from rule set
     for (const doc of ruleSet.requiredDocuments) {
+      // Evaluate condition if present and conditional logic is enabled
+      if (conditionalLogicEnabled && doc.condition && canonicalContext) {
+        const conditionResult = evaluateCondition(doc.condition, canonicalContext);
+
+        if (conditionResult === false) {
+          // Condition evaluates to false - exclude document
+          logInfo('[ChecklistRules] Document excluded by condition', {
+            documentType: doc.documentType,
+            condition: doc.condition,
+            result: 'excluded',
+          });
+          continue; // Skip this document
+        } else if (conditionResult === 'unknown') {
+          // Condition evaluation failed or field is unknown
+          // Include as highly_recommended and log warning
+          conditionWarnings.push(
+            `Condition evaluation failed for ${doc.documentType}: ${doc.condition}`
+          );
+          checklist.push({
+            documentType: doc.documentType,
+            category: 'highly_recommended', // Downgrade to highly_recommended
+            required: false,
+          });
+          continue;
+        }
+        // conditionResult === true - include document normally
+      }
+
+      // No condition or condition evaluates to true - include document
       // Map category to required boolean
       const required = doc.category === 'required';
 
@@ -42,6 +93,14 @@ export function buildBaseChecklistFromRules(
         documentType: doc.documentType,
         category: doc.category,
         required,
+      });
+    }
+
+    // Log warnings if any
+    if (conditionWarnings.length > 0) {
+      logWarn('[ChecklistRules] Condition evaluation warnings', {
+        warnings: conditionWarnings,
+        documentCount: conditionWarnings.length,
       });
     }
 
@@ -67,9 +126,8 @@ export function buildBaseChecklistFromRules(
     logInfo('[ChecklistRules] Base checklist built from rules', {
       totalItems: checklist.length,
       requiredCount: checklist.filter((item) => item.required).length,
-      highlyRecommendedCount: checklist.filter(
-        (item) => item.category === 'highly_recommended'
-      ).length,
+      highlyRecommendedCount: checklist.filter((item) => item.category === 'highly_recommended')
+        .length,
       optionalCount: checklist.filter((item) => item.category === 'optional').length,
     });
 

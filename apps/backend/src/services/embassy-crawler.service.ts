@@ -1,11 +1,15 @@
 /**
  * Embassy Crawler Service
  * Fetches and cleans HTML from embassy sources
+ * Stores cleaned text in EmbassyPageContent
  */
 
 import axios, { AxiosError } from 'axios';
 import { load } from 'cheerio';
+import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
+
+const prisma = new PrismaClient();
 
 /**
  * Crawled page data
@@ -213,5 +217,123 @@ export class EmbassyCrawlerService {
    */
   private static delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Crawl source and store cleaned text in EmbassyPageContent
+   * Updates EmbassySource status
+   */
+  static async crawlAndStore(
+    sourceId: string,
+    url: string,
+    metadata?: any
+  ): Promise<{ success: boolean; pageContentId?: string; error?: string }> {
+    try {
+      // Update source status to pending
+      await prisma.embassySource.update({
+        where: { id: sourceId },
+        data: {
+          lastStatus: 'pending',
+          updatedAt: new Date(),
+        },
+      });
+
+      // Crawl the source
+      const crawled = await this.crawlSource(url, metadata);
+
+      // Store in EmbassyPageContent
+      const pageContent = await prisma.embassyPageContent.create({
+        data: {
+          sourceId,
+          url: crawled.url,
+          cleanedText: crawled.cleanedText,
+          html: crawled.html, // Store HTML for debugging
+          title: crawled.title,
+          status: 'success',
+          httpStatus: crawled.metadata.statusCode,
+          metadata: {
+            fetchedAt: crawled.metadata.fetchedAt,
+            contentType: crawled.metadata.contentType,
+            contentLength: crawled.metadata.contentLength,
+          },
+        },
+      });
+
+      // Update source status to success
+      await prisma.embassySource.update({
+        where: { id: sourceId },
+        data: {
+          lastStatus: 'success',
+          lastError: null,
+          lastFetchedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      logInfo('[EmbassyCrawler] Successfully crawled and stored', {
+        sourceId,
+        pageContentId: pageContent.id,
+        url,
+        textLength: crawled.cleanedText.length,
+      });
+
+      return {
+        success: true,
+        pageContentId: pageContent.id,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Determine HTTP status if available
+      let httpStatus: number | null = null;
+      if (error instanceof AxiosError && error.response) {
+        httpStatus = error.response.status;
+      }
+
+      // Store failed attempt in EmbassyPageContent
+      try {
+        await prisma.embassyPageContent.create({
+          data: {
+            sourceId,
+            url,
+            cleanedText: '',
+            status: 'failed',
+            httpStatus,
+            errorMessage,
+            metadata: {
+              fetchedAt: new Date().toISOString(),
+            },
+          },
+        });
+      } catch (storeError) {
+        logError(
+          '[EmbassyCrawler] Failed to store error in EmbassyPageContent',
+          storeError as Error,
+          { sourceId, url }
+        );
+      }
+
+      // Update source status to failed
+      await prisma.embassySource.update({
+        where: { id: sourceId },
+        data: {
+          lastStatus: 'failed',
+          lastError: errorMessage,
+          lastFetchedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      logError('[EmbassyCrawler] Failed to crawl and store', error as Error, {
+        sourceId,
+        url,
+        httpStatus,
+      });
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
   }
 }

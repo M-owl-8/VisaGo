@@ -6,21 +6,49 @@
 
 import { AIOpenAIService } from './ai-openai.service';
 import { VisaRuleSetData } from './visa-rules.service';
-import { AIUserContext } from '../types/ai-context';
+import { AIUserContext, CanonicalAIUserContext } from '../types/ai-context';
+import { buildCanonicalAIUserContext } from './ai-context.service';
 import { logInfo, logError, logWarn } from '../middleware/logger';
+import { logDocumentVerification, extractApplicationId } from '../utils/gpt-logging';
 import { z } from 'zod';
 
 /**
- * Document Check Result Schema
+ * Document Check Result Schema (IMPROVED VERSION)
+ * Includes tri-language notes and stronger validation
  */
 const DocumentCheckResultSchema = z.object({
   status: z.enum(['APPROVED', 'NEED_FIX', 'REJECTED']),
-  short_reason: z.string(),
+  short_reason: z.string().max(200), // Enforce max length
+  notes: z
+    .object({
+      en: z.string().max(500).optional(),
+      uz: z.string().max(500).optional(),
+      ru: z.string().max(500).optional(),
+    })
+    .optional(),
   embassy_risk_level: z.enum(['LOW', 'MEDIUM', 'HIGH']),
-  technical_notes: z.string().nullable().optional(),
+  technical_notes: z.string().max(1000).nullable().optional(),
 });
 
 export type DocumentCheckResult = z.infer<typeof DocumentCheckResultSchema>;
+
+/**
+ * Internal status enum for mapping
+ */
+export enum DocumentVerificationStatus {
+  APPROVED = 'APPROVED',
+  NEED_FIX = 'NEED_FIX',
+  REJECTED = 'REJECTED',
+}
+
+/**
+ * Internal risk level enum for mapping
+ */
+export enum EmbassyRiskLevel {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+}
 
 /**
  * Visa Document Checker Service
@@ -28,6 +56,11 @@ export type DocumentCheckResult = z.infer<typeof DocumentCheckResultSchema>;
 export class VisaDocCheckerService {
   /**
    * Check a single document against a requirement
+   *
+   * @param requiredDocumentRule - Specific document rule (condition already resolved if applicable)
+   * @param userDocumentText - Full text of uploaded document (or best OCR output)
+   * @param aiUserContext - AIUserContext (will be converted to CanonicalAIUserContext)
+   * @param metadata - Optional document metadata
    */
   static async checkDocument(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -49,16 +82,40 @@ export class VisaDocCheckerService {
         hasMetadata: !!metadata,
       });
 
-      // Build system prompt
-      const systemPrompt = this.buildSystemPrompt();
+      // Convert to CanonicalAIUserContext for consistent input
+      let canonicalContext: CanonicalAIUserContext | null = null;
+      if (aiUserContext) {
+        try {
+          canonicalContext = buildCanonicalAIUserContext(aiUserContext);
+        } catch (error) {
+          logWarn('[VisaDocChecker] Failed to build canonical context', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
-      // Build user prompt
-      const userPrompt = this.buildUserPrompt(
-        requiredDocumentRule,
-        userDocumentText,
-        aiUserContext,
-        metadata
-      );
+      // Build compact system prompt
+      const useCompactPrompts = process.env.USE_COMPACT_DOC_VERIFICATION_PROMPTS !== 'false'; // Default: true
+      const systemPrompt = useCompactPrompts
+        ? this.buildSystemPromptCompact()
+        : this.buildSystemPromptLegacy();
+
+      // Build compact user prompt
+      const userPrompt = useCompactPrompts
+        ? this.buildUserPromptCompact(
+            requiredDocumentRule,
+            userDocumentText,
+            canonicalContext,
+            metadata
+          )
+        : this.buildUserPromptLegacy(
+            requiredDocumentRule,
+            userDocumentText,
+            aiUserContext,
+            metadata
+          );
+
+      const startTime = Date.now();
 
       // Call GPT-4 with structured output
       const response = await AIOpenAIService.getOpenAIClient().chat.completions.create({
@@ -72,6 +129,11 @@ export class VisaDocCheckerService {
         response_format: { type: 'json_object' }, // Force JSON output
       });
 
+      const responseTime = Date.now() - startTime;
+      const inputTokens = response.usage?.prompt_tokens || 0;
+      const outputTokens = response.usage?.completion_tokens || 0;
+      const totalTokens = inputTokens + outputTokens;
+
       const rawContent = response.choices[0]?.message?.content || '{}';
 
       logInfo('[VisaDocChecker] GPT-4 response received', {
@@ -81,53 +143,141 @@ export class VisaDocCheckerService {
 
       // Parse and validate JSON
       let parsed: any;
+      let jsonValidationRetries = 0;
+      let jsonValidationPassed = false;
       try {
         parsed = JSON.parse(rawContent);
+        jsonValidationPassed = true;
       } catch (parseError) {
+        jsonValidationRetries++;
         // Try to extract JSON from markdown code blocks
         const jsonMatch = rawContent.match(/```json\s*([\s\S]*?)\s*```/i);
         if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[1]);
-        } else {
+          try {
+            parsed = JSON.parse(jsonMatch[1]);
+            jsonValidationPassed = true;
+          } catch (e) {
+            // Continue to next attempt
+          }
+        }
+        if (!jsonValidationPassed) {
           const objectMatch = rawContent.match(/\{[\s\S]*\}/);
           if (objectMatch) {
-            parsed = JSON.parse(objectMatch[0]);
-          } else {
-            throw new Error('No valid JSON found in response');
+            try {
+              parsed = JSON.parse(objectMatch[0]);
+              jsonValidationPassed = true;
+            } catch (e) {
+              // Continue
+            }
           }
+        }
+        if (!jsonValidationPassed) {
+          throw new Error('No valid JSON found in response');
         }
       }
 
-      // Validate against schema
-      const validationResult = DocumentCheckResultSchema.safeParse(parsed);
+      // Validate against schema with stronger validation
+      let validationResult = DocumentCheckResultSchema.safeParse(parsed);
 
       if (!validationResult.success) {
+        jsonValidationRetries++;
         logError(
           '[VisaDocChecker] Schema validation failed',
           new Error('Invalid check result structure'),
           {
             documentType: requiredDocumentRule.documentType,
             errors: validationResult.error.errors,
+            rawResponse: rawContent.substring(0, 500),
           }
         );
 
-        // Fallback: create a conservative result
-        return {
-          status: 'NEED_FIX',
-          short_reason: 'Document validation could not be completed. Please review manually.',
-          embassy_risk_level: 'MEDIUM',
-          technical_notes: `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
-        };
+        // Try to fix common issues
+        const fixed = this.fixCommonValidationIssues(parsed);
+        validationResult = DocumentCheckResultSchema.safeParse(fixed);
+
+        if (!validationResult.success) {
+          // Extract application context for logging
+          const applicationId = aiUserContext ? extractApplicationId(aiUserContext) : 'unknown';
+          const countryCode = (aiUserContext as any)?.application?.country?.code || 'unknown';
+          const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
+          const visaType = (aiUserContext as any)?.application?.visaType?.name || 'unknown';
+
+          logDocumentVerification({
+            applicationId,
+            documentType: requiredDocumentRule.documentType,
+            country: countryName,
+            countryCode,
+            visaType,
+            status: 'NEED_FIX',
+            embassyRiskLevel: 'MEDIUM',
+            jsonValidationPassed: false,
+            jsonValidationRetries,
+            error: `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          });
+
+          // Fallback: create a conservative result
+          return {
+            status: 'NEED_FIX',
+            short_reason: 'Document validation could not be completed. Please review manually.',
+            embassy_risk_level: 'MEDIUM',
+            technical_notes: `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          };
+        }
+        jsonValidationPassed = true;
+      } else {
+        jsonValidationPassed = true;
       }
+
+      // Map to internal enums and validate
+      const result = this.mapToInternalEnums(validationResult.data);
+
+      // Extract application context for logging
+      const applicationId = aiUserContext ? extractApplicationId(aiUserContext) : 'unknown';
+      const countryCode = (aiUserContext as any)?.application?.country?.code || 'unknown';
+      const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
+      const visaType = (aiUserContext as any)?.application?.visaType?.name || 'unknown';
+
+      // Log structured document verification
+      logDocumentVerification({
+        applicationId,
+        documentType: requiredDocumentRule.documentType,
+        country: countryName,
+        countryCode,
+        visaType,
+        status: result.status,
+        embassyRiskLevel: result.embassy_risk_level,
+        jsonValidationPassed,
+        jsonValidationRetries,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
+      });
 
       logInfo('[VisaDocChecker] Document check completed', {
         documentType: requiredDocumentRule.documentType,
-        status: validationResult.data.status,
-        riskLevel: validationResult.data.embassy_risk_level,
+        status: result.status,
+        riskLevel: result.embassy_risk_level,
       });
 
-      return validationResult.data;
+      return result;
     } catch (error) {
+      const applicationId = aiUserContext ? extractApplicationId(aiUserContext) : 'unknown';
+      const countryCode = (aiUserContext as any)?.application?.country?.code || 'unknown';
+      const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
+      const visaType = (aiUserContext as any)?.application?.visaType?.name || 'unknown';
+
+      logDocumentVerification({
+        applicationId,
+        documentType: requiredDocumentRule.documentType,
+        country: countryName,
+        countryCode,
+        visaType,
+        status: 'NEED_FIX',
+        embassyRiskLevel: 'MEDIUM',
+        jsonValidationPassed: false,
+        jsonValidationRetries: 0,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
       logError('[VisaDocChecker] Document check failed', error as Error, {
         documentType: requiredDocumentRule.documentType,
       });
@@ -143,9 +293,41 @@ export class VisaDocCheckerService {
   }
 
   /**
-   * Build system prompt for document checking
+   * Build compact system prompt for document checking (COMPACT VERSION)
    */
-  private static buildSystemPrompt(): string {
+  private static buildSystemPromptCompact(): string {
+    return `You are a visa document verifier. Compare USER_DOCUMENT_TEXT against REQUIRED_DOCUMENT_RULE.
+
+OUTPUT SCHEMA:
+{
+  "status": "APPROVED" | "NEED_FIX" | "REJECTED",
+  "short_reason": "string (max 200 chars)",
+  "notes": {
+    "en": "string (optional, max 500 chars)",
+    "uz": "string (optional, max 500 chars)",
+    "ru": "string (optional, max 500 chars)"
+  },
+  "embassy_risk_level": "LOW" | "MEDIUM" | "HIGH",
+  "technical_notes": "string | null (optional, max 1000 chars)"
+}
+
+DECISION RULES:
+- APPROVED: Document satisfies REQUIRED_DOCUMENT_RULE key conditions
+- NEED_FIX: Document has correctable issues (missing months, wrong language, low amount)
+- REJECTED: Document is unusable (wrong type, expired, far below requirements)
+
+RISK LEVEL:
+- LOW: Solid and compliant
+- MEDIUM: Some weaknesses but might be accepted
+- HIGH: Serious issues likely to cause refusal
+
+Return ONLY valid JSON.`;
+  }
+
+  /**
+   * OLD SYSTEM PROMPT (kept for reference/rollback)
+   */
+  private static buildSystemPromptLegacy(): string {
     return `You are "VisaDocChecker", an embassy-level visa document reviewer.
 
 Your job:
@@ -221,9 +403,58 @@ Return ONLY valid JSON matching the schema, no other text.`;
   }
 
   /**
-   * Build user prompt with document and requirement
+   * Build compact user prompt (COMPACT VERSION)
    */
-  private static buildUserPrompt(
+  private static buildUserPromptCompact(
+    requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
+    userDocumentText: string,
+    canonicalContext: CanonicalAIUserContext | null,
+    metadata?: {
+      fileType?: string;
+      issueDate?: string;
+      expiryDate?: string;
+      amounts?: Array<{ value: number; currency: string }>;
+      bankName?: string;
+      accountHolder?: string;
+    }
+  ): string {
+    // Limit document text to 8000 chars (reasonable for GPT)
+    const truncatedText =
+      userDocumentText.length > 8000
+        ? userDocumentText.substring(0, 8000) + '\n\n[Text truncated]'
+        : userDocumentText;
+
+    let prompt = `REQUIRED_DOCUMENT_RULE:
+${JSON.stringify(requiredDocumentRule, null, 2)}
+
+USER_DOCUMENT_TEXT:
+${truncatedText}`;
+
+    if (metadata) {
+      prompt += `\n\nMETADATA:\n${JSON.stringify(metadata, null, 2)}`;
+    }
+
+    if (canonicalContext) {
+      // Include only relevant context for document verification
+      const relevantContext = {
+        sponsorType: canonicalContext.applicantProfile.sponsorType,
+        currentStatus: canonicalContext.applicantProfile.currentStatus,
+        bankBalanceUSD: canonicalContext.applicantProfile.bankBalanceUSD,
+        monthlyIncomeUSD: canonicalContext.applicantProfile.monthlyIncomeUSD,
+        riskLevel: canonicalContext.riskScore.level,
+      };
+      prompt += `\n\nAPPLICANT_CONTEXT:\n${JSON.stringify(relevantContext, null, 2)}`;
+    }
+
+    prompt += `\n\nEvaluate and return JSON result.`;
+
+    return prompt;
+  }
+
+  /**
+   * OLD USER PROMPT (kept for reference/rollback)
+   */
+  private static buildUserPromptLegacy(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
     userDocumentText: string,
     aiUserContext?: AIUserContext,
@@ -261,5 +492,75 @@ ${userDocumentText.substring(0, 10000)}${userDocumentText.length > 10000 ? '\n\n
     prompt += `\n\nEvaluate the document and return the JSON result following all rules in the system prompt.`;
 
     return prompt;
+  }
+
+  /**
+   * Fix common validation issues in GPT response
+   */
+  private static fixCommonValidationIssues(parsed: any): any {
+    const fixed: any = {
+      status: ['APPROVED', 'NEED_FIX', 'REJECTED'].includes(parsed.status)
+        ? parsed.status
+        : 'NEED_FIX',
+      short_reason:
+        typeof parsed.short_reason === 'string'
+          ? parsed.short_reason.substring(0, 200)
+          : 'Document validation completed',
+      embassy_risk_level: ['LOW', 'MEDIUM', 'HIGH'].includes(parsed.embassy_risk_level)
+        ? parsed.embassy_risk_level
+        : 'MEDIUM',
+    };
+
+    // Handle notes (support both old and new format)
+    if (parsed.notes && typeof parsed.notes === 'object') {
+      fixed.notes = {
+        en: typeof parsed.notes.en === 'string' ? parsed.notes.en.substring(0, 500) : undefined,
+        uz: typeof parsed.notes.uz === 'string' ? parsed.notes.uz.substring(0, 500) : undefined,
+        ru: typeof parsed.notes.ru === 'string' ? parsed.notes.ru.substring(0, 500) : undefined,
+      };
+    } else {
+      // Try old format (notesEn, notesUz, notesRu)
+      if (parsed.notesEn || parsed.notesUz || parsed.notesRu) {
+        fixed.notes = {
+          en: typeof parsed.notesEn === 'string' ? parsed.notesEn.substring(0, 500) : undefined,
+          uz: typeof parsed.notesUz === 'string' ? parsed.notesUz.substring(0, 500) : undefined,
+          ru: typeof parsed.notesRu === 'string' ? parsed.notesRu.substring(0, 500) : undefined,
+        };
+      }
+    }
+
+    if (parsed.technical_notes !== undefined) {
+      fixed.technical_notes =
+        typeof parsed.technical_notes === 'string'
+          ? parsed.technical_notes.substring(0, 1000)
+          : null;
+    }
+
+    return fixed;
+  }
+
+  /**
+   * Map validated result to internal enums and ensure type safety
+   */
+  private static mapToInternalEnums(result: DocumentCheckResult): DocumentCheckResult {
+    // Validate status enum
+    const status = Object.values(DocumentVerificationStatus).includes(
+      result.status as DocumentVerificationStatus
+    )
+      ? result.status
+      : DocumentVerificationStatus.NEED_FIX;
+
+    // Validate risk level enum
+    const riskLevel = Object.values(EmbassyRiskLevel).includes(
+      result.embassy_risk_level as EmbassyRiskLevel
+    )
+      ? result.embassy_risk_level
+      : EmbassyRiskLevel.MEDIUM;
+
+    return {
+      ...result,
+      status,
+      embassy_risk_level: riskLevel,
+    };
   }
 }

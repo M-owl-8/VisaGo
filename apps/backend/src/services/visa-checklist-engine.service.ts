@@ -6,8 +6,10 @@
 
 import { AIOpenAIService } from './ai-openai.service';
 import { VisaRulesService, VisaRuleSetData } from './visa-rules.service';
-import { AIUserContext } from '../types/ai-context';
+import { AIUserContext, CanonicalAIUserContext } from '../types/ai-context';
+import { buildCanonicalAIUserContext } from './ai-context.service';
 import { logInfo, logError, logWarn } from '../middleware/logger';
+import { logChecklistGeneration, extractApplicationId } from '../utils/gpt-logging';
 import { z } from 'zod';
 
 /**
@@ -72,11 +74,56 @@ export class VisaChecklistEngineService {
         return null as any;
       }
 
-      // Step 2: Build system prompt
-      const systemPrompt = this.buildSystemPrompt(countryCode, visaType, ruleSet);
+      // Step 2: Build base checklist from rules (documents are determined here)
+      const { buildBaseChecklistFromRules } = await import('./checklist-rules.service');
+      const baseDocuments = buildBaseChecklistFromRules(aiUserContext, ruleSet);
 
-      // Step 3: Build user prompt with context
-      const userPrompt = this.buildUserPrompt(aiUserContext, ruleSet, previousChecklist);
+      if (baseDocuments.length === 0) {
+        logWarn('[VisaChecklistEngine] Base checklist is empty', {
+          countryCode,
+          visaType,
+        });
+        return null as any;
+      }
+
+      // Step 3: Get optional embassy summary (if available)
+      let embassySummary: string | undefined;
+      try {
+        const { PrismaClient } = await import('@prisma/client');
+        const prisma = new PrismaClient();
+        const source = await prisma.embassySource.findFirst({
+          where: {
+            countryCode: countryCode.toUpperCase(),
+            visaType: visaType.toLowerCase(),
+            isActive: true,
+          },
+          include: {
+            pageContents: {
+              where: { status: 'success' },
+              orderBy: { fetchedAt: 'desc' },
+              take: 1,
+            },
+          },
+        });
+        if (source?.pageContents?.[0]?.cleanedText) {
+          embassySummary = source.pageContents[0].cleanedText.substring(0, 1000);
+        }
+        await prisma.$disconnect();
+      } catch (error) {
+        // Embassy summary is optional, continue without it
+        logWarn('[VisaChecklistEngine] Could not fetch embassy summary', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      // Step 4: Build compact system prompt
+      const useCompactPrompts = process.env.USE_COMPACT_CHECKLIST_PROMPTS !== 'false'; // Default: true
+      const systemPrompt = useCompactPrompts
+        ? this.buildSystemPrompt(countryCode, visaType, ruleSet, embassySummary)
+        : this.buildSystemPromptLegacy(countryCode, visaType, ruleSet);
+
+      // Step 5: Build compact user prompt with base documents
+      const userPrompt = this.buildUserPrompt(aiUserContext, baseDocuments, previousChecklist);
 
       // Step 4: Call GPT-4 with structured output using checklist model
       const checklistModel = AIOpenAIService.getChecklistModel();
@@ -92,6 +139,7 @@ export class VisaChecklistEngineService {
         visaType,
       });
 
+      const startTime = Date.now();
       const response = await AIOpenAIService.getOpenAIClient().chat.completions.create({
         model: checklistModel,
         messages: [
@@ -103,6 +151,11 @@ export class VisaChecklistEngineService {
         response_format: { type: 'json_object' }, // Force JSON output
       });
 
+      const responseTime = Date.now() - startTime;
+      const inputTokens = response.usage?.prompt_tokens || 0;
+      const outputTokens = response.usage?.completion_tokens || 0;
+      const totalTokens = inputTokens + outputTokens;
+
       const rawContent = response.choices[0]?.message?.content || '{}';
 
       logInfo('[VisaChecklistEngine] GPT-4 response received', {
@@ -110,31 +163,50 @@ export class VisaChecklistEngineService {
         countryCode,
         visaType,
         responseLength: rawContent.length,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
       });
 
       // Step 5: Parse and validate JSON
       let parsed: any;
+      let jsonValidationRetries = 0;
+      let jsonValidationPassed = false;
       try {
         parsed = JSON.parse(rawContent);
+        jsonValidationPassed = true;
       } catch (parseError) {
+        jsonValidationRetries++;
         // Try to extract JSON from markdown code blocks
         const jsonMatch = rawContent.match(/```json\s*([\s\S]*?)\s*```/i);
         if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[1]);
-        } else {
+          try {
+            parsed = JSON.parse(jsonMatch[1]);
+            jsonValidationPassed = true;
+          } catch (e) {
+            // Continue to next attempt
+          }
+        }
+        if (!jsonValidationPassed) {
           const objectMatch = rawContent.match(/\{[\s\S]*\}/);
           if (objectMatch) {
-            parsed = JSON.parse(objectMatch[0]);
-          } else {
-            throw new Error('No valid JSON found in response');
+            try {
+              parsed = JSON.parse(objectMatch[0]);
+              jsonValidationPassed = true;
+            } catch (e) {
+              // Continue
+            }
           }
+        }
+        if (!jsonValidationPassed) {
+          throw new Error('No valid JSON found in response');
         }
       }
 
       // Step 6: Validate against schema
-      const validationResult = ChecklistResponseSchema.safeParse(parsed);
+      let validationResult = ChecklistResponseSchema.safeParse(parsed);
 
       if (!validationResult.success) {
+        jsonValidationRetries++;
         logError(
           '[VisaChecklistEngine] Schema validation failed',
           new Error('Invalid checklist structure'),
@@ -144,6 +216,59 @@ export class VisaChecklistEngineService {
             errors: validationResult.error.errors,
           }
         );
+      } else {
+        // Additional validation: ensure all base documents are present and no extras
+        const responseDocTypes = new Set(
+          validationResult.data.checklist.map((item) => item.documentType)
+        );
+        const baseDocTypes = new Set(baseDocuments.map((doc) => doc.documentType));
+
+        const missing = Array.from(baseDocTypes).filter((dt) => !responseDocTypes.has(dt));
+        const extra = Array.from(responseDocTypes).filter((dt) => !baseDocTypes.has(dt));
+
+        if (missing.length > 0 || extra.length > 0) {
+          logWarn('[VisaChecklistEngine] Document type mismatch', {
+            countryCode,
+            visaType,
+            missing,
+            extra,
+          });
+
+          // Fix: remove extras, add missing with defaults
+          const fixedChecklist = [...validationResult.data.checklist];
+
+          // Remove extras
+          const filtered = fixedChecklist.filter((item) => baseDocTypes.has(item.documentType));
+
+          // Add missing
+          for (const docType of missing) {
+            const baseDoc = baseDocuments.find((d) => d.documentType === docType);
+            if (baseDoc) {
+              filtered.push({
+                id: `DOC_${filtered.length + 1}`,
+                documentType: baseDoc.documentType,
+                category: baseDoc.category as 'required' | 'highly_recommended' | 'optional',
+                required: baseDoc.required,
+                name: baseDoc.documentType,
+                nameUz: baseDoc.documentType,
+                nameRu: baseDoc.documentType,
+                description: `Required document: ${baseDoc.documentType}`,
+                appliesToThisApplicant: true,
+                extraRecommended: false,
+                group: 'other',
+                priority: filtered.length + 1,
+              });
+            }
+          }
+
+          parsed = { checklist: filtered };
+          // Re-validate after fix
+          validationResult = ChecklistResponseSchema.safeParse(parsed);
+        }
+      }
+
+      if (!validationResult.success) {
+        jsonValidationRetries++;
 
         // Try to fix common issues
         const fixed = this.fixCommonIssues(parsed);
@@ -156,9 +281,38 @@ export class VisaChecklistEngineService {
         }
 
         parsed = fixedValidation.data;
+        jsonValidationPassed = true;
       } else {
         parsed = validationResult.data;
+        jsonValidationPassed = true;
       }
+
+      // Get condition warnings from base documents
+      const { buildBaseChecklistFromRules } = await import('./checklist-rules.service');
+      const baseDocuments = buildBaseChecklistFromRules(aiUserContext, ruleSet);
+      const conditionWarnings: string[] = [];
+      // Note: condition warnings are logged in buildBaseChecklistFromRules, but we'll capture them here if needed
+
+      // Extract application ID for logging
+      const applicationId = extractApplicationId(aiUserContext);
+
+      // Get country name (try to get from context or use code)
+      const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
+
+      // Log structured checklist generation
+      logChecklistGeneration({
+        applicationId,
+        country: countryName,
+        countryCode,
+        visaType,
+        mode: 'rules',
+        jsonValidationPassed,
+        jsonValidationRetries,
+        itemCount: parsed.checklist.length,
+        conditionWarnings: conditionWarnings.length > 0 ? conditionWarnings : undefined,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
+      });
 
       logInfo('[VisaChecklistEngine] Checklist generated successfully', {
         countryCode,
@@ -168,6 +322,21 @@ export class VisaChecklistEngineService {
 
       return parsed as ChecklistResponse;
     } catch (error) {
+      const applicationId = extractApplicationId(aiUserContext);
+      const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
+
+      logChecklistGeneration({
+        applicationId,
+        country: countryName,
+        countryCode,
+        visaType,
+        mode: 'rules',
+        jsonValidationPassed: false,
+        jsonValidationRetries: 0,
+        itemCount: 0,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
       logError('[VisaChecklistEngine] Checklist generation failed', error as Error, {
         countryCode,
         visaType,
@@ -194,9 +363,58 @@ export class VisaChecklistEngineService {
   }
 
   /**
-   * Build system prompt for checklist generation
+   * Build system prompt for checklist generation (COMPACT VERSION)
+   * GPT only enriches fields, does NOT invent new documentTypes
    */
   private static buildSystemPrompt(
+    countryCode: string,
+    visaType: string,
+    ruleSet: VisaRuleSetData,
+    embassySummary?: string
+  ): string {
+    const embassyContext = embassySummary
+      ? `\nEMBASSY SUMMARY:\n${embassySummary.substring(0, 500)}\n`
+      : '';
+
+    return `You are a visa checklist enricher. Your ONLY job: enrich base documents with names, descriptions, and personalization flags.
+
+CRITICAL RULES:
+- You MUST output exactly the documentTypes provided in BASE_DOCUMENTS
+- You MUST NOT add new documentTypes
+- You MUST NOT remove documentTypes
+- You MUST NOT change category or required status
+- You ONLY enrich: name, nameUz, nameRu, description, appliesToThisApplicant, reasonIfApplies
+
+OUTPUT SCHEMA:
+{
+  "checklist": [
+    {
+      "id": "string",
+      "documentType": "string",      // MUST match BASE_DOCUMENTS exactly
+      "category": "required" | "highly_recommended" | "optional",  // MUST match BASE_DOCUMENTS
+      "required": boolean,           // MUST match BASE_DOCUMENTS
+      "name": "string",              // EN name
+      "nameUz": "string",            // Uzbek translation
+      "nameRu": "string",            // Russian translation
+      "description": "string",       // 1-2 sentences
+      "appliesToThisApplicant": boolean,  // Does THIS applicant need it?
+      "reasonIfApplies": "string",   // Why it applies (if appliesToThisApplicant=true)
+      "extraRecommended": boolean,
+      "group": "identity" | "financial" | "travel" | "education" | "employment" | "ties" | "other",
+      "priority": number,
+      "dependsOn": ["string"]
+    }
+  ]
+}
+
+${embassyContext}Return ONLY valid JSON, no markdown.`;
+  }
+
+  /**
+   * OLD SYSTEM PROMPT (kept for reference/rollback)
+   * Enable via feature flag: USE_COMPACT_CHECKLIST_PROMPTS=false
+   */
+  private static buildSystemPromptLegacy(
     countryCode: string,
     visaType: string,
     ruleSet: VisaRuleSetData
@@ -295,30 +513,88 @@ Return ONLY valid JSON matching the schema, no other text.`;
   }
 
   /**
-   * Build user prompt with AIUserContext
+   * Build user prompt with base documents (COMPACT VERSION)
+   * GPT only enriches, does NOT decide which documents to include
    */
   private static buildUserPrompt(
+    aiUserContext: AIUserContext,
+    baseDocuments: Array<{ documentType: string; category: string; required: boolean }>,
+    previousChecklist?: ChecklistItem[]
+  ): string {
+    // Convert to canonical format for consistent GPT input
+    const canonical = buildCanonicalAIUserContext(aiUserContext);
+    const profile = canonical.applicantProfile;
+    const riskScore = canonical.riskScore;
+
+    // Compact applicant context
+    const applicantContext = {
+      sponsorType: profile.sponsorType,
+      currentStatus: profile.currentStatus,
+      hasInternationalTravel: profile.hasInternationalTravel,
+      previousVisaRejections: profile.previousVisaRejections,
+      bankBalanceUSD: profile.bankBalanceUSD,
+      monthlyIncomeUSD: profile.monthlyIncomeUSD,
+      hasProperty: profile.hasPropertyInUzbekistan,
+      hasFamily: profile.hasFamilyInUzbekistan,
+      hasChildren: profile.hasChildren,
+      riskLevel: riskScore.level,
+      riskProbability: riskScore.probabilityPercent,
+    };
+
+    let prompt = `BASE_DOCUMENTS (enrich these exact documents, no additions/removals):
+${JSON.stringify(baseDocuments, null, 2)}
+
+APPLICANT_CONTEXT:
+${JSON.stringify(applicantContext, null, 2)}`;
+
+    if (previousChecklist && previousChecklist.length > 0) {
+      prompt += `\n\nPREVIOUS_CHECKLIST (preserve IDs where possible):
+${JSON.stringify(
+  previousChecklist.map((item) => ({ id: item.id, documentType: item.documentType })),
+  null,
+  2
+)}`;
+    }
+
+    prompt += `\n\nFor each BASE_DOCUMENT:
+1. Set appliesToThisApplicant (true if document applies to this applicant based on context)
+2. Set reasonIfApplies (brief explanation if appliesToThisApplicant=true)
+3. Add name, nameUz, nameRu, description
+4. Keep documentType, category, required EXACTLY as in BASE_DOCUMENTS
+
+Return ONLY valid JSON.`;
+
+    return prompt;
+  }
+
+  /**
+   * OLD USER PROMPT (kept for reference/rollback)
+   */
+  private static buildUserPromptLegacy(
     aiUserContext: AIUserContext,
     ruleSet: VisaRuleSetData,
     previousChecklist?: ChecklistItem[]
   ): string {
-    const summary = aiUserContext.questionnaireSummary;
-    const riskScore = aiUserContext.riskScore;
+    // Convert to canonical format for consistent GPT input
+    const canonical = buildCanonicalAIUserContext(aiUserContext);
+    const profile = canonical.applicantProfile;
+    const riskScore = canonical.riskScore;
 
-    // Build explicit, human-readable context summary
-    const purpose = summary?.travelInfo?.purpose || summary?.visaType || 'tourism';
-    const duration = summary?.travelInfo?.duration || summary?.duration || 'Not specified';
-    const sponsorType = summary?.sponsorType || (summary?.financialInfo?.sponsorDetails ? 'sponsor' : 'self');
-    const employmentStatus = summary?.employment?.currentStatus || 'Not specified';
-    const hasInvitation = summary?.hasUniversityInvitation || summary?.hasOtherInvitation || false;
-    const travelHistory = summary?.hasInternationalTravel || summary?.travelHistory?.traveledBefore || false;
-    const previousRefusals = summary?.previousVisaRejections || summary?.travelHistory?.hasRefusals || false;
-    const bankBalance = summary?.bankBalanceUSD || summary?.financialInfo?.selfFundsUSD;
-    const monthlyIncome = summary?.monthlyIncomeUSD || summary?.employment?.monthlySalaryUSD;
-    const hasProperty = summary?.hasPropertyInUzbekistan || summary?.ties?.propertyDocs || false;
-    const hasFamily = summary?.hasFamilyInUzbekistan || summary?.ties?.familyTies || false;
-    const hasChildren = summary?.hasChildren && summary.hasChildren !== 'no';
-    const age = summary?.age || aiUserContext.userProfile?.age;
+    // Build explicit, human-readable context summary from canonical format
+    const purpose = profile.visaType === 'student' ? 'study' : 'tourism';
+    const duration = profile.duration === 'unknown' ? 'Not specified' : profile.duration;
+    const sponsorType = profile.sponsorType;
+    const employmentStatus =
+      profile.currentStatus === 'unknown' ? 'Not specified' : profile.currentStatus;
+    const hasInvitation = profile.hasUniversityInvitation || profile.hasOtherInvitation;
+    const travelHistory = profile.hasInternationalTravel;
+    const previousRefusals = profile.previousVisaRejections;
+    const bankBalance = profile.bankBalanceUSD;
+    const monthlyIncome = profile.monthlyIncomeUSD;
+    const hasProperty = profile.hasPropertyInUzbekistan;
+    const hasFamily = profile.hasFamilyInUzbekistan;
+    const hasChildren = profile.hasChildren;
+    const age = profile.age;
 
     let prompt = `Generate a personalized visa document checklist using the VISA_RULE_SET and the following applicant information:
 
@@ -327,13 +603,13 @@ APPLICANT PROFILE:
 - Stay duration: ${duration}
 - Employment status: ${employmentStatus}
 - Sponsor: ${sponsorType === 'self' ? 'Self-funded' : `Sponsored by ${sponsorType}`}
-- Approximate income/savings: ${bankBalance ? `~$${bankBalance}` : monthlyIncome ? `~$${monthlyIncome}/month` : 'Not specified'}
+- Approximate income/savings: ${bankBalance !== null ? `~$${bankBalance}` : monthlyIncome !== null ? `~$${monthlyIncome}/month` : 'Not specified'}
 - Has invitation letter: ${hasInvitation ? 'Yes' : 'No'}
 - Travel history: ${travelHistory ? 'Has previous international travel' : 'No previous international travel'}
 - Previous visa refusals: ${previousRefusals ? 'Yes' : 'No'}
 - Ties to home country: ${hasProperty ? 'Has property' : ''}${hasFamily ? (hasProperty ? ', has family' : 'Has family') : ''}${hasChildren ? (hasProperty || hasFamily ? ', has children' : 'Has children') : ''}${!hasProperty && !hasFamily && !hasChildren ? 'Standard ties' : ''}
-- Age: ${age || 'Not specified'}
-- Risk level: ${riskScore ? `${riskScore.level} (${riskScore.probabilityPercent}% probability)` : 'Not calculated'}
+- Age: ${age !== null ? age : 'Not specified'}
+- Risk level: ${riskScore.level} (${riskScore.probabilityPercent}% probability)
 
 VISA_RULE_SET.requiredDocuments:
 ${JSON.stringify(ruleSet.requiredDocuments, null, 2)}

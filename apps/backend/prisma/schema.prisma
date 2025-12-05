@@ -584,6 +584,8 @@ model EmbassySource {
   updatedAt     DateTime  @updatedAt
 
   ruleSets VisaRuleSet[]
+  pageContents EmbassyPageContent[]
+  candidates VisaRuleSetCandidate[]
 
   @@unique([countryCode, visaType, url])
   @@index([countryCode, visaType])
@@ -611,6 +613,7 @@ model VisaRuleSet {
 
   source EmbassySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   versions VisaRuleVersion[]
+  changeLogs VisaRuleSetChangeLog[]
 
   @@unique([countryCode, visaType, version])
   @@index([countryCode, visaType])
@@ -631,5 +634,67 @@ model VisaRuleVersion {
 
   @@index([ruleSetId])
   @@index([version])
+  @@index([createdAt])
+}
+
+model EmbassyPageContent {
+  id            String   @id @default(cuid())
+  sourceId      String   // Link to EmbassySource
+  url           String   // URL that was crawled
+  cleanedText   String   @db.Text // Cleaned plain text content
+  html          String?  @db.Text // Optional: raw HTML (for debugging)
+  title         String?  // Page title
+  status        String   @default("success") // "success" | "failed" | "pending"
+  httpStatus    Int?     // HTTP status code (200, 404, 403, etc.)
+  errorMessage  String?  // Error message if fetch failed
+  metadata      Json?    // Additional metadata (contentType, contentLength, etc.)
+  fetchedAt     DateTime @default(now())
+
+  source EmbassySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([url])
+  @@index([fetchedAt])
+  @@index([status])
+}
+
+model VisaRuleSetCandidate {
+  id            String   @id @default(cuid())
+  sourceId      String   // Link to EmbassySource
+  pageContentId String?  // Link to EmbassyPageContent used for extraction
+  countryCode   String   // ISO 3166-1 alpha-2
+  visaType       String   // "student" | "tourist" | "work" | etc.
+  data           Json     // Proposed VisaRuleSetData (not yet approved)
+  confidence     Float?   // Extraction confidence score (0-1)
+  extractionMetadata Json? // GPT-4 extraction metadata
+  status         String   @default("pending") // "pending" | "approved" | "rejected"
+  reviewedBy     String?  // Admin user ID who reviewed
+  reviewedAt     DateTime?
+  reviewNotes    String?  // Admin review notes
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  source EmbassySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  pageContent EmbassyPageContent? @relation(fields: [pageContentId], references: [id], onDelete: SetNull)
+
+  @@index([sourceId])
+  @@index([countryCode, visaType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model VisaRuleSetChangeLog {
+  id            String   @id @default(cuid())
+  ruleSetId     String   // Link to VisaRuleSet
+  changeType    String   // "created" | "updated" | "approved" | "rejected" | "condition_added" | "condition_modified"
+  changedBy     String?  // User ID or "system"
+  changeDetails Json?    // Structured change details
+  description   String?  // Human-readable description
+  createdAt     DateTime @default(now())
+
+  ruleSet VisaRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@index([ruleSetId])
+  @@index([changeType])
   @@index([createdAt])
 }

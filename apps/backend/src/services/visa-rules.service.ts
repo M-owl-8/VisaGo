@@ -14,6 +14,11 @@ const prisma = new PrismaClient();
  * This matches the JSON schema expected from GPT-4 extraction
  */
 export interface VisaRuleSetData {
+  // Version/Feature flag for conditional logic
+  // If not present, assume version 1 (no conditions)
+  // Version 2+ supports condition field
+  version?: number; // Default: 1
+
   // Required Documents
   requiredDocuments: Array<{
     documentType: string; // e.g., "passport", "bank_statement", "i20_form"
@@ -21,6 +26,14 @@ export interface VisaRuleSetData {
     description?: string;
     validityRequirements?: string; // e.g., "6 months validity remaining"
     formatRequirements?: string; // e.g., "Original + 2 copies"
+    // Condition for conditional inclusion (version 2+)
+    // Examples:
+    // - "sponsorType !== 'self'" (include only if sponsored)
+    // - "currentStatus === 'employed'" (include only if employed)
+    // - "previousVisaRejections === true" (include only if previous refusals)
+    // - "(sponsorType !== 'self') && (currentStatus === 'employed')" (AND logic)
+    // - "(isStudent === true) || (hasUniversityInvitation === true)" (OR logic)
+    condition?: string;
   }>;
 
   // Financial Requirements
@@ -334,6 +347,54 @@ export class VisaRulesService {
       logError('[VisaRules] Error rejecting rule set', error as Error, {
         ruleSetId,
         rejectedBy,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update rule set data (admin action)
+   * Used for editing conditions and other fields
+   */
+  static async updateRuleSetData(
+    ruleSetId: string,
+    data: VisaRuleSetData,
+    updatedBy: string
+  ): Promise<{ success: boolean; id: string }> {
+    try {
+      const ruleSet = await prisma.visaRuleSet.findUnique({
+        where: { id: ruleSetId },
+      });
+
+      if (!ruleSet) {
+        throw new Error('Rule set not found');
+      }
+
+      // Serialize data for database
+      const dataSerialized = JSON.stringify(data);
+
+      // Update rule set
+      await prisma.visaRuleSet.update({
+        where: { id: ruleSetId },
+        data: {
+          data: dataSerialized as any,
+          updatedAt: new Date(),
+          createdBy: updatedBy,
+        },
+      });
+
+      logInfo('[VisaRules] Rule set data updated', {
+        ruleSetId,
+        updatedBy,
+        countryCode: ruleSet.countryCode,
+        visaType: ruleSet.visaType,
+      });
+
+      return { success: true, id: ruleSetId };
+    } catch (error) {
+      logError('[VisaRules] Error updating rule set data', error as Error, {
+        ruleSetId,
+        updatedBy,
       });
       throw error;
     }
