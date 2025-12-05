@@ -2092,6 +2092,9 @@ Generate checklist with at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is
                 return null;
             }
             const parsed = parseResult.parsed;
+            if (!parsed || !parsed.checklist) {
+                throw new Error('Invalid checklist response: missing checklist array');
+            }
             // Auto-translate missing translations if needed
             if (parseResult.validation.warnings.some((w) => w.includes('Missing'))) {
                 const { autoTranslateChecklistItems } = await Promise.resolve().then(() => __importStar(require('../utils/translation-helper')));
@@ -2104,7 +2107,7 @@ Generate checklist with at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is
             });
             return {
                 type: visaType,
-                checklist: parsed.checklist,
+                checklist: parsed.checklist, // Type assertion needed due to legacy format compatibility
             };
         }
         catch (error) {

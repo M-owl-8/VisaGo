@@ -545,298 +545,40 @@ export function buildApplicantProfileFromQuestionnaire(
         : visaTypeName;
 
   // Derive ageRange from questionnaire (if DOB/age available)
-  const age = questionnaireData?.age || questionnaireData?.summary?.age || questionnaireData?.personalInfo?.dateOfBirth 
-    ? (() => {
-        const dob = questionnaireData?.personalInfo?.dateOfBirth;
-        if (dob) {
-          const birthYear = new Date(dob).getFullYear();
-          const currentYear = new Date().getFullYear();
-          return currentYear - birthYear;
-        }
-        return questionnaireData?.age || questionnaireData?.summary?.age;
-      })()
-    : undefined;
-  const ageRange: 'minor' | 'adult' | undefined = age !== undefined ? (age < 18 ? 'minor' : 'adult') : undefined;
+  const age =
+    questionnaireData?.age ||
+    questionnaireData?.summary?.age ||
+    questionnaireData?.personalInfo?.dateOfBirth
+      ? (() => {
+          const dob = questionnaireData?.personalInfo?.dateOfBirth;
+          if (dob) {
+            const birthYear = new Date(dob).getFullYear();
+            const currentYear = new Date().getFullYear();
+            return currentYear - birthYear;
+          }
+          return questionnaireData?.age || questionnaireData?.summary?.age;
+        })()
+      : undefined;
+  const ageRange: 'minor' | 'adult' | undefined =
+    age !== undefined ? (age < 18 ? 'minor' : 'adult') : undefined;
 
   // Derive isRetired
-  const isRetired = currentStatus === 'retired' || 
+  const isRetired =
+    currentStatus === 'retired' ||
     questionnaireData?.employment?.currentStatus === 'retired' ||
     questionnaireData?.summary?.currentStatus === 'retired' ||
     false;
 
   // Derive hasProperty
-  const hasProperty = questionnaireData?.summary?.hasPropertyInUzbekistan === true ||
+  const hasProperty =
+    questionnaireData?.summary?.hasPropertyInUzbekistan === true ||
     questionnaireData?.ties?.propertyDocs === true ||
     false;
 
   // Derive hasBusiness
-  const hasBusiness = currentStatus === 'entrepreneur' ||
-    currentStatus === 'self_employed' ||
-    questionnaireData?.employment?.currentStatus === 'self_employed' ||
-    questionnaireData?.employment?.currentStatus === 'entrepreneur' ||
-    false;
-
-  // Extract country-specific fields
-  const countrySpecific: ApplicantProfile['countrySpecific'] = {};
-  if (countryCode === 'US') {
-    countrySpecific.us = {
-      sevisId: questionnaireData?.education?.sevisId || questionnaireData?.summary?.sevisId,
-    };
-  }
-  if (countryCode === 'GB' || countryCode === 'UK') {
-    countrySpecific.uk = {
-      casNumber: questionnaireData?.education?.casNumber || questionnaireData?.summary?.casNumber,
-    };
-  }
-  if (countryCode === 'AU') {
-    countrySpecific.au = {
-      coeNumber: questionnaireData?.education?.coeNumber || questionnaireData?.summary?.coeNumber,
-    };
-  }
-  if (countryCode === 'CA') {
-    countrySpecific.ca = {
-      dliNumber: questionnaireData?.education?.dliNumber || questionnaireData?.summary?.dliNumber,
-    };
-  }
-  if (countryCode === 'NZ') {
-    countrySpecific.nz = {
-      nzqaNumber: questionnaireData?.education?.nzqaNumber || questionnaireData?.summary?.nzqaNumber,
-    };
-  }
-
-  const profile: ApplicantProfile = {
-    travel: {
-      purpose,
-      duration,
-      previousTravel: traveledBefore,
-    },
-    employment: {
-      currentStatus,
-      hasStableIncome,
-    },
-    financial: {
-      financialSituation,
-      isSponsored,
-    },
-    familyAndTies: {
-      maritalStatus,
-      hasChildren,
-      hasStrongTies,
-    },
-    language: {
-      englishLevel,
-    },
-    meta: {
-      countryCode,
-      visaType,
-    },
-    ageRange,
-    isRetired: isRetired || undefined,
-    hasProperty: hasProperty || undefined,
-    hasBusiness: hasBusiness || undefined,
-    countrySpecific: Object.keys(countrySpecific).length > 0 ? countrySpecific : undefined,
-  };
-
-  // Log extended profile
-  logInfo('[Checklist][ApplicantProfile] Built extended profile', {
-    countryCode,
-    visaType,
-    ageRange,
-    isRetired,
-    hasProperty,
-    hasBusiness,
-    countrySpecific: Object.keys(countrySpecific).length > 0 ? 'present' : 'none',
-  });
-
-  return profile;
-}
-
-/**
- * Legacy function - kept for backward compatibility with visa-brain types
- * @deprecated Use buildApplicantProfileFromQuestionnaire() for checklist personalization
- */
-export function buildApplicantProfile(
-  ctx: AIUserContext,
-  countryName: string,
-  visaTypeLabel: string
-): VisaBrainApplicantProfile {
-  const { userProfile, application, questionnaireSummary } = ctx;
-
-  // Extract nationality/citizenship (default to UZ for Uzbekistan-based applicants)
-  const nationality = questionnaireSummary?.citizenship || userProfile.citizenship || 'UZ';
-  const residenceCountry =
-    questionnaireSummary?.personalInfo?.currentResidenceCountry || 'Uzbekistan';
-
-  // Extract trip purpose from questionnaire
-  const tripPurpose = questionnaireSummary?.travelInfo?.purpose || questionnaireSummary?.notes;
-
-  // Extract travel dates if available
-  const plannedTravelDates = questionnaireSummary?.travelInfo?.plannedDates
-    ? {
-        start: questionnaireSummary.travelInfo.plannedDates,
-        // End date would need to be calculated from duration, not available in current schema
-      }
-    : undefined;
-
-  // Extract sponsor information
-  const sponsorType = mapSponsorType(
-    questionnaireSummary?.sponsorType ||
-      questionnaireSummary?.financialInfo?.sponsorDetails?.relationship
-  );
-  const sponsorDescription =
-    sponsorType === 'other'
-      ? questionnaireSummary?.financialInfo?.sponsorDetails?.relationship
-      : undefined;
-
-  // Extract financial information
-  const bankBalanceUSD =
-    questionnaireSummary?.bankBalanceUSD || questionnaireSummary?.financialInfo?.selfFundsUSD;
-  const monthlyIncomeUSD =
-    questionnaireSummary?.monthlyIncomeUSD || questionnaireSummary?.employment?.monthlySalaryUSD;
-
-  // Extract travel history
-  const hasTravelHistory =
-    questionnaireSummary?.hasInternationalTravel ??
-    questionnaireSummary?.travelHistory?.traveledBefore ??
-    (questionnaireSummary?.travelHistory?.visitedCountries?.length ?? 0) > 0;
-
-  // Extract property and family ties
-  const hasPropertyInHomeCountry =
-    questionnaireSummary?.hasPropertyInUzbekistan ??
-    questionnaireSummary?.ties?.propertyDocs ??
-    false;
-  const hasFamilyInHomeCountry =
-    questionnaireSummary?.hasFamilyInUzbekistan ?? questionnaireSummary?.ties?.familyTies ?? false;
-
-  // Normalize destination country code for template lookup
-  const normalizedCountryCode =
-    normalizeCountryCodeFromName(countryName) || application.country || nationality;
-
-  // Build the profile
-  const profile: VisaBrainApplicantProfile = {
-    userId: userProfile.userId,
-    nationality,
-    residenceCountry,
-    destinationCountryCode: normalizedCountryCode,
-    destinationCountryName: countryName,
-    visaTypeCode: application.visaType,
-    visaTypeLabel,
-    tripPurpose,
-    durationCategory: mapDurationCategory(
-      questionnaireSummary?.duration || questionnaireSummary?.travelInfo?.duration
-    ),
-    plannedTravelDates,
-    sponsorType,
-    sponsorDescription,
-    hasTravelHistory,
-    previousVisaRefusals:
-      questionnaireSummary?.previousVisaRejections ??
-      questionnaireSummary?.travelHistory?.hasRefusals ??
-      false,
-    previousOverstays: questionnaireSummary?.previousOverstay ?? false,
-    hasPropertyInHomeCountry,
-    hasFamilyInHomeCountry,
-    bankBalanceUSD,
-    monthlyIncomeUSD,
-    appLanguage: userProfile.appLanguage,
-    age: userProfile.age ?? questionnaireSummary?.age,
-    citizenshipCode: nationality,
-  };
-
-  return profile;
-}
-
-    questionnaireData?.duration ||
-    questionnaireData?.summary?.duration ||
-    questionnaireData?.travelInfo?.duration ||
-    '1_3_months';
-  const traveledBefore =
-    questionnaireData?.traveledBefore ??
-    questionnaireData?.summary?.previousTravels ??
-    questionnaireData?.travelHistory?.traveledBefore ??
-    questionnaireData?.summary?.hasInternationalTravel ??
-    false;
-  const currentStatus =
-    questionnaireData?.currentStatus ||
-    questionnaireData?.summary?.currentStatus ||
-    questionnaireData?.employment?.currentStatus ||
-    'employee';
-  const financialSituation =
-    questionnaireData?.financialSituation ||
-    questionnaireData?.summary?.financialSituation ||
-    questionnaireData?.travelInfo?.funding ||
-    'stable_income';
-  const maritalStatus =
-    questionnaireData?.maritalStatus || questionnaireData?.summary?.maritalStatus || 'single';
-  const hasChildren =
-    questionnaireData?.hasChildren || questionnaireData?.summary?.hasChildren || 'no';
-  const englishLevel =
-    questionnaireData?.englishLevel ||
-    questionnaireData?.summary?.englishLevel ||
-    questionnaireData?.summary?.englishLevel ||
-    'intermediate';
-
-  // Derive boolean flags
-  const isSponsored =
-    financialSituation === 'sponsor' ||
-    financialSituation === 'mix' ||
-    questionnaireData?.summary?.sponsorType !== undefined ||
-    questionnaireData?.financialInfo?.sponsorDetails !== undefined;
-
-  const hasStableIncome =
-    currentStatus === 'employee' ||
-    currentStatus === 'employed' ||
+  const hasBusiness =
     currentStatus === 'entrepreneur' ||
     currentStatus === 'self_employed' ||
-    financialSituation === 'stable_income';
-
-  // Derive strong ties (married + children OR property OR family)
-  const hasStrongTies =
-    maritalStatus === 'married' ||
-    hasChildren !== 'no' ||
-    questionnaireData?.summary?.hasPropertyInUzbekistan === true ||
-    questionnaireData?.summary?.hasFamilyInUzbekistan === true ||
-    questionnaireData?.ties?.propertyDocs === true ||
-    questionnaireData?.ties?.familyTies === true;
-
-  // Extract country code and visa type from application
-  const countryCode = application.country.code.toUpperCase();
-  const visaTypeName = application.visaType.name.toLowerCase();
-  const visaType =
-    visaTypeName.includes('student') || visaTypeName.includes('study')
-      ? 'student'
-      : visaTypeName.includes('tourist') || visaTypeName.includes('tourism')
-        ? 'tourist'
-        : visaTypeName;
-
-  // Derive ageRange from questionnaire (if DOB/age available)
-  const age = questionnaireData?.age || questionnaireData?.summary?.age || questionnaireData?.personalInfo?.dateOfBirth 
-    ? (() => {
-        const dob = questionnaireData?.personalInfo?.dateOfBirth;
-        if (dob) {
-          const birthYear = new Date(dob).getFullYear();
-          const currentYear = new Date().getFullYear();
-          return currentYear - birthYear;
-        }
-        return questionnaireData?.age || questionnaireData?.summary?.age;
-      })()
-    : undefined;
-  const ageRange: 'minor' | 'adult' | undefined = age !== undefined ? (age < 18 ? 'minor' : 'adult') : undefined;
-
-  // Derive isRetired
-  const isRetired = currentStatus === 'retired' || 
-    questionnaireData?.employment?.currentStatus === 'retired' ||
-    questionnaireData?.summary?.currentStatus === 'retired' ||
-    false;
-
-  // Derive hasProperty
-  const hasProperty = questionnaireData?.summary?.hasPropertyInUzbekistan === true ||
-    questionnaireData?.ties?.propertyDocs === true ||
-    false;
-
-  // Derive hasBusiness
-  const hasBusiness = currentStatus === 'entrepreneur' ||
-    currentStatus === 'self_employed' ||
     questionnaireData?.employment?.currentStatus === 'self_employed' ||
     questionnaireData?.employment?.currentStatus === 'entrepreneur' ||
     false;
@@ -865,7 +607,8 @@ export function buildApplicantProfile(
   }
   if (countryCode === 'NZ') {
     countrySpecific.nz = {
-      nzqaNumber: questionnaireData?.education?.nzqaNumber || questionnaireData?.summary?.nzqaNumber,
+      nzqaNumber:
+        questionnaireData?.education?.nzqaNumber || questionnaireData?.summary?.nzqaNumber,
     };
   }
 

@@ -8,183 +8,149 @@ import Redis from 'ioredis';
 
 let redisClient: Redis | null = null;
 let redisInitialized = false;
-let redisHealthy = false;
 
-// Initialize Redis client with timeout
-if (process.env.REDIS_URL) {
+interface ChecklistRateLimitInfo {
+  generationsUsed: number;
+  generationsRemaining: number;
+  validationsUsed: number;
+  validationsRemaining: number;
+  isChecklistLimited: boolean;
+  isValidationLimited: boolean;
+  resetTime: string;
+}
+
+/**
+ * Initialize Redis client for rate limiting
+ */
+export function initializeChecklistRateLimiter(redisUrl?: string): void {
+  if (redisInitialized) {
+    return;
+  }
+
   try {
-    redisClient = new Redis(process.env.REDIS_URL, {
-      connectTimeout: 2000,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-    });
-
-    // Test connection immediately
-    redisClient
-      .ping()
-      .then(() => {
-        redisHealthy = true;
-        console.log('[Checklist Rate Limit] Redis connected successfully');
-      })
-      .catch((err) => {
-        console.warn('[Checklist Rate Limit] Redis connection failed:', err.message);
-        redisClient = null;
+    if (redisUrl) {
+      redisClient = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        retryStrategy: (times) => {
+          const delay = Math.min(times * 50, 2000);
+          return delay;
+        },
       });
 
-    redisInitialized = true;
+      redisClient.on('error', (err) => {
+        console.error('Redis rate limiter connection error:', err);
+      });
+
+      redisClient.on('connect', () => {
+        console.log('Redis rate limiter connected');
+      });
+
+      redisInitialized = true;
+    } else {
+      console.warn('Redis URL not provided for checklist rate limiter, using in-memory fallback');
+    }
   } catch (error) {
-    console.warn('[Checklist Rate Limit] Failed to initialize Redis:', error);
-    redisClient = null;
+    console.error('Failed to initialize Redis for rate limiter:', error);
   }
 }
 
 const CHECKLIST_GENERATION_LIMIT = 20; // checklist generations per day
 const DOCUMENT_VALIDATION_LIMIT = 50; // document validations per day
-const LIMIT_WINDOW = 24 * 60 * 60; // 24 hours in seconds
-
-interface ChecklistRateLimitInfo {
-  userId: string;
-  checklistsUsed: number;
-  checklistsRemaining: number;
-  validationsUsed: number;
-  validationsRemaining: number;
-  resetTime: Date;
-  isChecklistLimited: boolean;
-  isValidationLimited: boolean;
-}
 
 /**
  * Helper function to execute Redis command with timeout
  */
-async function executeRedisWithTimeout<T>(
-  operation: () => Promise<T>,
-  timeoutMs: number = 1000
-): Promise<T | null> {
-  return Promise.race([
-    operation(),
-    new Promise<null>((_, reject) =>
-      setTimeout(() => reject(new Error('Redis operation timeout')), timeoutMs)
-    ),
-  ]).catch(() => null);
+async function executeRedisCommand<T>(
+  command: (client: Redis) => Promise<T>,
+  fallback: T
+): Promise<T> {
+  if (!redisClient || !redisInitialized) {
+    return fallback;
+  }
+
+  try {
+    return await Promise.race([
+      command(redisClient),
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error('Redis command timeout')), 1000)
+      ),
+    ]);
+  } catch (error) {
+    console.error('Redis command error:', error);
+    return fallback;
+  }
 }
 
 /**
  * Get current usage for a user
  */
 export async function getChecklistRateLimitInfo(userId: string): Promise<ChecklistRateLimitInfo> {
-  const checklistKey = `checklist:limit:${userId}`;
-  const validationKey = `validation:limit:${userId}`;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = `checklist_rate_limit:${userId}:${today.toISOString().split('T')[0]}`;
 
-  try {
-    if (redisHealthy && redisClient) {
-      const [checklistData, validationData, checklistTtl, validationTtl] = await Promise.all([
-        executeRedisWithTimeout(() => redisClient!.get(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.get(validationKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(validationKey), 1000),
-      ]);
-
-      const checklistsUsed = checklistData ? parseInt(checklistData as string, 10) : 0;
-      const validationsUsed = validationData ? parseInt(validationData as string, 10) : 0;
-
-      // Calculate reset time from TTL
-      const resetTime = new Date();
-      const maxTtl = Math.max((checklistTtl as number) || 0, (validationTtl as number) || 0);
-      if (maxTtl > 0) {
-        resetTime.setSeconds(resetTime.getSeconds() + maxTtl);
-      } else {
-        resetTime.setHours(resetTime.getHours() + 24);
-      }
+  const result = await executeRedisCommand(
+    async (client) => {
+      const generations = await client.get(`${todayKey}:generations`);
+      const validations = await client.get(`${todayKey}:validations`);
 
       return {
-        userId,
-        checklistsUsed,
-        checklistsRemaining: Math.max(0, CHECKLIST_GENERATION_LIMIT - checklistsUsed),
-        validationsUsed,
-        validationsRemaining: Math.max(0, DOCUMENT_VALIDATION_LIMIT - validationsUsed),
-        resetTime,
-        isChecklistLimited: checklistsUsed >= CHECKLIST_GENERATION_LIMIT,
-        isValidationLimited: validationsUsed >= DOCUMENT_VALIDATION_LIMIT,
+        generationsUsed: parseInt(generations || '0', 10),
+        validationsUsed: parseInt(validations || '0', 10),
       };
-    }
+    },
+    { generationsUsed: 0, validationsUsed: 0 }
+  );
 
-    // Fallback: in-memory or Redis unavailable
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  } catch (error) {
-    console.error('Error getting checklist rate limit info:', error);
-    // Fallback: allow on error
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  }
+  const generationsRemaining = Math.max(0, CHECKLIST_GENERATION_LIMIT - result.generationsUsed);
+  const validationsRemaining = Math.max(0, DOCUMENT_VALIDATION_LIMIT - result.validationsUsed);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  return {
+    generationsUsed: result.generationsUsed,
+    generationsRemaining,
+    validationsUsed: result.validationsUsed,
+    validationsRemaining,
+    isChecklistLimited: result.generationsUsed >= CHECKLIST_GENERATION_LIMIT,
+    isValidationLimited: result.validationsUsed >= DOCUMENT_VALIDATION_LIMIT,
+    resetTime: tomorrow.toISOString(),
+  };
 }
 
 /**
  * Increment checklist generation counter for a user
  */
 export async function incrementChecklistGenerationCount(userId: string): Promise<number> {
-  const key = `checklist:limit:${userId}`;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = `checklist_rate_limit:${userId}:${today.toISOString().split('T')[0]}`;
 
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
+  const count = await executeRedisCommand(async (client) => {
+    const newCount = await client.incr(`${todayKey}:generations`);
+    await client.expire(`${todayKey}:generations`, 86400); // 24 hours
+    return newCount;
+  }, 1);
 
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing checklist generation count:', error);
-    return 1;
-  }
+  return count;
 }
 
 /**
  * Increment document validation counter for a user
  */
 export async function incrementDocumentValidationCount(userId: string): Promise<number> {
-  const key = `validation:limit:${userId}`;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = `checklist_rate_limit:${userId}:${today.toISOString().split('T')[0]}`;
 
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
+  const count = await executeRedisCommand(async (client) => {
+    const newCount = await client.incr(`${todayKey}:validations`);
+    await client.expire(`${todayKey}:validations`, 86400); // 24 hours
+    return newCount;
+  }, 1);
 
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing document validation count:', error);
-    return 1;
-  }
+  return count;
 }
 
 /**
@@ -221,897 +187,12 @@ export async function checklistRateLimitMiddleware(
       return res.status(429).json({
         success: false,
         error: {
-          message: `Daily checklist generation limit exceeded. You have used ${limitInfo.checklistsUsed}/${CHECKLIST_GENERATION_LIMIT} today.`,
+          message: `Daily checklist generation limit exceeded. You have used ${limitInfo.generationsUsed}/${CHECKLIST_GENERATION_LIMIT} today.`,
           code: 'RATE_LIMIT_EXCEEDED',
         },
         data: {
-          checklistsUsed: limitInfo.checklistsUsed,
-          checklistsRemaining: limitInfo.checklistsRemaining,
-          limit: CHECKLIST_GENERATION_LIMIT,
-          resetTime: limitInfo.resetTime,
-        },
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Checklist rate limit middleware error:', error);
-    // Allow on error to prevent blocking users
-    next();
-  }
-}
-
-/**
- * Middleware: Check if user has remaining document validation quota
- */
-export async function documentValidationRateLimitMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          message: 'Unauthorized',
-        },
-      });
-    }
-
-    // Only apply to document validation endpoints
-    if (!req.path.includes('/api/documents') || req.method === 'GET') {
-      return next();
-    }
-
-    const limitInfo = await getChecklistRateLimitInfo(userId);
-
-    // Attach limit info to request for later use
-    (req as any).checklistLimitInfo = limitInfo;
-
-    if (limitInfo.isValidationLimited) {
-      return res.status(429).json({
-        success: false,
-        error: {
-          message: `Daily document validation limit exceeded. You have used ${limitInfo.validationsUsed}/${DOCUMENT_VALIDATION_LIMIT} today.`,
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-        data: {
-          validationsUsed: limitInfo.validationsUsed,
-          validationsRemaining: limitInfo.validationsRemaining,
-          limit: DOCUMENT_VALIDATION_LIMIT,
-          resetTime: limitInfo.resetTime,
-        },
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Document validation rate limit middleware error:', error);
-    // Allow on error to prevent blocking users
-    next();
-  }
-}
- * Checklist & Document Validation Rate Limiter - User-based
- * Tracks per-user checklist generations and document validations per day
- */
-
-import { Request, Response, NextFunction } from 'express';
-import Redis from 'ioredis';
-
-let redisClient: Redis | null = null;
-let redisInitialized = false;
-let redisHealthy = false;
-
-// Initialize Redis client with timeout
-if (process.env.REDIS_URL) {
-  try {
-    redisClient = new Redis(process.env.REDIS_URL, {
-      connectTimeout: 2000,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-    });
-
-    // Test connection immediately
-    redisClient
-      .ping()
-      .then(() => {
-        redisHealthy = true;
-        console.log('[Checklist Rate Limit] Redis connected successfully');
-      })
-      .catch((err) => {
-        console.warn('[Checklist Rate Limit] Redis connection failed:', err.message);
-        redisClient = null;
-      });
-
-    redisInitialized = true;
-  } catch (error) {
-    console.warn('[Checklist Rate Limit] Failed to initialize Redis:', error);
-    redisClient = null;
-  }
-}
-
-const CHECKLIST_GENERATION_LIMIT = 20; // checklist generations per day
-const DOCUMENT_VALIDATION_LIMIT = 50; // document validations per day
-const LIMIT_WINDOW = 24 * 60 * 60; // 24 hours in seconds
-
-interface ChecklistRateLimitInfo {
-  userId: string;
-  checklistsUsed: number;
-  checklistsRemaining: number;
-  validationsUsed: number;
-  validationsRemaining: number;
-  resetTime: Date;
-  isChecklistLimited: boolean;
-  isValidationLimited: boolean;
-}
-
-/**
- * Helper function to execute Redis command with timeout
- */
-async function executeRedisWithTimeout<T>(
-  operation: () => Promise<T>,
-  timeoutMs: number = 1000
-): Promise<T | null> {
-  return Promise.race([
-    operation(),
-    new Promise<null>((_, reject) =>
-      setTimeout(() => reject(new Error('Redis operation timeout')), timeoutMs)
-    ),
-  ]).catch(() => null);
-}
-
-/**
- * Get current usage for a user
- */
-export async function getChecklistRateLimitInfo(userId: string): Promise<ChecklistRateLimitInfo> {
-  const checklistKey = `checklist:limit:${userId}`;
-  const validationKey = `validation:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const [checklistData, validationData, checklistTtl, validationTtl] = await Promise.all([
-        executeRedisWithTimeout(() => redisClient!.get(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.get(validationKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(validationKey), 1000),
-      ]);
-
-      const checklistsUsed = checklistData ? parseInt(checklistData as string, 10) : 0;
-      const validationsUsed = validationData ? parseInt(validationData as string, 10) : 0;
-
-      // Calculate reset time from TTL
-      const resetTime = new Date();
-      const maxTtl = Math.max((checklistTtl as number) || 0, (validationTtl as number) || 0);
-      if (maxTtl > 0) {
-        resetTime.setSeconds(resetTime.getSeconds() + maxTtl);
-      } else {
-        resetTime.setHours(resetTime.getHours() + 24);
-      }
-
-      return {
-        userId,
-        checklistsUsed,
-        checklistsRemaining: Math.max(0, CHECKLIST_GENERATION_LIMIT - checklistsUsed),
-        validationsUsed,
-        validationsRemaining: Math.max(0, DOCUMENT_VALIDATION_LIMIT - validationsUsed),
-        resetTime,
-        isChecklistLimited: checklistsUsed >= CHECKLIST_GENERATION_LIMIT,
-        isValidationLimited: validationsUsed >= DOCUMENT_VALIDATION_LIMIT,
-      };
-    }
-
-    // Fallback: in-memory or Redis unavailable
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  } catch (error) {
-    console.error('Error getting checklist rate limit info:', error);
-    // Fallback: allow on error
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  }
-}
-
-/**
- * Increment checklist generation counter for a user
- */
-export async function incrementChecklistGenerationCount(userId: string): Promise<number> {
-  const key = `checklist:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
-
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing checklist generation count:', error);
-    return 1;
-  }
-}
-
-/**
- * Increment document validation counter for a user
- */
-export async function incrementDocumentValidationCount(userId: string): Promise<number> {
-  const key = `validation:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
-
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing document validation count:', error);
-    return 1;
-  }
-}
-
-/**
- * Middleware: Check if user has remaining checklist generation quota
- */
-export async function checklistRateLimitMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          message: 'Unauthorized',
-        },
-      });
-    }
-
-    // Only apply to checklist generation endpoints
-    if (!req.path.includes('/api/document-checklist') || req.method === 'GET') {
-      return next();
-    }
-
-    const limitInfo = await getChecklistRateLimitInfo(userId);
-
-    // Attach limit info to request for later use
-    (req as any).checklistLimitInfo = limitInfo;
-
-    if (limitInfo.isChecklistLimited) {
-      return res.status(429).json({
-        success: false,
-        error: {
-          message: `Daily checklist generation limit exceeded. You have used ${limitInfo.checklistsUsed}/${CHECKLIST_GENERATION_LIMIT} today.`,
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-        data: {
-          checklistsUsed: limitInfo.checklistsUsed,
-          checklistsRemaining: limitInfo.checklistsRemaining,
-          limit: CHECKLIST_GENERATION_LIMIT,
-          resetTime: limitInfo.resetTime,
-        },
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Checklist rate limit middleware error:', error);
-    // Allow on error to prevent blocking users
-    next();
-  }
-}
-
-/**
- * Middleware: Check if user has remaining document validation quota
- */
-export async function documentValidationRateLimitMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          message: 'Unauthorized',
-        },
-      });
-    }
-
-    // Only apply to document validation endpoints
-    if (!req.path.includes('/api/documents') || req.method === 'GET') {
-      return next();
-    }
-
-    const limitInfo = await getChecklistRateLimitInfo(userId);
-
-    // Attach limit info to request for later use
-    (req as any).checklistLimitInfo = limitInfo;
-
-    if (limitInfo.isValidationLimited) {
-      return res.status(429).json({
-        success: false,
-        error: {
-          message: `Daily document validation limit exceeded. You have used ${limitInfo.validationsUsed}/${DOCUMENT_VALIDATION_LIMIT} today.`,
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-        data: {
-          validationsUsed: limitInfo.validationsUsed,
-          validationsRemaining: limitInfo.validationsRemaining,
-          limit: DOCUMENT_VALIDATION_LIMIT,
-          resetTime: limitInfo.resetTime,
-        },
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Document validation rate limit middleware error:', error);
-    // Allow on error to prevent blocking users
-    next();
-  }
-}
- * Checklist & Document Validation Rate Limiter - User-based
- * Tracks per-user checklist generations and document validations per day
- */
-
-import { Request, Response, NextFunction } from 'express';
-import Redis from 'ioredis';
-
-let redisClient: Redis | null = null;
-let redisInitialized = false;
-let redisHealthy = false;
-
-// Initialize Redis client with timeout
-if (process.env.REDIS_URL) {
-  try {
-    redisClient = new Redis(process.env.REDIS_URL, {
-      connectTimeout: 2000,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-    });
-
-    // Test connection immediately
-    redisClient
-      .ping()
-      .then(() => {
-        redisHealthy = true;
-        console.log('[Checklist Rate Limit] Redis connected successfully');
-      })
-      .catch((err) => {
-        console.warn('[Checklist Rate Limit] Redis connection failed:', err.message);
-        redisClient = null;
-      });
-
-    redisInitialized = true;
-  } catch (error) {
-    console.warn('[Checklist Rate Limit] Failed to initialize Redis:', error);
-    redisClient = null;
-  }
-}
-
-const CHECKLIST_GENERATION_LIMIT = 20; // checklist generations per day
-const DOCUMENT_VALIDATION_LIMIT = 50; // document validations per day
-const LIMIT_WINDOW = 24 * 60 * 60; // 24 hours in seconds
-
-interface ChecklistRateLimitInfo {
-  userId: string;
-  checklistsUsed: number;
-  checklistsRemaining: number;
-  validationsUsed: number;
-  validationsRemaining: number;
-  resetTime: Date;
-  isChecklistLimited: boolean;
-  isValidationLimited: boolean;
-}
-
-/**
- * Helper function to execute Redis command with timeout
- */
-async function executeRedisWithTimeout<T>(
-  operation: () => Promise<T>,
-  timeoutMs: number = 1000
-): Promise<T | null> {
-  return Promise.race([
-    operation(),
-    new Promise<null>((_, reject) =>
-      setTimeout(() => reject(new Error('Redis operation timeout')), timeoutMs)
-    ),
-  ]).catch(() => null);
-}
-
-/**
- * Get current usage for a user
- */
-export async function getChecklistRateLimitInfo(userId: string): Promise<ChecklistRateLimitInfo> {
-  const checklistKey = `checklist:limit:${userId}`;
-  const validationKey = `validation:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const [checklistData, validationData, checklistTtl, validationTtl] = await Promise.all([
-        executeRedisWithTimeout(() => redisClient!.get(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.get(validationKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(validationKey), 1000),
-      ]);
-
-      const checklistsUsed = checklistData ? parseInt(checklistData as string, 10) : 0;
-      const validationsUsed = validationData ? parseInt(validationData as string, 10) : 0;
-
-      // Calculate reset time from TTL
-      const resetTime = new Date();
-      const maxTtl = Math.max((checklistTtl as number) || 0, (validationTtl as number) || 0);
-      if (maxTtl > 0) {
-        resetTime.setSeconds(resetTime.getSeconds() + maxTtl);
-      } else {
-        resetTime.setHours(resetTime.getHours() + 24);
-      }
-
-      return {
-        userId,
-        checklistsUsed,
-        checklistsRemaining: Math.max(0, CHECKLIST_GENERATION_LIMIT - checklistsUsed),
-        validationsUsed,
-        validationsRemaining: Math.max(0, DOCUMENT_VALIDATION_LIMIT - validationsUsed),
-        resetTime,
-        isChecklistLimited: checklistsUsed >= CHECKLIST_GENERATION_LIMIT,
-        isValidationLimited: validationsUsed >= DOCUMENT_VALIDATION_LIMIT,
-      };
-    }
-
-    // Fallback: in-memory or Redis unavailable
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  } catch (error) {
-    console.error('Error getting checklist rate limit info:', error);
-    // Fallback: allow on error
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  }
-}
-
-/**
- * Increment checklist generation counter for a user
- */
-export async function incrementChecklistGenerationCount(userId: string): Promise<number> {
-  const key = `checklist:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
-
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing checklist generation count:', error);
-    return 1;
-  }
-}
-
-/**
- * Increment document validation counter for a user
- */
-export async function incrementDocumentValidationCount(userId: string): Promise<number> {
-  const key = `validation:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
-
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing document validation count:', error);
-    return 1;
-  }
-}
-
-/**
- * Middleware: Check if user has remaining checklist generation quota
- */
-export async function checklistRateLimitMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          message: 'Unauthorized',
-        },
-      });
-    }
-
-    // Only apply to checklist generation endpoints
-    if (!req.path.includes('/api/document-checklist') || req.method === 'GET') {
-      return next();
-    }
-
-    const limitInfo = await getChecklistRateLimitInfo(userId);
-
-    // Attach limit info to request for later use
-    (req as any).checklistLimitInfo = limitInfo;
-
-    if (limitInfo.isChecklistLimited) {
-      return res.status(429).json({
-        success: false,
-        error: {
-          message: `Daily checklist generation limit exceeded. You have used ${limitInfo.checklistsUsed}/${CHECKLIST_GENERATION_LIMIT} today.`,
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-        data: {
-          checklistsUsed: limitInfo.checklistsUsed,
-          checklistsRemaining: limitInfo.checklistsRemaining,
-          limit: CHECKLIST_GENERATION_LIMIT,
-          resetTime: limitInfo.resetTime,
-        },
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Checklist rate limit middleware error:', error);
-    // Allow on error to prevent blocking users
-    next();
-  }
-}
-
-/**
- * Middleware: Check if user has remaining document validation quota
- */
-export async function documentValidationRateLimitMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          message: 'Unauthorized',
-        },
-      });
-    }
-
-    // Only apply to document validation endpoints
-    if (!req.path.includes('/api/documents') || req.method === 'GET') {
-      return next();
-    }
-
-    const limitInfo = await getChecklistRateLimitInfo(userId);
-
-    // Attach limit info to request for later use
-    (req as any).checklistLimitInfo = limitInfo;
-
-    if (limitInfo.isValidationLimited) {
-      return res.status(429).json({
-        success: false,
-        error: {
-          message: `Daily document validation limit exceeded. You have used ${limitInfo.validationsUsed}/${DOCUMENT_VALIDATION_LIMIT} today.`,
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-        data: {
-          validationsUsed: limitInfo.validationsUsed,
-          validationsRemaining: limitInfo.validationsRemaining,
-          limit: DOCUMENT_VALIDATION_LIMIT,
-          resetTime: limitInfo.resetTime,
-        },
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Document validation rate limit middleware error:', error);
-    // Allow on error to prevent blocking users
-    next();
-  }
-}
- * Checklist & Document Validation Rate Limiter - User-based
- * Tracks per-user checklist generations and document validations per day
- */
-
-import { Request, Response, NextFunction } from 'express';
-import Redis from 'ioredis';
-
-let redisClient: Redis | null = null;
-let redisInitialized = false;
-let redisHealthy = false;
-
-// Initialize Redis client with timeout
-if (process.env.REDIS_URL) {
-  try {
-    redisClient = new Redis(process.env.REDIS_URL, {
-      connectTimeout: 2000,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-    });
-
-    // Test connection immediately
-    redisClient
-      .ping()
-      .then(() => {
-        redisHealthy = true;
-        console.log('[Checklist Rate Limit] Redis connected successfully');
-      })
-      .catch((err) => {
-        console.warn('[Checklist Rate Limit] Redis connection failed:', err.message);
-        redisClient = null;
-      });
-
-    redisInitialized = true;
-  } catch (error) {
-    console.warn('[Checklist Rate Limit] Failed to initialize Redis:', error);
-    redisClient = null;
-  }
-}
-
-const CHECKLIST_GENERATION_LIMIT = 20; // checklist generations per day
-const DOCUMENT_VALIDATION_LIMIT = 50; // document validations per day
-const LIMIT_WINDOW = 24 * 60 * 60; // 24 hours in seconds
-
-interface ChecklistRateLimitInfo {
-  userId: string;
-  checklistsUsed: number;
-  checklistsRemaining: number;
-  validationsUsed: number;
-  validationsRemaining: number;
-  resetTime: Date;
-  isChecklistLimited: boolean;
-  isValidationLimited: boolean;
-}
-
-/**
- * Helper function to execute Redis command with timeout
- */
-async function executeRedisWithTimeout<T>(
-  operation: () => Promise<T>,
-  timeoutMs: number = 1000
-): Promise<T | null> {
-  return Promise.race([
-    operation(),
-    new Promise<null>((_, reject) =>
-      setTimeout(() => reject(new Error('Redis operation timeout')), timeoutMs)
-    ),
-  ]).catch(() => null);
-}
-
-/**
- * Get current usage for a user
- */
-export async function getChecklistRateLimitInfo(userId: string): Promise<ChecklistRateLimitInfo> {
-  const checklistKey = `checklist:limit:${userId}`;
-  const validationKey = `validation:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const [checklistData, validationData, checklistTtl, validationTtl] = await Promise.all([
-        executeRedisWithTimeout(() => redisClient!.get(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.get(validationKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(checklistKey), 1000),
-        executeRedisWithTimeout(() => redisClient!.ttl(validationKey), 1000),
-      ]);
-
-      const checklistsUsed = checklistData ? parseInt(checklistData as string, 10) : 0;
-      const validationsUsed = validationData ? parseInt(validationData as string, 10) : 0;
-
-      // Calculate reset time from TTL
-      const resetTime = new Date();
-      const maxTtl = Math.max((checklistTtl as number) || 0, (validationTtl as number) || 0);
-      if (maxTtl > 0) {
-        resetTime.setSeconds(resetTime.getSeconds() + maxTtl);
-      } else {
-        resetTime.setHours(resetTime.getHours() + 24);
-      }
-
-      return {
-        userId,
-        checklistsUsed,
-        checklistsRemaining: Math.max(0, CHECKLIST_GENERATION_LIMIT - checklistsUsed),
-        validationsUsed,
-        validationsRemaining: Math.max(0, DOCUMENT_VALIDATION_LIMIT - validationsUsed),
-        resetTime,
-        isChecklistLimited: checklistsUsed >= CHECKLIST_GENERATION_LIMIT,
-        isValidationLimited: validationsUsed >= DOCUMENT_VALIDATION_LIMIT,
-      };
-    }
-
-    // Fallback: in-memory or Redis unavailable
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  } catch (error) {
-    console.error('Error getting checklist rate limit info:', error);
-    // Fallback: allow on error
-    return {
-      userId,
-      checklistsUsed: 0,
-      checklistsRemaining: CHECKLIST_GENERATION_LIMIT,
-      validationsUsed: 0,
-      validationsRemaining: DOCUMENT_VALIDATION_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      isChecklistLimited: false,
-      isValidationLimited: false,
-    };
-  }
-}
-
-/**
- * Increment checklist generation counter for a user
- */
-export async function incrementChecklistGenerationCount(userId: string): Promise<number> {
-  const key = `checklist:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
-
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing checklist generation count:', error);
-    return 1;
-  }
-}
-
-/**
- * Increment document validation counter for a user
- */
-export async function incrementDocumentValidationCount(userId: string): Promise<number> {
-  const key = `validation:limit:${userId}`;
-
-  try {
-    if (redisHealthy && redisClient) {
-      const count = await executeRedisWithTimeout(() => redisClient!.incr(key), 1000);
-
-      if (count !== null && typeof count === 'number') {
-        // Set expiration only on first increment
-        if (count === 1) {
-          await executeRedisWithTimeout(() => redisClient!.expire(key, LIMIT_WINDOW), 1000);
-        }
-        return count;
-      }
-    }
-    return 1; // Fallback
-  } catch (error) {
-    console.error('Error incrementing document validation count:', error);
-    return 1;
-  }
-}
-
-/**
- * Middleware: Check if user has remaining checklist generation quota
- */
-export async function checklistRateLimitMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          message: 'Unauthorized',
-        },
-      });
-    }
-
-    // Only apply to checklist generation endpoints
-    if (!req.path.includes('/api/document-checklist') || req.method === 'GET') {
-      return next();
-    }
-
-    const limitInfo = await getChecklistRateLimitInfo(userId);
-
-    // Attach limit info to request for later use
-    (req as any).checklistLimitInfo = limitInfo;
-
-    if (limitInfo.isChecklistLimited) {
-      return res.status(429).json({
-        success: false,
-        error: {
-          message: `Daily checklist generation limit exceeded. You have used ${limitInfo.checklistsUsed}/${CHECKLIST_GENERATION_LIMIT} today.`,
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-        data: {
-          checklistsUsed: limitInfo.checklistsUsed,
-          checklistsRemaining: limitInfo.checklistsRemaining,
+          generationsUsed: limitInfo.generationsUsed,
+          generationsRemaining: limitInfo.generationsRemaining,
           limit: CHECKLIST_GENERATION_LIMIT,
           resetTime: limitInfo.resetTime,
         },

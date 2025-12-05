@@ -2073,7 +2073,9 @@ You MUST:
       }
 
       // STEP 3: Handle "too few items" gracefully - warn but don't fail
-      const { MIN_ITEMS_HARD, IDEAL_MIN_ITEMS, MAX_ITEMS_HARD, IDEAL_MAX_ITEMS } = await import('../config/checklist-config');
+      const { MIN_ITEMS_HARD, IDEAL_MIN_ITEMS, MAX_ITEMS_HARD, IDEAL_MAX_ITEMS } = await import(
+        '../config/checklist-config'
+      );
       const itemCount = parsed.checklist.length;
 
       if (itemCount < MIN_ITEMS_HARD) {
@@ -2338,7 +2340,7 @@ You MUST:
   /**
    * Generate checklist using legacy mode (GPT-4 structured output)
    * Used when no VisaRuleSet exists for the country/visa type
-   * 
+   *
    * @param application - Application object with country and visaType
    * @param aiUserContext - AI user context with questionnaire data
    * @returns Checklist response with items array
@@ -2367,7 +2369,7 @@ You MUST:
     const country = application.country.name;
     const visaType = application.visaType.name;
     const countryCode = application.country.code.toUpperCase();
-    
+
     logInfo('[OpenAI][Checklist][Legacy] Generating checklist with structured output', {
       country,
       visaType,
@@ -2375,7 +2377,7 @@ You MUST:
     });
 
     const startTime = Date.now();
-    
+
     try {
       // Import dependencies
       const { getVisaKnowledgeBase } = await import('../data/visaKnowledgeBase');
@@ -2391,11 +2393,15 @@ You MUST:
       const summary = aiUserContext.questionnaireSummary;
       const purpose = summary?.travelInfo?.purpose || summary?.visaType || 'tourism';
       const duration = summary?.travelInfo?.duration || summary?.duration || 'Not specified';
-      const sponsorType = summary?.sponsorType || (summary?.financialInfo?.sponsorDetails ? 'sponsor' : 'self');
+      const sponsorType =
+        summary?.sponsorType || (summary?.financialInfo?.sponsorDetails ? 'sponsor' : 'self');
       const employmentStatus = summary?.employment?.currentStatus || 'Not specified';
-      const hasInvitation = summary?.hasUniversityInvitation || summary?.hasOtherInvitation || false;
-      const travelHistory = summary?.hasInternationalTravel || summary?.travelHistory?.traveledBefore || false;
-      const previousRefusals = summary?.previousVisaRejections || summary?.travelHistory?.hasRefusals || false;
+      const hasInvitation =
+        summary?.hasUniversityInvitation || summary?.hasOtherInvitation || false;
+      const travelHistory =
+        summary?.hasInternationalTravel || summary?.travelHistory?.traveledBefore || false;
+      const previousRefusals =
+        summary?.previousVisaRejections || summary?.travelHistory?.hasRefusals || false;
       const bankBalance = summary?.bankBalanceUSD || summary?.financialInfo?.selfFundsUSD;
       const monthlyIncome = summary?.monthlyIncomeUSD || summary?.employment?.monthlySalaryUSD;
       const hasProperty = summary?.hasPropertyInUzbekistan || summary?.ties?.propertyDocs || false;
@@ -2507,6 +2513,10 @@ Generate checklist with at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is
 
       const parsed = parseResult.parsed;
 
+      if (!parsed || !parsed.checklist) {
+        throw new Error('Invalid checklist response: missing checklist array');
+      }
+
       // Auto-translate missing translations if needed
       if (parseResult.validation.warnings.some((w: string) => w.includes('Missing'))) {
         const { autoTranslateChecklistItems } = await import('../utils/translation-helper');
@@ -2521,7 +2531,7 @@ Generate checklist with at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is
 
       return {
         type: visaType,
-        checklist: parsed.checklist,
+        checklist: parsed.checklist as any, // Type assertion needed due to legacy format compatibility
       };
     } catch (error: any) {
       logError('[OpenAI][Checklist][Legacy] Generation failed', error as Error, {

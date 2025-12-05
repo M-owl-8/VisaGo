@@ -302,7 +302,7 @@ export class DocumentChecklistService {
       }
 
       // Get existing documents with full data
-      const existingDocumentsMap = new Map(
+      const existingDocumentsMap: Map<string, any> = new Map(
         application.documents.map((doc: any) => [
           doc.documentType,
           {
@@ -364,9 +364,16 @@ export class DocumentChecklistService {
             userContext
           );
 
-          if (engineResponse && engineResponse.checklist && engineResponse.checklist.length >= MIN_ITEMS_HARD) {
+          if (
+            engineResponse &&
+            engineResponse.checklist &&
+            engineResponse.checklist.length >= MIN_ITEMS_HARD
+          ) {
             // Convert engine format to ChecklistItem format
-            items = this.convertEngineChecklistToItems(engineResponse.checklist, existingDocumentsMap);
+            items = this.convertEngineChecklistToItems(
+              engineResponse.checklist,
+              existingDocumentsMap
+            );
             aiGenerated = true;
             logInfo('[Checklist][Mode] Rules mode succeeded', {
               applicationId,
@@ -374,10 +381,13 @@ export class DocumentChecklistService {
             });
           } else {
             // Engine returned insufficient items or null - fall back to legacy
-            logWarn('[Checklist][Mode] Rules mode returned insufficient items, falling back to legacy', {
-              applicationId,
-              itemCount: engineResponse?.checklist?.length || 0,
-            });
+            logWarn(
+              '[Checklist][Mode] Rules mode returned insufficient items, falling back to legacy',
+              {
+                applicationId,
+                itemCount: engineResponse?.checklist?.length || 0,
+              }
+            );
             // Fall through to legacy mode
           }
         } catch (engineError: any) {
@@ -405,18 +415,28 @@ export class DocumentChecklistService {
             userContext
           );
 
-          if (legacyResponse && legacyResponse.checklist && legacyResponse.checklist.length >= MIN_ITEMS_HARD) {
-            items = this.convertLegacyChecklistToItems(legacyResponse.checklist, existingDocumentsMap);
+          if (
+            legacyResponse &&
+            legacyResponse.checklist &&
+            legacyResponse.checklist.length >= MIN_ITEMS_HARD
+          ) {
+            items = this.convertLegacyChecklistToItems(
+              legacyResponse.checklist,
+              existingDocumentsMap
+            );
             aiGenerated = true;
             logInfo('[Checklist][Mode] Legacy mode succeeded', {
               applicationId,
               itemCount: items.length,
             });
           } else {
-            logWarn('[Checklist][Mode] Legacy mode returned insufficient items, using static fallback', {
-              applicationId,
-              itemCount: legacyResponse?.checklist?.length || 0,
-            });
+            logWarn(
+              '[Checklist][Mode] Legacy mode returned insufficient items, using static fallback',
+              {
+                applicationId,
+                itemCount: legacyResponse?.checklist?.length || 0,
+              }
+            );
             aiFallbackUsed = true;
           }
         } catch (legacyError: any) {
@@ -437,7 +457,9 @@ export class DocumentChecklistService {
           visaType: visaTypeName,
         });
 
-        const { buildFallbackChecklistFromStaticConfig } = await import('../utils/fallback-checklist-helper');
+        const { buildFallbackChecklistFromStaticConfig } = await import(
+          '../utils/fallback-checklist-helper'
+        );
         items = buildFallbackChecklistFromStaticConfig(
           countryCode,
           visaTypeName,
@@ -467,10 +489,14 @@ export class DocumentChecklistService {
 
       // Validate final result
       if (items.length < MIN_ITEMS_HARD) {
-        logError('[Checklist][Mode] All modes failed, using emergency fallback', new Error('All checklist modes failed'), {
-          applicationId,
-          finalItemCount: items.length,
-        });
+        logError(
+          '[Checklist][Mode] All modes failed, using emergency fallback',
+          new Error('All checklist modes failed'),
+          {
+            applicationId,
+            finalItemCount: items.length,
+          }
+        );
         // Use the old generateRobustFallbackChecklist as last resort
         items = await this.generateRobustFallbackChecklist(
           application.country,
@@ -501,7 +527,6 @@ export class DocumentChecklistService {
           idealMin: IDEAL_MIN_ITEMS,
         });
       }
-
 
       // Merge full document data including AI verification
       const enrichedItems = this.mergeChecklistItemsWithDocuments(
@@ -1115,7 +1140,7 @@ Only return the JSON object, no other text.`;
   ): ChecklistItem[] {
     return engineItems.map((item, index) => {
       const existingDoc = existingDocumentsMap.get(item.documentType);
-      
+
       return {
         id: item.id || `checklist-item-${index}`,
         documentType: item.documentType,
@@ -1127,7 +1152,13 @@ Only return the JSON object, no other text.`;
         descriptionRu: item.description,
         category: item.category,
         required: item.required,
-        priority: item.priority ? (item.priority <= 2 ? 'high' : item.priority <= 4 ? 'medium' : 'low') : 'medium',
+        priority: item.priority
+          ? item.priority <= 2
+            ? 'high'
+            : item.priority <= 4
+              ? 'medium'
+              : 'low'
+          : 'medium',
         status: existingDoc?.status ? (existingDoc.status as any) : 'missing',
         userDocumentId: existingDoc?.id,
         fileUrl: existingDoc?.fileUrl,
@@ -1167,9 +1198,7 @@ Only return the JSON object, no other text.`;
   ): ChecklistItem[] {
     return legacyItems.map((aiItem, index) => {
       const docType =
-        aiItem.document ||
-        aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
-        `document_${index}`;
+        aiItem.document || aiItem.name?.toLowerCase().replace(/\s+/g, '_') || `document_${index}`;
       const existingDoc = existingDocumentsMap.get(docType);
 
       const item = {
@@ -1232,9 +1261,12 @@ Only return the JSON object, no other text.`;
     const normalizedType = documentType.toLowerCase().replace(/[_-]/g, '');
     for (const [docType, doc] of existingDocumentsMap.entries()) {
       const normalizedDocType = docType.toLowerCase().replace(/[_-]/g, '');
-      
+
       // Check if one contains the other (e.g., "bank_statement" matches "bank_statement_6_months")
-      if (normalizedType.includes(normalizedDocType) || normalizedDocType.includes(normalizedType)) {
+      if (
+        normalizedType.includes(normalizedDocType) ||
+        normalizedDocType.includes(normalizedType)
+      ) {
         // Additional safety: only match if they're similar enough
         const similarity = this.calculateStringSimilarity(normalizedType, normalizedDocType);
         if (similarity > 0.7) {
@@ -1258,7 +1290,7 @@ Only return the JSON object, no other text.`;
     const longer = str1.length > str2.length ? str1 : str2;
     const shorter = str1.length > str2.length ? str2 : str1;
     if (longer.length === 0) return 1.0;
-    
+
     const distance = this.levenshteinDistance(longer, shorter);
     return (longer.length - distance) / longer.length;
   }
