@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/applications/StatusBadge';
 import { DocumentChecklist } from '@/components/checklist/DocumentChecklist';
 import { ChecklistSummary } from '@/components/checklist/ChecklistSummary';
+import { RiskExplanationPanel } from '@/components/checklist/RiskExplanationPanel';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { RefreshCcw } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
@@ -268,6 +269,14 @@ export default function ApplicationDetailPage() {
                 </div>
               </div>
             </Card>
+          )}
+
+          {/* Risk Explanation Panel - Show when checklist is ready */}
+          {checklistItems.length > 0 && !isPollingChecklist && (
+            <RiskExplanationPanel
+              applicationId={applicationId}
+              language={i18n.language}
+            />
           )}
 
           {/* Checklist component - shows empty state if no items and not polling */}

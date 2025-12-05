@@ -6,6 +6,7 @@
 import { AIOpenAIService } from './ai-openai.service';
 import { VisaRuleSetData } from './visa-rules.service';
 import { logInfo, logError, logWarn } from '../middleware/logger';
+import { getAIConfig } from '../config/ai-models';
 import { z } from 'zod';
 
 /**
@@ -177,16 +178,26 @@ export class AIEmbassyExtractorService {
         pageTitle
       );
 
-      // Call GPT-4 with structured output
+      // Call GPT-4 with structured output using centralized config
+      const aiConfig = getAIConfig('rulesExtraction');
+
+      logInfo('[AIEmbassyExtractor] Calling GPT-4 for rules extraction', {
+        model: aiConfig.model,
+        countryCode,
+        visaType,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
+      });
+
       const response = await AIOpenAIService.getOpenAIClient().chat.completions.create({
-        model: AIOpenAIService.MODEL,
+        model: aiConfig.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.3, // Lower temperature for more consistent extraction
-        max_tokens: 3000, // Allow for detailed rule sets
-        response_format: { type: 'json_object' }, // Force JSON output
+        temperature: aiConfig.temperature,
+        max_tokens: aiConfig.maxTokens,
+        response_format: aiConfig.responseFormat || undefined,
       });
 
       const rawContent = response.choices[0]?.message?.content || '{}';
@@ -273,7 +284,7 @@ export class AIEmbassyExtractorService {
           tokensUsed,
           confidence: ruleSet.sourceInfo?.confidence || 0.7,
           extractionTime,
-          model: AIOpenAIService.MODEL,
+          model: aiConfig.model,
         },
       };
     } catch (error) {

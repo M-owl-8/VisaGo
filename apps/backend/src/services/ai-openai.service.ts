@@ -1,4 +1,5 @@
 ﻿import OpenAI from 'openai';
+import { getAIConfig } from '../config/ai-models';
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 
@@ -2462,16 +2463,26 @@ You MUST:
         );
       }
 
-      // Call GPT-4 with structured output
+      // Call GPT-4 with structured output using centralized config
+      const aiConfig = getAIConfig('checklistLegacy');
+
+      logInfo('[OpenAI][Checklist][Legacy] Calling GPT-4 with centralized config', {
+        model: aiConfig.model,
+        country,
+        visaType,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
+      });
+
       const response = await this.callChecklistAPI(
         [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
         {
-          temperature: 0.5,
-          max_completion_tokens: 2000,
-          response_format: { type: 'json_object' },
+          temperature: aiConfig.temperature,
+          max_completion_tokens: aiConfig.maxTokens,
+          response_format: aiConfig.responseFormat || undefined,
         },
         {
           country,

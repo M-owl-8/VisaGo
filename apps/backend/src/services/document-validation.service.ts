@@ -6,6 +6,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { AIOpenAIService } from './ai-openai.service';
+import { getAIConfig } from '../config/ai-models';
 import { buildAIUserContext } from './ai-context.service';
 import { VisaRulesService } from './visa-rules.service';
 import { VisaDocCheckerService } from './visa-doc-checker.service';
@@ -313,15 +314,25 @@ export async function validateDocumentWithAI(params: {
     let validationResult: DocumentValidationResultAI;
 
     try {
+      // Use centralized config for document verification
+      const aiConfig = getAIConfig('docVerification');
+
+      logInfo('[DocumentValidation] Calling GPT-4 for document validation', {
+        model: aiConfig.model,
+        documentType: document.documentType,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
+      });
+
       const response = await openaiClient.chat.completions.create({
-        model: AIOpenAIService.MODEL,
+        model: aiConfig.model,
         messages: [
           { role: 'system', content: DOCUMENT_VALIDATION_SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
         ],
-        max_tokens: 1500, // Increased to accommodate problems/suggestions arrays
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
+        max_tokens: aiConfig.maxTokens,
+        temperature: aiConfig.temperature,
+        response_format: aiConfig.responseFormat || undefined,
       });
 
       const responseTime = Date.now() - startTime;

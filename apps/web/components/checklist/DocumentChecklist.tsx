@@ -2,6 +2,7 @@
 
 import { Card } from '@/components/ui/Card';
 import { DocumentChecklistItem } from '@/components/applications/DocumentChecklistItem';
+import { ChecklistFeedbackForm } from '@/components/checklist/ChecklistFeedbackForm';
 import { useTranslation } from 'react-i18next';
 
 export interface ChecklistItem {
@@ -158,6 +159,13 @@ export function DocumentChecklist({
           </div>
         )}
       </div>
+
+      {/* Feedback Form */}
+      {items.length > 0 && (
+        <div className="mt-6 border-t border-white/10 pt-4">
+          <ChecklistFeedbackForm applicationId={applicationId} />
+        </div>
+      )}
     </Card>
   );
 }

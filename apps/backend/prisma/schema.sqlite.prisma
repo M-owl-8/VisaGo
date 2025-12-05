@@ -130,6 +130,8 @@ model VisaApplication {
   documents         UserDocument[]
   payment           Payment?
   checkpoints       Checkpoint[]
+  riskExplanation   VisaRiskExplanation?
+  checklistFeedback ChecklistFeedback[]
 
   @@unique([userId, countryId, visaTypeId])
   @@index([userId])
@@ -658,5 +660,48 @@ model VisaRuleSetChangeLog {
 
   @@index([ruleSetId])
   @@index([changeType])
+  @@index([createdAt])
+}
+
+model VisaRiskExplanation {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  userId        String
+  countryCode   String
+  visaType      String
+  riskLevel     String   // "low" | "medium" | "high"
+  summaryEn     String
+  summaryUz     String
+  summaryRu     String
+  recommendations String // JSON string for SQLite compatibility
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([userId])
+  @@index([countryCode, visaType])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+model ChecklistFeedback {
+  id              String   @id @default(cuid())
+  applicationId   String
+  userId          String
+  countryCode     String
+  visaType        String
+  checklistSnapshot String // JSON string for SQLite compatibility
+  feedbackType    String   // "missing_docs" | "unnecessary_docs" | "other"
+  feedbackText    String
+  createdAt       DateTime @default(now())
+
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([userId])
+  @@index([countryCode, visaType])
+  @@index([feedbackType])
   @@index([createdAt])
 }

@@ -5,6 +5,7 @@
  */
 
 import { AIOpenAIService } from './ai-openai.service';
+import { getAIConfig } from '../config/ai-models';
 import { VisaRuleSetData } from './visa-rules.service';
 import { AIUserContext, CanonicalAIUserContext } from '../types/ai-context';
 import { buildCanonicalAIUserContext } from './ai-context.service';
@@ -117,16 +118,25 @@ export class VisaDocCheckerService {
 
       const startTime = Date.now();
 
-      // Call GPT-4 with structured output
+      // Call GPT-4 with structured output using centralized config
+      const aiConfig = getAIConfig('docVerification');
+
+      logInfo('[VisaDocChecker] Calling GPT-4 for document verification', {
+        model: aiConfig.model,
+        documentType: requiredDocumentRule.documentType,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
+      });
+
       const response = await AIOpenAIService.getOpenAIClient().chat.completions.create({
-        model: AIOpenAIService.MODEL,
+        model: aiConfig.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.2, // Very low temperature for strict evaluation
-        max_tokens: 500, // Concise responses
-        response_format: { type: 'json_object' }, // Force JSON output
+        temperature: aiConfig.temperature,
+        max_tokens: aiConfig.maxTokens,
+        response_format: aiConfig.responseFormat || undefined,
       });
 
       const responseTime = Date.now() - startTime;

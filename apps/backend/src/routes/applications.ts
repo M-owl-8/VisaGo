@@ -1,11 +1,16 @@
 import express, { Request, Response, NextFunction } from 'express';
 import axios, { AxiosError } from 'axios';
+import { PrismaClient } from '@prisma/client';
 import { ApplicationsService } from '../services/applications.service';
 import { AIApplicationService } from '../services/ai-application.service';
 import { authenticateToken } from '../middleware/auth';
 import { buildAIUserContext, getQuestionnaireSummary } from '../services/ai-context.service';
 import { logError, logInfo, logWarn } from '../middleware/logger';
 import { AIOpenAIService } from '../services/ai-openai.service';
+import { VisaRiskExplanationService } from '../services/visa-risk-explanation.service';
+import { VisaChecklistExplanationService } from '../services/visa-checklist-explanation.service';
+
+const prisma = new PrismaClient();
 
 const router = express.Router();
 
@@ -573,6 +578,257 @@ router.post('/:id/visa-probability', async (req: Request, res: Response, next: N
       applicationId: req.params.id,
     });
     next(error);
+  }
+});
+
+/**
+ * GET /api/applications/:id/risk-explanation
+ * Get GPT-generated risk explanation and improvement advice
+ */
+router.get('/:id/risk-explanation', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const applicationId = req.params.id;
+    const userId = req.userId!;
+
+    if (!applicationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'APPLICATION_ID_REQUIRED',
+        message: 'Application ID is required',
+      });
+    }
+
+    logInfo('[RiskExplanation] Requesting risk explanation', {
+      userId,
+      applicationId,
+    });
+
+    const explanation = await VisaRiskExplanationService.generateRiskExplanation(
+      userId,
+      applicationId
+    );
+
+    res.json({
+      success: true,
+      data: explanation,
+    });
+  } catch (error: any) {
+    logError('[RiskExplanation] Error generating risk explanation', error as Error, {
+      userId: req.userId,
+      applicationId: req.params.id,
+    });
+
+    if (error.message === 'Application not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'APPLICATION_NOT_FOUND',
+        message: 'Application not found',
+      });
+    }
+
+    if (error.message === 'Unauthorized') {
+      return res.status(403).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'You do not have access to this application',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'RISK_EXPLANATION_ERROR',
+      message: error.message || 'Failed to generate risk explanation',
+    });
+  }
+});
+
+/**
+ * GET /api/applications/:applicationId/checklist/:documentType/explanation
+ * Get GPT-generated explanation for why a specific checklist item is needed
+ */
+router.get(
+  '/:applicationId/checklist/:documentType/explanation',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const applicationId = req.params.applicationId;
+      const documentType = req.params.documentType;
+      const userId = req.userId!;
+
+      if (!applicationId || !documentType) {
+        return res.status(400).json({
+          success: false,
+          error: 'MISSING_PARAMS',
+          message: 'Application ID and document type are required',
+        });
+      }
+
+      logInfo('[ChecklistExplanation] Requesting document explanation', {
+        userId,
+        applicationId,
+        documentType,
+      });
+
+      const explanation = await VisaChecklistExplanationService.getExplanation(
+        userId,
+        applicationId,
+        documentType
+      );
+
+      res.json({
+        success: true,
+        data: explanation,
+      });
+    } catch (error: any) {
+      logError('[ChecklistExplanation] Error generating explanation', error as Error, {
+        userId: req.userId,
+        applicationId: req.params.applicationId,
+        documentType: req.params.documentType,
+      });
+
+      if (error.message === 'Application not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'APPLICATION_NOT_FOUND',
+          message: 'Application not found',
+        });
+      }
+
+      if (error.message === 'Unauthorized') {
+        return res.status(403).json({
+          success: false,
+          error: 'UNAUTHORIZED',
+          message: 'You do not have access to this application',
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'EXPLANATION_ERROR',
+        message: error.message || 'Failed to generate explanation',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/applications/:id/checklist-feedback
+ * Submit feedback about checklist quality
+ */
+router.post('/:id/checklist-feedback', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const applicationId = req.params.id;
+    const userId = req.userId!;
+
+    if (!applicationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'APPLICATION_ID_REQUIRED',
+        message: 'Application ID is required',
+      });
+    }
+
+    const { feedbackType, feedbackText } = req.body;
+
+    if (!feedbackType || !feedbackText) {
+      return res.status(400).json({
+        success: false,
+        error: 'MISSING_FIELDS',
+        message: 'Feedback type and text are required',
+      });
+    }
+
+    if (!['missing_docs', 'unnecessary_docs', 'other'].includes(feedbackType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_FEEDBACK_TYPE',
+        message: 'Feedback type must be: missing_docs, unnecessary_docs, or other',
+      });
+    }
+
+    // Get application
+    const application = await prisma.visaApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        country: true,
+        visaType: true,
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        error: 'APPLICATION_NOT_FOUND',
+        message: 'Application not found',
+      });
+    }
+
+    // Verify ownership
+    if (application.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'You do not have access to this application',
+      });
+    }
+
+    // Get current checklist snapshot
+    const checklist = await prisma.documentChecklist.findUnique({
+      where: { applicationId },
+    });
+
+    let checklistSnapshot: any = null;
+    if (checklist?.checklistData) {
+      try {
+        checklistSnapshot =
+          typeof checklist.checklistData === 'string'
+            ? JSON.parse(checklist.checklistData)
+            : checklist.checklistData;
+      } catch (e) {
+        // If parse fails, use raw data
+        checklistSnapshot = { raw: checklist.checklistData };
+      }
+    }
+
+    // Store feedback
+    const feedback = await prisma.checklistFeedback.create({
+      data: {
+        applicationId,
+        userId,
+        countryCode: application.country.code.toUpperCase(),
+        visaType: application.visaType.name.toLowerCase(),
+        checklistSnapshot: JSON.stringify(checklistSnapshot) as any,
+        feedbackType,
+        feedbackText,
+      },
+    });
+
+    logInfo('[ChecklistFeedback] Feedback submitted', {
+      feedbackId: feedback.id,
+      applicationId,
+      userId,
+      countryCode: application.country.code,
+      visaType: application.visaType.name,
+      feedbackType,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        id: feedback.id,
+        message: 'Feedback submitted successfully',
+      },
+    });
+  } catch (error: any) {
+    logError('[ChecklistFeedback] Error submitting feedback', error as Error, {
+      userId: req.userId,
+      applicationId: req.params.id,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'FEEDBACK_ERROR',
+      message: error.message || 'Failed to submit feedback',
+    });
   }
 });
 

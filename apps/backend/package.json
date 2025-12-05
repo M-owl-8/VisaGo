@@ -45,7 +45,9 @@
     "eval:checklists": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/eval-checklists.ts",
     "analyze:visas": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/analyze-supported-visas.ts",
     "seed:us-b1b2-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-us-b1b2-rules.ts",
-    "verify:us-b1b2-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/verify-us-b1b2-rules.ts"
+    "verify:us-b1b2-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/verify-us-b1b2-rules.ts",
+    "seed:de-tourist-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-de-tourist-rules.ts",
+    "verify:de-tourist-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/verify-de-tourist-rules.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.21.1",

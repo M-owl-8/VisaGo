@@ -19,9 +19,18 @@ export type VisaTypeAliasMap = {
  */
 const VISA_TYPE_RULE_ALIASES: VisaTypeAliasMap = {
   US: {
+    // B1/B2 Visitor Visa variations (all map to "tourist" for rules lookup)
+    'b1/b2 visitor visa': 'tourist',
     'b1/b2 visitor': 'tourist',
     'b1/b2': 'tourist',
+    'b1 b2': 'tourist', // Space instead of slash
+    'b-1/b-2': 'tourist', // With dashes
+    'b-1 b-2': 'tourist', // With dashes and space
     visitor: 'tourist',
+    'visitor visa': 'tourist',
+    // Common UI variations
+    'b1/b2 tourist': 'tourist',
+    'b1/b2 travel': 'tourist',
   },
 };
 
@@ -42,7 +51,14 @@ const VISA_TYPE_RULE_ALIASES: VisaTypeAliasMap = {
  */
 export function normalizeVisaTypeForRules(countryCode: string, visaType: string): string {
   const normalizedCountryCode = countryCode.toUpperCase();
-  const normalizedVisaType = visaType.toLowerCase().trim();
+  let normalizedVisaType = visaType.toLowerCase().trim();
+
+  // Remove common suffixes like "visa" if present
+  normalizedVisaType = normalizedVisaType.replace(/\s+visa\s*$/i, '').trim();
+
+  // Normalize B1/B2 variations (handle slash, space, dash variations)
+  normalizedVisaType = normalizedVisaType.replace(/\s*[\/\-]\s*/g, '/'); // Normalize separators to slash
+  normalizedVisaType = normalizedVisaType.replace(/\s+/g, ' '); // Normalize multiple spaces to single space
 
   const countryAliases = VISA_TYPE_RULE_ALIASES[normalizedCountryCode];
 
@@ -66,14 +82,14 @@ export function wasAliasApplied(
   originalVisaType: string,
   normalizedVisaType: string
 ): boolean {
-  const normalizedCountryCode = countryCode.toUpperCase();
-  const normalizedOriginal = originalVisaType.toLowerCase().trim();
+  // Normalize the original visa type the same way normalizeVisaTypeForRules does
+  const normalizedOriginal = normalizeVisaTypeForRules(countryCode, originalVisaType);
 
-  const countryAliases = VISA_TYPE_RULE_ALIASES[normalizedCountryCode];
-
-  return !!(
-    countryAliases &&
-    countryAliases[normalizedOriginal] &&
-    countryAliases[normalizedOriginal] === normalizedVisaType
-  );
+  // If normalization changed the value, an alias was applied
+  const originalLower = originalVisaType
+    .toLowerCase()
+    .trim()
+    .replace(/\s+visa\s*$/i, '')
+    .trim();
+  return normalizedOriginal !== originalLower && normalizedOriginal === normalizedVisaType;
 }

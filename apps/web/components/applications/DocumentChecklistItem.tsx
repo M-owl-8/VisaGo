@@ -1,11 +1,13 @@
 'use client';
 
-import { CheckCircle2, Clock, XCircle, Upload, Eye } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, Clock, XCircle, Upload, Eye, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils/cn';
+import { DocumentExplanationModal } from '@/components/checklist/DocumentExplanationModal';
 
 interface DocumentChecklistItemProps {
   item: {
@@ -44,10 +46,13 @@ export function DocumentChecklistItem({
   language = 'en',
   t,
 }: DocumentChecklistItemProps) {
+  const [showExplanation, setShowExplanation] = useState(false);
   const status = item.status || 'missing';
   const isVerified = status === 'verified';
   const isRejected = status === 'rejected';
   const isPending = status === 'pending';
+  
+  const documentType = item.documentType || item.document || '';
 
   // Get localized text
   const name = language === 'uz' ? item.nameUz || item.name : language === 'ru' ? item.nameRu || item.name : item.name;
@@ -204,7 +209,28 @@ export function DocumentChecklistItem({
             {t('documents.uploadDocument', 'Upload')}
           </Link>
         )}
+        {documentType && (
+          <button
+            onClick={() => setShowExplanation(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+            title={t('applications.whyDoINeedThis', 'Why do I need this document?')}
+          >
+            <HelpCircle size={14} />
+            <span>{t('applications.why', 'Why?')}</span>
+          </button>
+        )}
       </div>
+
+      {/* Explanation Modal */}
+      {documentType && (
+        <DocumentExplanationModal
+          isOpen={showExplanation}
+          onClose={() => setShowExplanation(false)}
+          applicationId={applicationId}
+          documentType={documentType}
+          language={language}
+        />
+      )}
     </div>
   );
 }

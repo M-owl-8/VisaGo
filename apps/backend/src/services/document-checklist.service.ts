@@ -350,13 +350,47 @@ export class DocumentChecklistService {
       const { VisaRulesService } = await import('./visa-rules.service');
       const ruleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaTypeName);
 
+      // Special check for US/tourist - ensure rules are found
+      const isUSTourist =
+        countryCode === 'US' &&
+        (visaTypeName.toLowerCase().includes('tourist') ||
+          visaTypeName.toLowerCase().includes('b1') ||
+          visaTypeName.toLowerCase().includes('b2') ||
+          visaTypeName.toLowerCase().includes('visitor'));
+
+      if (isUSTourist && !ruleSet) {
+        logError(
+          '[Checklist][Mode] CRITICAL: US B1/B2 Tourist should have rules but none found',
+          new Error('US/tourist rules not found'),
+          {
+            applicationId,
+            countryCode,
+            visaType: visaTypeName,
+            normalizedVisaType: 'tourist',
+            suggestion: 'Run: pnpm seed:us-b1b2-rules',
+          }
+        );
+      }
+
       if (ruleSet) {
         // MODE 1: Rules-based mode (VisaChecklistEngine)
-        logInfo('[Checklist][Mode] Using RULES mode (VisaChecklistEngine)', {
-          applicationId,
-          countryCode,
-          visaType: visaTypeName,
-        });
+        if (isUSTourist) {
+          logInfo('[Checklist][Mode] Using RULES mode for US B1/B2 Tourist (VisaChecklistEngine)', {
+            applicationId,
+            countryCode,
+            visaType: visaTypeName,
+            normalizedVisaType: 'tourist',
+            ruleSetVersion: ruleSet.version || 1,
+            ruleSetDocumentCount: ruleSet.requiredDocuments?.length || 0,
+          });
+        } else {
+          logInfo('[Checklist][Mode] Using RULES mode (VisaChecklistEngine)', {
+            applicationId,
+            countryCode,
+            visaType: visaTypeName,
+            ruleSetVersion: ruleSet.version || 1,
+          });
+        }
 
         try {
           const { VisaChecklistEngineService } = await import('./visa-checklist-engine.service');
@@ -395,32 +429,87 @@ export class DocumentChecklistService {
             });
           } else {
             // Engine returned insufficient items or null - fall back to legacy
-            logWarn(
-              '[Checklist][Mode] Rules mode returned insufficient items, falling back to legacy',
-              {
-                applicationId,
-                itemCount: engineResponse?.checklist?.length || 0,
-              }
-            );
+            if (isUSTourist) {
+              logError(
+                '[Checklist][Mode] CRITICAL: US B1/B2 Tourist rules mode returned insufficient items - this should not happen',
+                new Error('Rules mode failed for US/tourist'),
+                {
+                  applicationId,
+                  countryCode,
+                  visaType: visaTypeName,
+                  normalizedVisaType: 'tourist',
+                  itemCount: engineResponse?.checklist?.length || 0,
+                  ruleSetVersion: ruleSet?.version || 'unknown',
+                  ruleSetDocumentCount: ruleSet?.requiredDocuments?.length || 0,
+                }
+              );
+            } else {
+              logWarn(
+                '[Checklist][Mode] Rules mode returned insufficient items, falling back to legacy',
+                {
+                  applicationId,
+                  countryCode,
+                  visaType: visaTypeName,
+                  itemCount: engineResponse?.checklist?.length || 0,
+                }
+              );
+            }
             // Fall through to legacy mode
           }
         } catch (engineError: any) {
-          logWarn('[Checklist][Mode] Rules mode failed, falling back to legacy', {
-            applicationId,
-            error: engineError?.message || String(engineError),
-          });
+          if (isUSTourist) {
+            logError(
+              '[Checklist][Mode] CRITICAL: US B1/B2 Tourist rules mode failed - this should not happen',
+              engineError instanceof Error ? engineError : new Error(String(engineError)),
+              {
+                applicationId,
+                countryCode,
+                visaType: visaTypeName,
+                normalizedVisaType: 'tourist',
+                error: engineError?.message || String(engineError),
+                ruleSetVersion: ruleSet?.version || 'unknown',
+                ruleSetDocumentCount: ruleSet?.requiredDocuments?.length || 0,
+              }
+            );
+          } else {
+            logWarn('[Checklist][Mode] Rules mode failed, falling back to legacy', {
+              applicationId,
+              countryCode,
+              visaType: visaTypeName,
+              error: engineError?.message || String(engineError),
+            });
+          }
           // Fall through to legacy mode
         }
       }
 
       // STEP 2: If no rules or rules mode failed, use legacy AI mode
       if (items.length < MIN_ITEMS_HARD) {
-        logInfo('[Checklist][Mode] Using LEGACY mode (GPT-4 structured)', {
-          applicationId,
-          countryCode,
-          visaType: visaTypeName,
-          reason: ruleSet ? 'rules_mode_failed' : 'no_rules_available',
-        });
+        if (isUSTourist) {
+          logError(
+            '[Checklist][Mode] CRITICAL: US B1/B2 Tourist falling back to LEGACY mode - rules should be available',
+            new Error('US/tourist should use rules mode'),
+            {
+              applicationId,
+              countryCode,
+              visaType: visaTypeName,
+              normalizedVisaType: 'tourist',
+              reason: ruleSet ? 'rules_mode_failed' : 'no_rules_available',
+              ruleSetVersion: ruleSet?.version || 'none',
+              ruleSetDocumentCount: ruleSet?.requiredDocuments?.length || 0,
+              suggestion: ruleSet
+                ? 'Check rules engine logs for errors'
+                : 'Run: pnpm seed:us-b1b2-rules',
+            }
+          );
+        } else {
+          logInfo('[Checklist][Mode] Using LEGACY mode (GPT-4 structured)', {
+            applicationId,
+            countryCode,
+            visaType: visaTypeName,
+            reason: ruleSet ? 'rules_mode_failed' : 'no_rules_available',
+          });
+        }
 
         try {
           const { AIOpenAIService } = await import('./ai-openai.service');

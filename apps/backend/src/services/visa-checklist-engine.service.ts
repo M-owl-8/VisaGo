@@ -5,6 +5,7 @@
  */
 
 import { AIOpenAIService } from './ai-openai.service';
+import { getAIConfig } from '../config/ai-models';
 import { VisaRulesService, VisaRuleSetData } from './visa-rules.service';
 import { AIUserContext, CanonicalAIUserContext } from '../types/ai-context';
 import { buildCanonicalAIUserContext } from './ai-context.service';
