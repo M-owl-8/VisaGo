@@ -93,11 +93,27 @@ const AdditionalRequirementsSchema = z.object({
  */
 const VisaRuleSetDataSchema = z
   .object({
-    requiredDocuments: z.array(RequiredDocumentSchema).optional().default([]),
-    financialRequirements: FinancialRequirementsSchema.optional(),
-    processingInfo: ProcessingInfoSchema.optional(),
-    fees: FeesSchema.optional(),
-    additionalRequirements: AdditionalRequirementsSchema.optional(),
+    requiredDocuments: z
+      .union([z.array(RequiredDocumentSchema), z.null(), z.undefined()])
+      .transform((v) => v ?? [])
+      .optional()
+      .default([]),
+    financialRequirements: z
+      .union([FinancialRequirementsSchema, z.null(), z.undefined()])
+      .transform((v) => v ?? undefined)
+      .optional(),
+    processingInfo: z
+      .union([ProcessingInfoSchema, z.null(), z.undefined()])
+      .transform((v) => v ?? undefined)
+      .optional(),
+    fees: z
+      .union([FeesSchema, z.null(), z.undefined()])
+      .transform((v) => v ?? undefined)
+      .optional(),
+    additionalRequirements: z
+      .union([AdditionalRequirementsSchema, z.null(), z.undefined()])
+      .transform((v) => v ?? undefined)
+      .optional(),
     sourceInfo: z
       .object({
         extractedFrom: z.string().optional(),
