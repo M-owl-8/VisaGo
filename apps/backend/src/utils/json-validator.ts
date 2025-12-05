@@ -1,9 +1,32 @@
 /**
  * JSON Validator and Sanity Checker
  * Ensures GPT-4 responses are valid JSON and meet all requirements
+ * 
+ * EXPECTED JSON STRUCTURE:
+ * The validator expects GPT-4 to return a JSON object with this exact structure:
+ * {
+ *   "type": string (optional),           // Visa type (e.g., "tourist", "student")
+ *   "country": string (optional),        // Country name (e.g., "United States", "Germany")
+ *   "checklist": Array<ChecklistItem>    // REQUIRED: Must be an array, never an object
+ * }
+ * 
+ * The "checklist" field MUST be a JSON array of checklist item objects.
+ * Each item must have:
+ *   - document: string (required)
+ *   - name: string (required)
+ *   - category: "required" | "highly_recommended" | "optional" (required)
+ *   - required: boolean (required)
+ *   - priority: "high" | "medium" | "low" (required)
+ *   - nameUz, nameRu, description, descriptionUz, descriptionRu, etc. (optional but recommended)
+ * 
+ * Common validation failures:
+ * - "checklist: Missing or invalid (must be an array)" - checklist is missing, null, or not an array
+ * - "Too few items" - checklist has fewer than MIN_ITEMS_HARD items (validation error)
+ * - Missing required fields in checklist items
  */
 
 import { logError, logWarn, logInfo } from '../middleware/logger';
+import { MIN_ITEMS_HARD, IDEAL_MIN_ITEMS, MAX_ITEMS_HARD, IDEAL_MAX_ITEMS } from '../config/checklist-config';
 
 export interface ChecklistValidationResult {
   isValid: boolean;
@@ -121,11 +144,17 @@ export function validateChecklistResponse(
   const items = parsed.checklist;
   const itemCount = items.length;
 
-  // Validate item count - stricter thresholds
-  if (itemCount < 10) {
-    errors.push(`Too few items: ${itemCount} (minimum 10 required)`);
-  } else if (itemCount > 16) {
-    warnings.push(`Too many items: ${itemCount} (maximum 16 recommended)`);
+  // Validate item count - relaxed thresholds
+  if (itemCount < MIN_ITEMS_HARD) {
+    errors.push(`Too few items: ${itemCount} (minimum ${MIN_ITEMS_HARD} required)`);
+  } else if (itemCount < IDEAL_MIN_ITEMS) {
+    warnings.push(`Checklist has fewer than ${IDEAL_MIN_ITEMS} items (got ${itemCount}). This is acceptable but suboptimal.`);
+  }
+  
+  if (itemCount > MAX_ITEMS_HARD) {
+    errors.push(`Too many items: ${itemCount} (maximum ${MAX_ITEMS_HARD} allowed)`);
+  } else if (itemCount > IDEAL_MAX_ITEMS) {
+    warnings.push(`Too many items: ${itemCount} (maximum ${IDEAL_MAX_ITEMS} recommended)`);
   }
 
   // Validate categories
@@ -149,7 +178,9 @@ export function validateChecklistResponse(
     if (!item.category) {
       errors.push(`checklist[${index}].category: Missing field`);
     } else if (!['required', 'highly_recommended', 'optional'].includes(item.category)) {
-      errors.push(`checklist[${index}].category: Invalid value "${item.category}" (must be one of: required, highly_recommended, optional)`);
+      errors.push(
+        `checklist[${index}].category: Invalid value "${item.category}" (must be one of: required, highly_recommended, optional)`
+      );
     } else {
       categories.add(item.category);
       categoryCounts[item.category]++;
@@ -163,7 +194,9 @@ export function validateChecklistResponse(
       (item.category === 'highly_recommended' || item.category === 'optional') &&
       item.required === true
     ) {
-      warnings.push(`checklist[${index}].required: Should be false when category is "${item.category}"`);
+      warnings.push(
+        `checklist[${index}].required: Should be false when category is "${item.category}"`
+      );
     }
 
     // Check translations (warnings, not errors)
@@ -393,7 +426,7 @@ export function parseAndValidateChecklistResponse(
         visaType,
       });
     });
-    
+
     logWarn('[JSON Validator] Validation failed (summary)', {
       attempt,
       errorCount: validation.errors.length,

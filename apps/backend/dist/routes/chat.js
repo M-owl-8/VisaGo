@@ -37,12 +37,16 @@ const express_1 = require("express");
 const chat_service_1 = require("../services/chat.service");
 const auth_1 = require("../middleware/auth");
 const input_validation_1 = require("../middleware/input-validation");
+const chat_rate_limit_1 = require("../middleware/chat-rate-limit");
 const router = (0, express_1.Router)();
 // ============================================================================
 // MIDDLEWARE
 // ============================================================================
 // Require authentication for all chat routes
 router.use(auth_1.authenticateToken);
+// Apply rate limiting AFTER authentication (so we have userId)
+router.use(chat_rate_limit_1.chatRateLimitMiddleware);
+router.use(chat_rate_limit_1.attachChatLimitHeaders);
 // ============================================================================
 // ROUTES
 // ============================================================================
@@ -50,14 +54,14 @@ router.use(auth_1.authenticateToken);
  * POST /api/chat
  * Send a message and get AI response (primary endpoint)
  */
-router.post("/", input_validation_1.validateRAGRequest, async (req, res) => {
+router.post('/', input_validation_1.validateRAGRequest, async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -69,18 +73,55 @@ router.post("/", input_validation_1.validateRAGRequest, async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: {
-                    message: "Message content is required",
+                    message: 'Message content is required',
                 },
             });
         }
+        console.log('[Chat Route] Processing message:', {
+            userId,
+            contentLength: content.length,
+            hasApplicationId: !!applicationId,
+            historyLength: conversationHistory?.length || 0,
+        });
         const response = await chat_service_1.chatService.sendMessage(userId, content, applicationId, conversationHistory);
+        // Validate response before sending
+        if (!response || !response.message) {
+            console.error('[Chat Route] Invalid response from ChatService:', response);
+            return res.status(500).json({
+                success: false,
+                error: {
+                    message: 'AI service returned invalid response. Please try again.',
+                },
+            });
+        }
+        console.log('[Chat Route] Message processed successfully:', {
+            hasMessage: !!response.message,
+            messageLength: response.message.length,
+            hasId: !!response.id,
+            model: response.model,
+            messagePreview: response.message.substring(0, 100),
+        });
         // Increment rate limit counter after successful message
-        const { incrementChatMessageCount, getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const { incrementChatMessageCount, getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require('../middleware/chat-rate-limit')));
         await incrementChatMessageCount(userId);
         const limitInfo = await getChatRateLimitInfo(userId);
+        // Ensure response structure is correct (handle optional properties)
+        const responseData = {
+            message: response.message,
+            sources: response.sources || [],
+            tokens_used: response.tokens_used || 0,
+            model: response.model || 'gpt-4',
+            id: response.id || `msg-${Date.now()}`,
+            applicationContext: response.applicationContext || null,
+        };
+        console.log('[Chat Route] Sending response to client:', {
+            hasMessage: !!responseData.message,
+            messageLength: responseData.message.length,
+            hasId: !!responseData.id,
+        });
         res.status(201).json({
             success: true,
-            data: response,
+            data: responseData,
             quota: {
                 messagesUsed: limitInfo.messagesUsed,
                 messagesRemaining: limitInfo.messagesRemaining,
@@ -90,11 +131,17 @@ router.post("/", input_validation_1.validateRAGRequest, async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Chat error:", error);
+        const userId = req.userId || req.user?.id;
+        console.error('[Chat Route] Error processing message:', {
+            error: error.message,
+            stack: error.stack,
+            userId,
+            contentLength: req.body.content?.length || req.body.query?.length || 0,
+        });
         res.status(500).json({
             success: false,
             error: {
-                message: error.message || "Failed to process message",
+                message: error.message || 'Failed to process message',
             },
         });
     }
@@ -103,14 +150,14 @@ router.post("/", input_validation_1.validateRAGRequest, async (req, res) => {
  * POST /api/chat/send
  * Send a message (legacy endpoint, redirects to POST /api/chat)
  */
-router.post("/send", async (req, res) => {
+router.post('/send', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -120,13 +167,13 @@ router.post("/send", async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: {
-                    message: "Message content is required",
+                    message: 'Message content is required',
                 },
             });
         }
         const response = await chat_service_1.chatService.sendMessage(userId, content, applicationId, conversationHistory);
         // Increment rate limit counter after successful message
-        const { incrementChatMessageCount, getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const { incrementChatMessageCount, getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require('../middleware/chat-rate-limit')));
         await incrementChatMessageCount(userId);
         const limitInfo = await getChatRateLimitInfo(userId);
         res.status(201).json({
@@ -141,11 +188,11 @@ router.post("/send", async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Chat error:", error);
+        console.error('Chat error:', error);
         res.status(500).json({
             success: false,
             error: {
-                message: error.message || "Failed to process message",
+                message: error.message || 'Failed to process message',
             },
         });
     }
@@ -154,14 +201,15 @@ router.post("/send", async (req, res) => {
  * GET /api/chat/history
  * Get conversation history
  */
-router.get("/history", async (req, res) => {
+router.get('/history', async (req, res) => {
+    // Extract userId outside try-catch so it's accessible in catch block
+    const userId = req.userId || req.user?.id;
     try {
-        const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -173,22 +221,40 @@ router.get("/history", async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: {
-                    message: "Limit cannot exceed 100",
+                    message: 'Limit cannot exceed 100',
                 },
             });
         }
-        const history = await chat_service_1.chatService.getConversationHistory(userId, applicationId, limit, offset);
+        // Fix: Pass undefined (not null) when applicationId is missing to use new API path
+        // This prevents falling into legacy mode which expects sessionId
+        // The service handles undefined applicationId by treating it as null internally
+        const history = await chat_service_1.chatService.getConversationHistory(userId, applicationId || undefined, // Pass undefined, service will handle it
+        limit, offset, userId // Always pass verified userId for security
+        );
+        // Always return success with data (empty array if no history)
         res.json({
             success: true,
-            data: history,
+            data: history || [], // Ensure we always return an array
         });
     }
     catch (error) {
-        res.status(500).json({
-            success: false,
-            error: {
-                message: error.message,
-            },
+        // Rate-limited error logging to prevent spam
+        const errorKey = `chat-history-error-${userId}`;
+        const errorCache = global.__chatErrorCache || {};
+        if (!errorCache[errorKey] || Date.now() - errorCache[errorKey] > 5000) {
+            errorCache[errorKey] = Date.now();
+            global.__chatErrorCache = errorCache;
+            const { logError } = await Promise.resolve().then(() => __importStar(require('../middleware/logger')));
+            logError('[ChatHistory] Error loading history', error instanceof Error ? error : new Error(String(error)), {
+                userId: req.userId || req.user?.id,
+                applicationId: req.query.applicationId,
+            });
+        }
+        // Return empty array instead of error to allow user to start chatting
+        // This prevents 500 errors when no session exists yet
+        res.json({
+            success: true,
+            data: [], // Return empty array instead of error
         });
     }
 });
@@ -196,14 +262,14 @@ router.get("/history", async (req, res) => {
  * POST /api/chat/search
  * Search documents and knowledge base
  */
-router.post("/search", async (req, res) => {
+router.post('/search', async (req, res) => {
     try {
         const { query } = req.body;
         if (!query || !query.trim()) {
             return res.status(400).json({
                 success: false,
                 error: {
-                    message: "Search query is required",
+                    message: 'Search query is required',
                 },
             });
         }
@@ -226,14 +292,14 @@ router.post("/search", async (req, res) => {
  * DELETE /api/chat/history
  * Clear conversation history
  */
-router.delete("/history", async (req, res) => {
+router.delete('/history', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -257,14 +323,14 @@ router.delete("/history", async (req, res) => {
  * GET /api/chat/stats
  * Get chat statistics
  */
-router.get("/stats", async (req, res) => {
+router.get('/stats', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -290,14 +356,14 @@ router.get("/stats", async (req, res) => {
  * GET /api/chat/sessions
  * Get all chat sessions for user with pagination
  */
-router.get("/sessions", async (req, res) => {
+router.get('/sessions', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -320,32 +386,42 @@ router.get("/sessions", async (req, res) => {
 });
 /**
  * GET /api/chat/sessions/:sessionId
- * Get specific session details with all messages
+ * Get specific session details with message history (last N messages, default 100)
  */
-router.get("/sessions/:sessionId", async (req, res) => {
+router.get('/sessions/:sessionId', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
         const { sessionId } = req.params;
-        const session = await chat_service_1.chatService.getSessionDetails(sessionId, userId);
+        const limit = parseInt(req.query.limit) || 100;
+        // Validate limit (max 1000 to prevent abuse)
+        if (limit > 1000) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Limit cannot exceed 1000',
+                },
+            });
+        }
+        const session = await chat_service_1.chatService.getSessionDetails(sessionId, userId, limit);
         res.json({
             success: true,
             data: session,
         });
     }
     catch (error) {
-        if (error.message === "Session not found") {
+        if (error.message === 'Session not found') {
             return res.status(404).json({
                 success: false,
                 error: {
-                    message: "Session not found",
+                    message: 'Session not found',
                 },
             });
         }
@@ -361,14 +437,14 @@ router.get("/sessions/:sessionId", async (req, res) => {
  * PATCH /api/chat/sessions/:sessionId
  * Update session (rename, etc)
  */
-router.patch("/sessions/:sessionId", async (req, res) => {
+router.patch('/sessions/:sessionId', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -378,7 +454,7 @@ router.patch("/sessions/:sessionId", async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: {
-                    message: "Title is required",
+                    message: 'Title is required',
                 },
             });
         }
@@ -389,11 +465,11 @@ router.patch("/sessions/:sessionId", async (req, res) => {
         });
     }
     catch (error) {
-        if (error.message === "Session not found") {
+        if (error.message === 'Session not found') {
             return res.status(404).json({
                 success: false,
                 error: {
-                    message: "Session not found",
+                    message: 'Session not found',
                 },
             });
         }
@@ -409,14 +485,14 @@ router.patch("/sessions/:sessionId", async (req, res) => {
  * DELETE /api/chat/sessions/:sessionId
  * Delete a specific chat session
  */
-router.delete("/sessions/:sessionId", async (req, res) => {
+router.delete('/sessions/:sessionId', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -425,7 +501,7 @@ router.delete("/sessions/:sessionId", async (req, res) => {
         res.json({
             success: true,
             data: result,
-            message: "Session deleted successfully",
+            message: 'Session deleted successfully',
         });
     }
     catch (error) {
@@ -444,24 +520,24 @@ router.delete("/sessions/:sessionId", async (req, res) => {
  * POST /api/chat/messages/:messageId/feedback
  * Add feedback to a specific message
  */
-router.post("/messages/:messageId/feedback", async (req, res) => {
+router.post('/messages/:messageId/feedback', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
         const { messageId } = req.params;
         const { feedback } = req.body;
-        if (!feedback || !["thumbs_up", "thumbs_down"].includes(feedback)) {
+        if (!feedback || !['thumbs_up', 'thumbs_down'].includes(feedback)) {
             return res.status(400).json({
                 success: false,
                 error: {
-                    message: "Valid feedback type required (thumbs_up or thumbs_down)",
+                    message: 'Valid feedback type required (thumbs_up or thumbs_down)',
                 },
             });
         }
@@ -469,7 +545,7 @@ router.post("/messages/:messageId/feedback", async (req, res) => {
         res.json({
             success: true,
             data: message,
-            message: "Feedback recorded successfully",
+            message: 'Feedback recorded successfully',
         });
     }
     catch (error) {
@@ -485,14 +561,14 @@ router.post("/messages/:messageId/feedback", async (req, res) => {
  * POST /api/chat/search (Enhanced with filters)
  * Search documents with optional country/visa type filters
  */
-router.post("/search", async (req, res) => {
+router.post('/search', async (req, res) => {
     try {
         const { query, country, visaType, limit } = req.body;
         if (!query || !query.trim()) {
             return res.status(400).json({
                 success: false,
                 error: {
-                    message: "Search query is required",
+                    message: 'Search query is required',
                 },
             });
         }
@@ -518,18 +594,18 @@ router.post("/search", async (req, res) => {
  * GET /api/chat/quota
  * Check user's remaining chat message quota for today
  */
-router.get("/quota", async (req, res) => {
+router.get('/quota', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
-        const { getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const { getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require('../middleware/chat-rate-limit')));
         const limitInfo = await getChatRateLimitInfo(userId);
         res.json({
             success: true,
@@ -546,7 +622,7 @@ router.get("/quota", async (req, res) => {
         res.status(500).json({
             success: false,
             error: {
-                message: error.message || "Failed to fetch quota information",
+                message: error.message || 'Failed to fetch quota information',
             },
         });
     }
@@ -555,14 +631,14 @@ router.get("/quota", async (req, res) => {
  * GET /api/chat/usage/daily
  * Get daily usage and cost data
  */
-router.get("/usage/daily", async (req, res) => {
+router.get('/usage/daily', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -592,14 +668,14 @@ router.get("/usage/daily", async (req, res) => {
  * GET /api/chat/usage/weekly
  * Get weekly usage and cost data
  */
-router.get("/usage/weekly", async (req, res) => {
+router.get('/usage/weekly', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -622,14 +698,14 @@ router.get("/usage/weekly", async (req, res) => {
  * GET /api/chat/usage/monthly
  * Get monthly usage and cost data
  */
-router.get("/usage/monthly", async (req, res) => {
+router.get('/usage/monthly', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -652,14 +728,14 @@ router.get("/usage/monthly", async (req, res) => {
  * GET /api/chat/usage/cost-analysis
  * Get comprehensive cost analysis across periods
  */
-router.get("/usage/cost-analysis", async (req, res) => {
+router.get('/usage/cost-analysis', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
@@ -682,20 +758,20 @@ router.get("/usage/cost-analysis", async (req, res) => {
  * POST /api/chat/increment-message-count
  * Manually increment message count (for testing purposes)
  */
-router.post("/increment-message-count", async (req, res) => {
+router.post('/increment-message-count', async (req, res) => {
     try {
         const userId = req.userId || req.user?.id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 error: {
-                    message: "User not authenticated",
+                    message: 'User not authenticated',
                 },
             });
         }
-        const { incrementChatMessageCount } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const { incrementChatMessageCount } = await Promise.resolve().then(() => __importStar(require('../middleware/chat-rate-limit')));
         const newCount = await incrementChatMessageCount(userId);
-        const { getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require("../middleware/chat-rate-limit")));
+        const { getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require('../middleware/chat-rate-limit')));
         const limitInfo = await getChatRateLimitInfo(userId);
         res.json({
             success: true,

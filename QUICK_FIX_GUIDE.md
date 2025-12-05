@@ -171,3 +171,10 @@ https://visabuddy-backend-production.up.railway.app/api/health
 - Can't proceed past login
 
 **Solution:** Make sure backend is online!
+
+
+
+
+
+
+

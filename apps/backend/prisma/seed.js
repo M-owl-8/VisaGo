@@ -37,45 +37,107 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var client_1 = require("@prisma/client");
+// NOTE: In production, seeding is NON-DESTRUCTIVE.
+// We only upsert reference data (countries, visa types) and we never delete user data.
 var prisma = new client_1.PrismaClient();
-function main() {
+// Detect production environment
+var isProd = process.env.NODE_ENV === 'production' ||
+    process.env.RAILWAY_ENVIRONMENT_NAME === 'production';
+// Check if destructive operations are allowed
+var allowWipe = process.env.ALLOW_DB_WIPE === 'true';
+/**
+ * Development seed: Clears all data and recreates reference data + demo data
+ * WARNING: This deletes ALL user data (applications, documents, payments, etc.)
+ * ONLY runs if ALLOW_DB_WIPE=true is explicitly set
+ */
+function seedDev() {
     return __awaiter(this, void 0, void 0, function () {
-        var countries, createdCountries, visaTypes;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    console.log("🌱 Starting database seed...");
+                    console.log("[Seed] NODE_ENV=", process.env.NODE_ENV, "ALLOW_DB_WIPE=", process.env.ALLOW_DB_WIPE);
+                    if (!!allowWipe) return [3 /*break*/, 2];
+                    console.log("🌱 Dev seed: Skipping destructive data wipe (ALLOW_DB_WIPE not set to 'true')");
+                    console.log("🌱 Dev seed: Only upserting reference data (non-destructive)");
+                    return [4 /*yield*/, seedReferenceData()];
+                case 1:
+                    _a.sent();
+                    return [2 /*return*/];
+                case 2:
+                    console.log("🌱 Dev seed: clearing ALL data... (ALLOW_DB_WIPE=true)");
                     // Clear existing data in correct order (child records first, then parent records)
                     // This prevents foreign key constraint violations
                     console.log("🗑️  Clearing existing data...");
                     // Delete child records that reference VisaApplication
                     return [4 /*yield*/, prisma.checkpoint.deleteMany({})];
-                case 1:
+                case 3:
                     // Delete child records that reference VisaApplication
                     _a.sent();
                     return [4 /*yield*/, prisma.userDocument.deleteMany({})];
-                case 2:
+                case 4:
                     _a.sent();
                     return [4 /*yield*/, prisma.payment.deleteMany({})];
-                case 3:
+                case 5:
                     _a.sent();
                     // Delete applications that reference VisaType and Country
                     return [4 /*yield*/, prisma.visaApplication.deleteMany({})];
-                case 4:
+                case 6:
                     // Delete applications that reference VisaType and Country
                     _a.sent();
                     return [4 /*yield*/, prisma.application.deleteMany({})];
-                case 5:
+                case 7:
                     _a.sent();
                     // Now safe to delete VisaType and Country
                     return [4 /*yield*/, prisma.visaType.deleteMany({})];
-                case 6:
+                case 8:
                     // Now safe to delete VisaType and Country
                     _a.sent();
                     return [4 /*yield*/, prisma.country.deleteMany({})];
-                case 7:
+                case 9:
                     _a.sent();
                     console.log("✅ Existing data cleared");
+                    // Create countries and visa types (shared data)
+                    return [4 /*yield*/, seedReferenceData()];
+                case 10:
+                    // Create countries and visa types (shared data)
+                    _a.sent();
+                    return [2 /*return*/];
+            }
+        });
+    });
+}
+/**
+ * Production seed: Only upserts reference data (countries, visa types)
+ * NEVER deletes user data (User, VisaApplication, UserDocument, ChatMessage, ChatSession, Payment, etc.)
+ */
+function seedProd() {
+    return __awaiter(this, void 0, void 0, function () {
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    console.log("[Seed] NODE_ENV=", process.env.NODE_ENV, "ALLOW_DB_WIPE=", process.env.ALLOW_DB_WIPE);
+                    console.log("🌱 Prod seed: seeding ONLY reference data (non-destructive)");
+                    console.log("🌱 Prod seed: Skipping destructive data wipe (production mode)");
+                    // Only ensure countries and visaTypes exist using upsert
+                    return [4 /*yield*/, seedReferenceData()];
+                case 1:
+                    // Only ensure countries and visaTypes exist using upsert
+                    _a.sent();
+                    return [2 /*return*/];
+            }
+        });
+    });
+}
+/**
+ * Shared function to seed reference data (countries and visa types)
+ * Uses upsert to ensure data exists without deleting anything
+ */
+function seedReferenceData() {
+    return __awaiter(this, void 0, void 0, function () {
+        var countries, createdCountries, visaTypes;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
                     countries = [
                         {
                             name: "United States",
@@ -159,13 +221,20 @@ function main() {
                         },
                     ];
                     return [4 /*yield*/, Promise.all(countries.map(function (country) {
-                            return prisma.country.create({
-                                data: country,
+                            return prisma.country.upsert({
+                                where: { code: country.code },
+                                update: {
+                                    name: country.name,
+                                    flagEmoji: country.flagEmoji,
+                                    description: country.description,
+                                    requirements: country.requirements,
+                                },
+                                create: country,
                             });
                         }))];
-                case 8:
+                case 1:
                     createdCountries = _a.sent();
-                    console.log("\u2705 Created ".concat(createdCountries.length, " countries"));
+                    console.log("\u2705 Upserted ".concat(createdCountries.length, " countries"));
                     visaTypes = [
                         // USA Visas
                         {
@@ -618,14 +687,52 @@ function main() {
                             ]),
                         },
                     ];
+                    // Upsert visa types (create if not exists, update if exists)
                     return [4 /*yield*/, Promise.all(visaTypes.map(function (visaType) {
-                            return prisma.visaType.create({
-                                data: visaType,
+                            return prisma.visaType.upsert({
+                                where: {
+                                    countryId_name: {
+                                        countryId: visaType.countryId,
+                                        name: visaType.name,
+                                    },
+                                },
+                                update: {
+                                    description: visaType.description,
+                                    processingDays: visaType.processingDays,
+                                    validity: visaType.validity,
+                                    fee: visaType.fee,
+                                    requirements: visaType.requirements,
+                                    documentTypes: visaType.documentTypes,
+                                },
+                                create: visaType,
                             });
                         }))];
-                case 9:
+                case 2:
+                    // Upsert visa types (create if not exists, update if exists)
                     _a.sent();
-                    console.log("\u2705 Created ".concat(visaTypes.length, " visa types"));
+                    console.log("\u2705 Upserted ".concat(visaTypes.length, " visa types"));
+                    return [2 /*return*/];
+            }
+        });
+    });
+}
+function main() {
+    return __awaiter(this, void 0, void 0, function () {
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    console.log("🌱 Starting database seed...");
+                    console.log("[Seed] Environment check: isProd=", isProd, "ALLOW_DB_WIPE=", allowWipe);
+                    if (!isProd) return [3 /*break*/, 2];
+                    return [4 /*yield*/, seedProd()];
+                case 1:
+                    _a.sent();
+                    return [3 /*break*/, 4];
+                case 2: return [4 /*yield*/, seedDev()];
+                case 3:
+                    _a.sent();
+                    _a.label = 4;
+                case 4:
                     console.log("✨ Database seed completed successfully!");
                     return [2 /*return*/];
             }

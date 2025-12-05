@@ -534,3 +534,606 @@ export async function saveValidationResultToDocument(
     throw error;
   }
 }
+
+        );
+
+        // Return fallback result
+        validationResult = {
+          status: 'needs_review',
+          confidence: 0.0,
+          verifiedByAI: false,
+          problems: [],
+          suggestions: [],
+          notes: {
+            uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+            ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+            en: 'AI could not automatically evaluate this document. Manual review required.',
+          },
+        };
+        return validationResult;
+      }
+
+      // Validate and normalize the result to match DocumentValidationResultAI
+      const status = ['verified', 'rejected', 'needs_review', 'uncertain'].includes(parsed.status)
+        ? (parsed.status as 'verified' | 'rejected' | 'needs_review' | 'uncertain')
+        : 'needs_review';
+
+      const confidence =
+        typeof parsed.confidence === 'number'
+          ? Math.max(0, Math.min(1, parsed.confidence))
+          : status === 'verified'
+            ? 0.7
+            : status === 'rejected'
+              ? 0.5
+              : 0.5;
+
+      const verifiedByAI = status === 'verified' && confidence >= 0.7;
+
+      // Normalize problems array
+      const problems = Array.isArray(parsed.problems)
+        ? parsed.problems.map((p: any) => ({
+            code: p.code || 'UNKNOWN_PROBLEM',
+            message: p.message || 'Unknown problem',
+            userMessage: p.userMessage,
+          }))
+        : [];
+
+      // Normalize suggestions array
+      const suggestions = Array.isArray(parsed.suggestions)
+        ? parsed.suggestions.map((s: any) => ({
+            code: s.code || 'UNKNOWN_SUGGESTION',
+            message: s.message || 'Unknown suggestion',
+          }))
+        : [];
+
+      // Normalize notes (ensure uz is present)
+      const notes = {
+        uz: parsed.notes?.uz || parsed.notesUz || "Hujjat yuklangan. Qo'lda tekshirish kerak.",
+        ru: parsed.notes?.ru || parsed.notesRu,
+        en: parsed.notes?.en || parsed.notesEn,
+      };
+
+      validationResult = {
+        status,
+        confidence,
+        verifiedByAI,
+        problems,
+        suggestions,
+        notes,
+        rawJson: content, // Store raw JSON for debugging
+      };
+
+      logInfo('[OpenAI][DocValidation] Validation result', {
+        model: AIOpenAIService.MODEL,
+        documentType: document.documentType,
+        applicationId: application.id,
+        status: validationResult.status,
+        verifiedByAI: validationResult.verifiedByAI,
+        confidence: validationResult.confidence,
+        problemsCount: validationResult.problems.length,
+        suggestionsCount: validationResult.suggestions.length,
+        tokensUsed: totalTokens,
+        inputTokens,
+        outputTokens,
+        responseTimeMs: responseTime,
+      });
+
+      return validationResult;
+    } catch (error: any) {
+      const errorType = error?.type || 'unknown';
+      const statusCode = error?.status || error?.response?.status;
+      const errorMessage = error?.message || String(error);
+
+      logError(
+        '[AI_DOC_VALIDATION_ERROR] Document validation with AI failed',
+        error instanceof Error ? error : new Error(errorMessage),
+        {
+          documentType: params.document.documentType,
+          applicationId: params.application.id,
+          model: AIOpenAIService.MODEL,
+          errorType,
+          statusCode,
+          errorMessage,
+        }
+      );
+
+      // Return safe fallback
+      const fallbackResult: DocumentValidationResultAI = {
+        status: 'needs_review',
+        confidence: 0.0,
+        verifiedByAI: false,
+        problems: [],
+        suggestions: [],
+        notes: {
+          uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+          ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+          en: 'AI could not automatically evaluate this document. Manual review required.',
+        },
+      };
+
+      return fallbackResult;
+    }
+  } catch (outerError: any) {
+    // This catch handles any errors from the outer try block (e.g., initialization errors)
+    logError(
+      '[AI_DOC_VALIDATION_ERROR] Unexpected error in document validation',
+      outerError instanceof Error ? outerError : new Error(String(outerError)),
+      {
+        documentType: params.document.documentType,
+        applicationId: params.application.id,
+      }
+    );
+
+    // Return safe fallback
+    const fallbackResult: DocumentValidationResultAI = {
+      status: 'needs_review',
+      confidence: 0.0,
+      verifiedByAI: false,
+      problems: [],
+      suggestions: [],
+      notes: {
+        uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+        ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+        en: 'AI could not automatically evaluate this document. Manual review required.',
+      },
+    };
+
+    return fallbackResult;
+  }
+}
+
+/**
+ * Save validation result to UserDocument
+ *
+ * @param documentId - UserDocument ID
+ * @param validationResult - DocumentValidationResultAI from GPT-4
+ * @returns Updated UserDocument
+ */
+export async function saveValidationResultToDocument(
+  documentId: string,
+  validationResult: DocumentValidationResultAI
+): Promise<void> {
+  try {
+    // Map DocumentValidationResultAI status to UserDocument status
+    let documentStatus: 'pending' | 'verified' | 'rejected' = 'pending';
+    if (validationResult.status === 'verified') {
+      documentStatus = 'verified';
+    } else if (validationResult.status === 'rejected') {
+      documentStatus = 'rejected';
+    } else {
+      documentStatus = 'pending'; // needs_review or uncertain -> pending
+    }
+
+    await prisma.userDocument.update({
+      where: { id: documentId },
+      data: {
+        status: documentStatus,
+        verifiedByAI: validationResult.verifiedByAI,
+        aiConfidence: validationResult.confidence,
+        aiNotesUz: validationResult.notes.uz,
+        aiNotesRu: validationResult.notes.ru || null,
+        aiNotesEn: validationResult.notes.en || null,
+        verificationNotes:
+          validationResult.problems.length > 0
+            ? validationResult.problems.map((p) => p.message).join('; ')
+            : null,
+      },
+    });
+
+    logInfo('[DocValidation] Saved validation result to UserDocument', {
+      documentId,
+      status: documentStatus,
+      verifiedByAI: validationResult.verifiedByAI,
+      confidence: validationResult.confidence,
+    });
+  } catch (error) {
+    logError(
+      '[DocValidation] Failed to save validation result',
+      error instanceof Error ? error : new Error(String(error)),
+      { documentId }
+    );
+    throw error;
+  }
+}
+
+        );
+
+        // Return fallback result
+        validationResult = {
+          status: 'needs_review',
+          confidence: 0.0,
+          verifiedByAI: false,
+          problems: [],
+          suggestions: [],
+          notes: {
+            uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+            ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+            en: 'AI could not automatically evaluate this document. Manual review required.',
+          },
+        };
+        return validationResult;
+      }
+
+      // Validate and normalize the result to match DocumentValidationResultAI
+      const status = ['verified', 'rejected', 'needs_review', 'uncertain'].includes(parsed.status)
+        ? (parsed.status as 'verified' | 'rejected' | 'needs_review' | 'uncertain')
+        : 'needs_review';
+
+      const confidence =
+        typeof parsed.confidence === 'number'
+          ? Math.max(0, Math.min(1, parsed.confidence))
+          : status === 'verified'
+            ? 0.7
+            : status === 'rejected'
+              ? 0.5
+              : 0.5;
+
+      const verifiedByAI = status === 'verified' && confidence >= 0.7;
+
+      // Normalize problems array
+      const problems = Array.isArray(parsed.problems)
+        ? parsed.problems.map((p: any) => ({
+            code: p.code || 'UNKNOWN_PROBLEM',
+            message: p.message || 'Unknown problem',
+            userMessage: p.userMessage,
+          }))
+        : [];
+
+      // Normalize suggestions array
+      const suggestions = Array.isArray(parsed.suggestions)
+        ? parsed.suggestions.map((s: any) => ({
+            code: s.code || 'UNKNOWN_SUGGESTION',
+            message: s.message || 'Unknown suggestion',
+          }))
+        : [];
+
+      // Normalize notes (ensure uz is present)
+      const notes = {
+        uz: parsed.notes?.uz || parsed.notesUz || "Hujjat yuklangan. Qo'lda tekshirish kerak.",
+        ru: parsed.notes?.ru || parsed.notesRu,
+        en: parsed.notes?.en || parsed.notesEn,
+      };
+
+      validationResult = {
+        status,
+        confidence,
+        verifiedByAI,
+        problems,
+        suggestions,
+        notes,
+        rawJson: content, // Store raw JSON for debugging
+      };
+
+      logInfo('[OpenAI][DocValidation] Validation result', {
+        model: AIOpenAIService.MODEL,
+        documentType: document.documentType,
+        applicationId: application.id,
+        status: validationResult.status,
+        verifiedByAI: validationResult.verifiedByAI,
+        confidence: validationResult.confidence,
+        problemsCount: validationResult.problems.length,
+        suggestionsCount: validationResult.suggestions.length,
+        tokensUsed: totalTokens,
+        inputTokens,
+        outputTokens,
+        responseTimeMs: responseTime,
+      });
+
+      return validationResult;
+    } catch (error: any) {
+      const errorType = error?.type || 'unknown';
+      const statusCode = error?.status || error?.response?.status;
+      const errorMessage = error?.message || String(error);
+
+      logError(
+        '[AI_DOC_VALIDATION_ERROR] Document validation with AI failed',
+        error instanceof Error ? error : new Error(errorMessage),
+        {
+          documentType: params.document.documentType,
+          applicationId: params.application.id,
+          model: AIOpenAIService.MODEL,
+          errorType,
+          statusCode,
+          errorMessage,
+        }
+      );
+
+      // Return safe fallback
+      const fallbackResult: DocumentValidationResultAI = {
+        status: 'needs_review',
+        confidence: 0.0,
+        verifiedByAI: false,
+        problems: [],
+        suggestions: [],
+        notes: {
+          uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+          ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+          en: 'AI could not automatically evaluate this document. Manual review required.',
+        },
+      };
+
+      return fallbackResult;
+    }
+  } catch (outerError: any) {
+    // This catch handles any errors from the outer try block (e.g., initialization errors)
+    logError(
+      '[AI_DOC_VALIDATION_ERROR] Unexpected error in document validation',
+      outerError instanceof Error ? outerError : new Error(String(outerError)),
+      {
+        documentType: params.document.documentType,
+        applicationId: params.application.id,
+      }
+    );
+
+    // Return safe fallback
+    const fallbackResult: DocumentValidationResultAI = {
+      status: 'needs_review',
+      confidence: 0.0,
+      verifiedByAI: false,
+      problems: [],
+      suggestions: [],
+      notes: {
+        uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+        ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+        en: 'AI could not automatically evaluate this document. Manual review required.',
+      },
+    };
+
+    return fallbackResult;
+  }
+}
+
+/**
+ * Save validation result to UserDocument
+ *
+ * @param documentId - UserDocument ID
+ * @param validationResult - DocumentValidationResultAI from GPT-4
+ * @returns Updated UserDocument
+ */
+export async function saveValidationResultToDocument(
+  documentId: string,
+  validationResult: DocumentValidationResultAI
+): Promise<void> {
+  try {
+    // Map DocumentValidationResultAI status to UserDocument status
+    let documentStatus: 'pending' | 'verified' | 'rejected' = 'pending';
+    if (validationResult.status === 'verified') {
+      documentStatus = 'verified';
+    } else if (validationResult.status === 'rejected') {
+      documentStatus = 'rejected';
+    } else {
+      documentStatus = 'pending'; // needs_review or uncertain -> pending
+    }
+
+    await prisma.userDocument.update({
+      where: { id: documentId },
+      data: {
+        status: documentStatus,
+        verifiedByAI: validationResult.verifiedByAI,
+        aiConfidence: validationResult.confidence,
+        aiNotesUz: validationResult.notes.uz,
+        aiNotesRu: validationResult.notes.ru || null,
+        aiNotesEn: validationResult.notes.en || null,
+        verificationNotes:
+          validationResult.problems.length > 0
+            ? validationResult.problems.map((p) => p.message).join('; ')
+            : null,
+      },
+    });
+
+    logInfo('[DocValidation] Saved validation result to UserDocument', {
+      documentId,
+      status: documentStatus,
+      verifiedByAI: validationResult.verifiedByAI,
+      confidence: validationResult.confidence,
+    });
+  } catch (error) {
+    logError(
+      '[DocValidation] Failed to save validation result',
+      error instanceof Error ? error : new Error(String(error)),
+      { documentId }
+    );
+    throw error;
+  }
+}
+
+        );
+
+        // Return fallback result
+        validationResult = {
+          status: 'needs_review',
+          confidence: 0.0,
+          verifiedByAI: false,
+          problems: [],
+          suggestions: [],
+          notes: {
+            uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+            ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+            en: 'AI could not automatically evaluate this document. Manual review required.',
+          },
+        };
+        return validationResult;
+      }
+
+      // Validate and normalize the result to match DocumentValidationResultAI
+      const status = ['verified', 'rejected', 'needs_review', 'uncertain'].includes(parsed.status)
+        ? (parsed.status as 'verified' | 'rejected' | 'needs_review' | 'uncertain')
+        : 'needs_review';
+
+      const confidence =
+        typeof parsed.confidence === 'number'
+          ? Math.max(0, Math.min(1, parsed.confidence))
+          : status === 'verified'
+            ? 0.7
+            : status === 'rejected'
+              ? 0.5
+              : 0.5;
+
+      const verifiedByAI = status === 'verified' && confidence >= 0.7;
+
+      // Normalize problems array
+      const problems = Array.isArray(parsed.problems)
+        ? parsed.problems.map((p: any) => ({
+            code: p.code || 'UNKNOWN_PROBLEM',
+            message: p.message || 'Unknown problem',
+            userMessage: p.userMessage,
+          }))
+        : [];
+
+      // Normalize suggestions array
+      const suggestions = Array.isArray(parsed.suggestions)
+        ? parsed.suggestions.map((s: any) => ({
+            code: s.code || 'UNKNOWN_SUGGESTION',
+            message: s.message || 'Unknown suggestion',
+          }))
+        : [];
+
+      // Normalize notes (ensure uz is present)
+      const notes = {
+        uz: parsed.notes?.uz || parsed.notesUz || "Hujjat yuklangan. Qo'lda tekshirish kerak.",
+        ru: parsed.notes?.ru || parsed.notesRu,
+        en: parsed.notes?.en || parsed.notesEn,
+      };
+
+      validationResult = {
+        status,
+        confidence,
+        verifiedByAI,
+        problems,
+        suggestions,
+        notes,
+        rawJson: content, // Store raw JSON for debugging
+      };
+
+      logInfo('[OpenAI][DocValidation] Validation result', {
+        model: AIOpenAIService.MODEL,
+        documentType: document.documentType,
+        applicationId: application.id,
+        status: validationResult.status,
+        verifiedByAI: validationResult.verifiedByAI,
+        confidence: validationResult.confidence,
+        problemsCount: validationResult.problems.length,
+        suggestionsCount: validationResult.suggestions.length,
+        tokensUsed: totalTokens,
+        inputTokens,
+        outputTokens,
+        responseTimeMs: responseTime,
+      });
+
+      return validationResult;
+    } catch (error: any) {
+      const errorType = error?.type || 'unknown';
+      const statusCode = error?.status || error?.response?.status;
+      const errorMessage = error?.message || String(error);
+
+      logError(
+        '[AI_DOC_VALIDATION_ERROR] Document validation with AI failed',
+        error instanceof Error ? error : new Error(errorMessage),
+        {
+          documentType: params.document.documentType,
+          applicationId: params.application.id,
+          model: AIOpenAIService.MODEL,
+          errorType,
+          statusCode,
+          errorMessage,
+        }
+      );
+
+      // Return safe fallback
+      const fallbackResult: DocumentValidationResultAI = {
+        status: 'needs_review',
+        confidence: 0.0,
+        verifiedByAI: false,
+        problems: [],
+        suggestions: [],
+        notes: {
+          uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+          ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+          en: 'AI could not automatically evaluate this document. Manual review required.',
+        },
+      };
+
+      return fallbackResult;
+    }
+  } catch (outerError: any) {
+    // This catch handles any errors from the outer try block (e.g., initialization errors)
+    logError(
+      '[AI_DOC_VALIDATION_ERROR] Unexpected error in document validation',
+      outerError instanceof Error ? outerError : new Error(String(outerError)),
+      {
+        documentType: params.document.documentType,
+        applicationId: params.application.id,
+      }
+    );
+
+    // Return safe fallback
+    const fallbackResult: DocumentValidationResultAI = {
+      status: 'needs_review',
+      confidence: 0.0,
+      verifiedByAI: false,
+      problems: [],
+      suggestions: [],
+      notes: {
+        uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
+        ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
+        en: 'AI could not automatically evaluate this document. Manual review required.',
+      },
+    };
+
+    return fallbackResult;
+  }
+}
+
+/**
+ * Save validation result to UserDocument
+ *
+ * @param documentId - UserDocument ID
+ * @param validationResult - DocumentValidationResultAI from GPT-4
+ * @returns Updated UserDocument
+ */
+export async function saveValidationResultToDocument(
+  documentId: string,
+  validationResult: DocumentValidationResultAI
+): Promise<void> {
+  try {
+    // Map DocumentValidationResultAI status to UserDocument status
+    let documentStatus: 'pending' | 'verified' | 'rejected' = 'pending';
+    if (validationResult.status === 'verified') {
+      documentStatus = 'verified';
+    } else if (validationResult.status === 'rejected') {
+      documentStatus = 'rejected';
+    } else {
+      documentStatus = 'pending'; // needs_review or uncertain -> pending
+    }
+
+    await prisma.userDocument.update({
+      where: { id: documentId },
+      data: {
+        status: documentStatus,
+        verifiedByAI: validationResult.verifiedByAI,
+        aiConfidence: validationResult.confidence,
+        aiNotesUz: validationResult.notes.uz,
+        aiNotesRu: validationResult.notes.ru || null,
+        aiNotesEn: validationResult.notes.en || null,
+        verificationNotes:
+          validationResult.problems.length > 0
+            ? validationResult.problems.map((p) => p.message).join('; ')
+            : null,
+      },
+    });
+
+    logInfo('[DocValidation] Saved validation result to UserDocument', {
+      documentId,
+      status: documentStatus,
+      verifiedByAI: validationResult.verifiedByAI,
+      confidence: validationResult.confidence,
+    });
+  } catch (error) {
+    logError(
+      '[DocValidation] Failed to save validation result',
+      error instanceof Error ? error : new Error(String(error)),
+      { documentId }
+    );
+    throw error;
+  }
+}

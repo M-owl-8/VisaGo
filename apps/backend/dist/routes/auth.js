@@ -16,6 +16,8 @@ const request_validation_1 = require("../middleware/request-validation");
 const validation_2 = require("../utils/validation");
 const response_1 = require("../utils/response");
 const constants_1 = require("../config/constants");
+const rate_limit_1 = require("../middleware/rate-limit");
+const logger_1 = require("../middleware/logger");
 const router = express_1.default.Router();
 /**
  * POST /api/auth/register
@@ -29,11 +31,17 @@ const router = express_1.default.Router();
  * @body {string} [lastName] - User last name (optional)
  * @returns {object} Authentication response with token and user data
  */
-router.post("/register", (0, request_validation_1.validateRequest)({
+router.post('/register', (req, res, next) => {
+    // LOW PRIORITY FIX: Use proper logger instead of console.log
+    // Note: Email logging removed for security - only log route access
+    (0, logger_1.logInfo)('[AUTH] Register route accessed', { method: req.method, path: req.path });
+    next();
+}, rate_limit_1.registerLimiter, // Apply rate limiter directly to the route
+(0, request_validation_1.validateRequest)({
     body: {
-        required: ["email", "password"],
-        optional: ["firstName", "lastName"],
-        sanitize: ["email", "firstName", "lastName"],
+        required: ['email', 'password'],
+        optional: ['firstName', 'lastName'],
+        sanitize: ['email', 'firstName', 'lastName'],
         validate: {
             email: (val) => (0, validation_2.isValidEmail)(val),
         },
@@ -50,6 +58,21 @@ router.post("/register", (0, request_validation_1.validateRequest)({
         (0, response_1.createdResponse)(res, result);
     }
     catch (error) {
+        // Log error details for debugging
+        if (error instanceof errors_1.ApiError) {
+            console.warn('[AUTH][REGISTER] Route error', {
+                email: req.body?.email,
+                code: error.code,
+                message: error.message,
+                status: error.status,
+            });
+        }
+        else {
+            console.error('[AUTH][REGISTER] Unexpected error', {
+                email: req.body?.email,
+                error: error?.message || String(error),
+            });
+        }
         next(error);
     }
 });
@@ -63,10 +86,15 @@ router.post("/register", (0, request_validation_1.validateRequest)({
  * @body {string} password - User password
  * @returns {object} Authentication response with token and user data
  */
-router.post("/login", (0, request_validation_1.validateRequest)({
+router.post('/login', (req, res, next) => {
+    // LOW PRIORITY FIX: Use proper logger instead of console.log
+    (0, logger_1.logInfo)('[AUTH] Login route accessed', { method: req.method, path: req.path });
+    next();
+}, rate_limit_1.loginLimiter, // Apply rate limiter directly to the route
+(0, request_validation_1.validateRequest)({
     body: {
-        required: ["email", "password"],
-        sanitize: ["email"],
+        required: ['email', 'password'],
+        sanitize: ['email'],
         validate: {
             email: (val) => (0, validation_2.isValidEmail)(val),
         },
@@ -87,42 +115,41 @@ router.post("/login", (0, request_validation_1.validateRequest)({
 /**
  * POST /api/auth/google
  * Login/Register with Google OAuth
- * Enhanced with better error messages and validation
+ * SECURE: Verifies Google ID token server-side
  *
  * @route POST /api/auth/google
  * @access Public
- * @body {string} googleId - Google user ID
- * @body {string} email - User email address
- * @body {string} [firstName] - User first name (optional)
- * @body {string} [lastName] - User last name (optional)
- * @body {string} [avatar] - User avatar URL (optional)
+ * @body {string} idToken - Google ID token from Google Sign-In SDK
  * @returns {object} Authentication response with token and user data
  */
-router.post("/google", (0, request_validation_1.validateRequest)({
+router.post('/google', (0, request_validation_1.validateRequest)({
     body: {
-        required: ["googleId", "email"],
-        optional: ["firstName", "lastName", "avatar"],
-        sanitize: ["email", "firstName", "lastName"],
+        required: ['idToken'],
+        optional: [],
+        sanitize: [],
         validate: {
-            email: (val) => (0, validation_2.isValidEmail)(val),
+            idToken: (val) => {
+                if (!val || typeof val !== 'string' || val.trim().length === 0) {
+                    return false;
+                }
+                return true;
+            },
         },
     },
 }), async (req, res, next) => {
     try {
-        const { googleId, email, firstName, lastName, avatar } = req.body;
-        // Check if Google OAuth is configured
-        const { getEnvConfig } = require("../config/env");
-        const config = getEnvConfig();
-        if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) {
-            return (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.SERVICE_UNAVAILABLE, "Google Sign-In is not configured. Please contact support.", "OAUTH_NOT_CONFIGURED");
+        const { idToken } = req.body;
+        if (!idToken || typeof idToken !== 'string' || idToken.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    code: 'ID_TOKEN_REQUIRED',
+                    message: 'Google ID token is required',
+                },
+            });
         }
-        const result = await auth_service_1.AuthService.verifyGoogleAuth({
-            googleId,
-            email,
-            firstName,
-            lastName,
-            avatar,
-        });
+        // Verify Google ID token server-side and authenticate user
+        const result = await auth_service_1.AuthService.verifyGoogleAuth(idToken);
         (0, response_1.successResponse)(res, result);
     }
     catch (error) {
@@ -132,7 +159,7 @@ router.post("/google", (0, request_validation_1.validateRequest)({
         }
         else {
             // Generic error for OAuth failures
-            next(new errors_1.ApiError(constants_1.HTTP_STATUS.INTERNAL_SERVER_ERROR, "Google Sign-In failed. Please try again or use email/password.", "OAUTH_ERROR"));
+            next(new errors_1.ApiError(constants_1.HTTP_STATUS.INTERNAL_SERVER_ERROR, 'Google Sign-In failed. Please try again or use email/password.', 'OAUTH_ERROR'));
         }
     }
 });
@@ -144,10 +171,10 @@ router.post("/google", (0, request_validation_1.validateRequest)({
  * @access Private
  * @returns {object} User profile data
  */
-router.get("/me", auth_1.authenticateToken, async (req, res, next) => {
+router.get('/me', auth_1.authenticateToken, async (req, res, next) => {
     try {
         if (!req.userId) {
-            return (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.UNAUTHORIZED, "User ID not found in request", constants_1.ERROR_CODES.UNAUTHORIZED);
+            return (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.UNAUTHORIZED, 'User ID not found in request', constants_1.ERROR_CODES.UNAUTHORIZED);
         }
         const profile = await auth_service_1.AuthService.getProfile(req.userId);
         (0, response_1.successResponse)(res, profile);
@@ -160,7 +187,7 @@ router.get("/me", auth_1.authenticateToken, async (req, res, next) => {
  * PUT /api/auth/me
  * Update user profile (requires authentication)
  */
-router.put("/me", auth_1.authenticateToken, async (req, res, next) => {
+router.put('/me', auth_1.authenticateToken, async (req, res, next) => {
     try {
         const updated = await auth_service_1.AuthService.updateProfile(req.userId, req.body);
         res.json({
@@ -177,15 +204,15 @@ router.put("/me", auth_1.authenticateToken, async (req, res, next) => {
  * Refresh JWT token (requires valid token)
  * Enhanced with better error handling
  */
-router.post("/refresh", auth_1.authenticateToken, async (req, res, next) => {
+router.post('/refresh', auth_1.authenticateToken, async (req, res, next) => {
     try {
         if (!req.userId) {
-            return (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.UNAUTHORIZED, "User ID not found. Please log in again.", constants_1.ERROR_CODES.UNAUTHORIZED);
+            return (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.UNAUTHORIZED, 'User ID not found. Please log in again.', constants_1.ERROR_CODES.UNAUTHORIZED);
         }
         const newToken = await auth_service_1.AuthService.refreshToken(req.userId);
         (0, response_1.successResponse)(res, {
             token: newToken,
-            message: "Token refreshed successfully",
+            message: 'Token refreshed successfully',
         });
     }
     catch (error) {
@@ -197,12 +224,12 @@ router.post("/refresh", auth_1.authenticateToken, async (req, res, next) => {
  * Logout user (optional - just clears client-side)
  * Enhanced with better response
  */
-router.post("/logout", auth_1.authenticateToken, async (req, res, next) => {
+router.post('/logout', auth_1.authenticateToken, async (req, res, next) => {
     try {
         // In a real app, you might invalidate the token on server side (e.g., add to blacklist)
         // For now, logout is handled client-side by removing the token from AsyncStorage
         (0, response_1.successResponse)(res, {
-            message: "Logged out successfully",
+            message: 'Logged out successfully',
         });
     }
     catch (error) {
@@ -218,9 +245,9 @@ router.post("/logout", auth_1.authenticateToken, async (req, res, next) => {
  * @access Public
  * @returns {object} Authentication service status
  */
-router.get("/status", async (req, res) => {
+router.get('/status', async (req, res) => {
     try {
-        const { getEnvConfig } = require("../config/env");
+        const { getEnvConfig } = require('../config/env');
         const config = getEnvConfig();
         const status = {
             emailPassword: {
@@ -240,7 +267,7 @@ router.get("/status", async (req, res) => {
         (0, response_1.successResponse)(res, status);
     }
     catch (error) {
-        (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.INTERNAL_SERVER_ERROR, "Failed to check authentication status", "STATUS_CHECK_ERROR");
+        (0, response_1.errorResponse)(res, constants_1.HTTP_STATUS.INTERNAL_SERVER_ERROR, 'Failed to check authentication status', 'STATUS_CHECK_ERROR');
     }
 });
 /**
@@ -252,10 +279,10 @@ router.get("/status", async (req, res) => {
  * @body {string} email - User email address
  * @returns {object} Success message
  */
-router.post("/forgot-password", (0, request_validation_1.validateRequest)({
+router.post('/forgot-password', (0, request_validation_1.validateRequest)({
     body: {
-        required: ["email"],
-        sanitize: ["email"],
+        required: ['email'],
+        sanitize: ['email'],
         validate: {
             email: (val) => (0, validation_2.isValidEmail)(val),
         },
@@ -266,7 +293,7 @@ router.post("/forgot-password", (0, request_validation_1.validateRequest)({
         await auth_service_1.AuthService.requestPasswordReset(email);
         // Always return success to prevent user enumeration
         (0, response_1.successResponse)(res, {
-            message: "If an account exists with this email, a password reset link has been sent.",
+            message: 'If an account exists with this email, a password reset link has been sent.',
         });
     }
     catch (error) {
@@ -283,9 +310,9 @@ router.post("/forgot-password", (0, request_validation_1.validateRequest)({
  * @body {string} password - New password
  * @returns {object} Success message
  */
-router.post("/reset-password", (0, request_validation_1.validateRequest)({
+router.post('/reset-password', (0, request_validation_1.validateRequest)({
     body: {
-        required: ["token", "password"],
+        required: ['token', 'password'],
         sanitize: [],
         validate: {},
     },
@@ -294,7 +321,7 @@ router.post("/reset-password", (0, request_validation_1.validateRequest)({
         const { token, password } = req.body;
         await auth_service_1.AuthService.resetPassword(token, password);
         (0, response_1.successResponse)(res, {
-            message: "Password has been reset successfully.",
+            message: 'Password has been reset successfully.',
         });
     }
     catch (error) {

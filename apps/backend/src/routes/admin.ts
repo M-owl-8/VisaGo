@@ -335,6 +335,8 @@ router.get(
 /**
  * GET /api/admin/visa-rules
  * List visa rule sets with filtering
+ * 
+ * CHANGED: Returns data formatted for admin panel with summary fields
  */
 router.get('/visa-rules', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -352,9 +354,50 @@ router.get('/visa-rules', authenticateToken, requireAdmin, async (req: Request, 
       offset,
     });
 
+    // Format rule sets for admin panel
+    const formattedRuleSets = result.ruleSets.map((ruleSet) => {
+      // Parse data if it's a string (SQLite) or use directly (PostgreSQL)
+      const data = typeof ruleSet.data === 'string' ? JSON.parse(ruleSet.data) : ruleSet.data;
+      
+      // Extract summary information
+      const requiredDocsCount = data.requiredDocuments?.length || 0;
+      const summary = {
+        requiredDocumentsCount: requiredDocsCount,
+        hasFinancialRequirements: !!data.financialRequirements,
+        hasProcessingInfo: !!data.processingInfo,
+        hasFees: !!data.fees,
+      };
+
+      return {
+        id: ruleSet.id,
+        countryCode: ruleSet.countryCode,
+        visaType: ruleSet.visaType,
+        version: ruleSet.version,
+        createdAt: ruleSet.createdAt,
+        updatedAt: ruleSet.updatedAt,
+        isApproved: ruleSet.isApproved,
+        approvedAt: ruleSet.approvedAt,
+        approvedBy: ruleSet.approvedBy,
+        sourceSummary: ruleSet.sourceSummary,
+        source: ruleSet.source ? {
+          id: ruleSet.source.id,
+          url: ruleSet.source.url,
+          name: ruleSet.source.name,
+        } : null,
+        summary,
+        // Include full data if needed (can be large)
+        data: data,
+      };
+    });
+
     res.json({
       success: true,
-      data: result,
+      data: {
+        ruleSets: formattedRuleSets,
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+      },
     });
   } catch (error: any) {
     console.error('[AdminRoute] Error listing visa rules:', error);
@@ -368,6 +411,8 @@ router.get('/visa-rules', authenticateToken, requireAdmin, async (req: Request, 
 /**
  * GET /api/admin/visa-rules/:id
  * Get visa rule set by ID
+ * 
+ * CHANGED: Returns data formatted for admin panel with summary fields
  */
 router.get(
   '/visa-rules/:id',
@@ -384,9 +429,54 @@ router.get(
         });
       }
 
+      // Parse data if it's a string (SQLite) or use directly (PostgreSQL)
+      const data = typeof ruleSet.data === 'string' ? JSON.parse(ruleSet.data) : ruleSet.data;
+      
+      // Extract summary information
+      const requiredDocsCount = data.requiredDocuments?.length || 0;
+      const summary = {
+        requiredDocumentsCount: requiredDocsCount,
+        hasFinancialRequirements: !!data.financialRequirements,
+        hasProcessingInfo: !!data.processingInfo,
+        hasFees: !!data.fees,
+        processingDays: data.processingInfo?.processingDays,
+        minimumBalance: data.financialRequirements?.minimumBalance,
+        currency: data.financialRequirements?.currency || data.fees?.currency,
+      };
+
+      // Format versions
+      const formattedVersions = ruleSet.versions.map((version) => ({
+        id: version.id,
+        version: version.version,
+        createdAt: version.createdAt,
+        changeLog: version.changeLog,
+        data: typeof version.data === 'string' ? JSON.parse(version.data) : version.data,
+      }));
+
       res.json({
         success: true,
-        data: ruleSet,
+        data: {
+          id: ruleSet.id,
+          countryCode: ruleSet.countryCode,
+          visaType: ruleSet.visaType,
+          version: ruleSet.version,
+          createdAt: ruleSet.createdAt,
+          updatedAt: ruleSet.updatedAt,
+          isApproved: ruleSet.isApproved,
+          approvedAt: ruleSet.approvedAt,
+          approvedBy: ruleSet.approvedBy,
+          rejectionReason: ruleSet.rejectionReason,
+          sourceSummary: ruleSet.sourceSummary,
+          extractionMetadata: ruleSet.extractionMetadata 
+            ? (typeof ruleSet.extractionMetadata === 'string' 
+                ? JSON.parse(ruleSet.extractionMetadata) 
+                : ruleSet.extractionMetadata)
+            : null,
+          source: ruleSet.source,
+          summary,
+          data,
+          versions: formattedVersions,
+        },
       });
     } catch (error: any) {
       console.error('[AdminRoute] Error getting visa rule set:', error);

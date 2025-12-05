@@ -8,22 +8,31 @@ class CountriesService {
     /**
      * Get all countries with visa types
      */
+    /**
+     * Get all countries with visa types
+     * HIGH PRIORITY FIX: Always return ALL countries (no limit) to ensure questionnaire shows all 8 destination countries
+     * This method must never limit results - the frontend questionnaire depends on all 8 countries being available
+     */
     static async getAllCountries(search) {
         const where = search
             ? {
-                OR: [
-                    { name: { contains: search } },
-                    { code: { contains: search } },
-                ],
+                OR: [{ name: { contains: search } }, { code: { contains: search } }],
             }
             : {};
+        // CRITICAL: No limit, no take() - return ALL countries from database
+        // The questionnaire requires all 8 destination countries to be available
         const countries = await prisma.country.findMany({
             where,
             include: {
                 visaTypes: true,
             },
-            orderBy: { name: "asc" },
+            orderBy: { name: 'asc' },
+            // Explicitly NO limit - return all countries
         });
+        // Log warning if we don't have 8 countries (expected count from seed)
+        if (!search && countries.length !== 8) {
+            console.warn('[CountriesService] Expected 8 countries in database, found:', countries.length);
+        }
         return countries;
     }
     /**
@@ -37,7 +46,7 @@ class CountriesService {
             },
         });
         if (!country) {
-            throw errors_1.errors.notFound("Country");
+            throw errors_1.errors.notFound('Country');
         }
         return country;
     }
@@ -49,12 +58,51 @@ class CountriesService {
             where: { code: code.toUpperCase() },
             include: {
                 visaTypes: {
-                    orderBy: { name: "asc" },
+                    orderBy: { name: 'asc' },
                 },
             },
         });
         if (!country) {
-            throw errors_1.errors.notFound("Country");
+            throw errors_1.errors.notFound('Country');
+        }
+        return country;
+    }
+    /**
+     * Get country by code or name (fallback helper for questionnaire)
+     * Used when country ID might be stale but we have code/name from summary
+     */
+    static async getCountryByCodeOrName(codeOrName) {
+        const value = codeOrName.trim();
+        if (!value) {
+            return null;
+        }
+        // First try exact code match (case-insensitive)
+        let country = await prisma.country.findFirst({
+            where: {
+                code: value.toUpperCase(), // e.g. "US"
+            },
+            include: {
+                visaTypes: {
+                    orderBy: { name: 'asc' },
+                },
+            },
+        });
+        // If not found by code, search by name (case-insensitive filtering in JavaScript)
+        if (!country) {
+            const valueLower = value.toLowerCase();
+            const countries = await prisma.country.findMany({
+                where: {
+                    name: { contains: value }, // Basic contains, will filter case-insensitively below
+                },
+                include: {
+                    visaTypes: {
+                        orderBy: { name: 'asc' },
+                    },
+                },
+                take: 10, // Get more to filter case-insensitively
+            });
+            // Filter case-insensitively (SQLite compatibility)
+            country = countries.find((c) => c.name.toLowerCase().includes(valueLower)) || null;
         }
         return country;
     }
@@ -69,7 +117,7 @@ class CountriesService {
                     take: 3,
                 },
             },
-            orderBy: { name: "asc" },
+            orderBy: { name: 'asc' },
         });
         return countries;
     }
@@ -84,7 +132,7 @@ class CountriesService {
             },
         });
         if (!visaType) {
-            throw errors_1.errors.notFound("Visa Type");
+            throw errors_1.errors.notFound('Visa Type');
         }
         return visaType;
     }
@@ -94,7 +142,7 @@ class CountriesService {
     static async getVisaTypesByCountry(countryId) {
         const visaTypes = await prisma.visaType.findMany({
             where: { countryId },
-            orderBy: { name: "asc" },
+            orderBy: { name: 'asc' },
         });
         return visaTypes;
     }
@@ -109,7 +157,7 @@ class CountriesService {
             },
         });
         if (existing) {
-            throw errors_1.errors.conflict("Country");
+            throw errors_1.errors.conflict('Country');
         }
         const country = await prisma.country.create({
             data: {
@@ -131,7 +179,7 @@ class CountriesService {
             where: { id: countryId },
         });
         if (!country) {
-            throw errors_1.errors.notFound("Country");
+            throw errors_1.errors.notFound('Country');
         }
         // Check if visa type already exists
         const existing = await prisma.visaType.findFirst({
@@ -141,7 +189,7 @@ class CountriesService {
             },
         });
         if (existing) {
-            throw errors_1.errors.conflict("Visa Type");
+            throw errors_1.errors.conflict('Visa Type');
         }
         const visaType = await prisma.visaType.create({
             data: {
@@ -149,9 +197,9 @@ class CountriesService {
                 name: data.name,
                 description: data.description,
                 processingDays: data.processingDays || 30,
-                validity: data.validity || "1 year",
+                validity: data.validity || '1 year',
                 fee: data.fee || 0,
-                requirements: data.requirements || "{}",
+                requirements: data.requirements || '{}',
                 documentTypes: JSON.stringify(data.documentTypes || []),
             },
         });

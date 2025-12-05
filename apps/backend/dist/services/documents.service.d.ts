@@ -17,6 +17,11 @@ export declare class DocumentService {
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
+        verifiedByAI: boolean | null;
+        aiConfidence: number | null;
+        aiNotesUz: string | null;
+        aiNotesRu: string | null;
+        aiNotesEn: string | null;
     }>;
     /**
      * Get all documents for a user
@@ -36,6 +41,11 @@ export declare class DocumentService {
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
+        verifiedByAI: boolean | null;
+        aiConfidence: number | null;
+        aiNotesUz: string | null;
+        aiNotesRu: string | null;
+        aiNotesEn: string | null;
     }[]>;
     /**
      * Get all documents for an application
@@ -55,6 +65,11 @@ export declare class DocumentService {
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
+        verifiedByAI: boolean | null;
+        aiConfidence: number | null;
+        aiNotesUz: string | null;
+        aiNotesRu: string | null;
+        aiNotesEn: string | null;
     }[]>;
     /**
      * Get a specific document
@@ -74,6 +89,11 @@ export declare class DocumentService {
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
+        verifiedByAI: boolean | null;
+        aiConfidence: number | null;
+        aiNotesUz: string | null;
+        aiNotesRu: string | null;
+        aiNotesEn: string | null;
     }>;
     /**
      * Delete a document
@@ -84,7 +104,7 @@ export declare class DocumentService {
     /**
      * Update document status (for admin)
      */
-    updateDocumentStatus(documentId: string, status: "pending" | "verified" | "rejected", verificationNotes?: string): Promise<{
+    updateDocumentStatus(documentId: string, status: 'pending' | 'verified' | 'rejected', verificationNotes?: string): Promise<{
         documentType: string;
         userId: string;
         fileUrl: string;
@@ -99,6 +119,11 @@ export declare class DocumentService {
         applicationId: string;
         documentName: string;
         verificationNotes: string | null;
+        verifiedByAI: boolean | null;
+        aiConfidence: number | null;
+        aiNotesUz: string | null;
+        aiNotesRu: string | null;
+        aiNotesEn: string | null;
     }>;
     /**
      * Get document statistics for a user

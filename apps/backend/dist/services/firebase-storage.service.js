@@ -39,20 +39,90 @@ const uuid_1 = require("uuid");
 const sharp_wrapper_1 = require("../utils/sharp-wrapper");
 class FirebaseStorageService {
     /**
-     * Initialize Firebase Admin SDK
+     * Check if Firebase Storage is enabled and properly configured
+     */
+    static isEnabled() {
+        return FirebaseStorageService.firebaseEnabled;
+    }
+    /**
+     * Get the configured bucket name
+     */
+    static getBucketName() {
+        return FirebaseStorageService.bucketName;
+    }
+    /**
+     * Initialize Firebase Admin SDK with full credential-based initialization
+     * Requires all 4 environment variables:
+     * - FIREBASE_PROJECT_ID
+     * - FIREBASE_CLIENT_EMAIL
+     * - FIREBASE_PRIVATE_KEY
+     * - FIREBASE_STORAGE_BUCKET
      */
     static async initialize() {
-        if (!FirebaseStorageService.instance) {
-            // Firebase Admin SDK initialization
-            // Credentials are automatically loaded from FIREBASE_PRIVATE_KEY environment variable
-            // or via gcloud authentication
+        // Check if already initialized
+        if (FirebaseStorageService.instance) {
+            return;
+        }
+        // Check for all required environment variables
+        const requiredVars = {
+            FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+            FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL,
+            FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY,
+            FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
+        };
+        // Check which variables are missing
+        const missingVars = [];
+        for (const [key, value] of Object.entries(requiredVars)) {
+            if (!value || value.trim() === '') {
+                missingVars.push(key);
+            }
+        }
+        // If any required vars are missing, do not initialize
+        if (missingVars.length > 0) {
+            FirebaseStorageService.firebaseEnabled = false;
+            console.warn(`⚠️  Firebase Storage not configured - missing environment variables: ${missingVars.join(', ')}`);
+            return;
+        }
+        try {
+            // Initialize Firebase Admin with credentials
+            // At this point, all required vars are confirmed to exist (checked above)
+            const projectId = requiredVars.FIREBASE_PROJECT_ID;
+            const clientEmail = requiredVars.FIREBASE_CLIENT_EMAIL;
+            // Process private key from environment variable (replace escaped newlines)
+            const privateKeyEnv = requiredVars.FIREBASE_PRIVATE_KEY;
+            const privateKey = privateKeyEnv.replace(/\\n/g, '\n');
+            const storageBucket = requiredVars.FIREBASE_STORAGE_BUCKET;
             if (!admin.apps.length) {
                 admin.initializeApp({
-                    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+                    credential: admin.credential.cert({
+                        projectId,
+                        clientEmail,
+                        privateKey,
+                    }),
+                    storageBucket,
                 });
             }
             FirebaseStorageService.instance = admin.app();
-            FirebaseStorageService.bucket = admin.storage().bucket();
+            FirebaseStorageService.bucket = admin.storage().bucket(storageBucket);
+            FirebaseStorageService.bucketName = storageBucket;
+            FirebaseStorageService.firebaseEnabled = true;
+            console.log(`✅ Firebase Storage configured (bucket: ${storageBucket})`);
+        }
+        catch (error) {
+            FirebaseStorageService.firebaseEnabled = false;
+            console.error('❌ Firebase Storage initialization failed:', error);
+            throw error;
+        }
+    }
+    /**
+     * Ensure Firebase is enabled before performing operations
+     */
+    static ensureEnabled() {
+        if (!FirebaseStorageService.firebaseEnabled) {
+            throw new Error('Firebase Storage is disabled. Check environment variables: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_STORAGE_BUCKET');
+        }
+        if (!FirebaseStorageService.bucket) {
+            throw new Error('Firebase Storage bucket is not initialized');
         }
     }
     /**
@@ -60,6 +130,7 @@ class FirebaseStorageService {
      */
     static async uploadFile(fileBuffer, fileName, fileType, userId, options = {}) {
         await this.initialize();
+        this.ensureEnabled();
         const { maxFileSize = 50 * 1024 * 1024, // 50MB
         allowedFormats = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'], compress = true, generateThumbnail = false, } = options;
         // Validate file size
@@ -146,6 +217,7 @@ class FirebaseStorageService {
      */
     static async deleteFile(fileName) {
         await this.initialize();
+        this.ensureEnabled();
         const file = FirebaseStorageService.bucket.file(fileName);
         await file.delete();
     }
@@ -154,6 +226,7 @@ class FirebaseStorageService {
      */
     static async getFileMetadata(fileName) {
         await this.initialize();
+        this.ensureEnabled();
         const file = FirebaseStorageService.bucket.file(fileName);
         const [metadata] = await file.getMetadata();
         return {
@@ -169,9 +242,7 @@ class FirebaseStorageService {
      */
     static async listFiles(prefix) {
         await this.initialize();
-        if (!FirebaseStorageService.bucket) {
-            throw new Error('Firebase Storage bucket is not initialized');
-        }
+        this.ensureEnabled();
         const [files] = await FirebaseStorageService.bucket.getFiles({
             prefix,
         });
@@ -182,6 +253,7 @@ class FirebaseStorageService {
      */
     static async copyFile(sourceName, destName) {
         await this.initialize();
+        this.ensureEnabled();
         const sourceFile = FirebaseStorageService.bucket.file(sourceName);
         const destFile = FirebaseStorageService.bucket.file(destName);
         await sourceFile.copy(destFile);
@@ -191,6 +263,7 @@ class FirebaseStorageService {
      */
     static async getSignedUrl(fileName, expiresInDays = 7) {
         await this.initialize();
+        this.ensureEnabled();
         const file = FirebaseStorageService.bucket.file(fileName);
         const [url] = await file.getSignedUrl({
             version: 'v4',
@@ -201,6 +274,9 @@ class FirebaseStorageService {
     }
 }
 exports.FirebaseStorageService = FirebaseStorageService;
-FirebaseStorageService.bucket = null;
+FirebaseStorageService.instance = null;
+FirebaseStorageService.bucket = null; // Firebase Storage Bucket type
+FirebaseStorageService.firebaseEnabled = false;
+FirebaseStorageService.bucketName = null;
 exports.default = FirebaseStorageService;
 //# sourceMappingURL=firebase-storage.service.js.map

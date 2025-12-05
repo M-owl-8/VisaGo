@@ -12,18 +12,33 @@ const firebase_storage_service_1 = __importDefault(require("./firebase-storage.s
 const local_storage_service_1 = __importDefault(require("./local-storage.service"));
 class StorageAdapter {
     /**
+     * Check if Firebase Storage is actually enabled and configured
+     */
+    static isFirebaseEnabled() {
+        if (this.storageType !== 'firebase') {
+            return false;
+        }
+        // Check if Firebase is actually initialized and enabled
+        return firebase_storage_service_1.default.isEnabled();
+    }
+    /**
      * Get storage implementation
      */
     static getStorage() {
-        if (this.storageType === "firebase") {
+        if (this.isFirebaseEnabled()) {
             return firebase_storage_service_1.default;
         }
         return local_storage_service_1.default;
     }
     static async uploadFile(fileBuffer, fileName, fileType, userId, options = {}) {
         const storage = this.getStorage();
+        // If Firebase is requested but not enabled, use local storage
+        if (this.storageType === 'firebase' && !this.isFirebaseEnabled()) {
+            console.warn('Firebase Storage not configured, using local storage. Check FIREBASE_* environment variables.');
+            return local_storage_service_1.default.uploadFile(fileBuffer, fileName, fileType, userId, options);
+        }
         // If using Firebase, try with fallback to local storage
-        if (this.storageType === "firebase") {
+        if (this.isFirebaseEnabled()) {
             try {
                 return await storage.uploadFile(fileBuffer, fileName, fileType, userId, options);
             }
@@ -69,7 +84,30 @@ class StorageAdapter {
     static getStorageType() {
         return this.storageType;
     }
+    /**
+     * Get effective storage type (actual implementation being used)
+     */
+    static getEffectiveStorageType() {
+        if (this.isFirebaseEnabled()) {
+            return 'firebase';
+        }
+        return 'local';
+    }
+    /**
+     * Get storage status info for logging
+     */
+    static getStorageInfo() {
+        if (this.isFirebaseEnabled()) {
+            return {
+                type: 'firebase',
+                bucket: firebase_storage_service_1.default.getBucketName(),
+            };
+        }
+        return {
+            type: 'local',
+        };
+    }
 }
-StorageAdapter.storageType = process.env.STORAGE_TYPE || "local";
+StorageAdapter.storageType = process.env.STORAGE_TYPE || 'local';
 exports.default = StorageAdapter;
 //# sourceMappingURL=storage-adapter.js.map

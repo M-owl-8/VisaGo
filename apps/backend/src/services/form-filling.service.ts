@@ -7,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import { getEnvConfig } from '../config/env';
 import { errors } from '../utils/errors';
 import { logError, logInfo } from '../middleware/logger';
-import AIOpenAIService from './ai-openai.service';
+import { AIOpenAIService } from './ai-openai.service';
 
 const prisma = new PrismaClient();
 

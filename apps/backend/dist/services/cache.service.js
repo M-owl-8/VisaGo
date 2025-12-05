@@ -83,13 +83,13 @@ class CacheService {
      * Cache all countries
      */
     static cacheCountries(data) {
-        this.set("countries:all", data, this.TTL.LONG);
+        this.set('countries:all', data, this.TTL.LONG);
     }
     /**
      * Get cached countries
      */
     static getCountries() {
-        return this.get("countries:all");
+        return this.get('countries:all');
     }
     /**
      * Invalidate country cache
@@ -98,7 +98,7 @@ class CacheService {
         if (countryId) {
             this.del(`countries:${countryId}`);
         }
-        this.del("countries:all");
+        this.del('countries:all');
     }
     /**
      * Cache visa types

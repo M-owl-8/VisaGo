@@ -591,3 +591,10 @@ describe('Applications Routes - PUT /api/applications/:id/checkpoints/:checkpoin
     expect(response.body.error).toContain('not found');
   });
 });
+
+
+
+
+
+
+

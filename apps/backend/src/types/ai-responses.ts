@@ -117,3 +117,6 @@ export interface DocumentValidationResultAI {
    */
   rawJson?: string;
 }
+
+
+

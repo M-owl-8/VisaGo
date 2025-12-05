@@ -447,3 +447,21 @@ export function logError(message: string, error?: Error, metadata?: Record<strin
     // Silently fail - external logging should not break the app
   });
 }
+
+  // Send to external integrations (async, don't wait)
+  sendToIntegrations(entry).catch(() => {
+    // Silently fail - external logging should not break the app
+  });
+}
+
+  // Send to external integrations (async, don't wait)
+  sendToIntegrations(entry).catch(() => {
+    // Silently fail - external logging should not break the app
+  });
+}
+
+  // Send to external integrations (async, don't wait)
+  sendToIntegrations(entry).catch(() => {
+    // Silently fail - external logging should not break the app
+  });
+}

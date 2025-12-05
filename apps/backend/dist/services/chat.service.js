@@ -3,18 +3,52 @@
  * Chat service
  * Handles AI-powered chat functionality with RAG context
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.chatService = exports.ChatService = void 0;
-const client_1 = require("@prisma/client");
 const axios_1 = __importDefault(require("axios"));
 const usage_tracking_service_1 = require("./usage-tracking.service");
 const env_1 = require("../config/env");
 const logger_1 = require("../middleware/logger");
-const ai_openai_service_1 = require("./ai-openai.service");
-const prisma = new client_1.PrismaClient();
+const db_1 = __importDefault(require("../db"));
+const visaKnowledgeBase_1 = require("../data/visaKnowledgeBase");
+const documentGuides_1 = require("../data/documentGuides");
+const prisma = db_1.default; // Use shared Prisma instance
 /**
  * Get AI service URL from environment
  */
@@ -27,24 +61,41 @@ class ChatService {
     /**
      * Create or get a chat session
      */
+    /**
+     * Get or create a chat session
+     * MEDIUM PRIORITY FIX: Ensure session exists before saving messages to prevent orphaned messages
+     * This method is called before every message save to guarantee session exists
+     */
     async getOrCreateSession(userId, applicationId) {
-        const session = await prisma.chatSession.findFirst({
-            where: {
-                userId,
-                applicationId: applicationId || null,
-            },
-        });
-        if (session) {
-            return session.id;
+        try {
+            const session = await prisma.chatSession.findFirst({
+                where: {
+                    userId,
+                    applicationId: applicationId || null,
+                },
+            });
+            if (session) {
+                return session.id;
+            }
+            // MEDIUM PRIORITY FIX: Create session if it doesn't exist, with proper error handling
+            // This ensures messages are never saved without a valid session
+            const newSession = await prisma.chatSession.create({
+                data: {
+                    userId,
+                    applicationId: applicationId || null,
+                    title: applicationId ? `Chat for ${applicationId}` : 'General Chat',
+                },
+            });
+            if (!newSession || !newSession.id) {
+                throw new Error('Failed to create chat session');
+            }
+            return newSession.id;
         }
-        const newSession = await prisma.chatSession.create({
-            data: {
-                userId,
-                applicationId: applicationId || null,
-                title: applicationId ? `Chat for ${applicationId}` : 'General Chat',
-            },
-        });
-        return newSession.id;
+        catch (error) {
+            // Log error and re-throw to prevent messages from being saved without a session
+            console.error('[ChatService] Failed to get or create session:', error);
+            throw new Error(`Failed to create chat session: ${error.message || 'Unknown error'}`);
+        }
     }
     /**
      * Extract context from visa application
@@ -166,55 +217,96 @@ User's Current Visa Application:
 - Application Status: ${applicationContext.status}
         `.trim();
             }
-            // Check if AI service is configured
+            // Check if DeepSeek API key is configured for chat
             const envConfig = (0, env_1.getEnvConfig)();
-            if (!envConfig.OPENAI_API_KEY) {
-                (0, logger_1.logWarn)('OpenAI API key not configured, using fallback response', {
+            if (!process.env.DEEPSEEK_API_KEY) {
+                (0, logger_1.logWarn)('DeepSeek API key not configured, using fallback response', {
                     userId,
                     applicationId,
                 });
-                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, 'AI service not configured. Please configure OPENAI_API_KEY in environment variables.');
+                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, 'AI service not configured. Please configure DEEPSEEK_API_KEY in environment variables.');
             }
-            // Use OpenAI service directly (simplified ChatGPT-like experience)
+            // Use DeepSeek Reasoner for AI assistant chat
+            // Build messages array with trimmed history
             let aiResponse;
             try {
-                // Build system prompt with context
-                const systemPrompt = this.buildSystemPrompt(applicationContext, ragContext);
-                // Convert history to OpenAI format
-                const openaiMessages = history.map((msg) => ({
-                    role: (msg.role === 'user' ? 'user' : 'assistant'),
-                    content: msg.content || '',
-                }));
-                // Add current user message
-                openaiMessages.push({
-                    role: 'user',
-                    content: content,
-                });
-                // Call OpenAI directly
-                aiResponse = await ai_openai_service_1.AIOpenAIService.chat(openaiMessages, systemPrompt);
+                // Build compact system prompt with context
+                const systemPrompt = this.buildSystemPrompt(applicationContext, ragContext, content);
+                // Import DeepSeek service
+                const { deepseekVisaChat } = await Promise.resolve().then(() => __importStar(require('./deepseek')));
+                // Trim conversation history to last 20 messages (max ~1500 tokens)
+                const trimmedHistory = this.trimConversationHistory(history, 20, 1500);
+                // Build messages array for DeepSeek
+                const messages = [
+                    ...trimmedHistory.map((msg) => ({
+                        role: msg.role,
+                        content: msg.content,
+                    })),
+                    { role: 'user', content },
+                ];
+                // Call DeepSeek with messages array (system prompt is included separately)
+                const deepseekResponse = await deepseekVisaChat(messages, systemPrompt, userId, applicationId);
                 // Format response to match expected structure
                 const formattedResponse = {
-                    message: aiResponse.message,
-                    sources: [],
-                    tokens_used: aiResponse.tokensUsed,
-                    model: aiResponse.model,
+                    message: deepseekResponse.message,
+                    sources: [], // DeepSeek doesn't provide RAG sources, but we keep the structure
+                    tokens_used: deepseekResponse.tokensUsed,
+                    model: deepseekResponse.model,
                 };
                 aiResponse = { data: formattedResponse };
             }
-            catch (openaiError) {
-                (0, logger_1.logError)('OpenAI service error', openaiError, {
+            catch (chatError) {
+                // Handle DeepSeek errors with friendly multilingual messages
+                (0, logger_1.logError)('[DeepSeek][Chat] Service error', chatError instanceof Error ? chatError : new Error(String(chatError)), {
                     userId,
                     applicationId,
                 });
-                // Provide user-friendly error message
-                const errorMessage = openaiError.message ||
-                    'AI service temporarily unavailable. Please try again in a moment.';
-                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, errorMessage);
+                // Check if it's a configuration error
+                if (chatError.message?.includes('not configured') ||
+                    chatError.message === 'DEEPSEEK_AUTH_ERROR') {
+                    throw chatError; // Re-throw configuration errors to be handled by outer catch
+                }
+                // Handle timeout with friendly message
+                if (chatError.message === 'DEEPSEEK_TIMEOUT') {
+                    return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, "Serverimizdagi AI hozir sekin ishlayapti. Iltimos, birozdan so'ng qayta urinib ko'ring.");
+                }
+                // For other errors, provide user-friendly message
+                if (chatError.message === 'DEEPSEEK_CHAT_ERROR' ||
+                    chatError.message === 'DEEPSEEK_RATE_LIMIT') {
+                    return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, 'AI service temporarily unavailable. Please try again in a moment.');
+                }
+                // Generic fallback
+                return this.createFallbackResponse(userId, applicationId, sessionId, content, startTime, 'AI service temporarily unavailable. Please try again in a moment.');
             }
             const { message, sources = [], tokens_used = 0, model = 'gpt-4' } = aiResponse.data;
+            // Validate response has a message
+            if (!message || !message.trim()) {
+                console.error('[ChatService] Empty message in response:', {
+                    hasData: !!aiResponse.data,
+                    dataKeys: Object.keys(aiResponse.data || {}),
+                });
+                throw new Error('AI service returned empty response');
+            }
+            console.log('[ChatService] AI response received:', {
+                messageLength: message?.length || 0,
+                hasMessage: !!message,
+                messagePreview: message.substring(0, 50),
+                sourcesCount: sources?.length || 0,
+                tokensUsed: tokens_used,
+                model,
+            });
+            // Log RAG usage if sources are present
+            if (sources && sources.length > 0) {
+                (0, logger_1.logWarn)('RAG sources used in response', {
+                    userId,
+                    applicationId,
+                    sourceCount: sources.length,
+                });
+            }
             const responseTime = Date.now() - startTime;
-            // Save user message
-            await prisma.chatMessage.create({
+            // CRITICAL FIX: Save user message and ensure it's committed before saving assistant message
+            // This prevents race conditions where history is queried before messages are saved
+            const userMessage = await prisma.chatMessage.create({
                 data: {
                     sessionId,
                     userId,
@@ -225,20 +317,50 @@ User's Current Visa Application:
                     responseTime,
                 },
             });
-            // Save assistant response with sources and response time
-            const assistantMessage = await prisma.chatMessage.create({
-                data: {
-                    sessionId,
-                    userId,
-                    role: 'assistant',
-                    content: message,
-                    sources: JSON.stringify(sources || []),
-                    model,
-                    tokensUsed: tokens_used,
-                    responseTime,
-                },
+            // CRITICAL FIX: Update session timestamp immediately after saving user message
+            // This ensures session is marked as active and messages are queryable
+            await prisma.chatSession.update({
+                where: { id: sessionId },
+                data: { updatedAt: new Date() },
             });
-            // Update session's last interaction time
+            // Save assistant response with sources and response time
+            let assistantMessage;
+            try {
+                assistantMessage = await prisma.chatMessage.create({
+                    data: {
+                        sessionId,
+                        userId,
+                        role: 'assistant',
+                        content: message,
+                        // MEDIUM PRIORITY FIX: Properly serialize sources - handle both array and already-stringified cases
+                        // This prevents double-stringification errors and ensures sources are stored correctly
+                        sources: Array.isArray(sources)
+                            ? JSON.stringify(sources)
+                            : typeof sources === 'string'
+                                ? sources
+                                : JSON.stringify([]),
+                        model,
+                        tokensUsed: tokens_used,
+                        responseTime,
+                    },
+                });
+                // CRITICAL FIX: Update session again after assistant message to ensure both messages are queryable
+                await prisma.chatSession.update({
+                    where: { id: sessionId },
+                    data: { updatedAt: new Date() },
+                });
+            }
+            catch (error) {
+                // CRITICAL FIX: If assistant message save fails, delete user message to maintain consistency
+                // This prevents orphaned user messages without responses
+                await prisma.chatMessage.delete({ where: { id: userMessage.id } }).catch(() => {
+                    // Ignore delete errors
+                });
+                throw error;
+            }
+            // CRITICAL FIX: Update session timestamp to ensure it's included in history queries
+            // This prevents race conditions where getConversationHistory is called before session is updated
+            // Only update once after both messages are saved
             await prisma.chatSession.update({
                 where: { id: sessionId },
                 data: { updatedAt: new Date() },
@@ -247,14 +369,21 @@ User's Current Visa Application:
             usage_tracking_service_1.usageTrackingService
                 .trackMessageUsage(userId, tokens_used, model, responseTime)
                 .catch((err) => console.error('Failed to track usage:', err));
-            return {
-                message,
-                sources,
-                tokens_used,
-                model,
+            // Ensure we always return a valid response
+            const finalResponse = {
+                message: message || 'I apologize, but I could not generate a response. Please try again.',
+                sources: sources || [],
+                tokens_used: tokens_used || 0,
+                model: model || 'gpt-4',
                 id: assistantMessage.id,
-                applicationContext,
+                applicationContext: applicationContext || null,
             };
+            console.log('[ChatService] Returning response:', {
+                hasMessage: !!finalResponse.message,
+                messageLength: finalResponse.message.length,
+                hasId: !!finalResponse.id,
+            });
+            return finalResponse;
         }
         catch (error) {
             console.error('Chat service error:', error);
@@ -283,7 +412,7 @@ User's Current Visa Application:
                     console.error('Failed to save message:', saveError);
                 }
                 return {
-                    message: "AI service is temporarily unavailable. Your message has been saved and we'll respond as soon as possible.",
+                    message: "I'm currently experiencing technical difficulties. Your message has been saved, and I'll respond as soon as the service is restored. Thank you for your patience!",
                     sources: [],
                     tokens_used: 0,
                     model: 'fallback',
@@ -294,20 +423,26 @@ User's Current Visa Application:
     }
     /**
      * Get conversation history
+     * CRITICAL SECURITY FIX: Always require userId for verification
      */
-    async getConversationHistory(userIdOrSessionId, applicationId, limit = 50, offset = 0) {
-        // If applicationId is provided, it's the new API with userId, applicationId, limit, offset
-        // Otherwise, treat the first param as sessionId (legacy API)
+    async getConversationHistory(userIdOrSessionId, applicationId, limit = 50, offset = 0, verifiedUserId // Required for legacy API to verify session ownership
+    ) {
+        // If applicationId is provided (including null), it's the new API with userId, applicationId, limit, offset
+        // We check !== undefined to distinguish between "not provided" (legacy mode) and "explicitly null" (general chat)
         if (applicationId !== undefined) {
             const userId = userIdOrSessionId;
             const sessions = await prisma.chatSession.findMany({
                 where: {
                     userId,
-                    applicationId: applicationId || null,
+                    applicationId: applicationId || null, // Convert empty string to null for Prisma
                 },
                 select: { id: true },
             });
             const sessionIds = sessions.map((s) => s.id);
+            // If no sessions exist, return empty array instead of error
+            if (sessionIds.length === 0) {
+                return [];
+            }
             const messages = await prisma.chatMessage.findMany({
                 where: {
                     sessionId: {
@@ -322,10 +457,26 @@ User's Current Visa Application:
         }
         else {
             // Legacy: treat first param as sessionId
+            // CRITICAL SECURITY FIX: Verify session belongs to requesting user
             const sessionId = userIdOrSessionId;
+            // Require verifiedUserId for legacy API to prevent unauthorized access
+            if (!verifiedUserId) {
+                throw new Error('User ID required for session verification');
+            }
+            // Verify session ownership - this prevents users from accessing other users' sessions
+            const session = await prisma.chatSession.findFirst({
+                where: {
+                    id: sessionId,
+                    userId: verifiedUserId, // CRITICAL: Verify session belongs to requesting user
+                },
+            });
+            if (!session) {
+                throw new Error('Session not found or access denied');
+            }
             const messages = await prisma.chatMessage.findMany({
                 where: { sessionId },
                 orderBy: { createdAt: 'desc' },
+                skip: offset,
                 take: limit,
             });
             return messages.reverse();
@@ -363,32 +514,50 @@ User's Current Visa Application:
         };
     }
     /**
-     * Get session details
+     * Get session details with message history
+     * @param sessionId - Session ID
+     * @param userId - User ID for authorization
+     * @param limit - Maximum number of messages to return (default: 100)
      */
-    async getSessionDetails(sessionId, userId) {
+    async getSessionDetails(sessionId, userId, limit = 100) {
         const session = await prisma.chatSession.findFirst({
             where: { id: sessionId, userId },
-            include: {
-                messages: {
-                    orderBy: { createdAt: 'asc' },
-                    select: {
-                        id: true,
-                        role: true,
-                        content: true,
-                        sources: true,
-                        model: true,
-                        tokensUsed: true,
-                        responseTime: true,
-                        feedback: true,
-                        createdAt: true,
-                    },
-                },
+            select: {
+                id: true,
+                userId: true,
+                applicationId: true,
+                title: true,
+                systemPrompt: true,
+                createdAt: true,
+                updatedAt: true,
             },
         });
         if (!session) {
             throw new Error('Session not found');
         }
-        return session;
+        // Get messages ordered by createdAt DESC (newest first), then take last N and reverse
+        const messages = await prisma.chatMessage.findMany({
+            where: { sessionId },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+            select: {
+                id: true,
+                role: true,
+                content: true,
+                sources: true,
+                model: true,
+                tokensUsed: true,
+                responseTime: true,
+                feedback: true,
+                createdAt: true,
+            },
+        });
+        // Reverse to get oldest → newest order for client
+        const orderedMessages = messages.reverse();
+        return {
+            ...session,
+            messages: orderedMessages,
+        };
     }
     /**
      * Rename a chat session
@@ -423,29 +592,93 @@ User's Current Visa Application:
         });
     }
     /**
-     * Build system prompt with application context
+     * Trim conversation history to last N messages, ensuring total tokens stay under limit
+     * @param history - Full conversation history
+     * @param maxMessages - Maximum number of messages to keep (default: 10)
+     * @param maxTokens - Maximum total tokens for history (default: 2000)
+     * @returns Trimmed history array
      */
-    buildSystemPrompt(applicationContext, ragContext) {
-        let prompt = `You are a helpful AI assistant for visa applications. You help users with visa-related questions, document requirements, application processes, and general guidance.
+    trimConversationHistory(history, maxMessages = 20, maxTokens = 1500) {
+        if (!history || history.length === 0) {
+            return [];
+        }
+        // Take last N messages
+        let trimmed = history.slice(-maxMessages);
+        // Rough token estimation: ~4 characters per token
+        // Count tokens for each message
+        let totalTokens = 0;
+        const result = [];
+        // Add messages from the end until we hit token limit
+        for (let i = trimmed.length - 1; i >= 0; i--) {
+            const msg = trimmed[i];
+            const msgTokens = Math.ceil((msg.content?.length || 0) / 4);
+            if (totalTokens + msgTokens > maxTokens && result.length > 0) {
+                break; // Stop if adding this message would exceed limit
+            }
+            result.unshift(msg); // Add to beginning
+            totalTokens += msgTokens;
+        }
+        return result;
+    }
+    /**
+     * Build compact system prompt with application context
+     * Optimized for faster responses and lower token usage
+     */
+    buildSystemPrompt(applicationContext, ragContext, latestUserMessage) {
+        // Compact system prompt - focused on essential instructions
+        let prompt = `You are Ketdik's visa assistant. Answer concisely (short paragraphs, no essays).
 
-Guidelines:
-- Be friendly, professional, and helpful
-- Provide accurate information about visa processes
-- If you don't know something, say so honestly
-- Keep responses concise but informative
-- Support multiple languages (English, Uzbek, Russian)`;
+LANGUAGE: Match user's language (UZ/RU/EN). Keep it simple and polite.
+
+ROLE: Help with tourist/student visas for Spain, Germany, Italy, France, Turkey, UAE, UK, USA, Canada, South Korea.
+
+RESPONSE FORMAT:
+- If missing info: Ask 2-6 short questions (nationality, destination, visa type, duration, finances, travel history).
+- If you have info: 1-2 sentence summary, then structured answer (Eligibility, Documents, Finances, Process, Refusal risks), end with 3-7 action items.
+
+KNOWLEDGE BASE: Use APPLICATION_CONTEXT, VISA_KNOWLEDGE_BASE, DOCUMENT_GUIDES, RAG_CONTEXT when provided. Mark general advice: UZ "Umumiy maslahat, iltimos rasmiy manbadan tekshiring." / RU "Общий совет, проверьте на официальном сайте." / EN "General advice, verify on official sources."
+
+SAFETY: Never promise approval. Remind users to verify with official sources. Never suggest lying or fake documents.
+
+STYLE: Short paragraphs, simple lists (1., 2., 3.), no markdown headings, no chain-of-thought output, no <think> tags.`;
+        // Extract country and visaType from applicationContext
+        const country = applicationContext?.country ||
+            applicationContext?.destinationCountry ||
+            applicationContext?.targetCountry ||
+            null;
+        const visaType = applicationContext?.visaType || applicationContext?.visa_type || null;
+        // Get Spain visa knowledge base if applicable
+        const visaKb = (0, visaKnowledgeBase_1.getVisaKnowledgeBase)(country, visaType);
+        // Get relevant document guides based on user's latest message
+        const documentGuides = (0, documentGuides_1.getRelevantDocumentGuides)(latestUserMessage || '');
+        // Build KNOWLEDGE_BASE section with priority order:
+        // 1. Application context (if present)
+        // 2. Spain visa KB (if available)
+        // 3. Document guides (if user asks about specific documents)
+        // 4. RAG context (if present)
+        let knowledgeBaseBlock = '';
         if (applicationContext) {
-            prompt += `\n\nCurrent User Context:
-- Country: ${applicationContext.country}
-- Visa Type: ${applicationContext.visaType}
-- Processing Time: ${applicationContext.processingDays} days
-- Application Status: ${applicationContext.status}
-- Documents Uploaded: ${applicationContext.documentsUploaded}/${applicationContext.documentsTotal}
-${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${applicationContext.missingDocuments.join(', ')}` : ''}`;
+            knowledgeBaseBlock += `APPLICATION CONTEXT:\n- Destination Country: ${applicationContext.country}\n- Visa Type: ${applicationContext.visaType}\n- Processing Time: ${applicationContext.processingDays} days\n- Application Fee: $${applicationContext.fee}\n- Application Status: ${applicationContext.status}\n- Documents Progress: ${applicationContext.documentsUploaded} of ${applicationContext.documentsTotal} documents uploaded\n${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${applicationContext.missingDocuments.join(', ')}` : '- All required documents uploaded'}\n${applicationContext.nextCheckpoint ? `- Next Step: ${applicationContext.nextCheckpoint}` : ''}\n\nUse this context to provide personalized, relevant advice. Reference their specific application when helpful.\n\n`;
+        }
+        if (visaKb) {
+            knowledgeBaseBlock += `VISA_KNOWLEDGE_BASE:\n${visaKb}\n\n`;
+        }
+        if (documentGuides) {
+            knowledgeBaseBlock += `DOCUMENT_GUIDES:\n${documentGuides}\n\n`;
         }
         if (ragContext) {
-            prompt += `\n\n${ragContext}`;
+            knowledgeBaseBlock += `RAG_CONTEXT:\n${ragContext}\n\n`;
         }
+        // Add KNOWLEDGE_BASE section to prompt if we have any content
+        if (knowledgeBaseBlock.trim()) {
+            prompt += `\n\nKNOWLEDGE_BASE\n${knowledgeBaseBlock.trim()}`;
+        }
+        // Add explicit chain-of-thought blocking rules at the end
+        prompt += `\n\nCRITICAL OUTPUT RULES (MUST FOLLOW):
+- Do NOT output chain-of-thought, hidden reasoning, or internal analysis.
+- Never output <think> or anything similar.
+- Only provide the final, concise answer.
+- If you need to reason, do it internally, but output only conclusions.`;
         return prompt;
     }
     /**
@@ -465,8 +698,25 @@ ${applicationContext.missingDocuments?.length > 0 ? `- Missing Documents: ${appl
                 responseTime: 0,
             },
         });
-        // Create fallback assistant message
-        const fallbackMessage = `I apologize, but I'm currently unable to process your request. ${errorMessage} Please try again in a few moments, or contact support if the issue persists.`;
+        // Create a helpful fallback message based on the user's question
+        let fallbackMessage = '';
+        const lowerContent = content.toLowerCase();
+        if (lowerContent.includes('xato') ||
+            lowerContent.includes('mistake') ||
+            lowerContent.includes('error')) {
+            fallbackMessage = `Arizachilar odatda quyidagi xatolarni qilishadi:\n\n1. To'liq bo'lmagan hujjatlar - barcha kerakli hujjatlarni yuklashni unutmang\n2. Noto'g'ri ma'lumotlar - barcha ma'lumotlarni tekshirib ko'ring\n3. Muddati o'tgan hujjatlar - barcha hujjatlarning amal qilish muddatini tekshiring\n4. Yetarli mablag' ko'rsatilmagan - moliyaviy hujjatlarni to'liq taqdim eting\n\nAgar sizda boshqa savollar bo'lsa, iltimos, so'rang!`;
+        }
+        else if (lowerContent.includes('hujjat') || lowerContent.includes('document')) {
+            fallbackMessage = `Visa arizasi uchun odatda quyidagi hujjatlar talab qilinadi:\n\n1. Pasport (kamida 6 oy amal qilish muddati)\n2. Arizachining fotosurati\n3. Moliyaviy hujjatlar (bank hisob varag'i)\n4. Mehmondo'stlik dalillari\n5. Sayohat rejasi\n\nAniq ro'yxat uchun arizangizni yarating va hujjatlar ro'yxatini ko'ring.`;
+        }
+        else if (lowerContent.includes('muddat') ||
+            lowerContent.includes('time') ||
+            lowerContent.includes('vaqt')) {
+            fallbackMessage = `Visa arizasini ko'rib chiqish odatda 5-15 ish kuni davom etadi, lekin bu mamlakat va visa turiga bog'liq. Aniq muddatni bilish uchun arizangizni yarating va mamlakat ma'lumotlarini ko'ring.`;
+        }
+        else {
+            fallbackMessage = `Kechirasiz, hozirda AI xizmati ishlamayapti. ${errorMessage}\n\nSizning xabaringiz saqlandi. Xizmat tiklanganda men sizga yordam beraman.\n\nBu vaqtda siz:\n- Arizalar bo'limida arizangiz holatini ko'rishingiz mumkin\n- Yuklangan hujjatlaringizni ko'rib chiqishingiz mumkin\n- Qo'shimcha yordam kerak bo'lsa, qo'llab-quvvatlash jamoasiga murojaat qiling\n\nRahmat!`;
+        }
         const assistantMessage = await prisma.chatMessage.create({
             data: {
                 sessionId,

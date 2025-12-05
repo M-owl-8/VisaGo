@@ -315,3 +315,10 @@ export function getRelevantDocumentGuides(query: string, maxGuides: number = 2):
 
   return parts.join('\n\n').trim();
 }
+
+
+
+
+
+
+

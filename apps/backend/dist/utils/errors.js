@@ -10,9 +10,9 @@ const constants_1 = require("../config/constants");
 class ApiError extends Error {
     constructor(status, message, code, isOperational = true, details) {
         super(message);
-        this.name = "ApiError";
+        this.name = 'ApiError';
         this.status = status;
-        this.code = code || "UNKNOWN_ERROR";
+        this.code = code || 'UNKNOWN_ERROR';
         this.isOperational = isOperational;
         this.details = details;
         // Maintains proper stack trace for where error was thrown

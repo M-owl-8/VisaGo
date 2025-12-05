@@ -12,6 +12,7 @@ import AIOpenAIService from './ai-openai.service';
 import { getDocumentTranslation } from '../data/document-translations';
 import { buildAIUserContext } from './ai-context.service';
 import { inferCategory, normalizePriority } from '../utils/checklist-helpers';
+import { MIN_ITEMS_HARD, IDEAL_MIN_ITEMS } from '../config/checklist-config';
 
 const prisma = new PrismaClient();
 
@@ -327,228 +328,180 @@ export class DocumentChecklistService {
       let aiFallbackUsed = false;
       let aiErrorOccurred = false;
 
-      try {
-        // Build AI user context with questionnaire summary
-        const userContext = await buildAIUserContext(userId, applicationId);
+      // Build AI user context with questionnaire summary (needed for all modes)
+      const userContext = await buildAIUserContext(userId, applicationId);
 
-        logInfo('[Checklist][AI] Requesting OpenAI checklist', {
+      const countryCode = application.country.code.toUpperCase();
+      const visaTypeName = application.visaType.name.toLowerCase();
+
+      logInfo('[Checklist][Mode] Starting checklist generation', {
+        applicationId,
+        country: application.country.name,
+        countryCode,
+        visaType: application.visaType.name,
+      });
+
+      // ========================================================================
+      // MODE ROUTING: Explicit decision tree
+      // ========================================================================
+
+      // STEP 1: Check if approved VisaRuleSet exists
+      const { VisaRulesService } = await import('./visa-rules.service');
+      const ruleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaTypeName);
+
+      if (ruleSet) {
+        // MODE 1: Rules-based mode (VisaChecklistEngine)
+        logInfo('[Checklist][Mode] Using RULES mode (VisaChecklistEngine)', {
           applicationId,
-          country: application.country.name,
-          visaType: application.visaType.name,
+          countryCode,
+          visaType: visaTypeName,
         });
-        const aiStart = Date.now();
-
-        // Call AI to generate checklist as primary source
-        let aiChecklist: any = null;
-        let aiError: Error | null = null;
 
         try {
-          aiChecklist = await AIOpenAIService.generateChecklist(
-            userContext,
-            application.country.name,
-            application.visaType.name
+          const { VisaChecklistEngineService } = await import('./visa-checklist-engine.service');
+          const engineResponse = await VisaChecklistEngineService.generateChecklistForApplication(
+            application,
+            userContext
           );
-          const aiDurationMs = Date.now() - aiStart;
-          if (aiDurationMs > 30000) {
-            logWarn('[Checklist][AI] Slow checklist generation', {
-              applicationId,
-              country: application.country.name,
-              visaType: application.visaType.name,
-              durationMs: aiDurationMs,
-            });
-          }
-        } catch (aiServiceError: any) {
-          // Catch any error from AI service (timeout, API error, etc.)
-          aiError =
-            aiServiceError instanceof Error ? aiServiceError : new Error(String(aiServiceError));
-          logWarn('[Checklist][AI] AI service error caught, will use fallback', {
-            applicationId,
-            country: application.country.name,
-            visaType: application.visaType.name,
-            errorMessage: aiError.message,
-            errorType: aiServiceError?.type || 'unknown',
-          });
-          // Set aiChecklist to null so we use fallback
-          aiChecklist = null;
-          aiFallbackUsed = true;
-          aiErrorOccurred = true;
-        }
 
-        // Parse AI response into ChecklistItem[] if we got a valid response
-        if (
-          aiChecklist &&
-          aiChecklist.checklist &&
-          Array.isArray(aiChecklist.checklist) &&
-          aiChecklist.checklist.length > 0
-        ) {
-          items = aiChecklist.checklist.map((aiItem: any, index: number) => {
-            const docType =
-              aiItem.document ||
-              aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
-              `document_${index}`;
-            const existingDoc = existingDocumentsMap.get(docType) as any;
-
-            const item = {
-              id: `checklist-item-${index}`,
-              documentType: docType,
-              name: aiItem.name || aiItem.document || 'Unknown Document',
-              nameUz: aiItem.nameUz || aiItem.name || aiItem.document || "Noma'lum hujjat",
-              nameRu: aiItem.nameRu || aiItem.name || aiItem.document || 'Неизвестный документ',
-              description: aiItem.description || '',
-              descriptionUz: aiItem.descriptionUz || aiItem.description || '',
-              descriptionRu: aiItem.descriptionRu || aiItem.description || '',
-              required: aiItem.required !== undefined ? aiItem.required : true,
-              priority: normalizePriority(aiItem.priority || (aiItem.required ? 'high' : 'medium')),
-              status: existingDoc?.status ? (existingDoc.status as any) : 'missing',
-              userDocumentId: existingDoc?.id as string | undefined,
-              fileUrl: existingDoc?.fileUrl as string | undefined,
-              fileName: existingDoc?.fileName as string | undefined,
-              fileSize: existingDoc?.fileSize as number | undefined,
-              uploadedAt: existingDoc?.uploadedAt
-                ? (existingDoc.uploadedAt as Date).toISOString()
-                : undefined,
-              verificationNotes:
-                (existingDoc?.aiNotesUz as string | null) ||
-                (existingDoc?.verificationNotes as string | null) ||
-                undefined,
-              aiVerified: existingDoc?.verifiedByAI === true,
-              aiConfidence: existingDoc?.aiConfidence as number | undefined,
-            };
-            return {
-              ...item,
-              category: aiItem.category ?? inferCategory(item),
-            };
-          });
-
-          // STEP 2: Validate AI result - only use fallback if empty or invalid
-          const MIN_AI_ITEMS = 4; // Minimum threshold for warning (but still use AI checklist)
-          if (!items || items.length === 0) {
-            // AI returned empty checklist - use fallback
-            logWarn('[Checklist][AI] AI returned empty checklist, using fallback', {
-              applicationId,
-              country: application.country.name,
-              visaType: application.visaType.name,
-              aiItemCount: 0,
-              reason: 'empty_checklist',
-            });
-
-            items = await this.generateRobustFallbackChecklist(
-              application.country,
-              application.visaType,
-              Array.from(existingDocumentsMap.values()).map((doc: any) => ({
-                type: doc.type,
-                status: doc.status,
-                id: doc.id,
-                fileUrl: doc.fileUrl,
-                fileName: doc.fileName,
-                fileSize: doc.fileSize,
-                uploadedAt: doc.uploadedAt,
-                verificationNotes: doc.verificationNotes,
-                verifiedByAI: doc.verifiedByAI,
-                aiConfidence: doc.aiConfidence,
-                aiNotesUz: doc.aiNotesUz,
-                aiNotesRu: doc.aiNotesRu,
-                aiNotesEn: doc.aiNotesEn,
-              }))
-            );
-            aiGenerated = false;
-            aiFallbackUsed = true;
-          } else {
-            // AI checklist is valid - use it even if it has fewer items than ideal
-            if (items.length < MIN_AI_ITEMS) {
-              logWarn('[Checklist][AI] AI checklist has few items but using it anyway', {
-                applicationId,
-                country: application.country.name,
-                visaType: application.visaType.name,
-                aiItemCount: items.length,
-                threshold: MIN_AI_ITEMS,
-                reason: 'few_items_but_using_ai',
-              });
-            }
+          if (engineResponse && engineResponse.checklist && engineResponse.checklist.length >= MIN_ITEMS_HARD) {
+            // Convert engine format to ChecklistItem format
+            items = this.convertEngineChecklistToItems(engineResponse.checklist, existingDocumentsMap);
             aiGenerated = true;
-            logInfo('[Checklist][AI] Using AI-generated checklist', {
+            logInfo('[Checklist][Mode] Rules mode succeeded', {
               applicationId,
               itemCount: items.length,
-              country: application.country.name,
-              visaType: application.visaType.name,
             });
+          } else {
+            // Engine returned insufficient items or null - fall back to legacy
+            logWarn('[Checklist][Mode] Rules mode returned insufficient items, falling back to legacy', {
+              applicationId,
+              itemCount: engineResponse?.checklist?.length || 0,
+            });
+            // Fall through to legacy mode
           }
-        } else {
-          // AI returned empty or invalid checklist - use fallback
-          logWarn('[Checklist][AI] AI returned empty or invalid checklist, using fallback', {
+        } catch (engineError: any) {
+          logWarn('[Checklist][Mode] Rules mode failed, falling back to legacy', {
             applicationId,
-            country: application.country.name,
-            visaType: application.visaType.name,
-            hasChecklist: !!aiChecklist,
-            checklistLength: aiChecklist?.checklist?.length || 0,
+            error: engineError?.message || String(engineError),
           });
-          items = await this.generateRobustFallbackChecklist(
-            application.country,
-            application.visaType,
-            Array.from(existingDocumentsMap.values()).map((doc: any) => ({
-              type: doc.type,
-              status: doc.status,
-              id: doc.id,
-              fileUrl: doc.fileUrl,
-              fileName: doc.fileName,
-              fileSize: doc.fileSize,
-              uploadedAt: doc.uploadedAt,
-              verificationNotes: doc.verificationNotes,
-              verifiedByAI: doc.verifiedByAI,
-              aiConfidence: doc.aiConfidence,
-              aiNotesUz: doc.aiNotesUz,
-              aiNotesRu: doc.aiNotesRu,
-              aiNotesEn: doc.aiNotesEn,
-            }))
-          );
-          aiGenerated = false;
-        }
-      } catch (unexpectedError: any) {
-        // Catch any unexpected errors (e.g., from buildAIUserContext or generateRobustFallbackChecklist)
-        logError(
-          '[Checklist][AI] Unexpected error in checklist generation',
-          unexpectedError as Error,
-          {
-            applicationId,
-            country: application.country.name,
-            visaType: application.visaType.name,
-            errorMessage: unexpectedError?.message || String(unexpectedError),
-          }
-        );
-
-        // Still try to generate fallback even if there was an unexpected error
-        try {
-          items = await this.generateRobustFallbackChecklist(
-            application.country,
-            application.visaType,
-            Array.from(existingDocumentsMap.values()).map((doc: any) => ({
-              type: doc.type,
-              status: doc.status,
-              id: doc.id,
-              fileUrl: doc.fileUrl,
-              fileName: doc.fileName,
-              fileSize: doc.fileSize,
-              uploadedAt: doc.uploadedAt,
-              verificationNotes: doc.verificationNotes,
-              verifiedByAI: doc.verifiedByAI,
-              aiConfidence: doc.aiConfidence,
-              aiNotesUz: doc.aiNotesUz,
-              aiNotesRu: doc.aiNotesRu,
-              aiNotesEn: doc.aiNotesEn,
-            }))
-          );
-          aiGenerated = false;
-          aiFallbackUsed = true;
-          aiErrorOccurred = true;
-        } catch (fallbackError: any) {
-          // If even fallback fails, log but don't throw - let the outer catch handle it
-          logError('[Checklist][AI] Even fallback generation failed', fallbackError as Error, {
-            applicationId,
-          });
-          // Re-throw to be handled by outer catch which will use emergency fallback
-          throw fallbackError;
+          // Fall through to legacy mode
         }
       }
+
+      // STEP 2: If no rules or rules mode failed, use legacy AI mode
+      if (items.length < MIN_ITEMS_HARD) {
+        logInfo('[Checklist][Mode] Using LEGACY mode (GPT-4 structured)', {
+          applicationId,
+          countryCode,
+          visaType: visaTypeName,
+          reason: ruleSet ? 'rules_mode_failed' : 'no_rules_available',
+        });
+
+        try {
+          const { AIOpenAIService } = await import('./ai-openai.service');
+          const legacyResponse = await AIOpenAIService.generateChecklistLegacy(
+            application,
+            userContext
+          );
+
+          if (legacyResponse && legacyResponse.checklist && legacyResponse.checklist.length >= MIN_ITEMS_HARD) {
+            items = this.convertLegacyChecklistToItems(legacyResponse.checklist, existingDocumentsMap);
+            aiGenerated = true;
+            logInfo('[Checklist][Mode] Legacy mode succeeded', {
+              applicationId,
+              itemCount: items.length,
+            });
+          } else {
+            logWarn('[Checklist][Mode] Legacy mode returned insufficient items, using static fallback', {
+              applicationId,
+              itemCount: legacyResponse?.checklist?.length || 0,
+            });
+            aiFallbackUsed = true;
+          }
+        } catch (legacyError: any) {
+          logWarn('[Checklist][Mode] Legacy mode failed, using static fallback', {
+            applicationId,
+            error: legacyError?.message || String(legacyError),
+          });
+          aiFallbackUsed = true;
+          aiErrorOccurred = true;
+        }
+      }
+
+      // STEP 3: If both modes failed, use static fallback
+      if (items.length < MIN_ITEMS_HARD) {
+        logInfo('[Checklist][Mode] Using STATIC FALLBACK mode', {
+          applicationId,
+          countryCode,
+          visaType: visaTypeName,
+        });
+
+        const { buildFallbackChecklistFromStaticConfig } = await import('../utils/fallback-checklist-helper');
+        items = buildFallbackChecklistFromStaticConfig(
+          countryCode,
+          visaTypeName,
+          Array.from(existingDocumentsMap.values()).map((doc: any) => ({
+            type: doc.type,
+            status: doc.status,
+            id: doc.id,
+            fileUrl: doc.fileUrl,
+            fileName: doc.fileName,
+            fileSize: doc.fileSize,
+            uploadedAt: doc.uploadedAt,
+            verificationNotes: doc.verificationNotes,
+            verifiedByAI: doc.verifiedByAI,
+            aiConfidence: doc.aiConfidence,
+            aiNotesUz: doc.aiNotesUz,
+            aiNotesRu: doc.aiNotesRu,
+            aiNotesEn: doc.aiNotesEn,
+          }))
+        );
+        aiGenerated = false;
+        aiFallbackUsed = true;
+        logInfo('[Checklist][Mode] Static fallback generated', {
+          applicationId,
+          itemCount: items.length,
+        });
+      }
+
+      // Validate final result
+      if (items.length < MIN_ITEMS_HARD) {
+        logError('[Checklist][Mode] All modes failed, using emergency fallback', new Error('All checklist modes failed'), {
+          applicationId,
+          finalItemCount: items.length,
+        });
+        // Use the old generateRobustFallbackChecklist as last resort
+        items = await this.generateRobustFallbackChecklist(
+          application.country,
+          application.visaType,
+          Array.from(existingDocumentsMap.values()).map((doc: any) => ({
+            type: doc.type,
+            status: doc.status,
+            id: doc.id,
+            fileUrl: doc.fileUrl,
+            fileName: doc.fileName,
+            fileSize: doc.fileSize,
+            uploadedAt: doc.uploadedAt,
+            verificationNotes: doc.verificationNotes,
+            verifiedByAI: doc.verifiedByAI,
+            aiConfidence: doc.aiConfidence,
+            aiNotesUz: doc.aiNotesUz,
+            aiNotesRu: doc.aiNotesRu,
+            aiNotesEn: doc.aiNotesEn,
+          }))
+        );
+        aiGenerated = false;
+        aiFallbackUsed = true;
+        aiErrorOccurred = true;
+      } else if (items.length < IDEAL_MIN_ITEMS) {
+        logWarn('[Checklist][Mode] Checklist has fewer than ideal items but is acceptable', {
+          applicationId,
+          itemCount: items.length,
+          idealMin: IDEAL_MIN_ITEMS,
+        });
+      }
+
 
       // Merge full document data including AI verification
       const enrichedItems = this.mergeChecklistItemsWithDocuments(
@@ -1139,12 +1092,204 @@ Only return the JSON object, no other text.`;
   }
 
   /**
+   * Convert VisaChecklistEngine checklist format to ChecklistItem format
+   */
+  private static convertEngineChecklistToItems(
+    engineItems: Array<{
+      id: string;
+      documentType: string;
+      category: 'required' | 'highly_recommended' | 'optional';
+      required: boolean;
+      name: string;
+      nameUz: string;
+      nameRu: string;
+      description: string;
+      appliesToThisApplicant?: boolean;
+      reasonIfApplies?: string;
+      extraRecommended?: boolean;
+      group?: string;
+      priority?: number;
+      dependsOn?: string[];
+    }>,
+    existingDocumentsMap: Map<string, any>
+  ): ChecklistItem[] {
+    return engineItems.map((item, index) => {
+      const existingDoc = existingDocumentsMap.get(item.documentType);
+      
+      return {
+        id: item.id || `checklist-item-${index}`,
+        documentType: item.documentType,
+        name: item.name,
+        nameUz: item.nameUz,
+        nameRu: item.nameRu,
+        description: item.description,
+        descriptionUz: item.description, // Engine doesn't provide separate translations
+        descriptionRu: item.description,
+        category: item.category,
+        required: item.required,
+        priority: item.priority ? (item.priority <= 2 ? 'high' : item.priority <= 4 ? 'medium' : 'low') : 'medium',
+        status: existingDoc?.status ? (existingDoc.status as any) : 'missing',
+        userDocumentId: existingDoc?.id,
+        fileUrl: existingDoc?.fileUrl,
+        fileName: existingDoc?.fileName,
+        fileSize: existingDoc?.fileSize,
+        uploadedAt: existingDoc?.uploadedAt?.toISOString(),
+        verificationNotes: existingDoc?.aiNotesUz || existingDoc?.verificationNotes || undefined,
+        aiVerified: existingDoc?.verifiedByAI === true,
+        aiConfidence: existingDoc?.aiConfidence,
+        whereToObtain: item.reasonIfApplies || undefined,
+        whereToObtainUz: item.reasonIfApplies || undefined,
+        whereToObtainRu: item.reasonIfApplies || undefined,
+      };
+    });
+  }
+
+  /**
+   * Convert legacy AI checklist format to ChecklistItem format
+   */
+  private static convertLegacyChecklistToItems(
+    legacyItems: Array<{
+      document?: string;
+      name?: string;
+      nameUz?: string;
+      nameRu?: string;
+      category?: 'required' | 'highly_recommended' | 'optional';
+      required?: boolean;
+      priority?: 'high' | 'medium' | 'low';
+      description?: string;
+      descriptionUz?: string;
+      descriptionRu?: string;
+      whereToObtain?: string;
+      whereToObtainUz?: string;
+      whereToObtainRu?: string;
+    }>,
+    existingDocumentsMap: Map<string, any>
+  ): ChecklistItem[] {
+    return legacyItems.map((aiItem, index) => {
+      const docType =
+        aiItem.document ||
+        aiItem.name?.toLowerCase().replace(/\s+/g, '_') ||
+        `document_${index}`;
+      const existingDoc = existingDocumentsMap.get(docType);
+
+      const item = {
+        id: `checklist-item-${index}`,
+        documentType: docType,
+        name: aiItem.name || aiItem.document || 'Unknown Document',
+        nameUz: aiItem.nameUz || aiItem.name || aiItem.document || "Noma'lum hujjat",
+        nameRu: aiItem.nameRu || aiItem.name || aiItem.document || 'Неизвестный документ',
+        description: aiItem.description || '',
+        descriptionUz: aiItem.descriptionUz || aiItem.description || '',
+        descriptionRu: aiItem.descriptionRu || aiItem.description || '',
+        required: aiItem.required !== undefined ? aiItem.required : true,
+        priority: normalizePriority(aiItem.priority || (aiItem.required ? 'high' : 'medium')),
+        status: existingDoc?.status ? (existingDoc.status as any) : 'missing',
+        userDocumentId: existingDoc?.id as string | undefined,
+        fileUrl: existingDoc?.fileUrl as string | undefined,
+        fileName: existingDoc?.fileName as string | undefined,
+        fileSize: existingDoc?.fileSize as number | undefined,
+        uploadedAt: existingDoc?.uploadedAt
+          ? (existingDoc.uploadedAt as Date).toISOString()
+          : undefined,
+        verificationNotes:
+          (existingDoc?.aiNotesUz as string | null) ||
+          (existingDoc?.verificationNotes as string | null) ||
+          undefined,
+        aiVerified: existingDoc?.verifiedByAI === true,
+        aiConfidence: existingDoc?.aiConfidence as number | undefined,
+        whereToObtain: aiItem.whereToObtain,
+        whereToObtainUz: aiItem.whereToObtainUz,
+        whereToObtainRu: aiItem.whereToObtainRu,
+      };
+      return {
+        ...item,
+        category: aiItem.category ?? inferCategory(item),
+      };
+    });
+  }
+
+  /**
    * Merge checklist items with existing documents
    * Reusable helper for both generateChecklist and recalculateDocumentProgress
    *
    * Matches documents by documentType (stable key) to ensure uploaded documents
    * are always attached to the correct checklist items, even after regeneration.
    */
+  /**
+   * Find matching document with fuzzy matching support
+   */
+  private static findMatchingDocument(
+    documentType: string,
+    existingDocumentsMap: Map<string, any>
+  ): any {
+    // First try exact match
+    const exactMatch = existingDocumentsMap.get(documentType);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // Try fuzzy matching for common variations
+    const normalizedType = documentType.toLowerCase().replace(/[_-]/g, '');
+    for (const [docType, doc] of existingDocumentsMap.entries()) {
+      const normalizedDocType = docType.toLowerCase().replace(/[_-]/g, '');
+      
+      // Check if one contains the other (e.g., "bank_statement" matches "bank_statement_6_months")
+      if (normalizedType.includes(normalizedDocType) || normalizedDocType.includes(normalizedType)) {
+        // Additional safety: only match if they're similar enough
+        const similarity = this.calculateStringSimilarity(normalizedType, normalizedDocType);
+        if (similarity > 0.7) {
+          logInfo('[Checklist][Merge] Fuzzy match found', {
+            checklistType: documentType,
+            documentType: docType,
+            similarity,
+          });
+          return doc;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate simple string similarity (0-1)
+   */
+  private static calculateStringSimilarity(str1: string, str2: string): number {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    if (longer.length === 0) return 1.0;
+    
+    const distance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - distance) / longer.length;
+  }
+
+  /**
+   * Calculate Levenshtein distance between two strings
+   */
+  private static levenshteinDistance(str1: string, str2: string): number {
+    const matrix: number[][] = [];
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[str2.length][str1.length];
+  }
+
   private static mergeChecklistItemsWithDocuments(
     items: ChecklistItem[],
     existingDocumentsMap: Map<string, any>,
@@ -1152,10 +1297,11 @@ Only return the JSON object, no other text.`;
   ): ChecklistItem[] {
     const documentsFound = existingDocumentsMap.size;
     let merged = 0;
+    const unmatchedItems: string[] = [];
 
     const mergedItems = items.map((item) => {
-      // Match by documentType (stable key, not AI-generated name)
-      const doc = existingDocumentsMap.get(item.documentType);
+      // Try exact match first, then fuzzy match
+      const doc = this.findMatchingDocument(item.documentType, existingDocumentsMap);
       if (doc) {
         merged++;
         return {
@@ -1170,6 +1316,14 @@ Only return the JSON object, no other text.`;
           aiVerified: doc.verifiedByAI === true,
           aiConfidence: doc.aiConfidence || undefined,
         };
+      } else {
+        unmatchedItems.push(item.documentType);
+        if (applicationId) {
+          logWarn('[Checklist][Merge] No uploaded document found for item', {
+            applicationId,
+            documentType: item.documentType,
+          });
+        }
       }
       return item;
     });
@@ -1182,6 +1336,7 @@ Only return the JSON object, no other text.`;
         merged,
         totalItems: items.length,
         unmatchedDocuments: documentsFound - merged,
+        unmatchedItems: unmatchedItems.length > 0 ? unmatchedItems : undefined,
       });
     }
 

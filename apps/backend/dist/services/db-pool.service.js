@@ -108,11 +108,22 @@ class DatabasePoolService {
         }
         DatabasePoolService.healthCheckInterval = setInterval(async () => {
             try {
+                // Only check if pool is initialized
+                if (!DatabasePoolService.instance) {
+                    return;
+                }
                 const stats = DatabasePoolService.getPoolStats();
-                // Alert on high connection usage
-                if (stats.idleConnections === 0) {
-                    console.warn(`⚠️  ALERT: No idle connections available. ` +
-                        `Active: ${stats.totalConnections - stats.idleConnections}/${stats.totalConnections}`);
+                // Only alert if pool is actually initialized and has connections
+                // Don't warn if totalConnections is 0 (pool not fully initialized yet)
+                if (stats.totalConnections > 0 && stats.idleConnections === 0) {
+                    // Only warn if we're using a significant portion of connections
+                    const activeConnections = stats.totalConnections - stats.idleConnections;
+                    const usagePercent = (activeConnections / stats.totalConnections) * 100;
+                    // Only warn if using more than 80% of connections
+                    if (usagePercent > 80) {
+                        console.warn(`⚠️  ALERT: High connection pool usage. ` +
+                            `Active: ${activeConnections}/${stats.totalConnections} (${usagePercent.toFixed(1)}%)`);
+                    }
                 }
                 // Alert on high query failure rate
                 const failureRate = stats.totalQueries > 0 ? (stats.failedQueries / stats.totalQueries) * 100 : 0;

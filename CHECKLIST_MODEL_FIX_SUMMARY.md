@@ -305,3 +305,6 @@ OPENAI_MODEL_CHECKLIST=gpt-4o  # or gpt-4.1, gpt-4-turbo, etc.
 - Never falls back to `gpt-4o-mini` unless explicitly configured
 
 **Result:** Checklist generation now consistently uses high-quality GPT-4 models with proper fallback handling and detailed logging for debugging.
+
+
+

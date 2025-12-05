@@ -46,14 +46,14 @@ const Sentry = __importStar(require("@sentry/node"));
 const profiling_node_1 = require("@sentry/profiling-node");
 const rate_limit_1 = require("./middleware/rate-limit");
 const input_validation_1 = require("./middleware/input-validation");
-const chat_rate_limit_1 = require("./middleware/chat-rate-limit");
 const db_pool_service_1 = __importDefault(require("./services/db-pool.service"));
 const firebase_storage_service_1 = __importDefault(require("./services/firebase-storage.service"));
 const local_storage_service_1 = __importDefault(require("./services/local-storage.service"));
+const storage_adapter_1 = __importDefault(require("./services/storage-adapter"));
 const cache_service_optimized_1 = require("./services/cache.service.optimized");
 const cache_invalidation_service_1 = require("./services/cache-invalidation.service");
 const slow_query_logger_1 = require("./services/slow-query-logger");
-const ai_openai_service_1 = __importDefault(require("./services/ai-openai.service"));
+const ai_openai_service_1 = require("./services/ai-openai.service");
 const db_1 = __importDefault(require("./db"));
 const env_1 = require("./config/env");
 const constants_1 = require("./config/constants");
@@ -77,6 +77,7 @@ const security_1 = __importDefault(require("./routes/security"));
 const health_1 = __importDefault(require("./routes/health"));
 const forms_1 = __importDefault(require("./routes/forms"));
 const document_checklist_1 = __importDefault(require("./routes/document-checklist"));
+const doc_check_1 = __importDefault(require("./routes/doc-check"));
 const internal_1 = __importDefault(require("./routes/internal"));
 const dev_1 = __importDefault(require("./routes/dev"));
 // Load environment variables
@@ -89,13 +90,13 @@ try {
     if (envConfig.NODE_ENV === 'production') {
         // Check for production security requirements
         if (!envConfig.CORS_ORIGIN || envConfig.CORS_ORIGIN === '*') {
-            console.warn("⚠️  CORS_ORIGIN is '*' or empty in production.");
-            console.warn('   For mobile-only APIs, this is acceptable (CORS only applies to browsers).');
-            console.warn('   For web APIs, set CORS_ORIGIN to specific allowed origins.');
+            process.stderr.write("⚠️  CORS_ORIGIN is '*' or empty in production.\n");
+            process.stderr.write('   For mobile-only APIs, this is acceptable (CORS only applies to browsers).\n');
+            process.stderr.write('   For web APIs, set CORS_ORIGIN to specific allowed origins.\n');
         }
         if (envConfig.JWT_SECRET.length < 32) {
-            console.error('❌ CRITICAL: JWT_SECRET must be at least 32 characters in production!');
-            console.error('   Generate a secure secret with: ./scripts/generate-secrets.sh');
+            process.stderr.write('❌ CRITICAL: JWT_SECRET must be at least 32 characters in production!\n');
+            process.stderr.write('   Generate a secure secret with: ./scripts/generate-secrets.sh\n');
             process.exit(1);
         }
     }
@@ -111,14 +112,15 @@ try {
         warnings.push('Google OAuth not configured - Google Sign-In will not work');
     }
     if (warnings.length > 0 && envConfig.NODE_ENV === 'production') {
-        console.warn('\n⚠️  Production Warnings:');
-        warnings.forEach((w) => console.warn(`   - ${w}`));
-        console.warn('');
+        // These are optional features - log as info, not warnings
+        process.stdout.write('\nℹ️  Optional Features (not configured):\n');
+        warnings.forEach((w) => process.stdout.write(`   - ${w}\n`));
+        process.stdout.write('\n');
     }
 }
 catch (error) {
-    console.error('❌ Environment validation failed:', error instanceof Error ? error.message : error);
-    console.error("\n💡 Tip: Run './scripts/validate-env.sh backend' to check your configuration");
+    process.stderr.write(`❌ Environment validation failed: ${error instanceof Error ? error.message : error}\n`);
+    process.stderr.write("\n💡 Tip: Run './scripts/validate-env.sh backend' to check your configuration\n");
     process.exit(1);
 }
 const sentryEnabled = Boolean(envConfig.SENTRY_DSN);
@@ -143,8 +145,9 @@ exports.cacheService = cacheService;
 // MIDDLEWARE
 // ============================================================================
 // Trust proxy - CRITICAL for Railway/Heroku/Cloud hosting
-// This allows Express to read X-Forwarded-For headers correctly
-app.set('trust proxy', true);
+// Only trust the first proxy (Railway's load balancer)
+// This prevents IP-based rate limiting bypass while still reading X-Forwarded-For headers
+app.set('trust proxy', 1);
 // Security middleware
 app.use((0, helmet_1.default)());
 app.use(securityHeaders_1.removeSensitiveHeaders);
@@ -156,7 +159,7 @@ try {
     allowedOrigins = (0, env_1.validateCorsOrigin)();
 }
 catch (error) {
-    console.error('❌ CORS configuration error:', error instanceof Error ? error.message : error);
+    process.stderr.write(`❌ CORS configuration error: ${error instanceof Error ? error.message : error}\n`);
     process.exit(1);
 }
 app.use((0, cors_1.default)({
@@ -239,9 +242,7 @@ app.get('/api/status', (req, res) => {
 // Register routes
 // Health check routes (public, no auth required)
 app.use('/api/health', health_1.default);
-// Rate limiters for auth endpoints
-app.use('/api/auth/login', rate_limit_1.loginLimiter); // 5 attempts per 15 minutes
-app.use('/api/auth/register', rate_limit_1.registerLimiter); // 3 attempts per hour
+// Auth routes (rate limiters are applied within the auth router)
 app.use('/api/auth', auth_1.default);
 app.use('/api/countries', countries_1.default);
 app.use('/api/visa-types', visa_types_1.default);
@@ -252,9 +253,11 @@ app.use('/api/documents', documents_1.default);
 app.use('/api/forms', forms_1.default);
 // Document checklist routes (AI-generated checklists)
 app.use('/api/document-checklist', document_checklist_1.default);
+// Document check routes (Phase 3: Document checking & readiness)
+app.use('/api/doc-check', doc_check_1.default);
 // Chat routes with user-level rate limiting and cost tracking
-app.use('/api/chat', chat_rate_limit_1.chatRateLimitMiddleware); // 50 messages per day per user
-app.use('/api/chat', chat_rate_limit_1.attachChatLimitHeaders); // Attach quota info to response headers
+// NOTE: chatRateLimitMiddleware must run AFTER authentication (which is in chatRoutes)
+// So we apply it inside the chatRoutes router, not here
 app.use('/api/chat', chat_1.default);
 app.use('/api/users', users_1.default);
 app.use('/api/notifications', notifications_1.default);
@@ -277,6 +280,17 @@ if (envConfig.NODE_ENV === 'development') {
 // ============================================================================
 // 404 handler
 app.use((req, res) => {
+    process.stdout.write(`[404 HANDLER] Request not found: ${JSON.stringify({
+        method: req.method,
+        path: req.path,
+        originalUrl: req.originalUrl,
+        url: req.url,
+        baseUrl: req.baseUrl,
+        headers: {
+            'user-agent': req.headers['user-agent'],
+            'content-type': req.headers['content-type'],
+        },
+    })}\n`);
     res.status(constants_1.HTTP_STATUS.NOT_FOUND).json({
         success: false,
         error: {
@@ -284,6 +298,7 @@ app.use((req, res) => {
             message: constants_1.API_MESSAGES.NOT_FOUND,
             code: 'NOT_FOUND',
             path: req.path,
+            originalUrl: req.originalUrl,
         },
     });
 });
@@ -365,22 +380,22 @@ app.use(async (err, req, res, next) => {
 // ============================================================================
 async function startServer() {
     try {
-        console.log('🚀 Initializing VisaBuddy Backend Services...\n');
+        process.stdout.write('🚀 Initializing VisaBuddy Backend Services...\n\n');
         // 1. Initialize Database Pool (skip for SQLite in development)
         const isDatabaseSQLite = envConfig.DATABASE_URL.includes('file:');
         if (!isDatabaseSQLite) {
-            console.log('📊 Initializing PostgreSQL Connection Pool...');
+            process.stdout.write('📊 Initializing PostgreSQL Connection Pool...\n');
             await db_pool_service_1.default.initialize({
                 connectionUrl: envConfig.DATABASE_URL,
                 max: 20,
             });
-            console.log('✓ PostgreSQL Connection Pool ready');
+            process.stdout.write('✓ PostgreSQL Connection Pool ready\n');
         }
         else {
-            console.log('📊 Using SQLite (skipping PostgreSQL connection pool)');
+            process.stdout.write('📊 Using SQLite (skipping PostgreSQL connection pool)\n');
         }
         // 2. Test Prisma connection with retry logic
-        console.log('🔗 Testing Prisma Database Connection...');
+        process.stdout.write('🔗 Testing Prisma Database Connection...\n');
         const { checkDatabaseHealth, resilientOperation, DatabaseConnectionState } = await Promise.resolve().then(() => __importStar(require('./utils/db-resilience')));
         let connectionHealthy = false;
         const maxConnectionAttempts = 3;
@@ -389,154 +404,205 @@ async function startServer() {
                 const health = await checkDatabaseHealth(prisma);
                 if (health.healthy) {
                     connectionHealthy = true;
-                    console.log(`✓ Prisma Database Connection successful (latency: ${health.latency}ms)`);
+                    process.stdout.write(`✓ Prisma Database Connection successful (latency: ${health.latency}ms)\n`);
                     break;
                 }
                 else {
-                    console.warn(`⚠️  Connection attempt ${attempt}/${maxConnectionAttempts} failed: ${health.error}`);
+                    process.stderr.write(`⚠️  Connection attempt ${attempt}/${maxConnectionAttempts} failed: ${health.error}\n`);
                     if (attempt < maxConnectionAttempts) {
                         await new Promise((resolve) => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
                     }
                 }
             }
             catch (error) {
-                console.warn(`⚠️  Connection attempt ${attempt}/${maxConnectionAttempts} error:`, error instanceof Error ? error.message : 'Unknown error');
+                process.stderr.write(`⚠️  Connection attempt ${attempt}/${maxConnectionAttempts} error: ${error instanceof Error ? error.message : 'Unknown error'}\n`);
                 if (attempt < maxConnectionAttempts) {
                     await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
                 }
             }
         }
         if (!connectionHealthy) {
-            console.error('❌ Failed to establish database connection after multiple attempts');
-            console.error('   The server will start but database operations may fail');
-            console.error('   Please check your DATABASE_URL and ensure the database is accessible');
+            process.stderr.write('❌ Failed to establish database connection after multiple attempts\n');
+            process.stderr.write('   The server will start but database operations may fail\n');
+            process.stderr.write('   Please check your DATABASE_URL and ensure the database is accessible\n');
         }
         // Start periodic health checks
         const { startDatabaseHealthChecks } = await Promise.resolve().then(() => __importStar(require('./db')));
         startDatabaseHealthChecks(30000); // Check every 30 seconds
         // 3. Initialize Storage Service with fallback support
         const storageType = envConfig.STORAGE_TYPE;
-        console.log(`💾 Initializing ${storageType === 'firebase' ? 'Firebase Storage' : 'Local Storage'}...`);
-        if (storageType === 'firebase' && envConfig.FIREBASE_PROJECT_ID) {
+        process.stdout.write(`💾 Initializing ${storageType === 'firebase' ? 'Firebase Storage' : 'Local Storage'}...\n`);
+        if (storageType === 'firebase') {
             try {
                 await firebase_storage_service_1.default.initialize();
-                console.log('✓ Firebase Storage initialized');
+                if (firebase_storage_service_1.default.isEnabled()) {
+                    const bucketName = firebase_storage_service_1.default.getBucketName();
+                    process.stdout.write(`✓ Firebase Storage initialized (bucket: ${bucketName})\n`);
+                }
+                else {
+                    process.stdout.write('ℹ️  Firebase Storage not configured, using local storage\n');
+                    process.stdout.write('   Missing required environment variables. Check: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_STORAGE_BUCKET\n');
+                    // Initialize local storage as fallback
+                    await local_storage_service_1.default.initialize();
+                    process.stdout.write(`✓ Local Storage initialized (uploads folder: ${envConfig.LOCAL_STORAGE_PATH})\n`);
+                }
             }
             catch (error) {
-                console.warn('⚠️  Firebase Storage initialization failed, falling back to local storage');
-                // Note: In production, this should be handled more gracefully
+                // Firebase Storage initialization failed - fallback to local storage
+                process.stderr.write(`⚠️  Firebase Storage initialization failed, using local storage: ${error instanceof Error ? error.message : 'Unknown error'}\n`);
+                await local_storage_service_1.default.initialize();
+                process.stdout.write(`✓ Local Storage initialized (uploads folder: ${envConfig.LOCAL_STORAGE_PATH})\n`);
             }
         }
         else if (storageType === 'local') {
             try {
                 await local_storage_service_1.default.initialize();
-                console.log(`✓ Local Storage initialized (uploads folder: ${envConfig.LOCAL_STORAGE_PATH})`);
+                process.stdout.write(`✓ Local Storage initialized (uploads folder: ${envConfig.LOCAL_STORAGE_PATH})\n`);
             }
             catch (error) {
-                console.error('✗ Local Storage initialization failed:', error);
+                process.stderr.write(`✗ Local Storage initialization failed: ${error}\n`);
                 throw error;
             }
         }
         // 4. Validate OAuth Configuration
-        console.log('🔐 Validating Authentication Configuration...');
+        process.stdout.write('🔐 Validating Authentication Configuration...\n');
         if (envConfig.GOOGLE_CLIENT_ID && envConfig.GOOGLE_CLIENT_SECRET) {
-            console.log('✓ Google OAuth configured');
+            process.stdout.write('✓ Google OAuth configured\n');
         }
         else {
-            console.warn('⚠️  Google OAuth not configured - Google Sign-In will not work');
-            console.warn('   See docs/SETUP_GOOGLE_OAUTH.md for setup instructions');
+            // Google OAuth is optional - log as info, not warning
+            process.stdout.write('ℹ️  Google OAuth not configured (optional feature)\n');
+            if (envConfig.NODE_ENV === 'development') {
+                process.stdout.write('   Google Sign-In will not work\n');
+                process.stdout.write('   See docs/SETUP_GOOGLE_OAUTH.md for setup instructions\n');
+            }
         }
         if (envConfig.JWT_SECRET && envConfig.JWT_SECRET.length >= 32) {
-            console.log('✓ JWT authentication configured');
+            process.stdout.write('✓ JWT authentication configured\n');
         }
         else {
-            console.error('❌ JWT_SECRET is not properly configured!');
-            console.error('   Run: ./scripts/generate-secrets.sh');
+            process.stderr.write('❌ JWT_SECRET is not properly configured!\n');
+            process.stderr.write('   Run: ./scripts/generate-secrets.sh\n');
         }
         // 5. Initialize AI Service
         if (envConfig.OPENAI_API_KEY) {
-            console.log('🤖 Initializing OpenAI Service...');
+            process.stdout.write('🤖 Initializing OpenAI Service...\n');
             try {
-                ai_openai_service_1.default.initialize(prisma);
-                console.log('✓ OpenAI Service initialized');
+                ai_openai_service_1.AIOpenAIService.initialize(prisma);
+                process.stdout.write('✓ OpenAI Service initialized\n');
             }
             catch (error) {
-                console.warn('⚠️  OpenAI Service initialization skipped');
+                process.stderr.write('⚠️  OpenAI Service initialization skipped\n');
             }
         }
         // 6. Initialize Cache Service with Invalidation Strategy
-        console.log('💾 Initializing Cache Service (Redis + Invalidation)...');
+        process.stdout.write('💾 Initializing Cache Service (Redis + Invalidation)...\n');
         try {
             const cacheStats = cacheService.getStats?.();
             if (cacheStats) {
-                console.log(`✓ Cache Service active (Redis: ${cacheStats.redisConnected ? '✓' : '✗'})`);
-                console.log(`   - Hit Rate: ${cacheStats.hitRate.toFixed(1)}%`);
-                console.log(`   - Local Cache Size: ${cacheStats.localCacheSize} entries`);
+                process.stdout.write(`✓ Cache Service active (Redis: ${cacheStats.redisConnected ? '✓' : '✗'})\n`);
+                process.stdout.write(`   - Hit Rate: ${cacheStats.hitRate.toFixed(1)}%\n`);
+                process.stdout.write(`   - Local Cache Size: ${cacheStats.localCacheSize} entries\n`);
             }
             // Initialize cache invalidation strategy
             const invalidationService = (0, cache_invalidation_service_1.getCacheInvalidationService)(cacheService);
-            console.log('✓ Cache Invalidation Strategy initialized');
-            console.log(`   - ${invalidationService.getRules().length} invalidation rules registered`);
+            process.stdout.write('✓ Cache Invalidation Strategy initialized\n');
+            process.stdout.write(`   - ${invalidationService.getRules().length} invalidation rules registered\n`);
         }
         catch (error) {
-            console.warn('⚠️  Cache initialization warning:', error);
+            process.stderr.write(`⚠️  Cache initialization warning: ${error}\n`);
         }
         // 7. Initialize Slow Query Logger
-        console.log('📊 Initializing Slow Query Logger...');
+        process.stdout.write('📊 Initializing Slow Query Logger...\n');
         try {
             const slowQueryLogger = (0, slow_query_logger_1.getSlowQueryLogger)(prisma);
-            console.log('✓ Slow Query Logger initialized');
-            console.log(`   - Warning Threshold: 500ms`);
-            console.log(`   - Critical Threshold: 2000ms`);
+            process.stdout.write('✓ Slow Query Logger initialized\n');
+            process.stdout.write(`   - Warning Threshold: 500ms\n`);
+            process.stdout.write(`   - Critical Threshold: 2000ms\n`);
         }
         catch (error) {
-            console.warn('⚠️  Slow Query Logger initialization skipped');
+            process.stderr.write('⚠️  Slow Query Logger initialization skipped\n');
         }
         // 8. Initialize Notification Services
-        console.log('📬 Initializing Notification Services...');
+        process.stdout.write('📬 Initializing Notification Services...\n');
         try {
             const { emailService } = await Promise.resolve().then(() => __importStar(require('./services/email.service')));
             const { fcmService } = await Promise.resolve().then(() => __importStar(require('./services/fcm.service')));
             const { notificationSchedulerService } = await Promise.resolve().then(() => __importStar(require('./services/notification-scheduler.service')));
-            console.log('✓ Email Service ready (SendGrid + Nodemailer fallback)');
-            console.log('✓ FCM (Firebase Cloud Messaging) Service ready');
-            console.log('✓ Notification Scheduler ready (Bull + Redis)');
+            process.stdout.write('✓ Email Service ready (SendGrid + Nodemailer fallback)\n');
+            process.stdout.write('✓ FCM (Firebase Cloud Messaging) Service ready\n');
+            process.stdout.write('✓ Notification Scheduler ready (Bull + Redis)\n');
         }
         catch (error) {
-            console.warn('⚠️  Notification Services initialization skipped:', error);
+            process.stderr.write(`⚠️  Notification Services initialization skipped: ${error}\n`);
         }
         // 9. Initialize Payment Reconciliation Job
-        console.log('💳 Initializing Payment System...');
+        process.stdout.write('💳 Initializing Payment System...\n');
         try {
             const { PaymentReconciliationService } = await Promise.resolve().then(() => __importStar(require('./services/payment-reconciliation.service')));
             const reconciliationService = PaymentReconciliationService.getInstance();
             const enableReconciliation = envConfig.ENABLE_RECONCILIATION !== 'false';
             if (enableReconciliation) {
                 reconciliationService.startReconciliationJob();
-                console.log('✓ Payment Reconciliation Job started (runs daily at 2 AM UTC)');
+                process.stdout.write('✓ Payment Reconciliation Job started (runs daily at 2 AM UTC)\n');
             }
             else {
-                console.log('✓ Payment Reconciliation Job available (disabled by ENABLE_RECONCILIATION env var)');
+                process.stdout.write('✓ Payment Reconciliation Job available (disabled by ENABLE_RECONCILIATION env var)\n');
             }
-            console.log('✓ Mock Payment Provider enabled for development/testing');
+            process.stdout.write('✓ Mock Payment Provider enabled for development/testing\n');
         }
         catch (error) {
-            console.warn('⚠️  Payment services initialization partial:', error);
+            process.stderr.write(`⚠️  Payment services initialization partial: ${error}\n`);
+        }
+        // 10. Initialize Embassy Rules Sync Pipeline
+        process.stdout.write('🌐 Initializing Embassy Rules Sync Pipeline...\n');
+        try {
+            const { EmbassySyncJobService } = await Promise.resolve().then(() => __importStar(require('./services/embassy-sync-job.service')));
+            const { EmbassySyncSchedulerService } = await Promise.resolve().then(() => __importStar(require('./services/embassy-sync-scheduler.service')));
+            // Initialize the queue
+            EmbassySyncJobService.initialize();
+            process.stdout.write('✓ Embassy Sync Job Queue initialized\n');
+            // Start scheduler if enabled
+            const enableSync = process.env.ENABLE_EMBASSY_SYNC !== 'false';
+            if (enableSync) {
+                EmbassySyncSchedulerService.start();
+                const cronExpression = process.env.EMBASSY_SYNC_CRON || '0 2 * * *';
+                process.stdout.write(`✓ Embassy Sync Scheduler started (runs ${cronExpression})\n`);
+            }
+            else {
+                process.stdout.write('✓ Embassy Sync Scheduler available (disabled by ENABLE_EMBASSY_SYNC env var)\n');
+            }
+        }
+        catch (error) {
+            process.stderr.write(`⚠️  Embassy Sync Pipeline initialization partial: ${error}\n`);
+        }
+        // 11. Initialize Document Processing Queue (for background document processing)
+        process.stdout.write('📄 Initializing Document Processing Queue...\n');
+        try {
+            const { DocumentProcessingQueueService } = await Promise.resolve().then(() => __importStar(require('./services/document-processing-queue.service')));
+            DocumentProcessingQueueService.initialize();
+            process.stdout.write('✓ Document Processing Queue initialized\n');
+        }
+        catch (error) {
+            process.stderr.write(`⚠️  Document Processing Queue initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}\n`);
+            process.stderr.write('   Document processing will use fallback mode\n');
         }
         // Get pool statistics
         const poolStats = db_pool_service_1.default.getPoolStats();
-        console.log('\n📈 Database Pool Stats:');
-        console.log(`   - Status: ${poolStats.status}`);
-        console.log(`   - Total connections: ${poolStats.totalConnections}`);
-        console.log(`   - Idle connections: ${poolStats.idleConnections}`);
-        console.log('\n✅ All services initialized successfully!\n');
+        process.stdout.write('\n📈 Database Pool Stats:\n');
+        process.stdout.write(`   - Status: ${poolStats.status}\n`);
+        process.stdout.write(`   - Total connections: ${poolStats.totalConnections}\n`);
+        process.stdout.write(`   - Idle connections: ${poolStats.idleConnections}\n`);
+        process.stdout.write('\n✅ All services initialized successfully!\n\n');
         // Start Express server
         app.listen(PORT, () => {
-            const finalStorageType = envConfig.STORAGE_TYPE === 'firebase' ? 'Firebase' : 'Local';
+            // Get actual storage status (not just STORAGE_TYPE env var)
+            const storageInfo = storage_adapter_1.default.getStorageInfo();
+            const storageDisplay = storageInfo.type === 'firebase' ? `Firebase (${storageInfo.bucket || 'unknown'})` : 'Local';
             const envPadding = NODE_ENV.padEnd(42);
             const portPadding = String(PORT).padEnd(52);
-            const storagePadding = finalStorageType.padEnd(44);
-            console.log(`
+            const storagePadding = storageDisplay.padEnd(44);
+            process.stdout.write(`
 ╔════════════════════════════════════════════════════════════╗
 ║         VisaBuddy Backend Server Started                    ║
 ╠════════════════════════════════════════════════════════════╣
@@ -549,11 +615,11 @@ async function startServer() {
 ║ Notifications: Email + Push + Job Scheduler                ║
 ║ API Docs: http://localhost:${PORT}/api/docs     ║
 ╚════════════════════════════════════════════════════════════╝
-      `);
+      \n`);
         });
     }
     catch (error) {
-        console.error('✗ Failed to start server:', error);
+        process.stderr.write(`✗ Failed to start server: ${error}\n`);
         await db_pool_service_1.default.close();
         await prisma.$disconnect();
         process.exit(1);
@@ -561,33 +627,47 @@ async function startServer() {
 }
 // Graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('\n✓ Shutting down gracefully...');
+    process.stdout.write('\n✓ Shutting down gracefully...\n');
     try {
         const { notificationSchedulerService } = await Promise.resolve().then(() => __importStar(require('./services/notification-scheduler.service')));
         await notificationSchedulerService.closeQueues();
     }
     catch (error) {
-        console.warn('⚠️  Could not close notification queues');
+        process.stderr.write('⚠️  Could not close notification queues\n');
+    }
+    try {
+        const { EmbassySyncJobService } = await Promise.resolve().then(() => __importStar(require('./services/embassy-sync-job.service')));
+        await EmbassySyncJobService.close();
+    }
+    catch (error) {
+        process.stderr.write('⚠️  Could not close embassy sync queue\n');
     }
     await db_pool_service_1.default.drain();
     await db_pool_service_1.default.close();
     await prisma.$disconnect();
-    console.log('✓ All services shut down');
+    process.stdout.write('✓ All services shut down\n');
     process.exit(0);
 });
 process.on('SIGTERM', async () => {
-    console.log('\n✓ Shutting down gracefully...');
+    process.stdout.write('\n✓ Shutting down gracefully...\n');
     try {
         const { notificationSchedulerService } = await Promise.resolve().then(() => __importStar(require('./services/notification-scheduler.service')));
         await notificationSchedulerService.closeQueues();
     }
     catch (error) {
-        console.warn('⚠️  Could not close notification queues');
+        process.stderr.write('⚠️  Could not close notification queues\n');
+    }
+    try {
+        const { EmbassySyncJobService } = await Promise.resolve().then(() => __importStar(require('./services/embassy-sync-job.service')));
+        await EmbassySyncJobService.close();
+    }
+    catch (error) {
+        process.stderr.write('⚠️  Could not close embassy sync queue\n');
     }
     await db_pool_service_1.default.drain();
     await db_pool_service_1.default.close();
     await prisma.$disconnect();
-    console.log('✓ All services shut down');
+    process.stdout.write('✓ All services shut down\n');
     process.exit(0);
 });
 // Start the server

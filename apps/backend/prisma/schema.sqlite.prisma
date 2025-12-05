@@ -523,5 +523,74 @@ model DocumentChecklist {
   @@index([status])
 }
 
+// ============================================================================
+// EMBASSY RULES SYNC PIPELINE MODELS
+// ============================================================================
 
+model EmbassySource {
+  id            String    @id @default(cuid())
+  countryCode   String    // ISO 3166-1 alpha-2 (e.g., "US", "CA")
+  visaType      String    // "student" | "tourist" | "work" | etc.
+  url           String    // Official embassy/consulate page URL
+  name          String?   // Human-readable name (e.g., "US Embassy Tashkent - Student Visa")
+  description   String?   // Optional description
+  isActive      Boolean   @default(true)
+  lastFetchedAt DateTime?
+  lastStatus    String?   // "success" | "failed" | "pending"
+  lastError     String?   // Error message if last fetch failed
+  fetchInterval Int       @default(86400) // Seconds between fetches (default: 24 hours)
+  priority      Int       @default(0) // Higher priority sources are fetched first
+  metadata      String?   // JSON with additional metadata (selectors, headers, etc.)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
+  ruleSets VisaRuleSet[]
+
+  @@unique([countryCode, visaType, url])
+  @@index([countryCode, visaType])
+  @@index([isActive])
+  @@index([lastFetchedAt])
+  @@index([priority])
+}
+
+model VisaRuleSet {
+  id            String   @id @default(cuid())
+  countryCode   String   // ISO 3166-1 alpha-2
+  visaType      String   // "student" | "tourist" | "work" | etc.
+  data          String   // Structured visa rules (JSON string for SQLite compatibility)
+  version       Int      @default(1) // Incremental version number
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String   @default("system") // "system" | "admin" | userId
+  sourceSummary String?  // Summary of sources used (e.g., "US Embassy Tashkent, VFS Global")
+  isApproved    Boolean  @default(false) // Only approved rule sets are used in production
+  approvedAt    DateTime?
+  approvedBy    String?  // Admin user ID who approved
+  rejectionReason String? // If rejected, reason for rejection
+  sourceId      String?  // Optional: link to EmbassySource that generated this
+  extractionMetadata String? // Metadata about GPT-4 extraction (JSON string for SQLite)
+
+  source EmbassySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  versions VisaRuleVersion[]
+
+  @@unique([countryCode, visaType, version])
+  @@index([countryCode, visaType])
+  @@index([isApproved])
+  @@index([createdAt])
+  @@index([version])
+}
+
+model VisaRuleVersion {
+  id          String   @id @default(cuid())
+  ruleSetId  String
+  data       String   // Snapshot of rule set data (JSON string for SQLite compatibility)
+  version    Int      // Version number
+  changeLog  String?  // Human-readable summary of changes
+  createdAt  DateTime @default(now())
+
+  ruleSet VisaRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@index([ruleSetId])
+  @@index([version])
+  @@index([createdAt])
+}

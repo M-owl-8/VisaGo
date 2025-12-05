@@ -29,6 +29,7 @@ export interface AuthResponse {
         firstName?: string;
         lastName?: string;
         emailVerified: boolean;
+        role: string;
     };
 }
 /**
@@ -84,6 +85,7 @@ export declare class AuthService {
         timezone: string | null;
         currency: string;
         emailVerified: boolean;
+        role: string;
         preferences: {
             userId: string;
             id: string;
@@ -122,19 +124,17 @@ export declare class AuthService {
     static refreshToken(userId: string): Promise<string>;
     /**
      * Verify Google OAuth login/registration
-     * Enhanced with better error handling and validation
+     * SECURE: Verifies idToken server-side using google-auth-library
+     *
+     * @param idToken - Google ID token from client
+     * @returns Authentication response with token and user data
+     * @throws {ApiError} If token verification fails or user creation fails
      */
-    static verifyGoogleAuth(payload: {
-        googleId: string;
-        email: string;
-        firstName?: string;
-        lastName?: string;
-        avatar?: string;
-    }): Promise<AuthResponse>;
+    static verifyGoogleAuth(idToken: string): Promise<AuthResponse>;
     /**
-   * Request password reset
-   * Generates a reset token and sends email
-   */
+     * Request password reset
+     * Generates a reset token and sends email
+     */
     static requestPasswordReset(email: string): Promise<void>;
     /**
      * Reset password with token

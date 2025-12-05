@@ -196,3 +196,39 @@ router.put(
 );
 
 export default router;
+
+        );
+      }
+
+      successResponse(res, checklistResult);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;
+
+        );
+      }
+
+      successResponse(res, checklistResult);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;
+
+        );
+      }
+
+      successResponse(res, checklistResult);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+export default router;

@@ -4,7 +4,7 @@
  */
 
 import { logInfo, logError } from '../middleware/logger';
-import AIOpenAIService from '../services/ai-openai.service';
+import { AIOpenAIService } from '../services/ai-openai.service';
 
 /**
  * Translate text to Uzbek or Russian using GPT-4

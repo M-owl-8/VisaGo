@@ -189,3 +189,10 @@ The existing flow continues to work:
 - `extractQuestionnaireSummary()` automatically handles V2
 - AI checklist generation uses the summary
 - No changes needed to existing application generation endpoints
+
+
+
+
+
+
+

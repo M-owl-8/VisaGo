@@ -64,12 +64,12 @@ export class VisaChecklistEngineService {
       );
 
       if (!ruleSet) {
-        logWarn('[VisaChecklistEngine] No approved rule set found, using fallback', {
+        logInfo('[VisaChecklistEngine] No approved rule set found, returning null for fallback', {
           countryCode,
           visaType,
         });
-        // Fall back to existing logic or return empty checklist
-        return { checklist: [] };
+        // Return null so caller can fall back to legacy mode
+        return null as any;
       }
 
       // Step 2: Build system prompt
@@ -172,8 +172,25 @@ export class VisaChecklistEngineService {
         countryCode,
         visaType,
       });
-      throw error;
+      // Return null on error so caller can fall back
+      return null as any;
     }
+  }
+
+  /**
+   * Generate checklist for an application (convenience method)
+   * @param application - Application object with country and visaType
+   * @param aiUserContext - AI user context with questionnaire data
+   * @returns ChecklistResponse or null if no rules exist or generation fails
+   */
+  static async generateChecklistForApplication(
+    application: { country: { code: string; name: string }; visaType: { name: string } },
+    aiUserContext: AIUserContext
+  ): Promise<ChecklistResponse | null> {
+    const countryCode = application.country.code.toUpperCase();
+    const visaType = application.visaType.name.toLowerCase();
+
+    return this.generateChecklist(countryCode, visaType, aiUserContext);
   }
 
   /**
@@ -285,43 +302,38 @@ Return ONLY valid JSON matching the schema, no other text.`;
     ruleSet: VisaRuleSetData,
     previousChecklist?: ChecklistItem[]
   ): string {
-    const contextSummary = {
-      basicInfo: {
-        age: aiUserContext.userProfile?.age,
-        citizenship: aiUserContext.userProfile?.citizenship,
-        residenceCountry:
-          aiUserContext.questionnaireSummary?.personalInfo?.currentResidenceCountry || 'Uzbekistan',
-      },
-      visaInfo: {
-        visaType: aiUserContext.questionnaireSummary?.visaType,
-        targetCountry: aiUserContext.questionnaireSummary?.targetCountry,
-        intendedDuration: aiUserContext.questionnaireSummary?.travelInfo?.duration,
-        travelDates: aiUserContext.questionnaireSummary?.travelInfo?.plannedDates,
-      },
-      sponsorInfo: {
-        sponsorType: aiUserContext.questionnaireSummary?.sponsorType,
-        sponsorIncome:
-          aiUserContext.questionnaireSummary?.financialInfo?.sponsorDetails?.annualIncomeUSD,
-        sponsorSavings: aiUserContext.questionnaireSummary?.financialInfo?.selfFundsUSD,
-      },
-      workStudy: {
-        employmentStatus: aiUserContext.questionnaireSummary?.employment?.currentStatus,
-        employerType: aiUserContext.questionnaireSummary?.employment?.employerName,
-        studentStatus: aiUserContext.questionnaireSummary?.education?.isStudent,
-        admissionStatus: aiUserContext.questionnaireSummary?.education?.hasGraduated,
-      },
-      travelRisk: {
-        travelHistory: aiUserContext.questionnaireSummary?.hasInternationalTravel,
-        previousRefusals: aiUserContext.questionnaireSummary?.previousVisaRejections,
-        riskScore: aiUserContext.riskScore?.level,
-        riskProbability: aiUserContext.riskScore?.probabilityPercent,
-      },
-    };
+    const summary = aiUserContext.questionnaireSummary;
+    const riskScore = aiUserContext.riskScore;
 
-    let prompt = `Generate a personalized visa document checklist using the VISA_RULE_SET and AI_USER_CONTEXT.
+    // Build explicit, human-readable context summary
+    const purpose = summary?.travelInfo?.purpose || summary?.visaType || 'tourism';
+    const duration = summary?.travelInfo?.duration || summary?.duration || 'Not specified';
+    const sponsorType = summary?.sponsorType || (summary?.financialInfo?.sponsorDetails ? 'sponsor' : 'self');
+    const employmentStatus = summary?.employment?.currentStatus || 'Not specified';
+    const hasInvitation = summary?.hasUniversityInvitation || summary?.hasOtherInvitation || false;
+    const travelHistory = summary?.hasInternationalTravel || summary?.travelHistory?.traveledBefore || false;
+    const previousRefusals = summary?.previousVisaRejections || summary?.travelHistory?.hasRefusals || false;
+    const bankBalance = summary?.bankBalanceUSD || summary?.financialInfo?.selfFundsUSD;
+    const monthlyIncome = summary?.monthlyIncomeUSD || summary?.employment?.monthlySalaryUSD;
+    const hasProperty = summary?.hasPropertyInUzbekistan || summary?.ties?.propertyDocs || false;
+    const hasFamily = summary?.hasFamilyInUzbekistan || summary?.ties?.familyTies || false;
+    const hasChildren = summary?.hasChildren && summary.hasChildren !== 'no';
+    const age = summary?.age || aiUserContext.userProfile?.age;
 
-AI_USER_CONTEXT:
-${JSON.stringify(contextSummary, null, 2)}
+    let prompt = `Generate a personalized visa document checklist using the VISA_RULE_SET and the following applicant information:
+
+APPLICANT PROFILE:
+- Purpose of travel: ${purpose}
+- Stay duration: ${duration}
+- Employment status: ${employmentStatus}
+- Sponsor: ${sponsorType === 'self' ? 'Self-funded' : `Sponsored by ${sponsorType}`}
+- Approximate income/savings: ${bankBalance ? `~$${bankBalance}` : monthlyIncome ? `~$${monthlyIncome}/month` : 'Not specified'}
+- Has invitation letter: ${hasInvitation ? 'Yes' : 'No'}
+- Travel history: ${travelHistory ? 'Has previous international travel' : 'No previous international travel'}
+- Previous visa refusals: ${previousRefusals ? 'Yes' : 'No'}
+- Ties to home country: ${hasProperty ? 'Has property' : ''}${hasFamily ? (hasProperty ? ', has family' : 'Has family') : ''}${hasChildren ? (hasProperty || hasFamily ? ', has children' : 'Has children') : ''}${!hasProperty && !hasFamily && !hasChildren ? 'Standard ties' : ''}
+- Age: ${age || 'Not specified'}
+- Risk level: ${riskScore ? `${riskScore.level} (${riskScore.probabilityPercent}% probability)` : 'Not calculated'}
 
 VISA_RULE_SET.requiredDocuments:
 ${JSON.stringify(ruleSet.requiredDocuments, null, 2)}

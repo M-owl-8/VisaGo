@@ -167,3 +167,10 @@ After testing the standalone APK:
 - Verify API connectivity
 - Test push notifications (if applicable)
 - Consider building an AAB (Android App Bundle) for Play Store distribution
+
+
+
+
+
+
+

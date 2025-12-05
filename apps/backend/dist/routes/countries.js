@@ -11,7 +11,7 @@ const router = express_1.default.Router();
  * GET /api/countries
  * Get all countries (with optional search)
  */
-router.get("/", async (req, res, next) => {
+router.get('/', async (req, res, next) => {
     try {
         const { search } = req.query;
         const countries = await countries_service_1.CountriesService.getAllCountries(search);
@@ -29,7 +29,7 @@ router.get("/", async (req, res, next) => {
  * GET /api/countries/popular
  * Get popular countries (top 10)
  */
-router.get("/popular", async (req, res, next) => {
+router.get('/popular', async (req, res, next) => {
     try {
         const countries = await countries_service_1.CountriesService.getPopularCountries();
         res.json({
@@ -45,7 +45,7 @@ router.get("/popular", async (req, res, next) => {
  * GET /api/countries/:id
  * Get country by ID
  */
-router.get("/:id", async (req, res, next) => {
+router.get('/:id', async (req, res, next) => {
     try {
         const country = await countries_service_1.CountriesService.getCountryById(req.params.id);
         res.json({
@@ -61,7 +61,7 @@ router.get("/:id", async (req, res, next) => {
  * GET /api/countries/code/:code
  * Get country by ISO code (e.g., US, GB)
  */
-router.get("/code/:code", async (req, res, next) => {
+router.get('/code/:code', async (req, res, next) => {
     try {
         const country = await countries_service_1.CountriesService.getCountryByCode(req.params.code);
         res.json({
@@ -77,7 +77,7 @@ router.get("/code/:code", async (req, res, next) => {
  * GET /api/countries/:countryId/visa-types
  * Get all visa types for a country
  */
-router.get("/:countryId/visa-types", async (req, res, next) => {
+router.get('/:countryId/visa-types', async (req, res, next) => {
     try {
         const visaTypes = await countries_service_1.CountriesService.getVisaTypesByCountry(req.params.countryId);
         res.json({
@@ -94,13 +94,13 @@ router.get("/:countryId/visa-types", async (req, res, next) => {
  * Check visa requirement for a country (for Uzbek citizens by default)
  * Query params: countryName (required), nationalityCode (optional, default: UZ)
  */
-router.get("/visa-requirements/check", async (req, res, next) => {
+router.get('/visa-requirements/check', async (req, res, next) => {
     try {
         const { countryName, nationalityCode } = req.query;
         if (!countryName) {
             return res.status(400).json({
                 success: false,
-                error: { message: "countryName query parameter is required" },
+                error: { message: 'countryName query parameter is required' },
             });
         }
         const requirement = await (0, visa_requirements_service_1.checkVisaRequirement)(countryName, nationalityCode || 'UZ');
@@ -118,7 +118,7 @@ router.get("/visa-requirements/check", async (req, res, next) => {
  * Get all countries that require visas (for Uzbek citizens by default)
  * Query params: nationalityCode (optional, default: UZ)
  */
-router.get("/visa-requirements/all", async (req, res, next) => {
+router.get('/visa-requirements/all', async (req, res, next) => {
     try {
         const { nationalityCode } = req.query;
         const countries = (0, visa_requirements_service_1.getAllVisaRequiredCountries)(nationalityCode || 'UZ');
@@ -137,7 +137,7 @@ router.get("/visa-requirements/all", async (req, res, next) => {
  * Get visa requirements organized by region (for Uzbek citizens by default)
  * Query params: nationalityCode (optional, default: UZ)
  */
-router.get("/visa-requirements/regions", async (req, res, next) => {
+router.get('/visa-requirements/regions', async (req, res, next) => {
     try {
         const { nationalityCode } = req.query;
         const regions = (0, visa_requirements_service_1.getVisaRequirementsByRegion)(nationalityCode || 'UZ');

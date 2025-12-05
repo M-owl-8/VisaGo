@@ -6,6 +6,11 @@ export declare class ChatService {
     /**
      * Create or get a chat session
      */
+    /**
+     * Get or create a chat session
+     * MEDIUM PRIORITY FIX: Ensure session exists before saving messages to prevent orphaned messages
+     * This method is called before every message save to guarantee session exists
+     */
     getOrCreateSession(userId: string, applicationId?: string): Promise<string>;
     /**
      * Extract context from visa application
@@ -47,21 +52,20 @@ export declare class ChatService {
         sources: never[];
         tokens_used: number;
         model: string;
-        id?: undefined;
-        applicationContext?: undefined;
     }>;
     /**
      * Get conversation history
+     * CRITICAL SECURITY FIX: Always require userId for verification
      */
-    getConversationHistory(userIdOrSessionId: string, applicationId?: string, limit?: number, offset?: number): Promise<{
+    getConversationHistory(userIdOrSessionId: string, applicationId?: string, limit?: number, offset?: number, verifiedUserId?: string): Promise<{
         model: string;
         userId: string;
-        id: string;
         responseTime: number | null;
+        id: string;
+        createdAt: Date;
         sources: string | null;
         tokensUsed: number;
         content: string;
-        createdAt: Date;
         role: string;
         sessionId: string;
         feedback: string | null;
@@ -72,8 +76,8 @@ export declare class ChatService {
     getUserSessions(userId: string, limit?: number, offset?: number): Promise<{
         sessions: ({
             messages: {
-                content: string;
                 createdAt: Date;
+                content: string;
                 role: string;
             }[];
         } & {
@@ -90,21 +94,23 @@ export declare class ChatService {
         offset: number;
     }>;
     /**
-     * Get session details
+     * Get session details with message history
+     * @param sessionId - Session ID
+     * @param userId - User ID for authorization
+     * @param limit - Maximum number of messages to return (default: 100)
      */
-    getSessionDetails(sessionId: string, userId: string): Promise<{
+    getSessionDetails(sessionId: string, userId: string, limit?: number): Promise<{
         messages: {
             model: string;
-            id: string;
             responseTime: number | null;
+            id: string;
+            createdAt: Date;
             sources: string | null;
             tokensUsed: number;
             content: string;
-            createdAt: Date;
             role: string;
             feedback: string | null;
         }[];
-    } & {
         title: string;
         userId: string;
         id: string;
@@ -131,12 +137,12 @@ export declare class ChatService {
     addFeedback(messageId: string, feedback: string): Promise<{
         model: string;
         userId: string;
-        id: string;
         responseTime: number | null;
+        id: string;
+        createdAt: Date;
         sources: string | null;
         tokensUsed: number;
         content: string;
-        createdAt: Date;
         role: string;
         sessionId: string;
         feedback: string | null;
@@ -154,7 +160,16 @@ export declare class ChatService {
         systemPrompt: string;
     }>;
     /**
-     * Build system prompt with application context
+     * Trim conversation history to last N messages, ensuring total tokens stay under limit
+     * @param history - Full conversation history
+     * @param maxMessages - Maximum number of messages to keep (default: 10)
+     * @param maxTokens - Maximum total tokens for history (default: 2000)
+     * @returns Trimmed history array
+     */
+    private trimConversationHistory;
+    /**
+     * Build compact system prompt with application context
+     * Optimized for faster responses and lower token usage
      */
     private buildSystemPrompt;
     /**
@@ -171,12 +186,12 @@ export declare class ChatService {
     addMessageFeedback(messageId: string, userId: string, feedback: 'thumbs_up' | 'thumbs_down' | string): Promise<{
         model: string;
         userId: string;
-        id: string;
         responseTime: number | null;
+        id: string;
+        createdAt: Date;
         sources: string | null;
         tokensUsed: number;
         content: string;
-        createdAt: Date;
         role: string;
         sessionId: string;
         feedback: string | null;
@@ -202,14 +217,14 @@ export declare class ChatService {
      */
     getDailyUsage(userId: string): Promise<{
         userId: string;
+        date: Date;
         id: string;
         createdAt: Date;
-        date: Date;
+        errorCount: number;
         totalRequests: number;
         totalTokens: number;
         totalCost: number;
         avgResponseTime: number;
-        errorCount: number;
     } | {
         userId: string;
         date: Date;
@@ -230,14 +245,14 @@ export declare class ChatService {
         };
         dailyBreakdown: {
             userId: string;
+            date: Date;
             id: string;
             createdAt: Date;
-            date: Date;
+            errorCount: number;
             totalRequests: number;
             totalTokens: number;
             totalCost: number;
             avgResponseTime: number;
-            errorCount: number;
         }[];
         totals: {
             avgResponseTime: number;
@@ -258,14 +273,14 @@ export declare class ChatService {
         };
         dailyBreakdown: {
             userId: string;
+            date: Date;
             id: string;
             createdAt: Date;
-            date: Date;
+            errorCount: number;
             totalRequests: number;
             totalTokens: number;
             totalCost: number;
             avgResponseTime: number;
-            errorCount: number;
         }[];
         totals: {
             avgResponseTime: number;

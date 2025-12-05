@@ -2,8 +2,8 @@
  * Authentication middleware and JWT utilities
  * Handles token verification and generation
  */
-import { Request, Response, NextFunction } from "express";
-import { JwtPayload } from "jsonwebtoken";
+import { Request, Response, NextFunction } from 'express';
+import { JwtPayload } from 'jsonwebtoken';
 /**
  * Extended Express Request interface with user information
  */

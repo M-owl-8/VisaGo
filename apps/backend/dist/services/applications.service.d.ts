@@ -9,21 +9,21 @@ export declare class ApplicationsService {
     static getApplication(applicationId: string, userId: string): Promise<{
         country: {
             description: string | null;
-            name: string;
+            code: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            code: string;
+            name: string;
             flagEmoji: string;
             requirements: string | null;
         };
         visaType: {
             description: string | null;
-            name: string;
             id: string;
-            countryId: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            countryId: string;
             fee: number;
             requirements: string;
             processingDays: number;
@@ -36,8 +36,8 @@ export declare class ApplicationsService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            order: number;
             applicationId: string;
+            order: number;
             isCompleted: boolean;
             completedAt: Date | null;
             dueDate: Date | null;
@@ -46,10 +46,10 @@ export declare class ApplicationsService {
         userId: string;
         status: string;
         id: string;
-        countryId: string;
-        visaTypeId: string;
         createdAt: Date;
         updatedAt: Date;
+        countryId: string;
+        visaTypeId: string;
         notes: string | null;
         expiryDate: Date | null;
         progressPercentage: number;
@@ -66,21 +66,21 @@ export declare class ApplicationsService {
     }): Promise<{
         country: {
             description: string | null;
-            name: string;
+            code: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            code: string;
+            name: string;
             flagEmoji: string;
             requirements: string | null;
         };
         visaType: {
             description: string | null;
-            name: string;
             id: string;
-            countryId: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            countryId: string;
             fee: number;
             requirements: string;
             processingDays: number;
@@ -93,8 +93,8 @@ export declare class ApplicationsService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            order: number;
             applicationId: string;
+            order: number;
             isCompleted: boolean;
             completedAt: Date | null;
             dueDate: Date | null;
@@ -103,10 +103,10 @@ export declare class ApplicationsService {
         userId: string;
         status: string;
         id: string;
-        countryId: string;
-        visaTypeId: string;
         createdAt: Date;
         updatedAt: Date;
+        countryId: string;
+        visaTypeId: string;
         notes: string | null;
         expiryDate: Date | null;
         progressPercentage: number;
@@ -119,21 +119,21 @@ export declare class ApplicationsService {
     static updateApplicationStatus(applicationId: string, userId: string, status: string): Promise<{
         country: {
             description: string | null;
-            name: string;
+            code: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            code: string;
+            name: string;
             flagEmoji: string;
             requirements: string | null;
         };
         visaType: {
             description: string | null;
-            name: string;
             id: string;
-            countryId: string;
             createdAt: Date;
             updatedAt: Date;
+            name: string;
+            countryId: string;
             fee: number;
             requirements: string;
             processingDays: number;
@@ -146,8 +146,8 @@ export declare class ApplicationsService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            order: number;
             applicationId: string;
+            order: number;
             isCompleted: boolean;
             completedAt: Date | null;
             dueDate: Date | null;
@@ -156,16 +156,23 @@ export declare class ApplicationsService {
         userId: string;
         status: string;
         id: string;
-        countryId: string;
-        visaTypeId: string;
         createdAt: Date;
         updatedAt: Date;
+        countryId: string;
+        visaTypeId: string;
         notes: string | null;
         expiryDate: Date | null;
         progressPercentage: number;
         submissionDate: Date | null;
         approvalDate: Date | null;
     }>;
+    /**
+     * Update application progress based on verified documents
+     * This is called after document uploads to keep progressPercentage in sync with document status
+     *
+     * @param applicationId - Application ID
+     */
+    static updateProgressFromDocuments(applicationId: string): Promise<void>;
     /**
      * Update checkpoint status
      */
@@ -175,8 +182,8 @@ export declare class ApplicationsService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        order: number;
         applicationId: string;
+        order: number;
         isCompleted: boolean;
         completedAt: Date | null;
         dueDate: Date | null;

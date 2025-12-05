@@ -191,3 +191,10 @@ Update these in:
 4. Rebuild mobile app with production URL
 5. Test on physical device
 6. Monitor Railway logs for any issues
+
+
+
+
+
+
+

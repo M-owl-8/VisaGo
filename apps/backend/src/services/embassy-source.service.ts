@@ -177,6 +177,8 @@ export class EmbassySourceService {
   /**
    * Get all active sources that need to be fetched
    * (sources that haven't been fetched recently or have failed)
+   * 
+   * CHANGED: Now properly checks each source's fetchInterval instead of hardcoded 24 hours
    */
   static async getSourcesNeedingFetch(): Promise<
     Array<{
@@ -187,30 +189,17 @@ export class EmbassySourceService {
       name: string | null;
       priority: number;
       metadata: any;
+      fetchInterval: number;
     }>
   > {
     try {
       const now = new Date();
-      const sources = await prisma.embassySource.findMany({
+      
+      // First, get all active sources
+      const allSources = await prisma.embassySource.findMany({
         where: {
           isActive: true,
-          OR: [
-            // Never fetched
-            { lastFetchedAt: null },
-            // Last fetch was more than fetchInterval seconds ago
-            {
-              lastFetchedAt: {
-                lt: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Default: 24 hours ago
-              },
-            },
-            // Last fetch failed
-            { lastStatus: 'failed' },
-          ],
         },
-        orderBy: [
-          { priority: 'desc' },
-          { lastFetchedAt: 'asc' }, // Fetch oldest first
-        ],
         select: {
           id: true,
           countryCode: true,
@@ -219,10 +208,51 @@ export class EmbassySourceService {
           name: true,
           priority: true,
           metadata: true,
+          fetchInterval: true,
+          lastFetchedAt: true,
+          lastStatus: true,
         },
+        orderBy: [
+          { priority: 'desc' },
+          { lastFetchedAt: 'asc' }, // Fetch oldest first
+        ],
       });
 
-      return sources;
+      // Filter sources that need fetching based on their individual fetchInterval
+      const sourcesNeedingFetch = allSources.filter((source) => {
+        // Never fetched - always needs fetch
+        if (source.lastFetchedAt === null) {
+          return true;
+        }
+
+        // Last fetch failed - always retry
+        if (source.lastStatus === 'failed') {
+          return true;
+        }
+
+        // Check if last fetch was more than fetchInterval seconds ago
+        const fetchIntervalMs = source.fetchInterval * 1000; // Convert seconds to milliseconds
+        const timeSinceLastFetch = now.getTime() - source.lastFetchedAt.getTime();
+        
+        return timeSinceLastFetch >= fetchIntervalMs;
+      });
+
+      logInfo('[EmbassySource] Found sources needing fetch', {
+        total: allSources.length,
+        needingFetch: sourcesNeedingFetch.length,
+      });
+
+      // Return only the fields needed for job enqueueing
+      return sourcesNeedingFetch.map((source) => ({
+        id: source.id,
+        countryCode: source.countryCode,
+        visaType: source.visaType,
+        url: source.url,
+        name: source.name,
+        priority: source.priority,
+        metadata: source.metadata,
+        fetchInterval: source.fetchInterval,
+      }));
     } catch (error) {
       logError('[EmbassySource] Error getting sources needing fetch', error as Error);
       throw error;
@@ -282,3 +312,4 @@ export class EmbassySourceService {
     }
   }
 }
+

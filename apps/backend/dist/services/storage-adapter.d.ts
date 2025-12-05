@@ -3,13 +3,17 @@
  * Abstracts storage implementation - can be local or Firebase
  * Switch implementation via STORAGE_TYPE environment variable
  */
-import { UploadOptions as FirebaseUploadOptions, UploadResult as FirebaseUploadResult } from "./firebase-storage.service";
-import { UploadOptions as LocalUploadOptions, UploadResult as LocalUploadResult } from "./local-storage.service";
+import { UploadOptions as FirebaseUploadOptions, UploadResult as FirebaseUploadResult } from './firebase-storage.service';
+import { UploadOptions as LocalUploadOptions, UploadResult as LocalUploadResult } from './local-storage.service';
 export type UploadOptions = FirebaseUploadOptions & LocalUploadOptions;
 export type UploadResult = FirebaseUploadResult & LocalUploadResult;
-type StorageType = "firebase" | "local";
+type StorageType = 'firebase' | 'local';
 declare class StorageAdapter {
     private static storageType;
+    /**
+     * Check if Firebase Storage is actually enabled and configured
+     */
+    private static isFirebaseEnabled;
     /**
      * Get storage implementation
      */
@@ -28,6 +32,17 @@ declare class StorageAdapter {
      * Get current storage type
      */
     static getStorageType(): StorageType;
+    /**
+     * Get effective storage type (actual implementation being used)
+     */
+    static getEffectiveStorageType(): StorageType;
+    /**
+     * Get storage status info for logging
+     */
+    static getStorageInfo(): {
+        type: StorageType;
+        bucket?: string | null;
+    };
 }
 export default StorageAdapter;
 //# sourceMappingURL=storage-adapter.d.ts.map
