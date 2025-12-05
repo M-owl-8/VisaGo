@@ -54,6 +54,63 @@ function isP3005Error(err) {
 }
 
 /**
+ * Check if an error is a P3009 error (failed migration needs resolution)
+ * Inspects all error fields to robustly detect P3009 errors
+ */
+function isP3009Error(err) {
+  if (!err) return false;
+
+  const parts = [];
+
+  // Collect all possible error text sources
+  if (typeof err.message === 'string') parts.push(err.message);
+  if (typeof err.stderr === 'string') parts.push(err.stderr);
+  if (Buffer.isBuffer(err.stderr)) parts.push(err.stderr.toString());
+  if (typeof err.stdout === 'string') parts.push(err.stdout);
+  if (Buffer.isBuffer(err.stdout)) parts.push(err.stdout.toString());
+  if (typeof err.toString === 'function') {
+    try {
+      parts.push(err.toString());
+    } catch (e) {
+      // Ignore toString errors
+    }
+  }
+
+  // Combine all text and check for P3009 indicators
+  const text = parts.join('\n').toLowerCase();
+
+  return (
+    text.includes('p3009') ||
+    text.includes('failed migrations') ||
+    text.includes('migration started at') && text.includes('failed')
+  );
+}
+
+/**
+ * Extract failed migration name from error message
+ */
+function extractFailedMigrationName(err) {
+  if (!err) return null;
+
+  const parts = [];
+  if (typeof err.message === 'string') parts.push(err.message);
+  if (typeof err.stderr === 'string') parts.push(err.stderr);
+  if (Buffer.isBuffer(err.stderr)) parts.push(err.stderr.toString());
+  if (typeof err.stdout === 'string') parts.push(err.stdout);
+  if (Buffer.isBuffer(err.stdout)) parts.push(err.stdout.toString());
+
+  const text = parts.join('\n');
+  
+  // Look for pattern like "The `20251202002712_ketdik` migration started at ... failed"
+  const match = text.match(/The `([^`]+)` migration started at .+ failed/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  
+  return null;
+}
+
+/**
  * Run prisma migrate deploy with automatic baseline handling for P3005 errors
  * If the database is non-empty but has no migration history, baseline all migrations
  * and retry the deploy.
@@ -139,6 +196,41 @@ function runMigrationsWithBaseline() {
         console.error('[Startup] Baseline process failed:', baselineError.message);
         throw baselineError;
       }
+    } else if (isP3009Error(error)) {
+      // Handle P3009: Failed migration needs resolution
+      console.log('[Startup] Detected failed migration (P3009). Attempting to resolve...');
+      
+      const failedMigrationName = extractFailedMigrationName(error);
+      if (!failedMigrationName) {
+        console.error('[Startup] Could not extract failed migration name from error');
+        throw error;
+      }
+      
+      console.log(`[Startup] Found failed migration: ${failedMigrationName}`);
+      console.log('[Startup] Marking failed migration as rolled back (assuming it did not complete)...');
+      
+      try {
+        // Mark the failed migration as rolled back (safer than marking as applied)
+        // This allows Prisma to retry the migration
+        execSync(`npx prisma migrate resolve --rolled-back ${failedMigrationName}`, {
+          stdio: 'inherit',
+          cwd: backendCwd,
+        });
+        console.log(`[Startup] ✓ Migration ${failedMigrationName} marked as rolled back`);
+        
+        console.log('[Startup] Retrying migrate deploy after resolving failed migration...');
+        
+        // Retry migrate deploy after resolving
+        execSync('npx prisma migrate deploy', {
+          stdio: 'inherit',
+          cwd: backendCwd,
+        });
+        console.log('[Startup] Migrations completed successfully after resolving failed migration');
+        return true;
+      } catch (resolveError) {
+        console.error('[Startup] Failed to resolve migration:', resolveError.message);
+        throw resolveError;
+      }
     } else {
       // For any other migration error, log and abort
       // Collect all error information for logging
@@ -147,7 +239,7 @@ function runMigrationsWithBaseline() {
       if (error.stderr) errorParts.push(`stderr: ${Buffer.isBuffer(error.stderr) ? error.stderr.toString() : error.stderr}`);
       if (error.stdout) errorParts.push(`stdout: ${Buffer.isBuffer(error.stdout) ? error.stdout.toString() : error.stdout}`);
       
-      console.error('[Startup] Migration failed with non-P3005 error:', error.message);
+      console.error('[Startup] Migration failed with non-P3005/P3009 error:', error.message);
       if (errorParts.length > 0) {
         console.error('[Startup] Error details:', errorParts.join(' | '));
       }
