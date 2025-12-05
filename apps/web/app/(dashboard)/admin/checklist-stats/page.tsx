@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { API_BASE_URL } from '@/lib/api/config';
 
 interface CountryStats {
   country: string;
@@ -46,9 +46,21 @@ export default function ChecklistStatsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiClient.get('/admin/checklist-stats');
-      if (response.data.success) {
-        setStats(response.data.data);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/api/admin/checklist-stats`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load statistics');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setStats(result.data);
       } else {
         setError('Failed to load statistics');
       }

@@ -55,9 +55,9 @@ RUN echo "=== Checking Prisma directory ===" && \
     echo "=== Searching for all model definitions ===" && \
     grep "^model " prisma/schema.postgresql.prisma | tail -5 && \
     echo "=== Verifying required models ===" && \
-    (grep -c "model EmbassySource" prisma/schema.postgresql.prisma | grep -q "1" && echo "✓ EmbassySource: FOUND" || (echo "✗ EmbassySource: NOT FOUND" && echo "Searching for 'Embassy'..." && grep -i embassy prisma/schema.postgresql.prisma | head -3 && exit 1)) && \
-    (grep -c "model VisaRuleSet" prisma/schema.postgresql.prisma | grep -q "1" && echo "✓ VisaRuleSet: FOUND" || (echo "✗ VisaRuleSet: NOT FOUND" && exit 1)) && \
-    (grep -c "model VisaRuleVersion" prisma/schema.postgresql.prisma | grep -q "1" && echo "✓ VisaRuleVersion: FOUND" || (echo "✗ VisaRuleVersion: NOT FOUND" && exit 1))
+    (grep -q "^model EmbassySource" prisma/schema.postgresql.prisma && echo "✓ EmbassySource: FOUND" || (echo "✗ EmbassySource: NOT FOUND" && echo "Searching for 'Embassy'..." && grep -i embassy prisma/schema.postgresql.prisma | head -3 && exit 1)) && \
+    (grep -q "^model VisaRuleSet" prisma/schema.postgresql.prisma && echo "✓ VisaRuleSet: FOUND" || (echo "✗ VisaRuleSet: NOT FOUND" && exit 1)) && \
+    (grep -q "^model VisaRuleVersion" prisma/schema.postgresql.prisma && echo "✓ VisaRuleVersion: FOUND" || (echo "✗ VisaRuleVersion: NOT FOUND" && exit 1))
 # Force PostgreSQL schema for production build
 RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma || (echo "ERROR: Failed to copy schema" && exit 1)
 # Verify copied schema has required models
