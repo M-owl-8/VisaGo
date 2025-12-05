@@ -87,6 +87,38 @@ function isP3009Error(err) {
 }
 
 /**
+ * Check if an error is a P3018 error (migration failed to apply)
+ * Inspects all error fields to robustly detect P3018 errors
+ */
+function isP3018Error(err) {
+  if (!err) return false;
+
+  const parts = [];
+
+  // Collect all possible error text sources
+  if (typeof err.message === 'string') parts.push(err.message);
+  if (typeof err.stderr === 'string') parts.push(err.stderr);
+  if (Buffer.isBuffer(err.stderr)) parts.push(err.stderr.toString());
+  if (typeof err.stdout === 'string') parts.push(err.stdout);
+  if (Buffer.isBuffer(err.stdout)) parts.push(err.stdout.toString());
+  if (typeof err.toString === 'function') {
+    try {
+      parts.push(err.toString());
+    } catch (e) {
+      // Ignore toString errors
+    }
+  }
+
+  // Combine all text and check for P3018 indicators
+  const text = parts.join('\n').toLowerCase();
+
+  return (
+    text.includes('p3018') ||
+    (text.includes('migration failed to apply') && text.includes('new migrations cannot be applied'))
+  );
+}
+
+/**
  * Extract failed migration name from error message
  */
 function extractFailedMigrationName(err) {
@@ -141,8 +173,10 @@ function runMigrationsWithBaseline() {
       console.error(error.stderr);
     }
     
-    // Use robust P3005 detection that checks all error fields
+    // Use robust error detection that checks all error fields
     const isP3005 = isP3005Error(error);
+    const isP3009 = isP3009Error(error);
+    const isP3018 = isP3018Error(error);
 
     if (isP3005) {
       console.log('[Startup] Detected existing non-empty database without Prisma migration history (P3005).');
@@ -262,6 +296,48 @@ function runMigrationsWithBaseline() {
           }
         }
         throw resolveError;
+      }
+    } else if (isP3018) {
+      // Handle P3018: Migration failed to apply (usually due to syntax error or missing migration file)
+      console.log('[Startup] Detected migration apply failure (P3018). Attempting to resolve...');
+      
+      // Try to extract migration name from error
+      const failedMigrationName = extractFailedMigrationName(error);
+      if (failedMigrationName) {
+        console.log(`[Startup] Found failed migration: ${failedMigrationName}`);
+        
+        // Check if migration file exists
+        const migrationPath = path.join(migrationsDir, failedMigrationName, 'migration.sql');
+        const migrationExists = fs.existsSync(migrationPath);
+        
+        if (!migrationExists) {
+          console.log(`[Startup] Migration file for ${failedMigrationName} does not exist. Marking as rolled back...`);
+          try {
+            execSync(`npx prisma migrate resolve --rolled-back ${failedMigrationName}`, {
+              stdio: 'inherit',
+              cwd: backendCwd,
+            });
+            console.log(`[Startup] ✓ Migration ${failedMigrationName} marked as rolled back`);
+            
+            // Retry migrate deploy
+            execSync('npx prisma migrate deploy', {
+              stdio: 'inherit',
+              cwd: backendCwd,
+            });
+            console.log('[Startup] Migrations completed successfully after resolving P3018 error');
+            return true;
+          } catch (resolveError) {
+            console.error('[Startup] Failed to resolve P3018 migration:', resolveError.message);
+            throw resolveError;
+          }
+        } else {
+          console.error(`[Startup] Migration file exists but failed to apply. This may indicate a syntax error.`);
+          console.error('[Startup] Please check the migration file for errors.');
+          throw error;
+        }
+      } else {
+        console.error('[Startup] Could not extract migration name from P3018 error');
+        throw error;
       }
     } else {
       // For any other migration error, log and abort
