@@ -346,7 +346,7 @@ export async function buildAIUserContext(
 
     // Get app language from user or default to 'en'
     const appLanguage = (application.user.language as 'uz' | 'ru' | 'en') || 'en';
-    const countryCode = application.country.code;
+    let countryCode = application.country.code;
 
     // Extract questionnaire summary from user bio (with context for legacy conversion)
     const questionnaireSummary = extractQuestionnaireSummary(
@@ -392,7 +392,6 @@ export async function buildAIUserContext(
     const applicationStatus = statusMap[application.status.toLowerCase()] || 'draft';
 
     // Get country code (prefer from summary, fallback to application)
-    let countryCode = application.country.code;
     if (questionnaireSummary && questionnaireSummary.targetCountry) {
       countryCode = questionnaireSummary.targetCountry;
     }
@@ -517,8 +516,19 @@ export function buildCanonicalAIUserContext(currentContext: AIUserContext): Cano
     | 'retired'
     | 'unknown' = 'unknown';
   if (summary?.employment?.currentStatus) {
-    currentStatus =
-      summary.employment.currentStatus === 'retired' ? 'retired' : summary.employment.currentStatus;
+    const empStatus = summary.employment.currentStatus;
+    // Handle all possible status values, including 'retired' if it exists
+    if (
+      empStatus === 'student' ||
+      empStatus === 'employed' ||
+      empStatus === 'self_employed' ||
+      empStatus === 'unemployed'
+    ) {
+      currentStatus = empStatus;
+    } else {
+      // If status is something else (like 'retired'), default to 'unknown'
+      currentStatus = 'unknown';
+    }
   } else if (summary?.education?.isStudent) {
     currentStatus = 'student';
   } else if (summary?.employment?.isEmployed) {

@@ -287,9 +287,7 @@ export class VisaChecklistEngineService {
         jsonValidationPassed = true;
       }
 
-      // Get condition warnings from base documents
-      const { buildBaseChecklistFromRules } = await import('./checklist-rules.service');
-      const baseDocuments = buildBaseChecklistFromRules(aiUserContext, ruleSet);
+      // Get condition warnings from base documents (reuse already computed baseDocuments)
       const conditionWarnings: string[] = [];
       // Note: condition warnings are logged in buildBaseChecklistFromRules, but we'll capture them here if needed
 
