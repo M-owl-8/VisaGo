@@ -33,6 +33,7 @@
     "verify-admin-data": "ts-node --project scripts/tsconfig.json scripts/verify-admin-data.ts",
     "debug:documents": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/debug-documents.ts",
     "generate-admin-token": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/generate-admin-token.ts",
+    "generate-token-direct": "ts-node --project scripts/tsconfig.json scripts/generate-token-direct.ts",
     "seed:embassy-sources": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-embassy-sources.ts",
     "coverage:report": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/visa-coverage-report.ts",
     "embassy:sync": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/run-embassy-sync.ts",

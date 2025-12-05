@@ -9,78 +9,104 @@ import { logInfo, logError, logWarn } from '../middleware/logger';
 import { z } from 'zod';
 
 /**
- * JSON Schema for VisaRuleSetData (using Zod)
+ * Tolerant helper types for nullable fields
+ * These accept null and coerce to safe defaults
  */
-const VisaRuleSetDataSchema = z.object({
-  requiredDocuments: z.array(
-    z.object({
-      documentType: z.string(),
-      category: z.enum(['required', 'highly_recommended', 'optional']),
-      description: z.string().optional(),
-      validityRequirements: z.string().optional(),
-      formatRequirements: z.string().optional(),
-    })
-  ),
-  financialRequirements: z
+const nullableString = z.union([z.string(), z.null()]).transform((v) => v ?? '');
+const nullableNumber = z.union([z.number(), z.null()]).transform((v) => v ?? 0);
+const nullableBool = z.union([z.boolean(), z.null()]).transform((v) => v ?? false);
+
+/**
+ * Required Document Schema
+ */
+const RequiredDocumentSchema = z.object({
+  documentType: z.string(), // Still required - core identifier
+  category: z.enum(['required', 'highly_recommended', 'optional']).optional().default('required'),
+  description: nullableString.optional(),
+  validityRequirements: nullableString.optional(),
+  formatRequirements: nullableString.optional(),
+});
+
+/**
+ * Financial Requirements Schema
+ */
+const FinancialRequirementsSchema = z.object({
+  minimumBalance: nullableNumber.optional(),
+  currency: nullableString.optional(),
+  bankStatementMonths: nullableNumber.optional(),
+  sponsorRequirements: z
     .object({
-      minimumBalance: z.number().optional(),
-      currency: z.string().optional(),
-      bankStatementMonths: z.number().optional(),
-      sponsorRequirements: z
-        .object({
-          allowed: z.boolean(),
-          requiredDocuments: z.array(z.string()).optional(),
-        })
-        .optional(),
-    })
-    .optional(),
-  processingInfo: z
-    .object({
-      processingDays: z.number().optional(),
-      appointmentRequired: z.boolean().optional(),
-      interviewRequired: z.boolean().optional(),
-      biometricsRequired: z.boolean().optional(),
-    })
-    .optional(),
-  fees: z
-    .object({
-      visaFee: z.number().optional(),
-      serviceFee: z.number().optional(),
-      currency: z.string().optional(),
-      paymentMethods: z.array(z.string()).optional(),
-    })
-    .optional(),
-  additionalRequirements: z
-    .object({
-      travelInsurance: z
-        .object({
-          required: z.boolean(),
-          minimumCoverage: z.number().optional(),
-          currency: z.string().optional(),
-        })
-        .optional(),
-      accommodationProof: z
-        .object({
-          required: z.boolean(),
-          types: z.array(z.string()).optional(),
-        })
-        .optional(),
-      returnTicket: z
-        .object({
-          required: z.boolean(),
-          refundable: z.boolean().optional(),
-        })
-        .optional(),
-    })
-    .optional(),
-  sourceInfo: z
-    .object({
-      extractedFrom: z.string().optional(),
-      extractedAt: z.string().optional(),
-      confidence: z.number().min(0).max(1).optional(),
+      allowed: nullableBool.optional(),
+      requiredDocuments: z.array(z.string()).optional().default([]),
     })
     .optional(),
 });
+
+/**
+ * Processing Info Schema
+ */
+const ProcessingInfoSchema = z.object({
+  processingDays: nullableNumber.optional(),
+  appointmentRequired: nullableBool.optional(),
+  interviewRequired: nullableBool.optional(),
+  biometricsRequired: nullableBool.optional(),
+});
+
+/**
+ * Fees Schema
+ */
+const FeesSchema = z.object({
+  visaFee: nullableNumber.optional(),
+  serviceFee: nullableNumber.optional(),
+  currency: nullableString.optional(),
+  paymentMethods: z.array(z.string()).optional().default([]),
+});
+
+/**
+ * Additional Requirements Schema
+ */
+const AdditionalRequirementsSchema = z.object({
+  travelInsurance: z
+    .object({
+      required: nullableBool.optional(),
+      minimumCoverage: nullableNumber.optional(),
+      currency: nullableString.optional(),
+    })
+    .optional(),
+  accommodationProof: z
+    .object({
+      required: nullableBool.optional(),
+      types: z.array(z.string()).optional().default([]),
+    })
+    .optional(),
+  returnTicket: z
+    .object({
+      required: nullableBool.optional(),
+      refundable: nullableBool.optional(),
+    })
+    .optional(),
+});
+
+/**
+ * JSON Schema for VisaRuleSetData (using Zod)
+ * Tolerant to null/missing fields - coerces nulls to safe defaults
+ */
+const VisaRuleSetDataSchema = z
+  .object({
+    requiredDocuments: z.array(RequiredDocumentSchema).optional().default([]),
+    financialRequirements: FinancialRequirementsSchema.optional(),
+    processingInfo: ProcessingInfoSchema.optional(),
+    fees: FeesSchema.optional(),
+    additionalRequirements: AdditionalRequirementsSchema.optional(),
+    sourceInfo: z
+      .object({
+        extractedFrom: z.string().optional(),
+        extractedAt: z.string().optional(),
+        confidence: z.number().min(0).max(1).optional(),
+      })
+      .optional(),
+  })
+  .passthrough(); // Allow unknown extra keys
 
 /**
  * AI Embassy Extractor Service
