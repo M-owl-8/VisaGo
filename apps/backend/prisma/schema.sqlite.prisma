@@ -627,7 +627,7 @@ model VisaRuleSetCandidate {
   countryCode   String
   visaType       String
   data           String   // JSON string for SQLite compatibility
-  confidence     Real?
+  confidence     Float?
   extractionMetadata String? // JSON string for SQLite compatibility
   status         String   @default("pending")
   reviewedBy     String?

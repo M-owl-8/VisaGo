@@ -23,10 +23,17 @@ export default function ApplicationDetailPage() {
   const params = useParams();
   const { isSignedIn } = useAuthStore();
   const applicationId = params.id as string;
-  const { application, checklist, isLoading, isRefreshing, error, refetch, clearError } = useApplication(
-    applicationId,
-    { autoFetch: isSignedIn }
-  );
+  const {
+    application,
+    checklist,
+    isLoading,
+    isRefreshing,
+    isPollingChecklist,
+    checklistPollTimeout,
+    error,
+    refetch,
+    clearError,
+  } = useApplication(applicationId, { autoFetch: isSignedIn });
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -209,20 +216,67 @@ export default function ApplicationDetailPage() {
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[2fr,1fr]">
         {/* Document Checklist */}
         <div className="space-y-6">
-          {checklist?.status === 'processing' && (
-            <Card className="glass-panel border border-white/10 bg-white/[0.03] p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-                <p className="text-sm text-white/60">
-                  {t('applications.checklistProcessing', 'Checklist is being generated...')}
-                </p>
+          {/* Polling state: Show loading message while checklist is being generated */}
+          {isPollingChecklist && (
+            <Card className="glass-panel border border-white/10 bg-white/[0.03] p-6">
+              <div className="flex items-center gap-4">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">
+                    {t(
+                      'applications.checklistGenerating',
+                      "Checklist is being prepared, this usually takes 10–20 seconds"
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-white/60">
+                    {t('applications.checklistGeneratingSubtext', 'Please wait while we generate your personalized document list...')}
+                  </p>
+                </div>
               </div>
             </Card>
           )}
+
+          {/* Timeout state: Show warning if polling timed out */}
+          {checklistPollTimeout && checklistItems.length === 0 && (
+            <Card className="glass-panel border border-amber-500/30 bg-amber-500/10 p-6">
+              <div className="flex items-start gap-4">
+                <div className="mt-0.5 h-5 w-5 shrink-0 text-amber-400">
+                  <Clock size={20} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-200">
+                    {t(
+                      'applications.checklistTimeout',
+                      'Checklist generation is taking longer than usual'
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-200/80">
+                    {t(
+                      'applications.checklistTimeoutSubtext',
+                      'Please refresh after a minute or contact support if the issue persists.'
+                    )}
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={refetch}
+                    className="mt-3 border-amber-500/30 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30"
+                  >
+                    <RefreshCcw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+                    <span className="ml-2">{t('applications.refreshChecklist', 'Refresh Checklist')}</span>
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Checklist component - shows empty state if no items and not polling */}
           <DocumentChecklist
             items={checklistItems}
             applicationId={applicationId}
             language={i18n.language}
+            isPolling={isPollingChecklist}
+            pollTimeout={checklistPollTimeout}
           />
         </div>
 

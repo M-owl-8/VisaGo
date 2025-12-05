@@ -35,6 +35,8 @@ interface DocumentChecklistProps {
   applicationId: string;
   language?: string;
   className?: string;
+  isPolling?: boolean; // New: indicates if we're polling for checklist
+  pollTimeout?: boolean; // New: indicates if polling timed out
 }
 
 export function DocumentChecklist({
@@ -42,6 +44,8 @@ export function DocumentChecklist({
   applicationId,
   language = 'en',
   className,
+  isPolling = false,
+  pollTimeout = false,
 }: DocumentChecklistProps) {
   const { t } = useTranslation();
 
@@ -50,7 +54,9 @@ export function DocumentChecklist({
   const highlyRecommendedItems = items.filter((item) => item.category === 'highly_recommended');
   const optionalItems = items.filter((item) => item.category === 'optional');
 
-  if (items.length === 0) {
+  // Show empty state only if not polling and not timed out
+  // (Polling and timeout states are handled by the parent component)
+  if (items.length === 0 && !isPolling && !pollTimeout) {
     return (
       <Card className={`glass-panel border border-white/10 bg-white/[0.03] p-6 ${className || ''}`}>
         <h2 className="mb-6 text-xl font-semibold text-white">
@@ -58,11 +64,16 @@ export function DocumentChecklist({
         </h2>
         <div className="py-12 text-center">
           <p className="text-white/60">
-            {t('applications.noChecklistAvailable', 'Checklist is being generated...')}
+            {t('applications.noChecklistAvailable', "Ro'yxat mavjud emas")}
           </p>
         </div>
       </Card>
     );
+  }
+
+  // If polling or timed out but no items, return null (parent handles the UI)
+  if (items.length === 0 && (isPolling || pollTimeout)) {
+    return null;
   }
 
   return (
