@@ -5,6 +5,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
+import { normalizeVisaTypeForRules, wasAliasApplied } from '../utils/visa-type-aliases';
 
 const prisma = new PrismaClient();
 
@@ -80,16 +81,32 @@ export interface VisaRuleSetData {
 export class VisaRulesService {
   /**
    * Get the latest approved rule set for a country/visa type
+   * Applies visa type alias mapping to reuse existing rulesets for equivalent visa types
    */
   static async getActiveRuleSet(
     countryCode: string,
     visaType: string
   ): Promise<VisaRuleSetData | null> {
     try {
+      // Normalize visa type using alias mapping (e.g., "b1/b2 visitor" -> "tourist" for US)
+      const normalizedVisaType = normalizeVisaTypeForRules(countryCode, visaType);
+
+      // Log if alias mapping was applied
+      if (wasAliasApplied(countryCode, visaType, normalizedVisaType)) {
+        logInfo(
+          `[VisaRules] Using alias mapping: ${visaType} → ${normalizedVisaType} for ${countryCode}`,
+          {
+            countryCode,
+            originalVisaType: visaType,
+            normalizedVisaType,
+          }
+        );
+      }
+
       const ruleSet = await prisma.visaRuleSet.findFirst({
         where: {
           countryCode: countryCode.toUpperCase(),
-          visaType: visaType.toLowerCase(),
+          visaType: normalizedVisaType,
           isApproved: true,
         },
         orderBy: {
@@ -101,6 +118,7 @@ export class VisaRulesService {
         logWarn('[VisaRules] No approved rule set found', {
           countryCode,
           visaType,
+          normalizedVisaType,
         });
         return null;
       }
