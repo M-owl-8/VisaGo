@@ -207,11 +207,20 @@ function runMigrationsWithBaseline() {
       }
       
       console.log(`[Startup] Found failed migration: ${failedMigrationName}`);
-      console.log('[Startup] Marking failed migration as rolled back (assuming it did not complete)...');
+      
+      // Check if migration file exists
+      const migrationPath = path.join(migrationsDir, failedMigrationName, 'migration.sql');
+      const migrationExists = fs.existsSync(migrationPath);
+      
+      if (!migrationExists) {
+        console.log(`[Startup] Migration file for ${failedMigrationName} does not exist (likely removed). Marking as rolled back...`);
+      } else {
+        console.log('[Startup] Migration file exists. Marking failed migration as rolled back (assuming it did not complete)...');
+      }
       
       try {
         // Mark the failed migration as rolled back (safer than marking as applied)
-        // This allows Prisma to retry the migration
+        // This allows Prisma to skip it if the file doesn't exist, or retry if it does
         execSync(`npx prisma migrate resolve --rolled-back ${failedMigrationName}`, {
           stdio: 'inherit',
           cwd: backendCwd,
@@ -229,6 +238,29 @@ function runMigrationsWithBaseline() {
         return true;
       } catch (resolveError) {
         console.error('[Startup] Failed to resolve migration:', resolveError.message);
+        // If the migration file doesn't exist and we still get an error, 
+        // try marking it as applied instead (in case it was partially applied)
+        if (!migrationExists) {
+          console.log('[Startup] Migration file missing. Trying to mark as applied instead...');
+          try {
+            execSync(`npx prisma migrate resolve --applied ${failedMigrationName}`, {
+              stdio: 'inherit',
+              cwd: backendCwd,
+            });
+            console.log(`[Startup] ✓ Migration ${failedMigrationName} marked as applied (file missing, assuming already applied)`);
+            
+            // Retry migrate deploy
+            execSync('npx prisma migrate deploy', {
+              stdio: 'inherit',
+              cwd: backendCwd,
+            });
+            console.log('[Startup] Migrations completed successfully after marking missing migration as applied');
+            return true;
+          } catch (applyError) {
+            console.error('[Startup] Failed to mark migration as applied:', applyError.message);
+            throw resolveError; // Throw original error
+          }
+        }
         throw resolveError;
       }
     } else {
