@@ -166,10 +166,3 @@ When you run the app and send a message, you should see logs like:
 3. Check console logs (via `adb logcat` or React Native debugger)
 4. Look for `[AI CHAT]` prefixed logs
 5. Share the logs to identify the exact issue
-
-
-
-
-
-
-

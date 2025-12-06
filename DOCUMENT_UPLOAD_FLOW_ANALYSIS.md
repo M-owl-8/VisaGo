@@ -1,4 +1,5 @@
 # Document Upload Flow Analysis
+
 ## Technical Deep-Dive: Current Behavior vs Expected UX
 
 **Date:** 2025-01-XX  
@@ -83,10 +84,10 @@
   ```typescript
   const document = await prisma.userDocument.create({
     data: {
-      documentType: 'passport',  // ✅ Correct at creation
+      documentType: 'passport', // ✅ Correct at creation
       status: 'pending',
       // ... other fields
-    }
+    },
   });
   ```
 - **Log:** `[UPLOAD_DEBUG] Created UserDocument { documentId: '...', documentType: 'passport', status: 'pending', ... }`
@@ -226,6 +227,7 @@
 **Root Cause:** DocumentClassifier runs in background and may overwrite `documentType` if it was initially `'document'` or if there's a race condition.
 
 **Evidence from logs:**
+
 ```
 [UPLOAD_DEBUG] Created UserDocument { documentType: 'passport', ... }
 [DocumentClassifier] Classified document ... type: 'other', confidence: 0.1
@@ -235,6 +237,7 @@
 **Code Location:** `apps/backend/src/services/document-classifier.service.ts` (lines 232-327)
 
 **Why it happens:**
+
 - If document was created with `documentType: 'document'` (old flow or fallback), classifier sees it as generic
 - Classifier runs with low confidence (0.1) but still updates to `'other'`
 - **Current fix:** Classifier checks `GENERIC_TYPES` and should skip if type is `'passport'`, but:
@@ -250,6 +253,7 @@
 **Root Cause:** `mergeChecklistItemsWithDocuments()` uses `documentType` as the map key, but documents in DB have different types than checklist items expect.
 
 **Evidence from logs:**
+
 ```
 [CHECKLIST_MERGE_DEBUG_START] {
   documentsMapKeys: ['other', 'document'],
@@ -269,6 +273,7 @@
 **Code Location:** `apps/backend/src/services/document-checklist.service.ts` (lines 1194-1287)
 
 **Why it happens:**
+
 - Checklist items have `documentType: 'passport'`, `'bank_statement'`, etc.
 - Documents in DB have `documentType: 'other'`, `'document'`
 - Map lookup: `existingDocumentsMap.get('passport')` → `undefined` (key doesn't exist)
@@ -283,17 +288,19 @@
 **Root Cause:** Even if validation runs and sets `status: 'rejected'` or `'verified'` on `UserDocument`, the merge fails, so checklist items never get these statuses.
 
 **Evidence:**
+
 - `UserDocument` in DB has: `status: 'rejected'`, `verifiedByAI: false`, `aiNotesEn: 'Document expired...'`
 - But checklist item shows: `status: 'missing'` (because merge failed)
 
 **Code Location:** `apps/backend/src/services/document-checklist.service.ts` (lines 1248-1259)
 
 **Merge logic:**
+
 ```typescript
 if (doc) {
   return {
     ...item,
-    status: doc.status,  // Would be 'rejected' or 'verified'
+    status: doc.status, // Would be 'rejected' or 'verified'
     verificationNotes: doc.aiNotesUz || doc.verificationNotes,
     aiVerified: doc.verifiedByAI === true,
     aiConfidence: doc.aiConfidence || undefined,
@@ -303,6 +310,7 @@ return item; // Never reached if doc is undefined
 ```
 
 **Why it fails:**
+
 - `doc` is `undefined` because `existingDocumentsMap.get('passport')` returns nothing
 - Merge never copies AI validation results to checklist item
 - Frontend never sees `status: 'rejected'` or `'verified'`
@@ -328,6 +336,7 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 ```
 
 **Evidence from logs:**
+
 ```
 [DocumentProgress] Recalculated progress from documents {
   progress: 0,  // ❌ Should be > 0
@@ -337,6 +346,7 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 ```
 
 **Why it happens:**
+
 - All items have `status: 'missing'` (merge failed)
 - `completed.length = 0`
 - `progress = (0 / 8) * 100 = 0`
@@ -350,6 +360,7 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 **Root Cause (Historical):** Upload endpoint used to wait for AI validation + classification + progress update synchronously, taking 70+ seconds.
 
 **Evidence:**
+
 - Frontend timeout: `timeout: 120000` (120 seconds)
 - Old flow: Upload → AI validation (30s) → Classification (10s) → Progress update with AI checklist generation (30s) = **~70s total**
 - Sometimes exceeded 120s → "timeout of 120000ms exceeded"
@@ -367,12 +378,14 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### A1. Ensure documentType Flows Correctly from Checklist → Upload → DB
 
 **Current State:**
+
 - ✅ Checklist item has `documentType: 'passport'`
 - ✅ Upload URL includes `?documentType=passport`
 - ✅ Frontend reads and sends `documentType: 'passport'`
 - ✅ Backend receives and creates `UserDocument` with `documentType: 'passport'`
 
 **Design Requirements:**
+
 1. **Verify documentType is never lost:**
    - Add validation in upload route: If `documentType` is `'document'` or `'other'` but checklist item exists with specific type, log warning and use checklist item's type instead
    - Add database constraint or application-level check: Reject `documentType: 'document'` if application has checklist with specific types
@@ -392,10 +405,12 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### A2. Ensure Merge Always Has Compatible Keys
 
 **Current State:**
+
 - Merge uses `documentType` as key: `existingDocumentsMap.get(item.documentType)`
 - If keys don't match, merge fails
 
 **Design Requirements:**
+
 1. **Normalize documentType values:**
    - Before merge, normalize both sides:
      - Trim whitespace
@@ -419,12 +434,15 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### B1. Status Mapping
 
 **Current State:**
+
 - `UserDocument.status`: `'pending'`, `'verified'`, `'rejected'`
 - `ChecklistItem.status`: `'missing'`, `'pending'`, `'verified'`, `'rejected'`
 - Mapping happens in merge, but merge fails
 
 **Design Requirements:**
+
 1. **Status flow:**
+
    ```
    UserDocument.status → ChecklistItem.status
    'pending' → 'pending' (Uploaded, awaiting AI review)
@@ -447,11 +465,13 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### B2. AI Notes Exposure
 
 **Current State:**
+
 - `UserDocument` has: `aiNotesEn`, `aiNotesUz`, `aiNotesRu`, `verificationNotes`
 - Merge copies: `verificationNotes: doc.aiNotesUz || doc.verificationNotes`
 - But merge fails, so notes never reach checklist item
 
 **Design Requirements:**
+
 1. **Notes in checklist item:**
    - Checklist item should have: `verificationNotes` (localized based on user language)
    - Display notes below item when `status: 'rejected'` or `'verified'`
@@ -472,16 +492,19 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### C1. Progress Calculation
 
 **Current State:**
+
 - Formula: `(verified required documents / total required documents) * 100`
 - But all items are `'missing'`, so progress = 0
 
 **Design Requirements:**
+
 1. **Progress tiers:**
    - `uploaded`: Items with `status !== 'missing'` (pending, verified, rejected all count)
    - `verified`: Items with `status === 'verified'`
    - `completion`: `(verified / totalRequired) * 100`
 
 2. **Summary counts:**
+
    ```typescript
    summary: {
      total: items.length,
@@ -499,10 +522,12 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### C2. Frontend Summary Interpretation
 
 **Current State:**
+
 - Backend returns summary, frontend displays it
 - But summary is wrong because merge failed
 
 **Design Requirements:**
+
 1. **Consistent status values:**
    - Backend and frontend must use same status enum: `'missing' | 'pending' | 'verified' | 'rejected'`
    - Add TypeScript types shared between backend and frontend
@@ -522,11 +547,13 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### D1. Async Processing UX
 
 **Current State:**
+
 - ✅ Upload returns immediately (<2s)
 - ⚠️ Processing happens in background (10-30s)
 - ❌ Frontend doesn't show processing status
 
 **Design Requirements:**
+
 1. **Upload flow:**
    - Show success banner: "Document uploaded successfully. Processing in background..."
    - Redirect to application page
@@ -544,10 +571,12 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 #### D2. Timeout Prevention
 
 **Current State:**
+
 - ✅ Upload endpoint returns immediately
 - ✅ Processing is async (no timeout risk)
 
 **Design Requirements:**
+
 1. **Queue monitoring:**
    - Add health check endpoint: `GET /api/queues/document-processing/health`
    - Show queue status in admin dashboard
@@ -581,6 +610,3 @@ private static calculateDocumentProgress(items: ChecklistItem[]): number {
 ---
 
 **End of Analysis**
-
-
-

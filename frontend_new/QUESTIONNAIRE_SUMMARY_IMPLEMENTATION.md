@@ -219,10 +219,3 @@ All requirements have been implemented:
 - ✅ No UI changes required
 
 The questionnaire summary is now standardized and ready for AI consumption!
-
-
-
-
-
-
-

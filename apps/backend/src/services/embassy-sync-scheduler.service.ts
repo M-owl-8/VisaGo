@@ -81,7 +81,3 @@ export class EmbassySyncSchedulerService {
     return this.cronJob !== null;
   }
 }
-
-
-
-

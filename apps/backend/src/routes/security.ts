@@ -78,7 +78,7 @@ router.get('/health', authenticateToken, requireAdmin, async (req: Request, res:
         status: healthScore >= 80 ? 'healthy' : healthScore >= 60 ? 'warning' : 'critical',
         checks,
         recommendations: [
-          ...(!checks.jwtSecret.strong ? ['Use a stronger JWT secret'] : []),
+          ...(!checks.jwtSecret.strong ? ['Use a stronger authentication token'] : []),
           ...(!checks.https.enabled && envConfig.NODE_ENV === 'production'
             ? ['Enable HTTPS in production']
             : []),
@@ -136,10 +136,3 @@ router.post('/check-password', async (req: Request, res: Response) => {
 });
 
 export default router;
-
-
-
-
-
-
-

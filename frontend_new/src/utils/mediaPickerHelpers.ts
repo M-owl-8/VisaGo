@@ -228,10 +228,3 @@ export const showFilePickerOptions = (
     },
   ]);
 };
-
-
-
-
-
-
-

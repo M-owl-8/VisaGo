@@ -360,10 +360,3 @@ cd android
 ---
 
 **Next Steps:** Run Prompt 2 (Environment Variable Audit) to get detailed env var mapping.
-
-
-
-
-
-
-

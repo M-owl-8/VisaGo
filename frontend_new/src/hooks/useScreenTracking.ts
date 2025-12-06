@@ -44,10 +44,3 @@ export const useScreenTracking = (
     };
   }, [screenName]);
 };
-
-
-
-
-
-
-

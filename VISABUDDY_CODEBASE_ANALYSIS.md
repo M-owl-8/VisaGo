@@ -40,6 +40,7 @@ VisaBuddy/
 ### Technologies
 
 **Backend:**
+
 - **Framework:** Express.js (TypeScript)
 - **Database:** PostgreSQL (via Prisma ORM)
 - **Cache:** Redis (via ioredis)
@@ -48,20 +49,23 @@ VisaBuddy/
 - **Auth:** JWT + Google OAuth
 
 **AI Service:**
+
 - **Framework:** FastAPI (Python 3.10+)
-- **AI Models:** 
+- **AI Models:**
   - OpenAI GPT-4o-mini (checklist generation)
   - DeepSeek-R1 via Together.ai (chat)
 - **RAG:** Pinecone vector database (with cache fallback)
 - **Embeddings:** OpenAI text-embedding-3-small
 
 **Mobile App:**
+
 - **Framework:** React Native (Expo)
 - **State:** Zustand
 - **Navigation:** React Navigation
 - **API Client:** Axios
 
 **Web App:**
+
 - **Framework:** Next.js 14
 - **UI:** Tailwind CSS + Framer Motion
 - **State:** Zustand
@@ -75,6 +79,7 @@ VisaBuddy/
 **File:** `apps/backend/src/index.ts`
 
 The backend server initializes:
+
 1. Express app with middleware (CORS, Helmet, rate limiting)
 2. Database connection pool (PostgreSQL)
 3. Redis cache service
@@ -87,6 +92,7 @@ The backend server initializes:
 ### Main Modules & Services
 
 **Routes** (`apps/backend/src/routes/`):
+
 - `auth.ts` - Authentication (login, register, Google OAuth, password reset)
 - `chat.ts` - AI chat endpoints (`POST /api/chat`)
 - `document-checklist.ts` - Checklist generation (`GET /api/document-checklist/:applicationId`)
@@ -150,6 +156,7 @@ The backend server initializes:
 ### API Endpoints Summary
 
 **Authentication:**
+
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - Email/password login
 - `POST /api/auth/google` - Google OAuth
@@ -157,32 +164,38 @@ The backend server initializes:
 - `POST /api/auth/reset-password` - Password reset
 
 **Chat:**
+
 - `POST /api/chat` - Send message, get AI response (primary)
 - `POST /api/chat/send` - Legacy endpoint (redirects to `/api/chat`)
 - `GET /api/chat/sessions` - List chat sessions
 - `GET /api/chat/sessions/:sessionId` - Get session messages
 
 **Document Checklist:**
+
 - `GET /api/document-checklist/:applicationId` - Get/Generate checklist
 - `PUT /api/document-checklist/:applicationId/items/:itemId` - Update item status
 
 **Documents:**
+
 - `POST /api/documents/upload` - Upload document (multipart/form-data)
 - `GET /api/documents/:documentId` - Get document metadata
 - `DELETE /api/documents/:documentId` - Delete document
 
 **Applications:**
+
 - `POST /api/applications` - Create application
 - `GET /api/applications` - List user's applications
 - `GET /api/applications/:id` - Get application details
 - `PATCH /api/applications/:id` - Update application
 
 **Payments:**
+
 - `POST /api/payments/create` - Create payment
 - `POST /api/payments/webhook/:gateway` - Webhook handlers
 - `GET /api/payments/:id` - Get payment status
 
 **Admin:**
+
 - `GET /api/admin/dashboard` - Dashboard metrics
 - `GET /api/admin/users` - List users
 - `GET /api/admin/applications` - List applications
@@ -285,6 +298,7 @@ The backend server initializes:
    - Outputs JSON matching `VisaRuleSet` schema
 
 **Configuration:**
+
 - `OPENAI_API_KEY` - Required
 - `OPENAI_MODEL` - Default: `gpt-4o-mini`
 - `OPENAI_MAX_TOKENS` - Default: 2000
@@ -300,12 +314,14 @@ The backend server initializes:
 **Primary Use Case:** Chat assistant responses
 
 **Configuration:**
+
 - `DEEPSEEK_API_KEY` - Together.ai API key
 - Timeout: 15 seconds (optimized for speed)
 - Max tokens: 500 (bounded responses)
 - Temperature: 0.5
 
 **Flow:**
+
 1. Mobile app → Backend `/api/chat`
 2. Backend → AI Service `/api/chat` (or direct OpenAI fallback)
 3. AI Service → DeepSeek via Together.ai
@@ -316,6 +332,7 @@ The backend server initializes:
 **File:** `apps/ai-service/main.py`
 
 **Endpoints:**
+
 - `POST /api/chat` - Chat with RAG
 - `POST /api/checklist/generate` - Checklist generation (calls backend)
 - `POST /api/visa-probability` - Visa probability estimate
@@ -323,12 +340,14 @@ The backend server initializes:
 - `POST /api/rag/validate` - RAG validation
 
 **RAG Service** (`apps/ai-service/services/rag.py`):
+
 - **Vector DB:** Pinecone (index: `visabuddy-visa-kb`)
 - **Embeddings:** OpenAI text-embedding-3-small (1536 dimensions)
 - **Fallback:** In-memory cache if Pinecone unavailable
 - **Chunking:** Paragraph-based (500 chars, 100 overlap)
 
 **Knowledge Base:**
+
 - Source: `apps/ai-service/data/visa_kb.json`
 - Ingested via `kb_ingestor.py`
 - Chunked via `chunker.py`
@@ -336,15 +355,18 @@ The backend server initializes:
 ### Model Selection Logic
 
 **Checklist Generation:**
+
 - Always uses OpenAI GPT-4o-mini
 - Model name from `OPENAI_MODEL` env var (default: `gpt-4o-mini`)
 
 **Chat:**
+
 - Primary: DeepSeek-R1 (via Together.ai)
 - Fallback: OpenAI GPT-4 (if DeepSeek unavailable)
 - Fallback: Static responses (if both unavailable)
 
 **RAG:**
+
 - Embeddings: OpenAI text-embedding-3-small
 - Vector search: Pinecone (or cache fallback)
 
@@ -400,6 +422,7 @@ The backend server initializes:
 6. Return enriched checklist
 
 **Rule Set Structure:**
+
 ```json
 {
   "baseDocuments": ["passport", "bank_statement", ...],
@@ -447,11 +470,13 @@ The backend server initializes:
    - Text-based search if embeddings unavailable
 
 **Usage in Chat:**
+
 - Query → Embed → Search Pinecone → Retrieve top chunks → Inject into GPT prompt
 
 ### Document Chunking & Storage
 
 **RAG Chunks:**
+
 - Stored in `RAGChunk` table (PostgreSQL)
 - Each chunk has embedding (JSON string)
 - Linked to `Document` via `documentId`
@@ -484,6 +509,7 @@ The backend server initializes:
    - Used for AI context
 
 **Files:**
+
 - `apps/backend/src/routes/applications.ts`
 - `apps/backend/src/services/applications.service.ts`
 
@@ -515,6 +541,7 @@ The backend server initializes:
    - Return checklist with items, progress, summary
 
 4. **Response Format:**
+
 ```json
 {
   "applicationId": "...",
@@ -543,6 +570,7 @@ The backend server initializes:
 ```
 
 **Files:**
+
 - `apps/backend/src/routes/document-checklist.ts`
 - `apps/backend/src/services/document-checklist.service.ts`
 - `apps/backend/src/services/ai-openai.service.ts` (checklist generation)
@@ -570,6 +598,7 @@ The backend server initializes:
    - Return response with sources
 
 4. **Response:**
+
 ```json
 {
   "success": true,
@@ -594,6 +623,7 @@ The backend server initializes:
    - Linked to `ChatSession`
 
 **Files:**
+
 - `apps/backend/src/routes/chat.ts`
 - `apps/backend/src/services/chat.service.ts`
 - `apps/ai-service/main.py` (chat endpoint)
@@ -627,6 +657,7 @@ The backend server initializes:
    - Application progress recalculated
 
 5. **Response:**
+
 ```json
 {
   "success": true,
@@ -642,6 +673,7 @@ The backend server initializes:
 ```
 
 **Files:**
+
 - `apps/backend/src/routes/documents.ts`
 - `apps/backend/src/services/documents.service.ts`
 - `apps/backend/src/services/document-validation.service.ts`
@@ -663,6 +695,7 @@ The backend server initializes:
    - Save results to `DocumentCheckResult` table
 
 3. **Response:**
+
 ```json
 {
   "results": [
@@ -678,6 +711,7 @@ The backend server initializes:
 ```
 
 **Files:**
+
 - `apps/backend/src/routes/doc-check.ts`
 - `apps/backend/src/services/doc-check.service.ts`
 - `apps/backend/src/services/visa-doc-checker.service.ts`
@@ -704,20 +738,24 @@ The backend server initializes:
 ### Embassy Sync
 
 **Manual Trigger:**
+
 - `POST /api/admin/embassy-sync/trigger`
 - Enqueues sync jobs for all sources needing fetch
 
 **Automatic Schedule:**
+
 - Daily at 2 AM UTC (configurable via `EMBASSY_SYNC_CRON`)
 - Can be disabled via `ENABLE_EMBASSY_SYNC=false`
 
 **Queue Processing:**
+
 - Bull queue: `embassy-sync`
 - Redis-backed
 - Retry: 3 attempts with exponential backoff
 - Processed in same process as backend
 
 **Files:**
+
 - `apps/backend/src/services/embassy-sync-job.service.ts`
 - `apps/backend/src/services/embassy-sync-scheduler.service.ts`
 - `apps/backend/src/services/embassy-crawler.service.ts`
@@ -726,22 +764,26 @@ The backend server initializes:
 ### Analytics
 
 **Endpoints:**
+
 - `GET /api/analytics/events` - Event tracking
 - `GET /api/analytics/metrics` - Aggregated metrics
 - `GET /api/analytics/daily` - Daily metrics
 
 **Tracking:**
+
 - Events: `AnalyticsEvent` table
 - Daily aggregation: `DailyMetrics` table
 - Metrics: signups, visa selections, payments, documents, messages
 
 **Files:**
+
 - `apps/backend/src/routes/analytics.ts`
 - `apps/backend/src/services/analytics.service.ts`
 
 ### Monitoring
 
 **Endpoints:**
+
 - `GET /api/health` - Basic health check
 - `GET /api/health/detailed` - Detailed health
 - `GET /api/health/ready` - Readiness probe
@@ -750,6 +792,7 @@ The backend server initializes:
 - `GET /api/monitoring/slow-queries` - Slow query log
 
 **Files:**
+
 - `apps/backend/src/routes/health.ts`
 - `apps/backend/src/routes/monitoring.ts`
 - `apps/backend/src/services/slow-query-logger.ts`
@@ -763,17 +806,20 @@ The backend server initializes:
 **Backend** (`apps/backend/.env`):
 
 **Required:**
+
 - `DATABASE_URL` - PostgreSQL connection string
 - `JWT_SECRET` - JWT signing secret (32+ chars)
 - `PORT` - Server port (default: 3000)
 - `NODE_ENV` - Environment (development/production)
 
 **AI Services:**
+
 - `OPENAI_API_KEY` - OpenAI API key
 - `DEEPSEEK_API_KEY` - Together.ai API key (for DeepSeek)
 - `AI_SERVICE_URL` - AI service URL (default: http://localhost:8001)
 
 **Storage:**
+
 - `STORAGE_TYPE` - `firebase` or `local`
 - `LOCAL_STORAGE_PATH` - Local storage path (default: `./uploads`)
 - `FIREBASE_PROJECT_ID` - Firebase project ID
@@ -782,13 +828,16 @@ The backend server initializes:
 - `FIREBASE_STORAGE_BUCKET` - Firebase storage bucket
 
 **Cache & Queue:**
+
 - `REDIS_URL` - Redis connection URL (default: redis://127.0.0.1:6379)
 
 **OAuth:**
+
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
 
 **Email:**
+
 - `SENDGRID_API_KEY` - SendGrid API key (optional)
 - `SMTP_HOST` - SMTP host (fallback)
 - `SMTP_PORT` - SMTP port
@@ -796,12 +845,14 @@ The backend server initializes:
 - `SMTP_PASS` - SMTP password
 
 **Payments:**
+
 - `STRIPE_SECRET_KEY` - Stripe secret key
 - `PAYME_MERCHANT_ID` - Payme merchant ID
 - `CLICK_MERCHANT_ID` - Click merchant ID
 - `UZUM_MERCHANT_ID` - Uzum merchant ID
 
 **Embassy Sync:**
+
 - `ENABLE_EMBASSY_SYNC` - Enable sync (default: true)
 - `EMBASSY_SYNC_CRON` - Cron expression (default: `0 2 * * *`)
 
@@ -824,20 +875,24 @@ The backend server initializes:
 ### Deployment Platforms
 
 **Backend:**
+
 - **Railway:** Primary production platform
 - **Docker:** `apps/backend/Dockerfile`
 - **Start Command:** `npm start` (runs migrations, then starts server)
 
 **AI Service:**
+
 - **Railway:** Separate service
 - **Docker:** `apps/ai-service/Dockerfile`
 - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port 8001`
 
 **Web App:**
+
 - **Vercel:** Next.js deployment
 - **Config:** `apps/web/vercel.json`
 
 **Mobile App:**
+
 - **EAS Build:** Expo Application Services
 - **Config:** `frontend_new/eas.json`
 
@@ -846,12 +901,14 @@ The backend server initializes:
 **File:** `docker-compose.yml`
 
 Services:
+
 - `backend` - Express API
 - `ai-service` - FastAPI service
 - `postgres` - PostgreSQL database
 - `redis` - Redis cache/queue
 
 **Usage:**
+
 ```bash
 docker-compose up -d
 docker-compose logs -f backend
@@ -1013,6 +1070,7 @@ VisaBuddy is a **production-ready** visa application management system with:
 - ✅ **RAG system** (Pinecone + OpenAI embeddings)
 
 **Architecture Highlights:**
+
 - Monorepo structure with clear separation of concerns
 - Hybrid checklist generation (rule engine + GPT-4 enrichment)
 - Dual AI models (GPT-4 for checklists, DeepSeek for chat)
@@ -1021,6 +1079,7 @@ VisaBuddy is a **production-ready** visa application management system with:
 - Comprehensive error handling and logging
 
 **Next Steps:**
+
 1. Complete Phase 3 document validation
 2. Expand knowledge base for RAG
 3. Add more integration tests
@@ -1030,7 +1089,3 @@ VisaBuddy is a **production-ready** visa application management system with:
 ---
 
 **End of Analysis**
-
-
-
-

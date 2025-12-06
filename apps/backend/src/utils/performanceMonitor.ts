@@ -189,10 +189,3 @@ export const {
   trackExternalApi,
   completeExternalApi,
 } = performanceMonitor;
-
-
-
-
-
-
-

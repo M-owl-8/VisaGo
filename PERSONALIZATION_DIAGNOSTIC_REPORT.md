@@ -16,9 +16,11 @@ After deep exploration of the codebase, I've identified **4 root causes** why th
 ### Current Status Values
 
 **Frontend** (`frontend_new/src/data/questionnaireQuestions.ts`):
+
 - Uses: `'self_employed'` (line 330)
 
 **Backend Mapping** (`apps/backend/src/services/ai-context.service.ts`):
+
 - Interface comment says: `'student' | 'employee' | 'entrepreneur' | 'unemployed' | 'other'` (line 27)
 - Actual code checks: `'self_employed'` OR `'entrepreneur'` (lines 512-513)
 - Mapping function accepts: `'self_employed'` (line 486, default 'employee')
@@ -28,9 +30,11 @@ After deep exploration of the codebase, I've identified **4 root causes** why th
 ### Duration Values
 
 **Frontend** (`frontend_new/src/types/questionnaire.ts`):
+
 - Values: `'less_than_1_month' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year'` (lines 15-20)
 
 **Backend** (`apps/backend/src/services/ai-context.service.ts`):
+
 - Interface: `'less_than_1' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year'` (line 23)
 - Mapping: Accepts `duration` from questionnaire (line 471-475, default `'1_3_months'`)
 
@@ -43,32 +47,33 @@ const profile: ApplicantProfile = {
   travel: {
     purpose: 'tourism',
     duration: '3_6_months', // or '6_12_months' if user selected that
-    previousTravel: true // or false
+    previousTravel: true, // or false
   },
   employment: {
     currentStatus: 'self_employed', // ✅ Correctly mapped
-    hasStableIncome: true // ✅ Derived correctly (line 512-514)
+    hasStableIncome: true, // ✅ Derived correctly (line 512-514)
   },
   financial: {
     financialSituation: 'stable_income', // or 'savings'
-    isSponsored: false // ✅ Correctly derived (line 503-507)
+    isSponsored: false, // ✅ Correctly derived (line 503-507)
   },
   familyAndTies: {
     maritalStatus: 'married', // ✅ Correctly mapped (line 493)
     hasChildren: 'no', // ✅ Correctly mapped (line 495)
-    hasStrongTies: true // ✅ Correctly derived (line 517-523: married = true)
+    hasStrongTies: true, // ✅ Correctly derived (line 517-523: married = true)
   },
   language: {
-    englishLevel: 'intermediate' // default
+    englishLevel: 'intermediate', // default
   },
   meta: {
     countryCode: 'DE',
-    visaType: 'tourist'
-  }
-}
+    visaType: 'tourist',
+  },
+};
 ```
 
 **Issues Found**:
+
 - ✅ Profile structure is correct
 - ✅ `currentStatus: 'self_employed'` is properly mapped
 - ✅ `hasStrongTies: true` is correctly derived from `maritalStatus: 'married'`
@@ -85,11 +90,13 @@ const profile: ApplicantProfile = {
 **Function**: `buildRulesModeSystemPrompt()` (lines 1227-1322)
 
 **Key Instructions**:
+
 1. ✅ "You MUST use ONLY the official visa rules provided below. Do NOT invent or add documents that are not in the rules." (line 1262)
 2. ✅ "Do not invent extra categories that are not supported by rules unless clearly standard practice" (line 1263)
 3. ✅ "If a document is NOT in the rules, do NOT add it unless it's a universally standard document" (line 1266)
 
 **ApplicantProfile Usage Section** (lines 1269-1284):
+
 - ✅ Mentions sponsor documents (if `isSponsored = true`)
 - ✅ Mentions student documents (if `currentStatus = 'student'`)
 - ✅ Mentions tie documents (if `hasStrongTies = true`)
@@ -105,13 +112,16 @@ const profile: ApplicantProfile = {
 **Function**: `buildRulesModeUserPrompt()` (lines 1327-1382)
 
 **ApplicantProfile Display** (lines 1353-1354):
+
 ```typescript
 APPLICANT PROFILE:
 ${JSON.stringify(applicantProfile, null, 2)}
 ```
+
 ✅ Profile is included as JSON
 
 **Personalization Instructions** (lines 1359-1371):
+
 1. ✅ Sponsor documents (if `isSponsored = true`)
 2. ✅ Student documents (if `currentStatus = 'student'`)
 3. ✅ Tie documents (if `hasStrongTies = true`)
@@ -122,6 +132,7 @@ ${JSON.stringify(applicantProfile, null, 2)}
 8. ❌ **MISSING**: Longer duration requirements
 
 **Strict Requirements** (lines 1372-1380):
+
 - "Include ALL required documents from the official rules"
 - "Include conditional documents ONLY if they apply to this applicant based on APPLICANT PROFILE"
 - "Do NOT add documents that are not in the official rules" ← **THIS IS THE PROBLEM**
@@ -129,24 +140,26 @@ ${JSON.stringify(applicantProfile, null, 2)}
 ### Root Cause: Prompt Restrictiveness
 
 **The Issue**:
+
 - GPT-4 is explicitly told: "Do NOT add documents that are not in the official rules"
 - If VisaRuleSet for DE tourist doesn't include `self_employment_proof`, `business_registration`, `tax_return`, or `marriage_certificate`, GPT **cannot** add them
 - Even though the ApplicantProfile shows `currentStatus: 'self_employed'` and `maritalStatus: 'married'`, GPT has no instruction to add these documents
 
 **The Missing Instructions**:
+
 ```typescript
 // NOT PRESENT IN CURRENT PROMPTS:
-"If ApplicantProfile.employment.currentStatus = 'self_employed' or 'entrepreneur', 
- include self-employment proof documents (business registration, tax returns, 
- invoices, business license) as required if these exist in the rules or are 
+"If ApplicantProfile.employment.currentStatus = 'self_employed' or 'entrepreneur',
+ include self-employment proof documents (business registration, tax returns,
+ invoices, business license) as required if these exist in the rules or are
  standard practice for this country/visa type."
 
-"If ApplicantProfile.familyAndTies.maritalStatus = 'married' and the applicant 
- is traveling alone, include marriage certificate as highly_recommended to 
+"If ApplicantProfile.familyAndTies.maritalStatus = 'married' and the applicant
+ is traveling alone, include marriage certificate as highly_recommended to
  demonstrate ties to home country."
 
-"If ApplicantProfile.travel.duration indicates a longer stay (3_6_months or 
- more), ensure financial proof documents reflect the extended duration 
+"If ApplicantProfile.travel.duration indicates a longer stay (3_6_months or
+ more), ensure financial proof documents reflect the extended duration
  requirements from the rules."
 ```
 
@@ -157,12 +170,14 @@ ${JSON.stringify(applicantProfile, null, 2)}
 ### Database Structure
 
 **Model**: `VisaRuleSet` (Prisma schema, lines 595-620)
+
 - `countryCode`: String (e.g., "DE")
 - `visaType`: String (e.g., "tourist")
 - `data`: Json (VisaRuleSetData structure)
 - `isApproved`: Boolean (only approved rules are used)
 
 **VisaRuleSetData Structure** (`apps/backend/src/services/visa-rules.service.ts`, lines 15-75):
+
 ```typescript
 {
   requiredDocuments: Array<{
@@ -193,6 +208,7 @@ ${JSON.stringify(applicantProfile, null, 2)}
 ### Evidence from Code
 
 **System Prompt** (line 1241-1249):
+
 ```typescript
 REQUIRED DOCUMENTS (from official rules):
 ${ruleSet.requiredDocuments.map((doc: any, i: number) =>
@@ -202,7 +218,8 @@ ${ruleSet.requiredDocuments.map((doc: any, i: number) =>
 
 This means GPT only sees documents that are **already in the rules**. If self-employment docs aren't in the rules, GPT never sees them.
 
-**Verdict**: 
+**Verdict**:
+
 - ⚠️ **LIKELY ISSUE**: If VisaRuleSet for DE tourist is generic (only standard Schengen docs), GPT cannot personalize beyond what's in the rules
 - 🔍 **NEEDS VERIFICATION**: Check actual database content for DE tourist VisaRuleSet
 
@@ -213,16 +230,19 @@ This means GPT only sees documents that are **already in the rules**. If self-em
 ### Flow Analysis
 
 **Step 1: GPT Response** (`generateChecklistFromRules`, lines 1006-1015)
+
 - ✅ Calls GPT-4 with system + user prompts
 - ✅ Uses `response_format: { type: 'json_object' }` for structured output
 
 **Step 2: Validation** (lines 1020-1105)
+
 - ✅ Parses JSON response
 - ✅ Validates structure (10-16 items, all categories present, required fields)
 - ✅ Retries once if validation fails
 - ✅ Throws error if retry fails → triggers fallback
 
 **Step 3: Mapping** (lines 1118-1138)
+
 ```typescript
 const mappedChecklist = parsed.checklist.map((item: any) => ({
   document: item.document, // ✅ Preserved
@@ -233,9 +253,11 @@ const mappedChecklist = parsed.checklist.map((item: any) => ({
   // ... all fields preserved
 }));
 ```
+
 ✅ **NO FILTERING** - All GPT items are preserved
 
 **Step 4: Conversion to Stored Format** (lines 524-561)
+
 ```typescript
 items = aiChecklist.checklist.map((aiItem: any, index: number) => {
   const docType = aiItem.document || ...; // ✅ Uses GPT's document field
@@ -247,22 +269,26 @@ items = aiChecklist.checklist.map((aiItem: any, index: number) => {
   };
 });
 ```
+
 ✅ **NO FILTERING** - All items are converted and stored
 
 **Step 5: Storage** (lines 696-715)
+
 ```typescript
 checklistData: JSON.stringify({
   items: sanitizedItems, // ✅ All items stored
   aiGenerated: true,
   aiFallbackUsed: false,
   aiErrorOccurred: false,
-})
+});
 ```
+
 ✅ **NO FILTERING** - All items stored in database
 
 ### Verdict: Pipeline Integrity
 
 ✅ **NO ISSUES FOUND**:
+
 - GPT output is not filtered or dropped
 - All document types from GPT are preserved
 - Mapping preserves all fields
@@ -277,6 +303,7 @@ checklistData: JSON.stringify({
 ### Issue Classification
 
 #### 1. Profile Issues (MINOR)
+
 - ✅ Profile structure is correct
 - ✅ `self_employed` is properly mapped
 - ✅ `hasStrongTies` is correctly derived
@@ -285,12 +312,14 @@ checklistData: JSON.stringify({
 **Impact**: **LOW** - Profile data is correct, but GPT doesn't know how to use it for self-employment
 
 #### 2. Rules Issues (CRITICAL - NEEDS VERIFICATION)
+
 - ❓ Unknown: Does DE tourist VisaRuleSet include self-employment/marital docs?
 - ❓ If rules are generic (only standard Schengen docs), GPT cannot personalize
 
 **Impact**: **HIGH** - If rules don't include these docs, GPT cannot add them
 
 #### 3. Prompt Issues (CRITICAL)
+
 - ❌ No instruction for self-employment documents
 - ❌ No instruction for marital status documents
 - ❌ No instruction for longer duration requirements
@@ -299,6 +328,7 @@ checklistData: JSON.stringify({
 **Impact**: **HIGH** - Even if rules include these docs, GPT doesn't know to prioritize them based on profile
 
 #### 4. Pipeline Issues (NONE)
+
 - ✅ No filtering detected
 - ✅ GPT output is preserved
 - ✅ All items are stored correctly
@@ -314,12 +344,13 @@ checklistData: JSON.stringify({
 **Location**: `buildRulesModeSystemPrompt()` in `document-checklist.service.ts`
 
 **Add to "APPLICANT PROFILE USAGE" section** (after line 1282):
+
 ```typescript
-- If ApplicantProfile.employment.currentStatus = 'self_employed' or 'entrepreneur', 
-  include self-employment proof documents (business_registration, tax_return, 
-  business_license, invoices) as required if these exist in the rules or are 
-  standard practice for this country/visa type. For self-employed applicants, 
-  employment_verification should be replaced or supplemented with business 
+- If ApplicantProfile.employment.currentStatus = 'self_employed' or 'entrepreneur',
+  include self-employment proof documents (business_registration, tax_return,
+  business_license, invoices) as required if these exist in the rules or are
+  standard practice for this country/visa type. For self-employed applicants,
+  employment_verification should be replaced or supplemented with business
   registration and tax documents.
 ```
 
@@ -332,19 +363,20 @@ checklistData: JSON.stringify({
 **Location**: `buildRulesModeUserPrompt()` in `document-checklist.service.ts`
 
 **Add to "PERSONALIZATION INSTRUCTIONS" section** (after line 1370):
+
 ```typescript
-6. If the applicant is self-employed (applicantProfile.employment.currentStatus = 'self_employed' or 'entrepreneur'), 
-   include self-employment proof documents as required (e.g., business_registration, 
-   tax_return, business_license, invoices). Replace generic "employment_verification" 
+6. If the applicant is self-employed (applicantProfile.employment.currentStatus = 'self_employed' or 'entrepreneur'),
+   include self-employment proof documents as required (e.g., business_registration,
+   tax_return, business_license, invoices). Replace generic "employment_verification"
    with specific self-employment documents if available in the rules.
 
-7. If the applicant is married but traveling alone (applicantProfile.familyAndTies.maritalStatus = 'married' 
-   and applicantProfile.familyAndTies.hasChildren = 'no'), include marriage certificate 
+7. If the applicant is married but traveling alone (applicantProfile.familyAndTies.maritalStatus = 'married'
+   and applicantProfile.familyAndTies.hasChildren = 'no'), include marriage certificate
    as highly_recommended to demonstrate strong ties to home country, if supported by rules.
 
-8. If the applicant is traveling for an extended duration (applicantProfile.travel.duration = '3_6_months' 
-   or '6_12_months'), ensure financial proof documents reflect the extended duration 
-   requirements (e.g., bank statements covering the full period, proof of sufficient 
+8. If the applicant is traveling for an extended duration (applicantProfile.travel.duration = '3_6_months'
+   or '6_12_months'), ensure financial proof documents reflect the extended duration
+   requirements (e.g., bank statements covering the full period, proof of sufficient
    funds for the entire stay).
 ```
 
@@ -357,6 +389,7 @@ checklistData: JSON.stringify({
 **Location**: `buildRulesModeSystemPrompt()` in `document-checklist.service.ts`
 
 **Modify line 1266**:
+
 ```typescript
 // BEFORE:
 "If a document is NOT in the rules, do NOT add it unless it's a universally standard document (e.g., passport, passport photo)."
@@ -364,9 +397,9 @@ checklistData: JSON.stringify({
 // AFTER:
 "If a document is NOT in the rules, you may still add it if:
 1. It is a universally standard document (e.g., passport, passport photo), OR
-2. It is standard practice for this specific applicant profile (e.g., business_registration 
-   for self-employed applicants, marriage_certificate for married applicants traveling alone, 
-   extended financial proof for longer stays) AND it is consistent with the country's visa 
+2. It is standard practice for this specific applicant profile (e.g., business_registration
+   for self-employed applicants, marriage_certificate for married applicants traveling alone,
+   extended financial proof for longer stays) AND it is consistent with the country's visa
    requirements for similar profiles."
 ```
 
@@ -379,19 +412,26 @@ checklistData: JSON.stringify({
 **Location**: `generateChecklistFromRules()` in `document-checklist.service.ts`
 
 **Add before calling GPT** (after line 982):
+
 ```typescript
 // Build profile-based document hints
 const profileHints: string[] = [];
-if (profileToUse.employment.currentStatus === 'self_employed' || 
-    profileToUse.employment.currentStatus === 'entrepreneur') {
+if (
+  profileToUse.employment.currentStatus === 'self_employed' ||
+  profileToUse.employment.currentStatus === 'entrepreneur'
+) {
   profileHints.push('business_registration', 'tax_return', 'business_license');
 }
-if (profileToUse.familyAndTies.maritalStatus === 'married' && 
-    profileToUse.familyAndTies.hasChildren === 'no') {
+if (
+  profileToUse.familyAndTies.maritalStatus === 'married' &&
+  profileToUse.familyAndTies.hasChildren === 'no'
+) {
   profileHints.push('marriage_certificate');
 }
-if (profileToUse.travel.duration === '3_6_months' || 
-    profileToUse.travel.duration === '6_12_months') {
+if (
+  profileToUse.travel.duration === '3_6_months' ||
+  profileToUse.travel.duration === '6_12_months'
+) {
   profileHints.push('extended_bank_statement', 'proof_of_extended_funds');
 }
 
@@ -409,6 +449,7 @@ if (profileHints.length > 0) {
 ### Fix 5: Verify and Enhance DE Tourist VisaRuleSet (REQUIRES DATABASE ACCESS)
 
 **Action**: Query database for DE tourist VisaRuleSet and verify:
+
 1. Does it include `self_employment_proof`, `business_registration`, `tax_return`?
 2. Does it include `marriage_certificate` or `family_ties_proof`?
 3. If not, consider adding them via embassy sync or manual approval
@@ -452,5 +493,3 @@ After implementing fixes:
 **Secondary Root Cause**: Unknown whether DE tourist VisaRuleSet includes self-employment/marital docs. If not, GPT cannot use them even with better prompts.
 
 **Recommended Action**: Implement Fixes 1, 2, and 3 immediately. This will enable GPT to personalize checklists based on ApplicantProfile even if rules are generic, as long as the documents are "standard practice" for the profile type.
-
-

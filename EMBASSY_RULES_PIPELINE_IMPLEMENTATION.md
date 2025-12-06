@@ -9,21 +9,25 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 ### 1. Database Models (Prisma)
 
 ✅ **EmbassySource** - Stores embassy/consulate URLs to crawl
+
 - Fields: countryCode, visaType, url, isActive, lastFetchedAt, lastStatus, lastError, fetchInterval, priority, metadata
 - Indexes: countryCode+visaType, isActive, lastFetchedAt, priority
 
 ✅ **VisaRuleSet** - Stores structured visa rules extracted by GPT-4
+
 - Fields: countryCode, visaType, data (Json/String), version, isApproved, approvedAt, approvedBy, sourceId, extractionMetadata
 - Indexes: countryCode+visaType, isApproved, createdAt, version
 - **Note**: Uses Json for PostgreSQL, String for SQLite (handled automatically)
 
 ✅ **VisaRuleVersion** - Version history for rule sets
+
 - Fields: ruleSetId, data (Json/String), version, changeLog
 - Indexes: ruleSetId, version, createdAt
 
 ### 2. Services
 
 ✅ **visa-rules.service.ts** - Manages rule sets
+
 - `getActiveRuleSet()` - Get latest approved rule set
 - `getLatestRuleSet()` - Get latest (approved or pending)
 - `createOrUpdateRuleSetFromAI()` - Create new rule set from GPT-4 extraction
@@ -34,6 +38,7 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 - `compareRuleSets()` - Compare two rule sets
 
 ✅ **embassy-source.service.ts** - Manages embassy sources
+
 - `listSources()` - List with filtering
 - `getSourceById()` - Get by ID
 - `addSource()` - Add new source
@@ -43,6 +48,7 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 - `updateSource()` - Update source metadata
 
 ✅ **embassy-crawler.service.ts** - Fetches and cleans HTML
+
 - `crawlSource()` - Fetch URL with retry logic (3 attempts)
 - HTML cleaning: removes scripts, styles, nav, headers, footers, ads
 - Extracts main content area
@@ -50,6 +56,7 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 - Returns: { url, html, cleanedText, title, metadata }
 
 ✅ **ai-embassy-extractor.service.ts** - GPT-4 extraction
+
 - `extractVisaRulesFromPage()` - Main extraction function
 - Uses GPT-4o-mini with structured JSON output
 - JSON schema validation using Zod
@@ -58,12 +65,14 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 - Returns: { ruleSet, metadata }
 
 ✅ **embassy-sync-job.service.ts** - Bull queue job
+
 - Processes sync jobs for each source
 - Orchestrates: crawl → extract → validate → store
 - Retry logic: 3 attempts with exponential backoff
 - Updates source status (pending → success/failed)
 
 ✅ **embassy-sync-scheduler.service.ts** - Cron scheduler
+
 - Default: Daily at 2 AM UTC (configurable)
 - Enqueues sync jobs for all sources needing fetch
 - Manual trigger support
@@ -71,12 +80,14 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 ### 3. Integration
 
 ✅ **checklist-rules.service.ts** - Updated to use VisaRuleSet
+
 - `buildBaseChecklistFromRules()` - Builds checklist from rule set
 - `getRuleSetForChecklist()` - Wrapper for VisaRulesService
 - Conditional documents based on user context
 - Risk-based documents for high-risk applicants
 
 ✅ **visaDocumentRules.ts** - Updated to query database
+
 - `findVisaDocumentRuleSet()` - Queries database instead of stub
 - Converts VisaRuleSetData to internal format
 - Returns null if no approved rule set exists
@@ -97,6 +108,7 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 ### 5. Initialization
 
 ✅ **index.ts** - Server startup
+
 - Initializes EmbassySyncJobService queue
 - Starts EmbassySyncSchedulerService (if enabled)
 - Graceful shutdown handlers
@@ -109,6 +121,7 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 ### 7. Documentation
 
 ✅ **docs/embassy-rules-pipeline.md** - Complete documentation
+
 - Architecture overview
 - Data flow
 - API endpoints
@@ -121,7 +134,7 @@ All components of the Embassy Rules Sync Pipeline have been successfully impleme
 ### Environment Variables
 
 - `ENABLE_EMBASSY_SYNC` - Enable/disable automatic sync (default: true)
-- `EMBASSY_SYNC_CRON` - Cron expression (default: "0 2 * * *" - daily at 2 AM UTC)
+- `EMBASSY_SYNC_CRON` - Cron expression (default: "0 2 \* \* \*" - daily at 2 AM UTC)
 - `OPENAI_API_KEY` - Required for GPT-4 extraction
 - `REDIS_URL` - Required for Bull queue
 
@@ -210,10 +223,3 @@ To test the pipeline:
 - ✅ Manual trigger support
 - ✅ SQLite and PostgreSQL compatibility
 - ✅ Comprehensive logging
-
-
-
-
-
-
-

@@ -76,5 +76,3 @@ npm run debug:documents
 ```
 
 But **checking Railway logs is easier** since you don't need database access!
-
-

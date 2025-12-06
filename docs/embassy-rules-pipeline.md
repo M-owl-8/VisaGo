@@ -140,6 +140,7 @@ POST /api/admin/embassy-sources
 The scheduler runs daily at 2 AM UTC (configurable via `EMBASSY_SYNC_CRON` env var).
 
 To disable automatic sync:
+
 ```bash
 ENABLE_EMBASSY_SYNC=false
 ```
@@ -239,7 +240,7 @@ The extracted rule set must match this structure:
 ### Environment Variables
 
 - `ENABLE_EMBASSY_SYNC` - Enable/disable automatic sync (default: true)
-- `EMBASSY_SYNC_CRON` - Cron expression for sync schedule (default: "0 2 * * *" - daily at 2 AM UTC)
+- `EMBASSY_SYNC_CRON` - Cron expression for sync schedule (default: "0 2 \* \* \*" - daily at 2 AM UTC)
 - `OPENAI_API_KEY` - Required for GPT-4 extraction
 - `REDIS_URL` - Required for Bull queue
 
@@ -258,6 +259,7 @@ GET /api/admin/embassy-sync/queue-stats
 ```
 
 Returns:
+
 ```json
 {
   "waiting": 5,
@@ -300,10 +302,3 @@ Check `EmbassySource.lastStatus` and `lastError` fields to monitor sync health.
 3. **Confidence scoring** - Auto-approve high-confidence extractions
 4. **Source health monitoring** - Track source reliability over time
 5. **A/B testing** - Compare rule set versions in production
-
-
-
-
-
-
-

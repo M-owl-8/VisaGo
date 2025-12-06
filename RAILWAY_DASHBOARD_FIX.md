@@ -93,10 +93,3 @@ Nixpacks Start:        (empty)              ← DELETE everything
 ```
 
 **SAVE and REDEPLOY!**
-
-
-
-
-
-
-

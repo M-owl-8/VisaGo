@@ -9,11 +9,13 @@ This document describes the new **Visa Checklist Engine** and **Document Checker
 ### 1. Visa Checklist Engine (`visa-checklist-engine.service.ts`)
 
 **Purpose**: Generate personalized visa document checklists using:
+
 - `VisaRuleSet` from database (official embassy rules)
 - `AIUserContext` (user profile + questionnaire)
 - GPT-4 for personalization and enrichment
 
 **Key Features**:
+
 - Uses approved `VisaRuleSet` as the ONLY source of official rules
 - Personalizes checklist based on user context (sponsor type, employment status, risk score, etc.)
 - Generates multilingual names and descriptions
@@ -21,10 +23,12 @@ This document describes the new **Visa Checklist Engine** and **Document Checker
 - Returns structured JSON matching `ChecklistResponseSchema`
 
 **Integration**:
+
 - Called from `document-checklist.service.ts` when generating checklists
 - Falls back to legacy `AIOpenAIService.generateChecklist` if no `VisaRuleSet` exists or engine fails
 
 **Output Schema**:
+
 ```typescript
 {
   checklist: [
@@ -53,6 +57,7 @@ This document describes the new **Visa Checklist Engine** and **Document Checker
 **Purpose**: Compare uploaded documents against `VisaRuleSet` requirements using GPT-4.
 
 **Key Features**:
+
 - Compares ONE uploaded document against ONE official requirement
 - Uses OCR text when available (via `DocumentClassifierService.extractTextForDocument`)
 - Returns strict evaluation: `APPROVED`, `NEED_FIX`, or `REJECTED`
@@ -60,11 +65,13 @@ This document describes the new **Visa Checklist Engine** and **Document Checker
 - Includes practical, user-friendly reasons
 
 **Integration**:
+
 - Called from `document-validation.service.ts` when validating uploaded documents
 - Only used if an approved `VisaRuleSet` exists and a matching requirement is found
 - Falls back to legacy validation if checker is unavailable
 
 **Output Schema**:
+
 ```typescript
 {
   status: "APPROVED" | "NEED_FIX" | "REJECTED",
@@ -174,6 +181,7 @@ This document describes the new **Visa Checklist Engine** and **Document Checker
 ### Manual Testing
 
 1. **Checklist Generation**:
+
    ```bash
    # Ensure approved VisaRuleSet exists for country/visa type
    # Create application
@@ -200,10 +208,3 @@ This document describes the new **Visa Checklist Engine** and **Document Checker
 - [Embassy Rules Sync Pipeline](./embassy-rules-pipeline.md) - How `VisaRuleSet` is populated
 - [AI Services](./ai-services.md) - General AI service architecture
 - [Document Checklist Service](../apps/backend/src/services/document-checklist.service.ts) - Main checklist service
-
-
-
-
-
-
-

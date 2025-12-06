@@ -294,10 +294,3 @@ Verify:
 ---
 
 **All mobile optimizations complete!** 🎉
-
-
-
-
-
-
-

@@ -211,10 +211,3 @@ All components are in place:
 4. Check Railway logs if issues occur
 
 The system is ready for testing! 🚀
-
-
-
-
-
-
-

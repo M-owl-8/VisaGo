@@ -168,10 +168,3 @@ export const getOCRStatusBadgeColor = (
       };
   }
 };
-
-
-
-
-
-
-
