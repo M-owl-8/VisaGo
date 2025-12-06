@@ -6,8 +6,10 @@
 import { PrismaClient } from '@prisma/client';
 import { AIOpenAIService } from './ai-openai.service';
 import { buildCanonicalAIUserContextForApplication } from './ai-context.service';
+import { VisaRulesService } from './visa-rules.service';
 import { getAIConfig } from '../config/ai-models';
 import { logInfo, logError, logWarn } from '../middleware/logger';
+import { CanonicalAIUserContext } from '../types/ai-context';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -70,6 +72,27 @@ export type RiskExplanationResponse = z.infer<typeof RiskExplanationResponseSche
  */
 export class VisaRiskExplanationService {
   /**
+   * ⚠️ DEV-ONLY: Build system and user prompts for evaluation/testing
+   *
+   * This helper allows evaluation harnesses to build prompts without hitting the database.
+   * It takes synthetic CanonicalAIUserContext and returns the prompts that would be sent to GPT-4.
+   *
+   * DO NOT use in production code paths. This is for testing/evaluation only.
+   *
+   * @param canonicalContext - Synthetic CanonicalAIUserContext (for evaluation)
+   * @param checklistItems - Optional synthetic checklist items (for evaluation)
+   * @returns Object with systemPrompt and userPrompt strings
+   */
+  static buildPromptsForEvaluation(
+    canonicalContext: CanonicalAIUserContext,
+    checklistItems: any[] = []
+  ): { systemPrompt: string; userPrompt: string } {
+    const systemPrompt = this.buildSystemPrompt();
+    const userPrompt = this.buildUserPrompt(canonicalContext, checklistItems);
+    return { systemPrompt, userPrompt };
+  }
+
+  /**
    * Generate risk explanation for an application
    */
   static async generateRiskExplanation(
@@ -122,6 +145,19 @@ export class VisaRiskExplanationService {
         applicationId
       );
 
+      // Phase 6: Get ruleSet for embassyRulesConfidence
+      try {
+        const ruleSet = await VisaRulesService.getActiveRuleSet(
+          application.country.code.toUpperCase(),
+          application.visaType.name.toLowerCase()
+        );
+        if (ruleSet) {
+          (canonicalContext as any).ruleSet = ruleSet;
+        }
+      } catch (error) {
+        // Non-blocking, continue without ruleSet
+      }
+
       // Get checklist if available (to see document situation)
       const checklist = await prisma.documentChecklist.findUnique({
         where: { applicationId },
@@ -148,11 +184,14 @@ export class VisaRiskExplanationService {
       const aiConfig = getAIConfig('riskExplanation');
 
       logInfo('[VisaRiskExplanation] Calling GPT-4 for risk explanation', {
+        task: 'riskExplanation',
         applicationId,
         countryCode: application.country.code,
         visaType: application.visaType.name,
         riskLevel: canonicalContext.riskScore.level,
         model: aiConfig.model,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
       });
 
       const startTime = Date.now();
@@ -169,6 +208,17 @@ export class VisaRiskExplanationService {
 
       const responseTime = Date.now() - startTime;
       const rawContent = response.choices[0]?.message?.content || '{}';
+      const tokensUsed = response.usage?.total_tokens || 0;
+
+      logInfo('[VisaRiskExplanation] GPT-4 response received', {
+        task: 'riskExplanation',
+        applicationId,
+        countryCode: application.country.code,
+        visaType: application.visaType.name,
+        model: aiConfig.model,
+        tokensUsed,
+        responseTimeMs: responseTime,
+      });
 
       // Parse and validate
       let parsed: any;
@@ -219,13 +269,15 @@ export class VisaRiskExplanationService {
       });
 
       logInfo('[VisaRiskExplanation] Risk explanation generated successfully', {
+        task: 'riskExplanation',
         applicationId,
         countryCode: application.country.code,
         visaType: application.visaType.name,
         riskLevel: explanation.riskLevel,
         recommendationsCount: explanation.recommendations.length,
+        model: aiConfig.model,
+        tokensUsed,
         responseTimeMs: responseTime,
-        tokensUsed: response.usage?.total_tokens || 0,
       });
 
       return explanation;
@@ -239,18 +291,77 @@ export class VisaRiskExplanationService {
   }
 
   /**
-   * Build system prompt for risk explanation
+   * Build system prompt for risk explanation (EXPERT CONSULTANT VERSION - Phase 5)
+   *
+   * Phase 5 Upgrade:
+   * - Expert visa consultant role specialized for Uzbek applicants
+   * - Uses expert fields (financial, ties, travelHistory) for honest risk assessment
+   * - Provides concrete, prioritized recommendations
+   * - Uzbek-focused explanations with practical tips
    */
   private static buildSystemPrompt(): string {
-    return `You are an expert visa consultant for VisaBuddy. Your task is to explain visa risk and provide actionable improvement advice.
+    return `You are an EXPERT VISA CONSULTANT with 10+ years of experience helping applicants from Uzbekistan apply to embassies of the US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, and UAE.
 
-CRITICAL REQUIREMENTS:
-1. You MUST return ONLY valid JSON matching the exact schema (no markdown, no explanations).
-2. Explain why the risk level is low/medium/high based on the applicant profile.
-3. Provide 2-4 specific, actionable recommendations to improve approval chances.
-4. All text must be in three languages: English (En), Uzbek (Uz), and Russian (Ru).
+================================================================================
+YOUR ROLE
+================================================================================
 
-OUTPUT FORMAT (JSON):
+Your task is to provide honest, clear risk assessment and actionable improvement advice for Uzbek visa applicants.
+
+You will receive:
+- CanonicalAIUserContext with expert fields:
+  * financial: requiredFundsUSD, availableFundsUSD, financialSufficiencyRatio, financialSufficiencyLabel
+  * ties: tiesStrengthScore, tiesStrengthLabel, hasPropertyInUzbekistan, hasFamilyInUzbekistan, hasChildren, isEmployed, employmentDurationMonths
+  * travelHistory: travelHistoryScore, travelHistoryLabel, previousVisaRejections, hasOverstayHistory
+  * riskScore from rule-based engine (level, probabilityPercent, riskFactors, positiveFactors)
+  * meta.dataCompletenessScore
+- Checklist status summary (totalRequiredDocs, uploadedDocsCount, verifiedDocsCount)
+
+================================================================================
+RISK ASSESSMENT LOGIC
+================================================================================
+
+You must evaluate risk using this systematic approach:
+
+1. FINANCIAL RISK:
+   - Use financialSufficiencyRatio + financialSufficiencyLabel
+   - Compare availableFundsUSD vs requiredFundsUSD
+   - Low/borderline = strong negative factor
+   - If ratio < 0.7 → high financial risk
+   - If 0.7 ≤ ratio < 1.0 → medium financial risk
+   - If ratio ≥ 1.0 → low financial risk
+
+2. TIES RISK:
+   - Use tiesStrengthScore + tiesStrengthLabel
+   - Evaluate: property ownership, employment stability, family ties, children
+   - Weak ties (score < 0.4) = strong negative factor
+   - Medium ties (0.4-0.7) = moderate concern
+   - Strong ties (score > 0.7) = positive factor
+
+3. TRAVEL HISTORY RISK:
+   - Use travelHistoryScore + travelHistoryLabel
+   - No history + no ties = more risky
+   - Previous refusals or overstay = strong negative
+   - Good travel history = positive factor
+
+4. PURPOSE & PROFILE CONSISTENCY:
+   - Use visaType, duration, country
+   - Ensure everything looks realistic (even if just qualitatively)
+   - Tourist visa: clear itinerary, accommodation, return plans
+   - Student visa: admission letter, tuition payment, study plans
+
+5. DATA COMPLETENESS:
+   - If dataCompletenessScore is low (< 0.6):
+     * Be cautious, treat risk assessment as approximate
+     * Mention uncertainty in summary
+     * Prefer medium risk over high/low when uncertain
+
+================================================================================
+OUTPUT REQUIREMENTS
+================================================================================
+
+You MUST return ONLY valid JSON matching this exact schema:
+
 {
   "riskLevel": "low" | "medium" | "high",
   "summaryEn": "Brief explanation in English (2-3 sentences)",
@@ -269,51 +380,168 @@ OUTPUT FORMAT (JSON):
   ]
 }
 
-RECOMMENDATION EXAMPLES:
-- "Increase bank balance to $X for stronger financial proof"
-- "Provide property ownership documents to show ties to home country"
-- "Complete travel history documentation to demonstrate travel experience"
-- "Obtain employment letter with detailed salary information"
+RISK LEVEL DETERMINATION:
+- riskLevel MUST reflect combined effect of financial, ties, travel history, and rule-based riskScore.level
+- If rule-based level is high OR financial/ties are very weak → 'high'
+- If mixed (some strong, some weak) → 'medium'
+- If strong finances + strong ties + no serious negatives → 'low'
 
-Be specific, actionable, and tailored to the applicant's profile.`;
+SUMMARY REQUIREMENTS:
+- summaryEn/Uz/Ru: 2-3 sentences each
+- MUST explicitly reference:
+  * Financial sufficiency (e.g., "Your financial capacity is borderline because you have X vs required Y.")
+  * Ties (strong/weak)
+  * Travel history (none/limited/good)
+- If data is incomplete, mention that it's an estimate
+- Uzbek (Uz): Simple, clear language with common terminology (bank hisoboti, ish joyidan ma'lumotnoma, kadastr hujjati)
+- Russian (Ru): Formal but simple
+- English (En): Neutral, embassy-style
+
+RECOMMENDATIONS REQUIREMENTS:
+- 2-4 items, prioritized for impact
+- Each with titleEn/Uz/Ru and detailsEn/Uz/Ru
+- Should be:
+  * Concrete ("Increase your bank balance to at least X USD and show 3-6 months statement.")
+  * Prioritized for impact (highest impact first)
+  * Realistic for Uzbek ecosystem (Uzbek banks, property docs, employment letters, kadastr, etc.)
+- Examples:
+  * "Increase bank balance to $X for stronger financial proof"
+  * "Provide property ownership documents (kadastr hujjati) to show ties to home country"
+  * "Obtain employment letter (ish joyidan ma'lumotnoma) with detailed salary information"
+  * "Complete travel history documentation to demonstrate travel experience"
+
+================================================================================
+FINAL INSTRUCTIONS
+================================================================================
+
+- Be honest and direct, but supportive (not fear-inducing)
+- Use expert fields directly in your reasoning
+- Reference Uzbek context naturally
+- Provide actionable, prioritized recommendations
+- Return ONLY valid JSON, no markdown, no extra text`;
   }
 
   /**
-   * Build user prompt with applicant context
+   * Build user prompt with applicant context (EXPERT CONSULTANT VERSION - Phase 5)
+   *
+   * Phase 5 Upgrade:
+   * - Structured APPLICANT_CONTEXT with expert fields grouped
+   * - Explicit "EXPERT RISK ANALYSIS REQUIRED" section
+   * - Clear instructions on using expert fields for risk assessment
    */
   private static buildUserPrompt(context: any, checklistItems: any[]): string {
     const profile = context.applicantProfile;
     const riskScore = context.riskScore;
 
-    let prompt = `Analyze this visa application and provide risk explanation with improvement advice.
+    let prompt = `EXPERT RISK ANALYSIS REQUIRED:
 
-APPLICANT PROFILE:
-- Country: ${context.application.country}
+You are analyzing a visa application for an Uzbek applicant. Your task:
+1. Determine riskLevel (low/medium/high) with short justification based on expert fields
+2. Write 3-language summaries (En/Uz/Ru) explicitly referencing:
+   - Financial sufficiency (availableFundsUSD vs requiredFundsUSD, financialSufficiencyLabel)
+   - Ties strength (tiesStrengthLabel, property, employment, family)
+   - Travel history (travelHistoryLabel, previous rejections, overstay)
+3. Provide 2-4 prioritized recommendations:
+   - Highest impact first
+   - Realistic to do in Uzbekistan (Uzbek banks, kadastr, employment letters, etc.)
+   - Each with En/Uz/Ru titles+details
+
+================================================================================
+APPLICATION CONTEXT
+================================================================================
+
+- Country: ${context.application?.country || profile.targetCountry || 'Unknown'}
 - Visa Type: ${profile.visaType}
-- Citizenship: ${profile.citizenship}
-- Age: ${profile.age || 'Unknown'}
-- Current Status: ${profile.currentStatus}
-- Sponsor Type: ${profile.sponsorType}
-- Bank Balance: ${profile.bankBalanceUSD ? `$${profile.bankBalanceUSD}` : 'Unknown'}
-- Monthly Income: ${profile.monthlyIncomeUSD ? `$${profile.monthlyIncomeUSD}` : 'Unknown'}
-- Has Property in Uzbekistan: ${profile.hasPropertyInUzbekistan ? 'Yes' : 'No'}
-- Has Family in Uzbekistan: ${profile.hasFamilyInUzbekistan ? 'Yes' : 'No'}
-- Has International Travel: ${profile.hasInternationalTravel ? 'Yes' : 'No'}
-- Previous Visa Rejections: ${profile.previousVisaRejections ? 'Yes' : 'No'}
-- Has Invitation: ${profile.hasOtherInvitation ? 'Yes' : 'No'}
+- Country Code: ${(context.application as any)?.countryCode || profile.targetCountry || 'Unknown'}
+- Duration: ${profile.duration || 'Unknown'}
 
-RISK ASSESSMENT:
+================================================================================
+APPLICANT PROFILE
+================================================================================
+
+- Citizenship: ${profile.citizenship || 'Unknown'}
+- Age: ${profile.age || 'Unknown'}
+- Current Status: ${profile.currentStatus || 'Unknown'}
+- Sponsor Type: ${profile.sponsorType || 'Unknown'}
+- Bank Balance USD: ${profile.bankBalanceUSD ? `$${profile.bankBalanceUSD.toLocaleString()}` : 'Unknown'}
+- Monthly Income USD: ${profile.monthlyIncomeUSD ? `$${profile.monthlyIncomeUSD.toLocaleString()}` : 'Unknown'}
+
+================================================================================
+EXPERT FIELDS (Pre-computed metrics for risk assessment)
+================================================================================
+
+FINANCIAL:
+${
+  profile.financial
+    ? `- Required Funds USD: ${profile.financial.requiredFundsUSD ? `$${profile.financial.requiredFundsUSD.toLocaleString()}` : 'N/A'}
+- Available Funds USD: ${profile.financial.availableFundsUSD ? `$${profile.financial.availableFundsUSD.toLocaleString()}` : 'N/A'}
+- Financial Sufficiency Ratio: ${profile.financial.financialSufficiencyRatio?.toFixed(2) ?? 'N/A'}
+- Financial Sufficiency Label: ${profile.financial.financialSufficiencyLabel ?? 'N/A'}`
+    : '- Financial metrics: Not available'
+}
+
+TIES:
+${
+  profile.ties
+    ? `- Ties Strength Score: ${profile.ties.tiesStrengthScore?.toFixed(2) ?? 'N/A'}
+- Ties Strength Label: ${profile.ties.tiesStrengthLabel ?? 'N/A'}
+- Has Property in Uzbekistan: ${(profile as any).hasPropertyInUzbekistan ? 'Yes' : 'No'}
+- Has Family in Uzbekistan: ${(profile as any).hasFamilyInUzbekistan ? 'Yes' : 'No'}
+- Has Children: ${(profile as any).hasChildren ? 'Yes' : 'No'}
+- Is Employed: ${profile.ties.isEmployed ? 'Yes' : 'No'}
+- Employment Duration (months): ${profile.ties.employmentDurationMonths ?? 'N/A'}`
+    : '- Ties metrics: Not available'
+}
+
+TRAVEL HISTORY:
+${
+  profile.travelHistory
+    ? `- Travel History Score: ${profile.travelHistory.travelHistoryScore?.toFixed(2) ?? 'N/A'}
+- Travel History Label: ${profile.travelHistory.travelHistoryLabel ?? 'N/A'}
+- Previous Visa Rejections Count: ${profile.travelHistory.previousVisaRejections ?? 0}
+- Has Overstay History: ${profile.travelHistory.hasOverstayHistory ? 'Yes' : 'No'}`
+    : '- Travel history metrics: Not available'
+}
+
+UZBEK CONTEXT:
+${
+  context.uzbekContext
+    ? `- Is Uzbek Citizen: ${context.uzbekContext.isUzbekCitizen ? 'Yes' : 'No'}
+- Resides in Uzbekistan: ${context.uzbekContext.residesInUzbekistan ? 'Yes' : 'No'}`
+    : '- Uzbek context: Not available'
+}
+
+================================================================================
+RULE-BASED RISK SCORE
+================================================================================
+
 - Risk Level: ${riskScore.level}
 - Probability: ${riskScore.probabilityPercent}%
 - Risk Factors: ${riskScore.riskFactors.join(', ') || 'None'}
 - Positive Factors: ${riskScore.positiveFactors.join(', ') || 'None'}
 
-CHECKLIST STATUS:
+================================================================================
+DATA COMPLETENESS
+================================================================================
+
+${
+  context.meta
+    ? `- Data Completeness Score: ${context.meta.dataCompletenessScore?.toFixed(2) ?? 'N/A'}${context.meta.missingCriticalFields && context.meta.missingCriticalFields.length > 0 ? `\n- Missing Critical Fields: ${context.meta.missingCriticalFields.join(', ')}` : ''}`
+    : '- Data completeness: Not available'
+}
+
+================================================================================
+CHECKLIST STATUS
+================================================================================
+
 - Total Documents: ${checklistItems.length}
 - Required Documents: ${checklistItems.filter((i: any) => i.category === 'required' || i.required).length}
 - Uploaded Documents: ${checklistItems.filter((i: any) => i.status === 'verified' || i.status === 'uploaded').length}
+- Verified Documents: ${checklistItems.filter((i: any) => i.status === 'verified').length}
 
-Provide risk explanation and 2-4 specific recommendations to improve approval chances.`;
+================================================================================
+
+Provide expert risk analysis using the systematic approach described in the system prompt.`;
 
     return prompt;
   }

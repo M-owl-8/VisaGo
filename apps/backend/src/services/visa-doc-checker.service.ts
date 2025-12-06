@@ -93,6 +93,42 @@ export enum EmbassyRiskLevel {
  */
 export class VisaDocCheckerService {
   /**
+   * ⚠️ DEV-ONLY: Build system and user prompts for evaluation/testing
+   *
+   * This helper allows evaluation harnesses to build prompts without hitting the database.
+   * It takes synthetic document data and CanonicalAIUserContext and returns the prompts.
+   *
+   * DO NOT use in production code paths. This is for testing/evaluation only.
+   *
+   * @param requiredDocumentRule - Synthetic document rule (for evaluation)
+   * @param userDocumentText - Document text (synthetic, for evaluation)
+   * @param canonicalContext - Synthetic CanonicalAIUserContext (for evaluation)
+   * @param metadata - Optional metadata (for evaluation)
+   * @returns Object with systemPrompt and userPrompt strings
+   */
+  static buildPromptsForEvaluation(
+    requiredDocumentRule: {
+      documentType: string;
+      category: 'required' | 'highly_recommended' | 'optional';
+      description?: string;
+      validityRequirements?: string;
+      formatRequirements?: string;
+    },
+    userDocumentText: string,
+    canonicalContext: CanonicalAIUserContext,
+    metadata?: any
+  ): { systemPrompt: string; userPrompt: string } {
+    const systemPrompt = this.buildSystemPromptCompact();
+    const userPrompt = this.buildUserPromptCompact(
+      requiredDocumentRule as any,
+      userDocumentText,
+      canonicalContext,
+      metadata
+    );
+    return { systemPrompt, userPrompt };
+  }
+
+  /**
    * Check a single document against a requirement
    *
    * @param requiredDocumentRule - Specific document rule (condition already resolved if applicable)
@@ -166,6 +202,7 @@ export class VisaDocCheckerService {
       const modelVersionId = modelRouting.modelVersionId;
 
       logInfo('[VisaDocChecker] Calling GPT-4 for document verification', {
+        task: 'document_check',
         model: docCheckModel,
         modelVersionId,
         documentType: requiredDocumentRule.documentType,
@@ -192,8 +229,12 @@ export class VisaDocCheckerService {
       const rawContent = response.choices[0]?.message?.content || '{}';
 
       logInfo('[VisaDocChecker] GPT-4 response received', {
+        task: 'document_check',
+        model: docCheckModel,
         documentType: requiredDocumentRule.documentType,
         responseLength: rawContent.length,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
       });
 
       // Parse and validate JSON
@@ -308,9 +349,13 @@ export class VisaDocCheckerService {
       });
 
       logInfo('[VisaDocChecker] Document check completed', {
+        task: 'document_check',
+        model: docCheckModel,
         documentType: requiredDocumentRule.documentType,
         status: result.status,
         riskLevel: result.embassy_risk_level,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
       });
 
       // Record AI interaction for training data pipeline
@@ -384,10 +429,18 @@ export class VisaDocCheckerService {
   }
 
   /**
-   * Build compact system prompt for document checking (COMPACT VERSION)
+   * Build compact system prompt for document checking (EXPERT OFFICER VERSION - Phase 4)
+   * GPT acts as an expert embassy document reviewer with deep knowledge of 10 countries × 2 visa types
+   *
+   * Phase 4 Upgrade:
+   * - Expert visa document reviewer role specialized for Uzbek applicants
+   * - Country-specific patterns (US, UK, Germany, Spain, Canada, Australia, Japan, Korea, UAE, Schengen)
+   * - Uses expert fields from CanonicalAIUserContext for risk-based validation
+   * - Clear status semantics: APPROVED / NEED_FIX / REJECTED
+   * - Tri-language notes (UZ/RU/EN) with Uzbek as primary
    */
   private static buildSystemPromptCompact(): string {
-    return `You are an EXPERT VISA DOCUMENT VERIFIER with 15+ years of experience reviewing visa documents for embassy submissions.
+    return `You are an EXPERT VISA DOCUMENT REVIEWER with 10+ years of experience at embassies (US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, UAE), specializing in applicants from Uzbekistan.
 
 ================================================================================
 YOUR EXPERTISE
@@ -402,132 +455,224 @@ You have deep knowledge of:
 - Embassy-specific requirements (country-specific formats, apostilles, translations)
 - Risk assessment (identifying documents that raise red flags)
 - Fraud detection (inconsistencies, impossible dates, mismatched information)
+- Uzbek applicant context (Uzbek banks, kadastr documents, employment patterns)
 
 ================================================================================
-EXPERT VALIDATION FRAMEWORK
+INPUTS YOU WILL RECEIVE
 ================================================================================
 
-When verifying documents, check:
+1. REQUIRED_DOCUMENT_RULE:
+   - From VisaRuleSet, includes conditions, validity, format requirements
+   - Specifies documentType, category, required fields, validity periods
+   - May include financial requirements (minimum balance, statement months)
 
-1. DOCUMENT TYPE ACCURACY:
-   - Is this the correct document type for the requirement?
-   - Does it match the REQUIRED_DOCUMENT_RULE documentType?
-   - Are there any mismatches (e.g., employment letter vs bank statement)?
+2. USER_DOCUMENT_TEXT:
+   - OCR/parsed text from uploaded document (may be incomplete or truncated)
+   - Contains document content: names, dates, amounts, institution names, etc.
+
+3. METADATA:
+   - fileType, issueDate, expiryDate
+   - bankName, accountHolder (for financial documents)
+   - amounts: Array of {value, currency} extracted from document
+
+4. APPLICANT_CONTEXT (CanonicalAIUserContext):
+   - financial: {
+       requiredFundsUSD, availableFundsUSD,
+       financialSufficiencyRatio, financialSufficiencyLabel ('low' | 'borderline' | 'sufficient' | 'strong')
+     }
+   - ties: {
+       tiesStrengthScore, tiesStrengthLabel ('weak' | 'medium' | 'strong'),
+       hasPropertyInUzbekistan, hasFamilyInUzbekistan, hasChildren,
+       isEmployed, employmentDurationMonths
+     }
+   - travelHistory: {
+       travelHistoryScore, travelHistoryLabel ('none' | 'limited' | 'good' | 'strong'),
+       previousVisaRejections, hasOverstayHistory
+     }
+   - uzbekContext: {
+       isUzbekCitizen, residesInUzbekistan
+     }
+   - meta: {
+       dataCompletenessScore (0.0-1.0), missingCriticalFields
+     }
+
+================================================================================
+REVIEW PROCESS
+================================================================================
+
+Follow this systematic review process:
+
+1. DOCUMENT TYPE AND RULE MATCH:
+   - "Is this document actually what the rule asks for?"
+   - Compare USER_DOCUMENT_TEXT against REQUIRED_DOCUMENT_RULE.documentType
+   - Check for mismatches (e.g., employment letter vs bank statement)
 
 2. CONTENT COMPLETENESS:
-   - Are all required fields present? (name, dates, amounts, signatures, stamps)
-   - Is the information sufficient for embassy evaluation?
-   - Are there missing critical elements?
+   - Are key fields present? (name, dates, amounts, institution, signatures, stamps)
+   - For bank statements: period coverage, balance, consistency
+   - For employment letters: employer name, position, salary, duration
+   - For property docs: kadastr number, property value, ownership proof
 
-3. FINANCIAL VALIDATION (for financial documents):
-   - Balance verification: Does the balance meet minimum requirements?
-   - Currency: Is the currency correct? (convert if needed)
-   - Statement months: Does it cover the required period?
-   - Income stability: Is income consistent? Any suspicious patterns?
-   - Source of funds: Is the source clear and legitimate?
+3. VALIDITY:
+   - Dates not expired / within requested period
+   - Issue date is logical and consistent
+   - Validity period meets embassy requirements
+   - Travel dates align with visa application dates (if applicable)
 
-4. DATE VALIDATION:
-   - Expiry dates: Is the document still valid?
-   - Issue dates: Are dates logical and consistent?
-   - Validity periods: Does validity meet embassy requirements?
-   - Travel dates: Do dates align with visa application dates?
+4. FORMAT:
+   - Does it appear to be a real official document (to the extent text reveals)?
+   - Is language acceptable? (Uzbek/Russian with translation if required)
+   - Are required translations present?
+   - Are required apostilles/legalizations present?
+   - Is format correct (original/certified copy)?
 
-5. FORMAT COMPLIANCE:
-   - Language: Is it in the required language(s)?
-   - Translation: Is translation required and present?
-   - Apostille: Is apostille required and present?
-   - Original vs copy: Is the format correct (original/certified copy)?
+5. RISK ASSESSMENT (using expert fields):
+   - For financial documents (bank statements, sponsor docs):
+     * If financialSufficiencyLabel is 'low' or 'borderline', be STRICT
+     * Compare document amounts against requiredFundsUSD and availableFundsUSD
+     * If balance is far below requiredFundsUSD → higher risk
+   - For ties documents (property, family ties, employment letter):
+     * If tiesStrengthLabel is 'weak', this document is CRITICAL
+     * Emphasize importance in notes if ties are weak
+   - For travel documents (itinerary, history, insurance):
+     * If travelHistoryScore is 'none' or 'limited', explain how these docs help
+     * These documents help mitigate risk for first-time travelers
 
-6. SIGNATURES AND STAMPS:
-   - Are required signatures present?
-   - Are official stamps/seals present?
-   - Are signatures/stamps from authorized entities?
-
-7. EMBASSY-SPECIFIC REQUIREMENTS:
-   - Country-specific formats (e.g., UK 28-day rule, Schengen insurance)
-   - Specific terminology and document names
-   - Additional requirements for the destination country
-
-8. RISK ASSESSMENT:
-   - Are there red flags? (suspicious patterns, inconsistencies, fraud indicators)
-   - Does the document raise immigration intent concerns?
-   - Is the document likely to be accepted by embassy officers?
+6. DATA COMPLETENESS AWARENESS:
+   - If dataCompletenessScore is low (< 0.6):
+     * Be cautious; avoid overconfident judgments
+     * Use NEED_FIX instead of REJECTED if you lack information
+     * Explain what's missing in notes
 
 ================================================================================
-OUTPUT SCHEMA
+OUTPUT DEFINITION
 ================================================================================
+
+You must return a JSON object with the following structure:
 
 {
   "status": "APPROVED" | "NEED_FIX" | "REJECTED",
-  "short_reason": "string (max 200 chars)",
+  "short_reason": "string (max 200 chars, concise embassy-style reasoning)",
   "notes": {
-    "en": "string (optional, max 500 chars)",
-    "uz": "string (optional, max 500 chars)",
-    "ru": "string (optional, max 500 chars)"
+    "uz": "string (REQUIRED, max 500 chars, primary explanation in Uzbek)",
+    "ru": "string (optional, max 500 chars, Russian version)",
+    "en": "string (optional, max 500 chars, English version)"
   },
   "embassy_risk_level": "LOW" | "MEDIUM" | "HIGH",
-  "technical_notes": "string | null (optional, max 1000 chars)",
-  "validationDetails": {
-    "documentTypeMatch": boolean,
-    "contentComplete": boolean,
-    "financialValid": boolean | null,
-    "dateValid": boolean,
-    "formatCompliant": boolean,
-    "signaturesPresent": boolean,
-    "issues": string[],
-    "recommendations": string[]
-  },
-  "embassyOfficerAssessment": "string (expert perspective on document quality)",
-  "actionableSteps": string[] (specific steps to fix issues)
+  "technical_notes": "string | null (optional, max 1000 chars, internal debug notes)"
 }
 
-================================================================================
-DECISION RULES
-================================================================================
-
-STATUS:
-- APPROVED: Document satisfies ALL key conditions, no critical issues
-- NEED_FIX: Document has correctable issues (missing months, wrong language, low amount, missing signatures)
-- REJECTED: Document is unusable (wrong type, expired, far below requirements, fraud indicators)
+STATUS SEMANTICS:
+- APPROVED: Document is sufficient and consistent with REQUIRED_DOCUMENT_RULE. All key conditions met, no critical issues. Embassy officers would likely accept this document.
+- NEED_FIX: Document is mostly correct but has fixable issues. Examples:
+  * Missing months of history (e.g., need 3 months, only 1 month provided)
+  * Wrong language when translation is required
+  * Amount slightly below minimum (but close)
+  * Missing signature or stamp
+  * Format issue that can be corrected
+  The user can fix this by obtaining an updated or corrected document.
+- REJECTED: Document is unusable or clearly wrong. Examples:
+  * Completely wrong document type (e.g., employment letter when bank statement required)
+  * Expired when validity is clearly required
+  * Amounts far below requirements (e.g., $500 when $10,000 required)
+  * Obviously fake or inconsistent (impossible dates, mismatched names)
+  * No relevant information present
 
 EMBASSY_RISK_LEVEL:
-- LOW: Solid and compliant, likely to be accepted
-- MEDIUM: Some weaknesses but might be accepted with additional documents
-- HIGH: Serious issues likely to cause refusal or additional scrutiny
+- LOW: Document appears solid and compliant. Embassy officers will likely accept it without additional scrutiny.
+- MEDIUM: Some weaknesses or small deviations, but it might still be accepted with additional supporting documents or explanations.
+- HIGH: Serious issues that are likely to cause refusal or additional scrutiny if not fixed. Embassy officers will be concerned.
 
-VALIDATION DETAILS:
-- documentTypeMatch: true if document type matches requirement
-- contentComplete: true if all required fields present
-- financialValid: true if financial requirements met (null if not applicable)
-- dateValid: true if dates are valid and meet requirements
-- formatCompliant: true if format meets embassy requirements
-- signaturesPresent: true if required signatures/stamps present
-- issues: Array of specific issues found
-- recommendations: Array of actionable recommendations
+NOTES REQUIREMENTS:
+- notes.uz is REQUIRED and should be the primary explanation for Uzbek users
+- Write in clear, simple Uzbek (not overly formal, understandable for average users)
+- notes.ru and notes.en are optional but recommended
+- Keep explanations short and actionable
+- Reference Uzbek context naturally (e.g., "Uzbek banklar", "kadastr hujjatlari")
 
-EMBASSY OFFICER ASSESSMENT:
-Provide expert perspective: "This document [strengths/weaknesses]. Embassy officers will likely [accept/reject/request additional documents] because [reasoning]."
+SHORT_REASON:
+- ≤ 200 characters, concise, embassy-style reasoning in English
+- Should summarize the key issue or approval reason
+- Neutral, professional tone
 
-ACTIONABLE STEPS:
-Provide specific, actionable steps to fix issues, e.g.:
-- "Obtain bank statement covering last 3 months (currently only 1 month)"
-- "Translate document to English and add apostille"
-- "Update document to show minimum balance of $X (currently $Y)"
+================================================================================
+COUNTRY-SPECIFIC PATTERNS (for context)
+================================================================================
 
-Return ONLY valid JSON.`;
+US (B1/B2 Tourist, F-1/J-1 Student):
+- Bank statements: 3-6 months history, sufficient funds for duration
+- I-20/DS-2019: Must be valid, SEVIS fee paid
+- Strong ties emphasis for tourist visas
+
+UK (Tourist, Student):
+- 28-day rule: Bank statements must show funds for 28+ consecutive days
+- CAS letter required for students
+- TB test certificate if required
+
+Schengen (Germany, Spain, etc.):
+- Travel insurance: Minimum €30,000 coverage
+- Accommodation proof required
+- Round-trip flight reservation
+
+Canada (Tourist, Student):
+- DLI/LOA for students
+- Strong ties requirement
+- Sufficient funds for tuition + living expenses
+
+Australia (Tourist, Student):
+- COE for students
+- OSHC insurance required
+- GTE statement may be required
+
+Japan:
+- Detailed itinerary
+- Certificate of Eligibility if applicable
+- Sponsor proof if sponsored
+
+Korea:
+- D-2/D-4 visa types
+- Clear study plans
+- Financial proof required
+
+UAE:
+- Hotel booking confirmation
+- Sponsor letter if invited
+- Proof of financial means
+
+================================================================================
+FINAL INSTRUCTIONS
+================================================================================
+
+- Use expert fields from APPLICANT_CONTEXT to guide your strictness:
+  * Low financial sufficiency → be strict on financial docs
+  * Weak ties → emphasize importance of ties docs
+  * Limited travel history → explain how travel docs help
+- If dataCompletenessScore is low, be cautious and prefer NEED_FIX over REJECTED
+- Write notes.uz as the primary explanation (clear, simple Uzbek)
+- Return ONLY valid JSON, no markdown, no extra text
+
+Return ONLY valid JSON matching the schema above.`;
   }
 
   /**
-   * OLD SYSTEM PROMPT (kept for reference/rollback)
+   * Legacy system prompt (aligned with expert officer mindset - Phase 4)
+   *
+   * Phase 4 Upgrade:
+   * - Same expert officer role as compact version
+   * - Conservative approach when expert fields are missing
+   * - Same status semantics: APPROVED / NEED_FIX / REJECTED
    */
   private static buildSystemPromptLegacy(): string {
-    return `You are "VisaDocChecker", an embassy-level visa document reviewer.
+    return `You are an EXPERT VISA DOCUMENT REVIEWER with 10+ years of experience at embassies (US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, UAE), specializing in applicants from Uzbekistan.
 
 Your job:
 - Compare ONE uploaded user document against ONE official document requirement.
 - Decide if the user document satisfies the requirement according to the official rules.
 - Return a strict, concise JSON result.
 - You must be strict but fair, similar to an experienced visa officer.
+
+NOTE: In legacy mode, some expert fields (financialSufficiencyRatio, tiesStrengthScore, travelHistoryScore, dataCompletenessScore) may be missing from APPLICANT_CONTEXT.
+When expert fields are missing, be conservative in your reasoning and mark documents as NEED_FIX rather than REJECTED if uncertain.
 
 OUTPUT SCHEMA (JSON):
 {
@@ -596,7 +741,12 @@ Return ONLY valid JSON matching the schema, no other text.`;
   }
 
   /**
-   * Build compact user prompt (COMPACT VERSION)
+   * Build compact user prompt (EXPERT OFFICER VERSION - Phase 4)
+   *
+   * Phase 4 Upgrade:
+   * - Structured APPLICANT_CONTEXT with expert fields grouped
+   * - Explicit "EXPERT DECISION REQUIRED" section
+   * - Clear instructions on using expert fields for validation
    */
   private static buildUserPromptCompact(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -617,52 +767,116 @@ Return ONLY valid JSON matching the schema, no other text.`;
         ? userDocumentText.substring(0, 8000) + '\n\n[Text truncated]'
         : userDocumentText;
 
-    let prompt = `REQUIRED_DOCUMENT_RULE:
+    let prompt = `EXPERT DECISION REQUIRED:
+
+You are reviewing a document uploaded by an Uzbek applicant. Your task:
+1. Decide status: APPROVED / NEED_FIX / REJECTED
+2. Consider:
+   - REQUIRED_DOCUMENT_RULE as ground truth (check document type, validity, format, amounts)
+   - USER_DOCUMENT_TEXT and METADATA to validate content, dates, amounts
+   - APPLICANT_CONTEXT to understand how critical this document is for this applicant
+3. Write short_reason in neutral, embassy-style English (≤200 chars)
+4. Write notes.uz as the primary explanation (clear, simple Uzbek, required)
+5. Write notes.ru and notes.en if helpful (optional)
+6. If uncertain because of missing info, prefer NEED_FIX with explanation instead of REJECTED
+
+================================================================================
+REQUIRED_DOCUMENT_RULE
+================================================================================
+
 ${JSON.stringify(requiredDocumentRule, null, 2)}
 
-USER_DOCUMENT_TEXT:
-${truncatedText}`;
+================================================================================
+USER_DOCUMENT_TEXT
+================================================================================
 
-    if (metadata) {
-      prompt += `\n\nMETADATA:\n${JSON.stringify(metadata, null, 2)}`;
-    }
+${truncatedText}
+
+================================================================================
+METADATA
+================================================================================
+
+${metadata ? JSON.stringify(metadata, null, 2) : 'No metadata provided'}
+
+================================================================================
+APPLICANT_CONTEXT
+================================================================================`;
 
     if (canonicalContext) {
-      // Include expert context for document verification (Phase 3)
-      const relevantContext = {
+      // Phase 4: Structured expert context with grouped fields
+      const applicantContext = {
+        visaType: canonicalContext.applicantProfile.visaType,
+        countryCode:
+          (canonicalContext.applicantProfile as any).countryCode ||
+          canonicalContext.applicantProfile.targetCountry,
+        duration: canonicalContext.applicantProfile.duration,
         sponsorType: canonicalContext.applicantProfile.sponsorType,
-        currentStatus: canonicalContext.applicantProfile.currentStatus,
-        bankBalanceUSD: canonicalContext.applicantProfile.bankBalanceUSD,
-        monthlyIncomeUSD: canonicalContext.applicantProfile.monthlyIncomeUSD,
-        riskLevel: canonicalContext.riskScore.level,
-        // Expert fields (Phase 3)
         financial: canonicalContext.applicantProfile.financial
           ? {
-              requiredFundsEstimate:
-                canonicalContext.applicantProfile.financial.requiredFundsEstimate,
+              requiredFundsUSD: canonicalContext.applicantProfile.financial.requiredFundsUSD,
+              availableFundsUSD: canonicalContext.applicantProfile.financial.availableFundsUSD,
               financialSufficiencyRatio:
                 canonicalContext.applicantProfile.financial.financialSufficiencyRatio,
-              minimumFundsRequired: canonicalContext.embassyContext?.minimumFundsRequired,
-              minimumStatementMonths: canonicalContext.embassyContext?.minimumStatementMonths,
+              financialSufficiencyLabel:
+                canonicalContext.applicantProfile.financial.financialSufficiencyLabel,
             }
           : undefined,
-        embassyContext: canonicalContext.embassyContext
+        ties: canonicalContext.applicantProfile.ties
           ? {
-              commonRefusalReasons: canonicalContext.embassyContext.commonRefusalReasons,
-              officerEvaluationCriteria: canonicalContext.embassyContext.officerEvaluationCriteria,
+              tiesStrengthScore: canonicalContext.applicantProfile.ties.tiesStrengthScore,
+              tiesStrengthLabel: canonicalContext.applicantProfile.ties.tiesStrengthLabel,
+              hasPropertyInUzbekistan: (canonicalContext.applicantProfile as any)
+                .hasPropertyInUzbekistan,
+              hasFamilyInUzbekistan: (canonicalContext.applicantProfile as any)
+                .hasFamilyInUzbekistan,
+              hasChildren: (canonicalContext.applicantProfile as any).hasChildren,
+              isEmployed: (canonicalContext.applicantProfile as any).isEmployed,
+              employmentDurationMonths:
+                canonicalContext.applicantProfile.ties.employmentDurationMonths,
+            }
+          : undefined,
+        travelHistory: canonicalContext.applicantProfile.travelHistory
+          ? {
+              travelHistoryScore:
+                canonicalContext.applicantProfile.travelHistory.travelHistoryScore,
+              travelHistoryLabel:
+                canonicalContext.applicantProfile.travelHistory.travelHistoryLabel,
+              previousVisaRejections:
+                canonicalContext.applicantProfile.travelHistory.previousVisaRejections,
+              hasOverstayHistory:
+                canonicalContext.applicantProfile.travelHistory.hasOverstayHistory,
+            }
+          : undefined,
+        uzbekContext: canonicalContext.uzbekContext
+          ? {
+              isUzbekCitizen: canonicalContext.uzbekContext.isUzbekCitizen,
+              residesInUzbekistan: canonicalContext.uzbekContext.residesInUzbekistan,
+            }
+          : undefined,
+        meta: canonicalContext.meta
+          ? {
+              dataCompletenessScore: canonicalContext.meta.dataCompletenessScore,
+              missingCriticalFields: canonicalContext.meta.missingCriticalFields,
             }
           : undefined,
       };
-      prompt += `\n\nAPPLICANT_CONTEXT (expert fields for validation):\n${JSON.stringify(relevantContext, null, 2)}`;
+      prompt += `\n${JSON.stringify(applicantContext, null, 2)}`;
+    } else {
+      prompt += `\nNo applicant context available.`;
     }
 
-    prompt += `\n\nEvaluate and return JSON result.`;
+    prompt += `\n\nEvaluate the document using expert officer reasoning and return JSON result.`;
 
     return prompt;
   }
 
   /**
-   * OLD USER PROMPT (kept for reference/rollback)
+   * Legacy user prompt (aligned with expert officer mindset - Phase 4)
+   *
+   * Phase 4 Upgrade:
+   * - Same structured context approach as compact version
+   * - Note that some expert fields may be missing
+   * - Same "EXPERT DECISION REQUIRED" instructions
    */
   private static buildUserPromptLegacy(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -677,29 +891,109 @@ ${truncatedText}`;
       accountHolder?: string;
     }
   ): string {
-    let prompt = `Check if the uploaded user document satisfies the official requirement.
+    let prompt = `EXPERT DECISION REQUIRED:
 
-REQUIRED_DOCUMENT_RULE:
+You are reviewing a document uploaded by an Uzbek applicant. Your task:
+1. Decide status: APPROVED / NEED_FIX / REJECTED
+2. Consider:
+   - REQUIRED_DOCUMENT_RULE as ground truth
+   - USER_DOCUMENT_TEXT and METADATA to validate content, dates, amounts
+   - APPLICANT_CONTEXT to understand how critical this document is (if available)
+3. Write short_reason in neutral, embassy-style English (≤200 chars)
+4. If uncertain because of missing info, prefer NEED_FIX with explanation instead of REJECTED
+
+NOTE: In legacy mode, some expert fields may be missing. Be conservative when expert fields are unavailable.
+
+================================================================================
+REQUIRED_DOCUMENT_RULE
+================================================================================
+
 ${JSON.stringify(requiredDocumentRule, null, 2)}
 
-USER_DOCUMENT_TEXT:
-${userDocumentText.substring(0, 10000)}${userDocumentText.length > 10000 ? '\n\n[Text truncated for length]' : ''}`;
+================================================================================
+USER_DOCUMENT_TEXT
+================================================================================
 
-    if (metadata) {
-      prompt += `\n\nOPTIONAL METADATA:\n${JSON.stringify(metadata, null, 2)}`;
-    }
+${userDocumentText.substring(0, 10000)}${userDocumentText.length > 10000 ? '\n\n[Text truncated for length]' : ''}
+
+================================================================================
+METADATA
+================================================================================
+
+${metadata ? JSON.stringify(metadata, null, 2) : 'No metadata provided'}
+
+================================================================================
+APPLICANT_CONTEXT
+================================================================================`;
 
     if (aiUserContext) {
+      // In legacy mode, use basic context (canonical context building is async and not available here)
+      // Use basic context summary instead
       const contextSummary = {
         sponsorType: aiUserContext.questionnaireSummary?.sponsorType,
         employmentStatus: aiUserContext.questionnaireSummary?.employment?.currentStatus,
         travelDates: aiUserContext.questionnaireSummary?.travelInfo?.plannedDates,
         riskScore: aiUserContext.riskScore?.level,
+        bankBalanceUSD: (aiUserContext as any).applicantProfile?.bankBalanceUSD,
+        monthlyIncomeUSD: (aiUserContext as any).applicantProfile?.monthlyIncomeUSD,
+        hasPropertyInUzbekistan: (aiUserContext as any).applicantProfile?.hasPropertyInUzbekistan,
+        hasFamilyInUzbekistan: (aiUserContext as any).applicantProfile?.hasFamilyInUzbekistan,
+        isEmployed: (aiUserContext as any).applicantProfile?.isEmployed,
+        previousVisaRejections: (aiUserContext as any).applicantProfile?.previousVisaRejections,
       };
-      prompt += `\n\nAI_USER_CONTEXT (for conditional requirements):\n${JSON.stringify(contextSummary, null, 2)}`;
+
+      // Check if we have any expert fields available (they might be pre-computed)
+      const hasExpertFields =
+        (aiUserContext as any).applicantProfile?.financial?.financialSufficiencyRatio !==
+          undefined ||
+        (aiUserContext as any).applicantProfile?.ties?.tiesStrengthScore !== undefined;
+
+      if (hasExpertFields) {
+        // Use structured context if expert fields are available
+        const applicantContext = {
+          visaType: (aiUserContext as any).applicantProfile?.visaType,
+          sponsorType: contextSummary.sponsorType,
+          financial: (aiUserContext as any).applicantProfile?.financial
+            ? {
+                requiredFundsUSD: (aiUserContext as any).applicantProfile.financial
+                  .requiredFundsUSD,
+                availableFundsUSD: (aiUserContext as any).applicantProfile.financial
+                  .availableFundsUSD,
+                financialSufficiencyRatio: (aiUserContext as any).applicantProfile.financial
+                  .financialSufficiencyRatio,
+                financialSufficiencyLabel: (aiUserContext as any).applicantProfile.financial
+                  .financialSufficiencyLabel,
+              }
+            : undefined,
+          ties: (aiUserContext as any).applicantProfile?.ties
+            ? {
+                tiesStrengthScore: (aiUserContext as any).applicantProfile.ties.tiesStrengthScore,
+                tiesStrengthLabel: (aiUserContext as any).applicantProfile.ties.tiesStrengthLabel,
+                hasPropertyInUzbekistan: contextSummary.hasPropertyInUzbekistan,
+                hasFamilyInUzbekistan: contextSummary.hasFamilyInUzbekistan,
+                isEmployed: contextSummary.isEmployed,
+              }
+            : undefined,
+          travelHistory: (aiUserContext as any).applicantProfile?.travelHistory
+            ? {
+                travelHistoryScore: (aiUserContext as any).applicantProfile.travelHistory
+                  .travelHistoryScore,
+                travelHistoryLabel: (aiUserContext as any).applicantProfile.travelHistory
+                  .travelHistoryLabel,
+                previousVisaRejections: contextSummary.previousVisaRejections,
+              }
+            : undefined,
+        };
+        prompt += `\n${JSON.stringify(applicantContext, null, 2)}`;
+      } else {
+        // Fallback to basic context
+        prompt += `\n${JSON.stringify(contextSummary, null, 2)}\n\nNOTE: Expert fields (financialSufficiencyRatio, tiesStrengthScore, etc.) are not available in legacy mode.`;
+      }
+    } else {
+      prompt += `\nNo applicant context available.`;
     }
 
-    prompt += `\n\nEvaluate the document and return the JSON result following all rules in the system prompt.`;
+    prompt += `\n\nEvaluate the document using expert officer reasoning and return JSON result.`;
 
     return prompt;
   }
