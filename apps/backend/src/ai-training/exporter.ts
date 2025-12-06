@@ -83,7 +83,7 @@ export async function exportTrainingDataForTask(
   }
 
   // Query interactions
-  let interactions = await prisma.aIInteraction.findMany({
+  let interactions = await (prisma as any).aIInteraction.findMany({
     where,
     orderBy: { createdAt: 'desc' },
     take: options?.limit || undefined,
@@ -93,8 +93,8 @@ export async function exportTrainingDataForTask(
 
   // Map to TrainingExample
   const trainingExamples = interactions
-    .map((interaction) => mapAIInteractionToTrainingExample(interaction))
-    .filter((ex): ex is TrainingExample => ex !== null);
+    .map((interaction: any) => mapAIInteractionToTrainingExample(interaction))
+    .filter((ex: any): ex is TrainingExample => ex !== null);
 
   console.log(`[Export] Mapped ${trainingExamples.length} training examples`);
 
@@ -109,23 +109,37 @@ export async function exportTrainingDataForTask(
   console.log(`[Export] Split: ${train.length} train, ${val.length} val`);
 
   // Convert to JSONL format (chat fine-tuning format)
-  const trainRecords = train.map((example: TrainingExample) => ({
-    messages: example.chatExample.messages,
-    metadata: {
-      taskType: example.taskType,
-      source: example.source,
-      ...example.meta,
-    },
-  }));
+  const trainRecords: any[] = [];
+  for (const example of train) {
+    if (example && typeof example === 'object' && 'taskType' in example) {
+      const ex = example as TrainingExample;
+      const { taskType, source, ...restMeta } = ex.meta;
+      trainRecords.push({
+        messages: ex.chatExample.messages,
+        metadata: {
+          taskType: ex.taskType,
+          source: ex.source,
+          ...restMeta,
+        },
+      });
+    }
+  }
 
-  const valRecords = val.map((example: TrainingExample) => ({
-    messages: example.chatExample.messages,
-    metadata: {
-      taskType: example.taskType,
-      source: example.source,
-      ...example.meta,
-    },
-  }));
+  const valRecords: any[] = [];
+  for (const example of val) {
+    if (example && typeof example === 'object' && 'taskType' in example) {
+      const ex = example as TrainingExample;
+      const { taskType, source, ...restMeta } = ex.meta;
+      valRecords.push({
+        messages: ex.chatExample.messages,
+        metadata: {
+          taskType: ex.taskType,
+          source: ex.source,
+          ...restMeta,
+        },
+      });
+    }
+  }
 
   // Write files
   const trainPath = path.join(outDir, `${taskType}.train.jsonl`);

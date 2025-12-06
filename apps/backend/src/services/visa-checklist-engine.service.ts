@@ -88,6 +88,10 @@ export class VisaChecklistEngineService {
     aiUserContext: AIUserContext,
     previousChecklist?: ChecklistItem[]
   ): Promise<ChecklistResponse> {
+    // Variables for error handling (declared outside try block for catch access)
+    let capturedBaseDocuments: any[] = [];
+    let capturedRuleSetId: string | null = null;
+
     try {
       logInfo('[VisaChecklistEngine] Generating checklist', {
         countryCode,
@@ -487,9 +491,9 @@ export class VisaChecklistEngineService {
           : PROMPT_VERSIONS.CHECKLIST_PROMPT_V1;
       const source = process.env.AI_EVAL_MODE === 'true' ? ('eval' as const) : ('prod' as const);
 
-      // Record failed interaction (baseDocuments and ruleSetId may not be in scope, use fallbacks)
-      const failedBaseDocuments = (typeof baseDocuments !== 'undefined' ? baseDocuments : []) || [];
-      const failedRuleSetId = typeof ruleSetId !== 'undefined' ? ruleSetId : null;
+      // Record failed interaction (use captured values if available)
+      const failedBaseDocuments = capturedBaseDocuments || [];
+      const failedRuleSetId = capturedRuleSetId || null;
 
       await AIOpenAIService['recordAIInteraction']({
         taskType: 'checklist_enrichment',
@@ -893,7 +897,12 @@ Return ONLY valid JSON matching the schema, no other text.`;
         }
 
         // Financial sufficiency adjustments
-        if (financialRatio !== null && financialRatio < 1.0 && item.group === 'financial') {
+        if (
+          financialRatio !== undefined &&
+          financialRatio !== null &&
+          financialRatio < 1.0 &&
+          item.group === 'financial'
+        ) {
           adjustedPriority = Math.max(1, item.priority - 1); // Critical if insufficient funds
         }
 

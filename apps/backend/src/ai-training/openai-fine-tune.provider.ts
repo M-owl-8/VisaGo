@@ -6,7 +6,7 @@
 import { FineTuneJobOptions, FineTuneProvider } from './fine-tune.service';
 
 export class OpenAIFineTuneProvider implements FineTuneProvider {
-  async startJob(options: FineTuneJobOptions) {
+  async startJob(options: FineTuneJobOptions): Promise<{ externalJobId: string }> {
     // TODO: Implement using OpenAI SDK:
     // 1. Upload train/val files using files.create()
     // 2. Create fine-tune job using fineTuning.jobs.create()
@@ -19,7 +19,12 @@ export class OpenAIFineTuneProvider implements FineTuneProvider {
     );
   }
 
-  async fetchStatus(externalJobId: string) {
+  async fetchStatus(externalJobId: string): Promise<{
+    status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+    resultModelName?: string;
+    metrics?: any;
+    errorMessage?: string;
+  }> {
     // TODO: Implement status polling:
     // 1. Call fineTuning.jobs.retrieve(externalJobId)
     // 2. Map OpenAI status to our status enum

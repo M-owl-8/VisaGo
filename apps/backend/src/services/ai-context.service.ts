@@ -974,17 +974,17 @@ export async function buildCanonicalAIUserContext(
   // ============================================
 
   // Financial expert fields
-  const financial = {
+  const financial: CanonicalAIUserContext['applicantProfile']['financial'] = {
     incomeHistory: summary?.employment?.monthlySalaryUSD
       ? [summary.employment.monthlySalaryUSD] // Single value for now, could be extended
       : undefined,
     savingsGrowth:
       bankBalanceUSD !== null && monthlyIncomeUSD !== null && monthlyIncomeUSD > 0
         ? bankBalanceUSD >= monthlyIncomeUSD * 6
-          ? 'increasing'
+          ? ('increasing' as 'increasing')
           : bankBalanceUSD >= monthlyIncomeUSD * 3
-            ? 'stable'
-            : 'decreasing'
+            ? ('stable' as 'stable')
+            : ('decreasing' as 'decreasing')
         : undefined,
     accountAgeMonths: null, // Not available in questionnaire
     sourceOfFunds:
@@ -1001,11 +1001,16 @@ export async function buildCanonicalAIUserContext(
             income: summary.financialInfo.sponsorDetails.annualIncomeUSD ?? null,
             savings: null, // Not available
             dependents: null, // Not available
-            relationship: summary.financialInfo.sponsorDetails.relationship ?? null,
+            relationship: (summary.financialInfo.sponsorDetails.relationship ?? 'other') as
+              | 'parent'
+              | 'sibling'
+              | 'relative'
+              | 'friend'
+              | 'other',
           }
         : undefined,
-    requiredFundsEstimate: null, // Will be calculated below
-    financialSufficiencyRatio: null, // Will be calculated below
+    requiredFundsEstimate: undefined, // Will be calculated below
+    financialSufficiencyRatio: undefined, // Will be calculated below
   };
 
   // Calculate required funds and sufficiency ratio
@@ -1017,14 +1022,14 @@ export async function buildCanonicalAIUserContext(
   if (requiredFunds !== null) {
     financial.requiredFundsEstimate = requiredFunds;
     const availableFunds = bankBalanceUSD ?? 0;
-    financial.financialSufficiencyRatio = calculateFinancialSufficiencyRatio(
-      availableFunds,
-      requiredFunds
-    );
-    if (financial.financialSufficiencyRatio !== null && financial.financialSufficiencyRatio < 1.0) {
-      warnings.push(
-        `Financial sufficiency ratio is ${(financial.financialSufficiencyRatio * 100).toFixed(0)}% - may need additional funds`
-      );
+    const ratio = calculateFinancialSufficiencyRatio(availableFunds, requiredFunds);
+    if (ratio !== null) {
+      financial.financialSufficiencyRatio = ratio;
+      if (ratio < 1.0) {
+        warnings.push(
+          `Financial sufficiency ratio is ${(ratio * 100).toFixed(0)}% - may need additional funds`
+        );
+      }
     }
   }
 
@@ -1038,7 +1043,8 @@ export async function buildCanonicalAIUserContext(
           salaryHistory: summary?.employment?.monthlySalaryUSD
             ? [summary.employment.monthlySalaryUSD]
             : undefined,
-          contractType: currentStatus === 'self_employed' ? 'freelance' : 'permanent',
+          contractType:
+            currentStatus === 'self_employed' ? ('freelance' as const) : ('permanent' as const),
           employerStability: 'unknown' as const,
         }
       : undefined;
@@ -1047,16 +1053,15 @@ export async function buildCanonicalAIUserContext(
   const education =
     isStudent || currentStatus === 'student'
       ? {
-          degreeLevel:
-            summary?.education?.programType === 'bachelor'
-              ? 'bachelor'
-              : summary?.education?.programType === 'master'
-                ? 'master'
-                : summary?.education?.programType === 'phd'
-                  ? 'phd'
-                  : summary?.education?.programType === 'language'
-                    ? 'certificate'
-                    : 'unknown',
+          degreeLevel: (summary?.education?.programType === 'bachelor'
+            ? 'bachelor'
+            : summary?.education?.programType === 'master'
+              ? 'master'
+              : summary?.education?.programType === 'phd'
+                ? 'phd'
+                : summary?.education?.programType === 'language'
+                  ? 'certificate'
+                  : 'unknown') as 'bachelor' | 'master' | 'phd' | 'certificate' | 'unknown',
           institution: summary?.education?.university ?? null,
           graduationDate: summary?.education?.hasGraduated ? null : null, // Not available
           fieldOfStudy: null, // Not available

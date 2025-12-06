@@ -3,7 +3,10 @@
  * Manages model versions, routing, and canary rollouts
  */
 
-import { PrismaClient, AIModelStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+
+// Type for AIModelStatus enum
+type AIModelStatus = 'ACTIVE' | 'CANDIDATE' | 'DEPRECATED' | 'ARCHIVED';
 import { AITaskType, ModelRoutingDecision, RoutingOptions } from './types';
 import { getAIConfig } from '../config/ai-models';
 
@@ -46,14 +49,11 @@ export async function getActiveModelForTask(
   }
 
   // 2. Query registry for active/candidate models
-  const models = await prisma.aIModelVersion.findMany({
+  const models = await (prisma as any).aIModelVersion.findMany({
     where: {
       taskType,
       status: {
-        in:
-          options.allowCandidates !== false
-            ? [AIModelStatus.ACTIVE, AIModelStatus.CANDIDATE]
-            : [AIModelStatus.ACTIVE],
+        in: options.allowCandidates !== false ? ['ACTIVE', 'CANDIDATE'] : ['ACTIVE'],
       },
       trafficPercent: {
         gt: 0,
@@ -75,7 +75,7 @@ export async function getActiveModelForTask(
   }
 
   // 3. Weighted random selection by trafficPercent
-  const totalWeight = models.reduce((sum, m) => sum + m.trafficPercent, 0);
+  const totalWeight = models.reduce((sum: number, m: any) => sum + m.trafficPercent, 0);
   if (totalWeight === 0) {
     // All have 0% traffic, use default
     const defaultModel = getDefaultModelForTask(taskType);
@@ -122,14 +122,14 @@ export async function registerModelCandidate(params: {
   dataSnapshot?: any;
   notes?: string;
 }): Promise<string> {
-  const model = await prisma.aIModelVersion.create({
+  const model = await (prisma as any).aIModelVersion.create({
     data: {
       taskType: params.taskType,
       provider: params.provider,
       baseModel: params.baseModel,
       modelName: params.modelName,
       externalModelId: params.externalModelId || null,
-      status: AIModelStatus.CANDIDATE,
+      status: 'CANDIDATE' as any,
       trafficPercent: 0,
       promptVersion: params.promptVersion || null,
       dataSnapshot: params.dataSnapshot || null,
@@ -152,7 +152,7 @@ export async function promoteModelToActive(params: {
   const deactivateOthers = params.deactivateOthers ?? true;
 
   // Get the model to promote
-  const model = await prisma.aIModelVersion.findUnique({
+  const model = await (prisma as any).aIModelVersion.findUnique({
     where: { id: params.modelVersionId },
   });
 
@@ -161,10 +161,10 @@ export async function promoteModelToActive(params: {
   }
 
   // Update this model
-  await prisma.aIModelVersion.update({
+  await (prisma as any).aIModelVersion.update({
     where: { id: params.modelVersionId },
     data: {
-      status: AIModelStatus.ACTIVE,
+      status: 'ACTIVE' as any,
       trafficPercent,
       activatedAt: new Date(),
     },
@@ -172,18 +172,18 @@ export async function promoteModelToActive(params: {
 
   // Deactivate others if requested
   if (deactivateOthers) {
-    await prisma.aIModelVersion.updateMany({
+    await (prisma as any).aIModelVersion.updateMany({
       where: {
         taskType: model.taskType,
         id: {
           not: params.modelVersionId,
         },
         status: {
-          in: [AIModelStatus.ACTIVE, AIModelStatus.CANDIDATE],
+          in: ['ACTIVE', 'CANDIDATE'],
         },
       },
       data: {
-        status: AIModelStatus.DEPRECATED,
+        status: 'DEPRECATED' as any,
         trafficPercent: 0,
       },
     });
@@ -201,7 +201,7 @@ export async function updateCanaryTraffic(params: {
     throw new Error('trafficPercent must be between 0 and 100');
   }
 
-  await prisma.aIModelVersion.update({
+  await (prisma as any).aIModelVersion.update({
     where: { id: params.modelVersionId },
     data: {
       trafficPercent: params.trafficPercent,
@@ -213,7 +213,7 @@ export async function updateCanaryTraffic(params: {
  * Get all models for a task
  */
 export async function listModelsForTask(taskType: AITaskType) {
-  return prisma.aIModelVersion.findMany({
+  return (prisma as any).aIModelVersion.findMany({
     where: { taskType },
     orderBy: { createdAt: 'desc' },
   });

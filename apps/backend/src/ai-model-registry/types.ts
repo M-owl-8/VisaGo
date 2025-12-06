@@ -22,3 +22,6 @@ export interface RoutingOptions {
   forceModelName?: string; // env override
   allowCandidates?: boolean; // use canary
 }
+
+// Re-export for use in other modules
+export type { RoutingOptions as AIRoutingOptions };

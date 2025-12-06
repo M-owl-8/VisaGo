@@ -4,8 +4,8 @@ import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 import { AITrainingTaskType, AITrainingSource } from '../ai-training/types';
 import { PROMPT_VERSIONS } from '../ai-training/config';
-import { getActiveModelForTask, RoutingOptions } from '../ai-model-registry/registry.service';
-import { AITaskType } from '../ai-model-registry/types';
+import { getActiveModelForTask } from '../ai-model-registry/registry.service';
+import { AITaskType, RoutingOptions } from '../ai-model-registry/types';
 
 /**
  * OpenAI + RAG Service
@@ -120,7 +120,7 @@ export class AIOpenAIService {
         AIOpenAIService.prisma = new PrismaClient();
       }
 
-      await AIOpenAIService.prisma.aIInteraction.create({
+      await (AIOpenAIService.prisma as any).aIInteraction.create({
         data: {
           taskType: params.taskType,
           model: params.model,

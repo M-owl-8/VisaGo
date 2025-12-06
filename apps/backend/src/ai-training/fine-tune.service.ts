@@ -3,7 +3,10 @@
  * Provider-agnostic fine-tuning job management
  */
 
-import { PrismaClient, AIFineTuneStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+
+// Type for AIFineTuneStatus enum
+type AIFineTuneStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
 import { AITaskType } from '../ai-model-registry/types';
 import { registerModelCandidate } from '../ai-model-registry/registry.service';
 
@@ -69,12 +72,12 @@ export async function startFineTuneJob(options: FineTuneJobOptions): Promise<{ j
   const { externalJobId } = await providerImpl.startJob(options);
 
   // 3. Store AIFineTuneJob row
-  const job = await prisma.aIFineTuneJob.create({
+  const job = await (prisma as any).aIFineTuneJob.create({
     data: {
       taskType: options.taskType,
       provider: options.provider,
       baseModel: options.baseModel,
-      status: AIFineTuneStatus.QUEUED,
+      status: 'QUEUED' as any,
       externalJobId,
       trainFilePath: options.trainFilePath,
       valFilePath: options.valFilePath ?? null,
@@ -89,7 +92,7 @@ export async function startFineTuneJob(options: FineTuneJobOptions): Promise<{ j
  * Refresh fine-tune job status from provider
  */
 export async function refreshFineTuneJobStatus(jobId: string) {
-  const job = await prisma.aIFineTuneJob.findUnique({ where: { id: jobId } });
+  const job = await (prisma as any).aIFineTuneJob.findUnique({ where: { id: jobId } });
   if (!job || !job.externalJobId) {
     throw new Error(`Job ${jobId} not found or has no externalJobId`);
   }
@@ -97,10 +100,10 @@ export async function refreshFineTuneJobStatus(jobId: string) {
   const providerImpl = getProvider(job.provider);
   const status = await providerImpl.fetchStatus(job.externalJobId);
 
-  const updated = await prisma.aIFineTuneJob.update({
+  const updated = await (prisma as any).aIFineTuneJob.update({
     where: { id: jobId },
     data: {
-      status: status.status as AIFineTuneStatus,
+      status: status.status as any,
       resultModelName: status.resultModelName ?? job.resultModelName,
       metrics: status.metrics ?? job.metrics,
       errorMessage: status.errorMessage ?? job.errorMessage,
@@ -112,7 +115,7 @@ export async function refreshFineTuneJobStatus(jobId: string) {
   // If job succeeded and resultModelName exists, update model version
   if (status.status === 'SUCCEEDED' && status.resultModelName) {
     if (job.modelVersionId) {
-      await prisma.aIModelVersion.update({
+      await (prisma as any).aIModelVersion.update({
         where: { id: job.modelVersionId },
         data: {
           modelName: status.resultModelName,
@@ -130,7 +133,7 @@ export async function refreshFineTuneJobStatus(jobId: string) {
  * List fine-tune jobs
  */
 export async function listFineTuneJobs(taskType?: AITaskType) {
-  return prisma.aIFineTuneJob.findMany({
+  return (prisma as any).aIFineTuneJob.findMany({
     where: taskType ? { taskType } : {},
     orderBy: { createdAt: 'desc' },
     take: 50,

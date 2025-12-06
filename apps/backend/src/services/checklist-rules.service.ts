@@ -175,10 +175,10 @@ async function buildBaseChecklistFromCatalogReferences(
 /**
  * Build base checklist from embedded documents (legacy mode)
  */
-function buildBaseChecklistFromEmbeddedDocuments(
+async function buildBaseChecklistFromEmbeddedDocuments(
   userContext: any,
   ruleSet: VisaRuleSetData
-): Array<BaseChecklistItem> {
+): Promise<Array<BaseChecklistItem>> {
   try {
     if (!ruleSet || !ruleSet.requiredDocuments || ruleSet.requiredDocuments.length === 0) {
       logWarn('[ChecklistRules] Rule set has no required documents', {

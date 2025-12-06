@@ -144,7 +144,9 @@ export function validateChecklistConstraints(
 
   // Check no extra documents
   if (scenario.expectedConstraints.mustNotAddDocuments) {
-    const extra = Array.from(outputDocTypes).filter((dt) => !baseDocTypes.has(dt));
+    const extra = Array.from(outputDocTypes).filter(
+      (dt: unknown) => typeof dt === 'string' && !baseDocTypes.has(dt)
+    );
     metrics.push({
       name: 'no_extra_documents',
       ok: extra.length === 0,
@@ -594,7 +596,7 @@ export function validateRulesExtractionConstraints(
     'cas',
     'sevis',
   ];
-  docKeywords.forEach((keyword) => {
+  docKeywords.forEach((keyword: string) => {
     if (textLower.includes(keyword)) {
       mentionedDocs.push(keyword);
     }
