@@ -1244,11 +1244,11 @@ Return ONLY valid JSON matching the schema, no other text.`;
       financial: profile.financial
         ? {
             requiredFundsEstimate: profile.financial.requiredFundsEstimate,
-            requiredFundsUSD: profile.financial.requiredFundsUSD, // Phase 2: Added
-            availableFundsUSD: profile.financial.availableFundsUSD, // Phase 2: Added
+            requiredFundsUSD: (profile.financial as any).requiredFundsUSD, // Phase 2: Added
+            availableFundsUSD: (profile.financial as any).availableFundsUSD, // Phase 2: Added
             financialSufficiencyRatio: profile.financial.financialSufficiencyRatio,
-            financialSufficiencyLabel: profile.financial.financialSufficiencyLabel, // Phase 2: Added
-            sponsorHasSufficientFunds: profile.financial.sponsorHasSufficientFunds, // Phase 2: Added
+            financialSufficiencyLabel: (profile.financial as any).financialSufficiencyLabel, // Phase 2: Added
+            sponsorHasSufficientFunds: (profile.financial as any).sponsorHasSufficientFunds, // Phase 2: Added
             savingsGrowth: profile.financial.savingsGrowth,
             sourceOfFunds: profile.financial.sourceOfFunds,
             sponsor: profile.financial.sponsor,
@@ -1264,18 +1264,18 @@ Return ONLY valid JSON matching the schema, no other text.`;
       ties: profile.ties
         ? {
             tiesStrengthScore: profile.ties.tiesStrengthScore,
-            tiesStrengthLabel: profile.ties.tiesStrengthLabel, // Phase 2: Added
+            tiesStrengthLabel: (profile.ties as any).tiesStrengthLabel, // Phase 2: Added
             tiesFactors: profile.ties.tiesFactors,
-            propertyValueUSD: profile.ties.propertyValueUSD, // Phase 2: Added
-            employmentDurationMonths: profile.ties.employmentDurationMonths, // Phase 2: Added
+            propertyValueUSD: (profile.ties as any).propertyValueUSD, // Phase 2: Added
+            employmentDurationMonths: (profile.ties as any).employmentDurationMonths, // Phase 2: Added
           }
         : undefined,
       travelHistory: profile.travelHistory
         ? {
-            travelHistoryScore: profile.travelHistory.travelHistoryScore, // Phase 2: Added
-            travelHistoryLabel: profile.travelHistory.travelHistoryLabel, // Phase 2: Added
-            previousVisaRejections: profile.travelHistory.previousVisaRejections, // Phase 2: Added
-            hasOverstayHistory: profile.travelHistory.hasOverstayHistory, // Phase 2: Added
+            travelHistoryScore: (profile.travelHistory as any).travelHistoryScore, // Phase 2: Added
+            travelHistoryLabel: (profile.travelHistory as any).travelHistoryLabel, // Phase 2: Added
+            previousVisaRejections: (profile.travelHistory as any).previousVisaRejections, // Phase 2: Added
+            hasOverstayHistory: (profile.travelHistory as any).hasOverstayHistory, // Phase 2: Added
           }
         : undefined,
       property: profile.property,
@@ -1288,11 +1288,11 @@ Return ONLY valid JSON matching the schema, no other text.`;
           }
         : undefined,
       // Phase 2: Uzbek context and meta
-      uzbekContext: canonical.uzbekContext,
-      meta: canonical.meta
+      uzbekContext: (canonical as any).uzbekContext,
+      meta: (canonical as any).meta
         ? {
-            dataCompletenessScore: canonical.meta.dataCompletenessScore,
-            missingCriticalFields: canonical.meta.missingCriticalFields,
+            dataCompletenessScore: (canonical as any).meta?.dataCompletenessScore,
+            missingCriticalFields: (canonical as any).meta?.missingCriticalFields,
           }
         : undefined,
     };
@@ -1453,8 +1453,8 @@ ${ruleSet.additionalRequirements ? `\nAdditional Requirements:\n${JSON.stringify
 ${canonical.applicantProfile.financial ? `Financial: ${JSON.stringify(canonical.applicantProfile.financial, null, 2)}` : ''}
 ${canonical.applicantProfile.ties ? `Ties: ${JSON.stringify(canonical.applicantProfile.ties, null, 2)}` : ''}
 ${canonical.applicantProfile.travelHistory ? `Travel History: ${JSON.stringify(canonical.applicantProfile.travelHistory, null, 2)}` : ''}
-${canonical.uzbekContext ? `Uzbek Context: ${JSON.stringify(canonical.uzbekContext, null, 2)}` : ''}
-${canonical.meta ? `Meta: ${JSON.stringify(canonical.meta, null, 2)}` : ''}
+${(canonical as any).uzbekContext ? `Uzbek Context: ${JSON.stringify((canonical as any).uzbekContext, null, 2)}` : ''}
+${(canonical as any).meta ? `Meta: ${JSON.stringify((canonical as any).meta, null, 2)}` : ''}
 
 Use these expert fields to guide your appliesToThisApplicant decisions and reasonIfApplies explanations.
 If expert fields are missing, be conservative and mark more documents as appliesToThisApplicant = true.`;

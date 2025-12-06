@@ -813,50 +813,52 @@ APPLICANT_CONTEXT
         sponsorType: canonicalContext.applicantProfile.sponsorType,
         financial: canonicalContext.applicantProfile.financial
           ? {
-              requiredFundsUSD: canonicalContext.applicantProfile.financial.requiredFundsUSD,
-              availableFundsUSD: canonicalContext.applicantProfile.financial.availableFundsUSD,
+              requiredFundsUSD: (canonicalContext.applicantProfile.financial as any)
+                .requiredFundsUSD,
+              availableFundsUSD: (canonicalContext.applicantProfile.financial as any)
+                .availableFundsUSD,
               financialSufficiencyRatio:
                 canonicalContext.applicantProfile.financial.financialSufficiencyRatio,
-              financialSufficiencyLabel:
-                canonicalContext.applicantProfile.financial.financialSufficiencyLabel,
+              financialSufficiencyLabel: (canonicalContext.applicantProfile.financial as any)
+                .financialSufficiencyLabel,
             }
           : undefined,
         ties: canonicalContext.applicantProfile.ties
           ? {
               tiesStrengthScore: canonicalContext.applicantProfile.ties.tiesStrengthScore,
-              tiesStrengthLabel: canonicalContext.applicantProfile.ties.tiesStrengthLabel,
+              tiesStrengthLabel: (canonicalContext.applicantProfile.ties as any).tiesStrengthLabel,
               hasPropertyInUzbekistan: (canonicalContext.applicantProfile as any)
                 .hasPropertyInUzbekistan,
               hasFamilyInUzbekistan: (canonicalContext.applicantProfile as any)
                 .hasFamilyInUzbekistan,
               hasChildren: (canonicalContext.applicantProfile as any).hasChildren,
               isEmployed: (canonicalContext.applicantProfile as any).isEmployed,
-              employmentDurationMonths:
-                canonicalContext.applicantProfile.ties.employmentDurationMonths,
+              employmentDurationMonths: (canonicalContext.applicantProfile.ties as any)
+                .employmentDurationMonths,
             }
           : undefined,
         travelHistory: canonicalContext.applicantProfile.travelHistory
           ? {
-              travelHistoryScore:
-                canonicalContext.applicantProfile.travelHistory.travelHistoryScore,
-              travelHistoryLabel:
-                canonicalContext.applicantProfile.travelHistory.travelHistoryLabel,
-              previousVisaRejections:
-                canonicalContext.applicantProfile.travelHistory.previousVisaRejections,
-              hasOverstayHistory:
-                canonicalContext.applicantProfile.travelHistory.hasOverstayHistory,
+              travelHistoryScore: (canonicalContext.applicantProfile.travelHistory as any)
+                .travelHistoryScore,
+              travelHistoryLabel: (canonicalContext.applicantProfile.travelHistory as any)
+                .travelHistoryLabel,
+              previousVisaRejections: (canonicalContext.applicantProfile.travelHistory as any)
+                .previousVisaRejections,
+              hasOverstayHistory: (canonicalContext.applicantProfile.travelHistory as any)
+                .hasOverstayHistory,
             }
           : undefined,
-        uzbekContext: canonicalContext.uzbekContext
+        uzbekContext: (canonicalContext as any).uzbekContext
           ? {
-              isUzbekCitizen: canonicalContext.uzbekContext.isUzbekCitizen,
-              residesInUzbekistan: canonicalContext.uzbekContext.residesInUzbekistan,
+              isUzbekCitizen: (canonicalContext as any).uzbekContext.isUzbekCitizen,
+              residesInUzbekistan: (canonicalContext as any).uzbekContext.residesInUzbekistan,
             }
           : undefined,
-        meta: canonicalContext.meta
+        meta: (canonicalContext as any).meta
           ? {
-              dataCompletenessScore: canonicalContext.meta.dataCompletenessScore,
-              missingCriticalFields: canonicalContext.meta.missingCriticalFields,
+              dataCompletenessScore: (canonicalContext as any).meta.dataCompletenessScore,
+              missingCriticalFields: (canonicalContext as any).meta.missingCriticalFields,
             }
           : undefined,
       };
