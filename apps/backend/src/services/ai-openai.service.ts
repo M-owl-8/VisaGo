@@ -2,6 +2,10 @@
 import { getAIConfig } from '../config/ai-models';
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
+import { AITrainingTaskType, AITrainingSource } from '../ai-training/types';
+import { PROMPT_VERSIONS } from '../ai-training/config';
+import { getActiveModelForTask, RoutingOptions } from '../ai-model-registry/registry.service';
+import { AITaskType } from '../ai-model-registry/types';
 
 /**
  * OpenAI + RAG Service
@@ -45,6 +49,103 @@ export class AIOpenAIService {
   // Checklist generation ALWAYS uses GPT-4 (gpt-4o or gpt-4.1) - never falls back to mini
   public static readonly CHECKLIST_MODEL = process.env.OPENAI_MODEL_CHECKLIST || 'gpt-4o';
   private static readonly MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS || '2000');
+
+  /**
+   * Resolve model for task using registry (with fallback to defaults)
+   */
+  private static async resolveModelForTask(
+    taskType: AITaskType,
+    defaultModel: string
+  ): Promise<{ modelName: string; modelVersionId?: string }> {
+    try {
+      // Check env overrides
+      const envOverride =
+        process.env[`${taskType.toUpperCase().replace(/_/g, '_')}_FORCE_MODEL`] ||
+        process.env[`${taskType.split('_')[0].toUpperCase()}_FORCE_MODEL`] ||
+        (taskType === 'checklist_enrichment' ? process.env.CHECKLIST_FORCE_MODEL : undefined) ||
+        (taskType === 'document_check' ? process.env.DOC_CHECK_FORCE_MODEL : undefined) ||
+        (taskType === 'risk_explanation' ? process.env.RISK_FORCE_MODEL : undefined) ||
+        (taskType === 'document_explanation'
+          ? process.env.DOC_EXPLANATION_FORCE_MODEL
+          : undefined) ||
+        (taskType === 'rules_extraction' ? process.env.RULES_EXTRACTION_FORCE_MODEL : undefined);
+
+      const options: RoutingOptions = {
+        forceModelName: envOverride,
+        allowCandidates: true, // Allow canary models
+      };
+
+      const routing = await getActiveModelForTask(taskType, options);
+      return {
+        modelName: routing.modelName,
+        modelVersionId: routing.modelVersionId,
+      };
+    } catch (error) {
+      // Fallback to default if registry fails
+      logWarn('[AIOpenAI] Failed to resolve model from registry, using default', {
+        error: error instanceof Error ? error.message : String(error),
+        taskType,
+        defaultModel,
+      });
+      return {
+        modelName: defaultModel,
+      };
+    }
+  }
+
+  /**
+   * Record AI interaction for training data pipeline
+   * Called after GPT-4 API calls to store request/response for export
+   */
+  private static async recordAIInteraction(params: {
+    taskType: AITrainingTaskType;
+    model: string;
+    promptVersion?: string;
+    source: AITrainingSource;
+    requestPayload: any;
+    responsePayload: any;
+    success: boolean;
+    errorMessage?: string;
+    modelVersionId?: string;
+    contextMeta?: {
+      countryCode?: string | null;
+      visaType?: string | null;
+      ruleSetId?: string | null;
+      applicationId?: string | null;
+      userId?: string | null;
+    };
+  }): Promise<void> {
+    try {
+      if (!AIOpenAIService.prisma) {
+        AIOpenAIService.prisma = new PrismaClient();
+      }
+
+      await AIOpenAIService.prisma.aIInteraction.create({
+        data: {
+          taskType: params.taskType,
+          model: params.model,
+          promptVersion: params.promptVersion || null,
+          requestPayload: params.requestPayload as any,
+          responsePayload: params.responsePayload as any,
+          success: params.success,
+          errorMessage: params.errorMessage || null,
+          source: params.source,
+          countryCode: params.contextMeta?.countryCode || null,
+          visaType: params.contextMeta?.visaType || null,
+          ruleSetId: params.contextMeta?.ruleSetId || null,
+          applicationId: params.contextMeta?.applicationId || null,
+          userId: params.contextMeta?.userId || null,
+          modelVersionId: params.modelVersionId || null,
+        },
+      });
+    } catch (error) {
+      // Don't fail the main request if logging fails
+      logWarn('[AIOpenAI] Failed to record AI interaction', {
+        error: error instanceof Error ? error.message : String(error),
+        taskType: params.taskType,
+      });
+    }
+  }
 
   /**
    * Get OpenAI client (for internal use)
@@ -612,17 +713,17 @@ NO markdown, NO extra text, ONLY valid JSON.`;
    * Build user prompt for hybrid mode
    * Includes base checklist and context
    */
-  private static buildHybridUserPrompt(
+  private static async buildHybridUserPrompt(
     userContext: any,
     country: string,
     visaType: string,
     baseChecklist: Array<{ documentType: string; category: string; required: boolean }>,
     visaKb: string,
     documentGuidesText: string
-  ): string {
+  ): Promise<string> {
     // Convert to canonical format for consistent GPT input
     const { buildCanonicalAIUserContext } = require('./ai-context.service');
-    const canonical = buildCanonicalAIUserContext(userContext);
+    const canonical = await buildCanonicalAIUserContext(userContext);
     const profile = canonical.applicantProfile;
     const riskScore = canonical.riskScore;
 
@@ -1106,7 +1207,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
             const hybridSystemPrompt = this.buildHybridSystemPrompt(country, visaType, visaKb);
 
             // Build hybrid user prompt with base checklist
-            const hybridUserPrompt = this.buildHybridUserPrompt(
+            const hybridUserPrompt = await this.buildHybridUserPrompt(
               userContext,
               country,
               visaType,
@@ -2425,7 +2526,7 @@ You MUST:
       let userPrompt: string;
       if (useCompactPrompts) {
         const { buildCanonicalAIUserContext } = await import('./ai-context.service');
-        const canonical = buildCanonicalAIUserContext(aiUserContext);
+        const canonical = await buildCanonicalAIUserContext(aiUserContext);
         userPrompt = this.buildLegacyUserPromptCompact(
           canonical,
           country,

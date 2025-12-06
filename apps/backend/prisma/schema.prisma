@@ -123,13 +123,13 @@ model VisaApplication {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  country      Country               @relation(fields: [countryId], references: [id])
-  visaType     VisaType              @relation(fields: [visaTypeId], references: [id])
-  documents    UserDocument[]
-  payment      Payment?
-  checkpoints  Checkpoint[]
-  checkResults DocumentCheckResult[] // Phase 3: Document check results
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country           Country               @relation(fields: [countryId], references: [id])
+  visaType          VisaType              @relation(fields: [visaTypeId], references: [id])
+  documents         UserDocument[]
+  payment           Payment?
+  checkpoints       Checkpoint[]
+  checkResults      DocumentCheckResult[] // Phase 3: Document check results
   riskExplanation   VisaRiskExplanation?
   checklistFeedback ChecklistFeedback[]
 
@@ -186,6 +186,9 @@ model UserDocument {
   aiNotesUz         String?
   aiNotesRu         String?
   aiNotesEn         String?
+  // Phase 3: Expert validation fields (JSONB for PostgreSQL)
+  validationDetails Json? // JSON with validationDetails from expert document verification
+  officerAssessment Json? // JSON with embassyOfficerAssessment and expert perspective
   // Phase 3: Document classification fields
   // TODO: classification fields were removed from DB; reintroduce carefully with a proper migration if needed.
   // classifiedType        String?   // e.g. "passport", "bank_statement", "employment_letter"
@@ -524,6 +527,8 @@ model DocumentChecklist {
   aiGenerated   Boolean   @default(false)
   generatedAt   DateTime?
   errorMessage  String?
+  // Phase 3: Expert fields (JSONB for PostgreSQL)
+  expertFields  Json? // JSON with expertReasoning, financialDetails, tiesDetails, countrySpecificRequirements
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -570,24 +575,24 @@ model DocumentCheckResult {
 
 model EmbassySource {
   id            String    @id @default(cuid())
-  countryCode   String    // ISO 3166-1 alpha-2 (e.g., "US", "CA")
-  visaType      String    // "student" | "tourist" | "work" | etc.
-  url           String    // Official embassy/consulate page URL
-  name          String?   // Human-readable name (e.g., "US Embassy Tashkent - Student Visa")
-  description   String?   // Optional description
+  countryCode   String // ISO 3166-1 alpha-2 (e.g., "US", "CA")
+  visaType      String // "student" | "tourist" | "work" | etc.
+  url           String // Official embassy/consulate page URL
+  name          String? // Human-readable name (e.g., "US Embassy Tashkent - Student Visa")
+  description   String? // Optional description
   isActive      Boolean   @default(true)
   lastFetchedAt DateTime?
-  lastStatus    String?   // "success" | "failed" | "pending"
-  lastError     String?   // Error message if last fetch failed
+  lastStatus    String? // "success" | "failed" | "pending"
+  lastError     String? // Error message if last fetch failed
   fetchInterval Int       @default(86400) // Seconds between fetches (default: 24 hours)
   priority      Int       @default(0) // Higher priority sources are fetched first
-  metadata      String?   // JSON with additional metadata (selectors, headers, etc.)
+  metadata      String? // JSON with additional metadata (selectors, headers, etc.)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  ruleSets VisaRuleSet[]
+  ruleSets     VisaRuleSet[]
   pageContents EmbassyPageContent[]
-  candidates VisaRuleSetCandidate[]
+  candidates   VisaRuleSetCandidate[]
 
   @@unique([countryCode, visaType, url])
   @@index([countryCode, visaType])
@@ -597,26 +602,26 @@ model EmbassySource {
 }
 
 model VisaRuleSet {
-  id            String   @id @default(cuid())
-  countryCode   String   // ISO 3166-1 alpha-2
-  visaType      String   // "student" | "tourist" | "work" | etc.
-  data          Json     // Structured visa rules (see VisaRuleSetData type)
-  data_legacy   Json?    // Backup for rollback and migration
-  version       Int      @default(1) // Incremental version number
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  createdBy     String   @default("system") // "system" | "admin" | userId
-  sourceSummary String?  // Summary of sources used (e.g., "US Embassy Tashkent, VFS Global")
-  isApproved    Boolean  @default(false) // Only approved rule sets are used in production
-  approvedAt    DateTime?
-  approvedBy    String?  // Admin user ID who approved
-  rejectionReason String? // If rejected, reason for rejection
-  sourceId      String?  // Optional: link to EmbassySource that generated this
+  id                 String    @id @default(cuid())
+  countryCode        String // ISO 3166-1 alpha-2
+  visaType           String // "student" | "tourist" | "work" | etc.
+  data               Json // Structured visa rules (see VisaRuleSetData type)
+  data_legacy        Json? // Backup for rollback and migration
+  version            Int       @default(1) // Incremental version number
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  createdBy          String    @default("system") // "system" | "admin" | userId
+  sourceSummary      String? // Summary of sources used (e.g., "US Embassy Tashkent, VFS Global")
+  isApproved         Boolean   @default(false) // Only approved rule sets are used in production
+  approvedAt         DateTime?
+  approvedBy         String? // Admin user ID who approved
+  rejectionReason    String? // If rejected, reason for rejection
+  sourceId           String? // Optional: link to EmbassySource that generated this
   extractionMetadata Json? // Metadata about GPT-4 extraction (tokens, confidence, etc.)
 
-  source EmbassySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  versions VisaRuleVersion[]
-  changeLogs VisaRuleSetChangeLog[]
+  source             EmbassySource?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  versions           VisaRuleVersion[]
+  changeLogs         VisaRuleSetChangeLog[]
   documentReferences VisaRuleReference[]
 
   @@unique([countryCode, visaType, version])
@@ -627,12 +632,12 @@ model VisaRuleSet {
 }
 
 model VisaRuleVersion {
-  id          String   @id @default(cuid())
-  ruleSetId  String
-  data       Json     // Snapshot of rule set data at this version
-  version    Int      // Version number
-  changeLog  String?  // Human-readable summary of changes
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  ruleSetId String
+  data      Json // Snapshot of rule set data at this version
+  version   Int // Version number
+  changeLog String? // Human-readable summary of changes
+  createdAt DateTime @default(now())
 
   ruleSet VisaRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
 
@@ -642,19 +647,19 @@ model VisaRuleVersion {
 }
 
 model EmbassyPageContent {
-  id            String   @id @default(cuid())
-  sourceId      String
-  url           String
-  cleanedText   String   @db.Text
-  html          String?  @db.Text
-  title         String?
-  status        String   @default("success")
-  httpStatus    Int?
-  errorMessage  String?
-  metadata      Json?
-  fetchedAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  sourceId     String
+  url          String
+  cleanedText  String   @db.Text
+  html         String?  @db.Text
+  title        String?
+  status       String   @default("success")
+  httpStatus   Int?
+  errorMessage String?
+  metadata     Json?
+  fetchedAt    DateTime @default(now())
 
-  source EmbassySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source     EmbassySource          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   candidates VisaRuleSetCandidate[]
 
   @@index([sourceId])
@@ -664,22 +669,22 @@ model EmbassyPageContent {
 }
 
 model VisaRuleSetCandidate {
-  id            String   @id @default(cuid())
-  sourceId      String
-  pageContentId String?
-  countryCode   String
-  visaType       String
-  data           Json
-  confidence     Float?
+  id                 String    @id @default(cuid())
+  sourceId           String
+  pageContentId      String?
+  countryCode        String
+  visaType           String
+  data               Json
+  confidence         Float?
   extractionMetadata Json?
-  status         String   @default("pending")
-  reviewedBy     String?
-  reviewedAt     DateTime?
-  reviewNotes    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status             String    @default("pending")
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  reviewNotes        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  source EmbassySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source      EmbassySource       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   pageContent EmbassyPageContent? @relation(fields: [pageContentId], references: [id], onDelete: SetNull)
 
   @@index([sourceId])
@@ -705,18 +710,24 @@ model VisaRuleSetChangeLog {
 }
 
 model VisaRiskExplanation {
-  id            String   @id @default(cuid())
-  applicationId String   @unique
-  userId        String
-  countryCode   String
-  visaType      String
-  riskLevel     String   // "low" | "medium" | "high"
-  summaryEn     String
-  summaryUz     String
-  summaryRu     String
-  recommendations Json   // JSON array of recommendation objects
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  applicationId      String   @unique
+  userId             String
+  countryCode        String
+  visaType           String
+  riskLevel          String // "low" | "medium" | "high"
+  summaryEn          String
+  summaryUz          String
+  summaryRu          String
+  recommendations    Json // JSON array of recommendation objects
+  // Phase 3: Expert fields (JSONB for PostgreSQL)
+  factorWeights      Json? // JSON with factorWeights (financial, ties, travelHistory, purpose, other)
+  improvementImpact  Json? // JSON with overall impact and probabilityIncrease
+  timeline           String? // Timeline for implementing recommendations
+  costEstimate       Json? // JSON with total, currency, breakdown
+  officerPerspective String?  @db.Text // Expert perspective on what officers will evaluate
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
@@ -728,15 +739,15 @@ model VisaRiskExplanation {
 }
 
 model ChecklistFeedback {
-  id              String   @id @default(cuid())
-  applicationId   String
-  userId          String
-  countryCode     String
-  visaType        String
-  checklistSnapshot Json   // JSON snapshot of checklist at time of feedback
-  feedbackType    String   // "missing_docs" | "unnecessary_docs" | "other"
-  feedbackText    String
-  createdAt       DateTime @default(now())
+  id                String   @id @default(cuid())
+  applicationId     String
+  userId            String
+  countryCode       String
+  visaType          String
+  checklistSnapshot Json // JSON snapshot of checklist at time of feedback
+  feedbackType      String // "missing_docs" | "unnecessary_docs" | "other"
+  feedbackText      String
+  createdAt         DateTime @default(now())
 
   application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
@@ -744,6 +755,116 @@ model ChecklistFeedback {
   @@index([userId])
   @@index([countryCode, visaType])
   @@index([feedbackType])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// AI INTERACTION LOGGING (Training Data Pipeline)
+// ============================================================================
+
+model AIInteraction {
+  id             String   @id @default(cuid())
+  taskType       String   // 'checklist_enrichment' | 'document_check' | 'risk_explanation' | 'document_explanation' | 'rules_extraction'
+  model          String   // e.g., 'gpt-4', 'gpt-4-turbo'
+  promptVersion  String?  // e.g., 'checklist-v2-expert'
+  requestPayload Json     // Full request (system prompt, user prompt, context)
+  responsePayload Json     // Full response (parsed JSON)
+  success        Boolean  @default(true)
+  errorMessage   String?
+  source         String   @default("prod") // 'prod' | 'eval' | 'synthetic' | 'human_correction'
+
+  // Context metadata
+  countryCode    String?
+  visaType       String?
+  ruleSetId      String?
+  applicationId String?
+  userId         String?
+
+  // Quality metrics
+  qualityScore   Float?   // 0.0-1.0, optional for later
+  createdAt      DateTime @default(now())
+
+  // Model registry relation
+  modelVersion   AIModelVersion? @relation(fields: [modelVersionId], references: [id])
+  modelVersionId String?
+
+  @@index([taskType])
+  @@index([source])
+  @@index([countryCode, visaType])
+  @@index([applicationId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([success])
+  @@index([modelVersionId])
+}
+
+// ============================================================================
+// AI MODEL REGISTRY & FINE-TUNE LIFECYCLE
+// ============================================================================
+
+enum AIModelStatus {
+  ACTIVE
+  CANDIDATE
+  DEPRECATED
+  ARCHIVED
+}
+
+enum AIFineTuneStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model AIModelVersion {
+  id             String        @id @default(cuid())
+  taskType       String        // e.g. 'checklist_enrichment'
+  provider       String        // e.g. 'openai', 'deepseek'
+  baseModel      String        // base model name, e.g. 'gpt-4o-mini'
+  modelName      String        // final model name used in calls (fine-tuned)
+  externalModelId String?      // provider-specific ID if different
+  status         AIModelStatus @default(CANDIDATE)
+  trafficPercent Int           @default(0) // 0..100, only ACTIVE/CANDIDATE considered for routing
+  promptVersion  String?       // links to prompt version used
+  dataSnapshot   Json?         // object storing info about datasets used, etc.
+  notes          String?       @db.Text
+  createdAt      DateTime      @default(now())
+  activatedAt    DateTime?
+
+  // Relations
+  fineTuneJobs   AIFineTuneJob[]
+  interactions   AIInteraction[]
+
+  @@index([taskType])
+  @@index([status])
+  @@index([taskType, status])
+  @@index([createdAt])
+}
+
+model AIFineTuneJob {
+  id              String           @id @default(cuid())
+  taskType        String
+  provider        String           // 'openai', 'deepseek', etc.
+  baseModel       String
+  status          AIFineTuneStatus  @default(QUEUED)
+  externalJobId   String?          // provider job ID
+  resultModelName String?          // resulting model name
+  trainFilePath   String           // path to train JSONL
+  valFilePath     String?          // path to val JSONL
+  metrics         Json?
+  errorMessage    String?          @db.Text
+
+  modelVersion    AIModelVersion?  @relation(fields: [modelVersionId], references: [id])
+  modelVersionId  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+
+  @@index([taskType])
+  @@index([status])
+  @@index([modelVersionId])
   @@index([createdAt])
 }
 
@@ -781,10 +902,10 @@ model VisaRuleReference {
   documentId          String
   condition           String?
   categoryOverride    String?
-  descriptionOverride String? @db.Text
+  descriptionOverride String?  @db.Text
   createdAt           DateTime @default(now())
 
-  ruleSet  VisaRuleSet    @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+  ruleSet  VisaRuleSet     @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
   document DocumentCatalog @relation(fields: [documentId], references: [id])
 
   @@unique([ruleSetId, documentId])

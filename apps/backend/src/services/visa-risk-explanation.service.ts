@@ -13,7 +13,8 @@ import { z } from 'zod';
 const prisma = new PrismaClient();
 
 /**
- * Risk Explanation Response Schema
+ * Risk Explanation Response Schema (EXPERT VERSION - Phase 3)
+ * Extended with expert fields: factorWeights, improvementImpact, timeline, costEstimate, officerPerspective
  */
 const RiskExplanationResponseSchema = z.object({
   riskLevel: z.enum(['low', 'medium', 'high']),
@@ -29,8 +30,37 @@ const RiskExplanationResponseSchema = z.object({
       detailsEn: z.string(),
       detailsUz: z.string(),
       detailsRu: z.string(),
+      // Phase 3: Expert fields (optional for backward compatibility)
+      improvementImpact: z.string().optional(), // Expected impact on approval chances
+      timeline: z.string().optional(), // How long to implement
+      costEstimate: z.string().optional(), // Estimated cost
     })
   ),
+  // Phase 3: Expert fields (optional for backward compatibility)
+  factorWeights: z
+    .object({
+      financial: z.number().optional(), // Weight of financial factors (0.0-1.0)
+      ties: z.number().optional(), // Weight of ties factors (0.0-1.0)
+      travelHistory: z.number().optional(), // Weight of travel history (0.0-1.0)
+      purpose: z.number().optional(), // Weight of purpose clarity (0.0-1.0)
+      other: z.number().optional(), // Weight of other factors (0.0-1.0)
+    })
+    .optional(),
+  improvementImpact: z
+    .object({
+      overall: z.string().optional(), // Overall expected impact
+      probabilityIncrease: z.number().optional(), // Expected probability increase (0-100)
+    })
+    .optional(),
+  timeline: z.string().optional(), // Timeline for implementing all recommendations
+  costEstimate: z
+    .object({
+      total: z.number().optional(), // Total estimated cost (USD)
+      currency: z.string().optional(), // Currency code
+      breakdown: z.array(z.object({ item: z.string(), cost: z.number() })).optional(),
+    })
+    .optional(),
+  officerPerspective: z.string().optional(), // Expert perspective on what officers will evaluate
 });
 
 export type RiskExplanationResponse = z.infer<typeof RiskExplanationResponseSchema>;

@@ -187,26 +187,125 @@ export interface CanonicalAIUserContext {
       | 'more_than_1_year'
       | 'unknown';
 
-    // Financial
+    // Financial (basic - kept for backward compatibility)
     sponsorType: 'self' | 'parent' | 'relative' | 'company' | 'other'; // Default: 'self'
     bankBalanceUSD: number | null; // null if unknown
     monthlyIncomeUSD: number | null; // null if unknown
 
-    // Employment/Education
+    // Financial (expert fields - Phase 3)
+    financial?: {
+      incomeHistory?: number[]; // Last 6 months of income
+      savingsGrowth?: 'increasing' | 'stable' | 'decreasing';
+      accountAgeMonths?: number | null;
+      sourceOfFunds?: 'employment' | 'business' | 'sponsor' | 'inheritance' | 'savings' | 'unknown';
+      sponsor?: {
+        income?: number | null;
+        savings?: number | null;
+        dependents?: number | null;
+        relationship?: 'parent' | 'sibling' | 'relative' | 'friend' | 'other';
+      };
+      requiredFundsEstimate?: number | null; // Estimated funds needed for trip
+      financialSufficiencyRatio?: number | null; // availableFunds / requiredFunds (0.0-1.0+)
+    };
+
+    // Employment/Education (basic - kept for backward compatibility)
     currentStatus: 'student' | 'employed' | 'self_employed' | 'unemployed' | 'retired' | 'unknown'; // Default: 'unknown'
     isStudent: boolean; // Default: false
     isEmployed: boolean; // Default: false
 
-    // Travel history
+    // Employment (expert fields - Phase 3)
+    employment?: {
+      employerName?: string | null;
+      industry?: string | null;
+      employmentDurationMonths?: number | null;
+      salaryHistory?: number[]; // Last 6 months of salary
+      contractType?: 'permanent' | 'contract' | 'freelance' | 'part_time' | 'unknown';
+      employerStability?:
+        | 'established_company'
+        | 'startup'
+        | 'government'
+        | 'self_employed'
+        | 'unknown';
+    };
+
+    // Education (expert fields - Phase 3)
+    education?: {
+      degreeLevel?: 'bachelor' | 'master' | 'phd' | 'diploma' | 'certificate' | 'none' | 'unknown';
+      institution?: string | null;
+      graduationDate?: string | null; // ISO date string
+      fieldOfStudy?: string | null;
+      gpa?: number | null;
+    };
+
+    // Travel history (basic - kept for backward compatibility)
     hasInternationalTravel: boolean; // Default: false
     previousVisaRejections: boolean; // Default: false
     previousOverstay: boolean; // Default: false
 
-    // Ties to home country
+    // Travel history (expert fields - Phase 3)
+    travelHistory?: {
+      countries?: Array<{
+        country: string; // ISO country code
+        dates?: string; // Date range or single date
+        visaType?: 'tourist' | 'student' | 'work' | 'transit' | 'other';
+        outcome?: 'approved' | 'rejected' | 'unknown';
+      }>;
+      previousVisaTypes?: string[]; // List of visa types obtained
+      previousVisaResults?: Array<{
+        country: string;
+        visaType: string;
+        outcome: 'approved' | 'rejected';
+        date?: string;
+      }>;
+    };
+
+    // Family (expert fields - Phase 3)
+    family?: {
+      spouse?: {
+        citizenship?: string | null;
+        employed?: boolean | null;
+        income?: number | null;
+      } | null;
+      children?: Array<{
+        age?: number | null;
+        citizenship?: string | null;
+        dependent?: boolean;
+      }>;
+      dependentFamily?: Array<{
+        relationship?: string;
+        dependent?: boolean;
+      }>;
+      familyAbroad?: Array<{
+        country?: string;
+        relationship?: string;
+        status?: string; // e.g., "citizen", "permanent_resident"
+      }>;
+    };
+
+    // Ties to home country (basic - kept for backward compatibility)
     hasPropertyInUzbekistan: boolean; // Default: false
     hasFamilyInUzbekistan: boolean; // Default: false
     maritalStatus: 'single' | 'married' | 'divorced' | 'widowed' | 'unknown'; // Default: 'unknown'
     hasChildren: boolean; // Default: false
+
+    // Property (expert fields - Phase 3)
+    property?: {
+      valueUSD?: number | null;
+      type?: 'apartment' | 'house' | 'land' | 'commercial' | 'unknown';
+      ownershipDurationMonths?: number | null;
+      location?: string | null;
+    };
+
+    // Ties (expert fields - Phase 3)
+    ties?: {
+      tiesStrengthScore?: number; // 0.0-1.0, calculated from property, employment, family
+      tiesFactors?: {
+        property?: number; // 0.0-1.0 contribution
+        employment?: number; // 0.0-1.0 contribution
+        family?: number; // 0.0-1.0 contribution
+        children?: number; // 0.0-1.0 contribution
+      };
+    };
 
     // Invitations
     hasUniversityInvitation: boolean; // Default: false
@@ -249,5 +348,14 @@ export interface CanonicalAIUserContext {
     sourceFormat: 'v2' | 'legacy' | 'hybrid' | 'unknown';
     extractionWarnings?: string[]; // Warnings about missing/incomplete data
     fallbackFieldsUsed?: string[]; // Fields that used defaults
+  };
+
+  // Embassy context (expert fields - Phase 3)
+  embassyContext?: {
+    minimumFundsRequired?: number | null; // From VisaRuleSet.financialRequirements.minimumBalance
+    minimumStatementMonths?: number | null; // From VisaRuleSet.financialRequirements.bankStatementMonths
+    currency?: string | null; // From VisaRuleSet.financialRequirements.currency
+    commonRefusalReasons?: string[]; // Country-specific common refusal reasons
+    officerEvaluationCriteria?: string[]; // What officers check for this country/visa type
   };
 }

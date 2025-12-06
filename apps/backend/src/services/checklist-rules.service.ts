@@ -74,7 +74,7 @@ async function buildBaseChecklistFromCatalogReferences(
     // Build canonical context for condition evaluation
     let canonicalContext: CanonicalAIUserContext | null = null;
     try {
-      canonicalContext = buildCanonicalAIUserContext(userContext);
+      canonicalContext = await buildCanonicalAIUserContext(userContext);
     } catch (error) {
       logWarn('[ChecklistRules] Failed to build canonical context for catalog mode', {
         error: error instanceof Error ? error.message : String(error),
@@ -196,7 +196,7 @@ function buildBaseChecklistFromEmbeddedDocuments(
     let canonicalContext: CanonicalAIUserContext | null = null;
     if (conditionalLogicEnabled) {
       try {
-        canonicalContext = buildCanonicalAIUserContext(userContext);
+        canonicalContext = await buildCanonicalAIUserContext(userContext);
       } catch (error) {
         logWarn('[ChecklistRules] Failed to build canonical context for condition evaluation', {
           error: error instanceof Error ? error.message : String(error),

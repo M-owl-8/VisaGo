@@ -13,9 +13,11 @@ import { buildCanonicalAIUserContext } from './ai-context.service';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 import { logChecklistGeneration, extractApplicationId } from '../utils/gpt-logging';
 import { z } from 'zod';
+import { PROMPT_VERSIONS } from '../ai-training/config';
 
 /**
  * Checklist Item Schema (using Zod for validation)
+ * Phase 3: Extended with expert fields
  */
 const ChecklistItemSchema = z.object({
   id: z.string(),
@@ -32,6 +34,38 @@ const ChecklistItemSchema = z.object({
   group: z.enum(['identity', 'financial', 'travel', 'education', 'employment', 'ties', 'other']),
   priority: z.number().int().min(1),
   dependsOn: z.array(z.string()).optional(),
+  // Phase 3: Expert fields (optional for backward compatibility)
+  expertReasoning: z
+    .object({
+      financialRelevance: z.string().optional(), // Why this document matters for financial sufficiency
+      tiesRelevance: z.string().optional(), // How this document strengthens ties
+      riskMitigation: z.array(z.string()).optional(), // Risk factors this document addresses
+      embassyOfficerPerspective: z.string().optional(), // What officers look for
+    })
+    .optional(),
+  financialDetails: z
+    .object({
+      minRequired: z.number().nullable().optional(), // Minimum funds required
+      applicantHas: z.number().nullable().optional(), // What applicant has available
+      ratio: z.number().nullable().optional(), // applicantHas / minRequired
+      meetsRequirement: z.boolean().optional(), // Whether requirement is met
+    })
+    .optional(),
+  tiesDetails: z
+    .object({
+      strengthensTies: z.boolean().optional(), // Whether this document strengthens ties
+      tiesStrengthContribution: z.number().optional(), // Contribution to ties strength (0.0-1.0)
+    })
+    .optional(),
+  countrySpecificRequirements: z
+    .object({
+      format: z.string().optional(), // Required format
+      apostille: z.boolean().optional(), // Whether apostille required
+      translation: z.string().optional(), // Translation requirements
+      validityPeriod: z.string().optional(), // Validity period requirements
+      officerNotes: z.string().optional(), // Country-specific officer notes
+    })
+    .optional(),
 });
 
 const ChecklistResponseSchema = z.object({
@@ -142,6 +176,10 @@ export class VisaChecklistEngineService {
         documentReferences,
       });
 
+      // Store for error handling
+      capturedBaseDocuments = baseDocuments;
+      capturedRuleSetId = ruleSetId || null;
+
       if (baseDocuments.length === 0) {
         logWarn('[VisaChecklistEngine] Base checklist is empty', {
           countryCode,
@@ -187,18 +225,31 @@ export class VisaChecklistEngineService {
         : this.buildSystemPromptLegacy(countryCode, visaType, ruleSet);
 
       // Step 5: Build compact user prompt with base documents
-      const userPrompt = this.buildUserPrompt(aiUserContext, baseDocuments, previousChecklist);
+      const userPrompt = await this.buildUserPrompt(
+        aiUserContext,
+        baseDocuments,
+        previousChecklist
+      );
 
-      // Step 4: Call GPT-4 with structured output using checklist model
-      const checklistModel = AIOpenAIService.getChecklistModel();
+      // Step 4: Resolve model from registry (with fallback)
+      const defaultChecklistModel = AIOpenAIService.getChecklistModel();
+      const modelRouting = await AIOpenAIService['resolveModelForTask'](
+        'checklist_enrichment',
+        defaultChecklistModel
+      );
+      const checklistModel = modelRouting.modelName;
+      const modelVersionId = modelRouting.modelVersionId;
+
       console.log(`[Checklist][AI] Using model: ${checklistModel}`, {
         countryCode,
         visaType,
         mode: 'visa-checklist-engine',
+        modelVersionId,
       });
 
       logInfo('[VisaChecklistEngine] Calling GPT-4 for checklist generation', {
         model: checklistModel,
+        modelVersionId,
         countryCode,
         visaType,
       });
@@ -351,6 +402,10 @@ export class VisaChecklistEngineService {
         jsonValidationPassed = true;
       }
 
+      // Phase 3: Apply risk-weighted prioritization
+      const canonical = await buildCanonicalAIUserContext(aiUserContext);
+      parsed.checklist = this.applyRiskWeightedPrioritization(parsed.checklist, canonical);
+
       // Get condition warnings from base documents (reuse already computed baseDocuments)
       const conditionWarnings: string[] = [];
       // Note: condition warnings are logged in buildBaseChecklistFromRules, but we'll capture them here if needed
@@ -382,10 +437,83 @@ export class VisaChecklistEngineService {
         itemCount: parsed.checklist.length,
       });
 
+      // Record AI interaction for training data pipeline
+      const userId = (aiUserContext as any)?.userProfile?.userId;
+      const promptVersion =
+        process.env.USE_COMPACT_CHECKLIST_PROMPTS !== 'false'
+          ? PROMPT_VERSIONS.CHECKLIST_PROMPT_V2_EXPERT
+          : PROMPT_VERSIONS.CHECKLIST_PROMPT_V1;
+      const source = process.env.AI_EVAL_MODE === 'true' ? ('eval' as const) : ('prod' as const);
+
+      await AIOpenAIService['recordAIInteraction']({
+        taskType: 'checklist_enrichment',
+        model: checklistModel,
+        promptVersion,
+        source,
+        modelVersionId,
+        requestPayload: {
+          systemPrompt,
+          userPrompt,
+          countryCode,
+          visaType,
+          baseDocuments,
+          canonicalAIUserContext: canonical,
+          embassySummary,
+        },
+        responsePayload: parsed,
+        success: true,
+        contextMeta: {
+          countryCode,
+          visaType,
+          ruleSetId,
+          applicationId,
+          userId,
+        },
+      }).catch((err) => {
+        // Don't fail the request if logging fails
+        logWarn('[VisaChecklistEngine] Failed to record AI interaction', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
       return parsed as ChecklistResponse;
     } catch (error) {
       const applicationId = extractApplicationId(aiUserContext);
       const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
+      const userId = (aiUserContext as any)?.userProfile?.userId;
+      const promptVersion =
+        process.env.USE_COMPACT_CHECKLIST_PROMPTS !== 'false'
+          ? PROMPT_VERSIONS.CHECKLIST_PROMPT_V2_EXPERT
+          : PROMPT_VERSIONS.CHECKLIST_PROMPT_V1;
+      const source = process.env.AI_EVAL_MODE === 'true' ? ('eval' as const) : ('prod' as const);
+
+      // Record failed interaction (baseDocuments and ruleSetId may not be in scope, use fallbacks)
+      const failedBaseDocuments = (typeof baseDocuments !== 'undefined' ? baseDocuments : []) || [];
+      const failedRuleSetId = typeof ruleSetId !== 'undefined' ? ruleSetId : null;
+
+      await AIOpenAIService['recordAIInteraction']({
+        taskType: 'checklist_enrichment',
+        model: AIOpenAIService.getChecklistModel(),
+        promptVersion,
+        source,
+        requestPayload: {
+          countryCode,
+          visaType,
+          baseDocuments: failedBaseDocuments,
+        },
+        responsePayload: {},
+        success: false,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        contextMeta: {
+          countryCode,
+          visaType,
+          ruleSetId: failedRuleSetId,
+          applicationId,
+          userId,
+        },
+      }).catch(() => {
+        // Ignore logging errors
+      });
 
       logChecklistGeneration({
         applicationId,
@@ -425,8 +553,8 @@ export class VisaChecklistEngineService {
   }
 
   /**
-   * Build system prompt for checklist generation (COMPACT VERSION)
-   * GPT only enriches fields, does NOT invent new documentTypes
+   * Build system prompt for checklist generation (EXPERT VERSION - Phase 3)
+   * GPT acts as an expert visa officer with deep immigration reasoning
    */
   private static buildSystemPrompt(
     countryCode: string,
@@ -435,10 +563,28 @@ export class VisaChecklistEngineService {
     embassySummary?: string
   ): string {
     const embassyContext = embassySummary
-      ? `\nEMBASSY SUMMARY:\n${embassySummary.substring(0, 500)}\n`
+      ? `\nEMBASSY SUMMARY:\n${embassySummary.substring(0, 2000)}\n`
       : '';
 
-    return `You are a visa checklist enricher. Your ONLY job: enrich base documents with names, descriptions, and personalization flags.
+    return `You are an EXPERT VISA OFFICER with 15+ years of experience evaluating visa applications from Uzbek applicants.
+
+================================================================================
+YOUR EXPERTISE
+================================================================================
+
+You have deep knowledge of:
+- Immigration law and visa requirements for ${countryCode} ${visaType.toUpperCase()} visas
+- Financial sufficiency assessment (calculating required funds, evaluating income stability, sponsor credibility)
+- Ties assessment (property, employment, family, children - all factors that prove return intention)
+- Risk factor identification (previous refusals, weak finances, unclear purpose, immigration intent)
+- Embassy officer evaluation criteria and decision-making patterns
+- Country-specific requirements, terminology, and common refusal reasons
+
+================================================================================
+YOUR ROLE: EXPERT CHECKLIST ENRICHMENT
+================================================================================
+
+Your ONLY job: Enrich base documents with expert-level names, descriptions, and personalization.
 
 CRITICAL RULES:
 - You MUST output exactly the documentTypes provided in BASE_DOCUMENTS
@@ -447,7 +593,42 @@ CRITICAL RULES:
 - You MUST NOT change category or required status
 - You ONLY enrich: name, nameUz, nameRu, description, appliesToThisApplicant, reasonIfApplies
 
-OUTPUT SCHEMA:
+================================================================================
+EXPERT REASONING FRAMEWORK
+================================================================================
+
+When evaluating appliesToThisApplicant, think like an embassy officer:
+
+1. FINANCIAL SUFFICIENCY REASONING:
+   - Calculate: Does applicant have sufficient funds? (availableFunds / requiredFunds ratio)
+   - If ratio < 1.0: Financial documents are CRITICAL, emphasize importance
+   - If sponsor: Evaluate sponsor credibility (income, relationship, dependents)
+   - Consider: Income stability, savings growth trend, account age
+   - Red flags: Sudden large deposits, inconsistent income, weak sponsor
+
+2. TIES ASSESSMENT:
+   - Property: Ownership duration, value, location (stronger if owned long-term)
+   - Employment: Duration, stability, industry (government/established > startup)
+   - Family: Spouse, children, dependent family (children = strongest tie)
+   - Ties strength score: 0.0-1.0 (higher = stronger return intention)
+   - If ties < 0.5: Emphasize documents that strengthen ties
+
+3. RISK FACTOR MITIGATION:
+   - Previous refusals: Include explanation letter, additional financial proof
+   - Weak finances: Require stronger guarantees, sponsor letters, property docs
+   - Unclear purpose: Emphasize detailed itinerary, invitation letters, travel plans
+   - Immigration intent concerns: Add employment letters, property docs, family ties
+
+4. EMBASSY OFFICER PERSPECTIVE:
+   - What would an officer check first? (Financial capacity, ties, purpose clarity)
+   - What documents reduce suspicion? (Employment proof, property docs, travel history)
+   - What documents address common refusal reasons? (Country-specific patterns)
+   - What makes an application "low risk"? (Strong finances + strong ties + clear purpose)
+
+================================================================================
+OUTPUT SCHEMA
+================================================================================
+
 {
   "checklist": [
     {
@@ -455,12 +636,12 @@ OUTPUT SCHEMA:
       "documentType": "string",      // MUST match BASE_DOCUMENTS exactly
       "category": "required" | "highly_recommended" | "optional",  // MUST match BASE_DOCUMENTS
       "required": boolean,           // MUST match BASE_DOCUMENTS
-      "name": "string",              // EN name
-      "nameUz": "string",            // Uzbek translation
-      "nameRu": "string",            // Russian translation
-      "description": "string",       // 1-2 sentences
-      "appliesToThisApplicant": boolean,  // Does THIS applicant need it?
-      "reasonIfApplies": "string",   // Why it applies (if appliesToThisApplicant=true)
+      "name": "string",              // Expert-level EN name (embassy terminology)
+      "nameUz": "string",            // Accurate Uzbek translation
+      "nameRu": "string",            // Accurate Russian translation
+      "description": "string",       // Expert description explaining WHY this document matters for THIS applicant
+      "appliesToThisApplicant": boolean,  // Expert evaluation: Does THIS applicant need it?
+      "reasonIfApplies": "string",   // Expert reasoning: Why it applies (financial sufficiency, ties, risk mitigation)
       "extraRecommended": boolean,
       "group": "identity" | "financial" | "travel" | "education" | "employment" | "ties" | "other",
       "priority": number,
@@ -469,11 +650,66 @@ OUTPUT SCHEMA:
   ]
 }
 
-${embassyContext}Return ONLY valid JSON, no markdown.`;
+================================================================================
+EXPERT DESCRIPTION GUIDELINES
+================================================================================
+
+When writing descriptions, include:
+- WHY this document matters for visa approval
+- HOW it addresses financial sufficiency / ties / risk factors
+- WHAT embassy officers look for in this document
+- Country-specific requirements (format, validity, currency)
+
+Example expert description:
+"Bank statements showing consistent income and sufficient funds for the trip duration. Embassy officers verify financial capacity, income stability, and ability to cover expenses without overstaying. Required: Last 3-6 months, original documents, sufficient balance (minimum $X for ${visaType} visa to ${countryCode})."
+
+================================================================================
+EXPERT REASONING FOR appliesToThisApplicant
+================================================================================
+
+Set appliesToThisApplicant = true if:
+- Document is required by rules (category = "required")
+- Document addresses a specific risk factor (weak finances, weak ties, previous refusal)
+- Document strengthens the application (employment proof, property docs, travel history)
+- Document is conditionally required AND condition is met (sponsor docs if sponsored, employment letter if employed)
+
+Set appliesToThisApplicant = false ONLY if:
+- Document is conditionally required AND condition is NOT met
+- Document is truly optional and doesn't address any risk factors
+
+================================================================================
+EXPERT REASONING FOR reasonIfApplies
+================================================================================
+
+When appliesToThisApplicant = true, provide expert reasoning:
+
+Financial documents:
+- "Required to demonstrate financial sufficiency. Applicant has $X available vs $Y required (ratio: Z%). [If ratio < 1.0: Additional proof needed to meet embassy requirements.]"
+
+Ties documents:
+- "Strengthens ties to home country. Applicant has [property/employment/family] which demonstrates return intention. Ties strength score: X/1.0."
+
+Risk mitigation:
+- "Addresses risk factor: [previous refusal/weak finances/unclear purpose]. This document helps mitigate concerns and improve approval chances."
+
+Country-specific:
+- "Required by ${countryCode} embassy for ${visaType} visas. [Specific requirement: format, validity, currency, etc.]"
+
+${embassyContext}
+
+================================================================================
+FINAL INSTRUCTIONS
+================================================================================
+
+- Think like an expert visa officer evaluating this specific applicant
+- Use financial sufficiency, ties assessment, and risk mitigation in your reasoning
+- Provide expert-level descriptions that explain WHY documents matter
+- Return ONLY valid JSON, no markdown, no explanations outside JSON
+- All translations (UZ/RU) must be accurate and natural`;
   }
 
   /**
-   * OLD SYSTEM PROMPT (kept for reference/rollback)
+   * LEGACY SYSTEM PROMPT (EXPERT VERSION - Phase 3)
    * Enable via feature flag: USE_COMPACT_CHECKLIST_PROMPTS=false
    */
   private static buildSystemPromptLegacy(
@@ -481,7 +717,25 @@ ${embassyContext}Return ONLY valid JSON, no markdown.`;
     visaType: string,
     ruleSet: VisaRuleSetData
   ): string {
-    return `You are "VisaChecklistEngine", an embassy-level visa document rules engine.
+    return `You are an EXPERT VISA OFFICER with 15+ years of experience evaluating visa applications from Uzbek applicants.
+
+================================================================================
+YOUR EXPERTISE
+================================================================================
+
+You have deep knowledge of:
+- Immigration law and visa requirements for ${countryCode} ${visaType.toUpperCase()} visas
+- Financial sufficiency assessment (calculating required funds, evaluating income stability, sponsor credibility)
+- Ties assessment (property, employment, family, children - all factors that prove return intention)
+- Risk factor identification (previous refusals, weak finances, unclear purpose, immigration intent)
+- Embassy officer evaluation criteria and decision-making patterns
+- Country-specific requirements, terminology, and common refusal reasons
+
+================================================================================
+YOUR ROLE: EXPERT CHECKLIST GENERATION
+================================================================================
+
+You are "VisaChecklistEngine", an EXPERT embassy-level visa document rules engine.
 
 Your job:
 - Use the provided VISA_RULE_SET as the ONLY source of official visa rules.
@@ -514,6 +768,38 @@ OUTPUT SCHEMA (JSON):
   ]
 }
 
+================================================================================
+EXPERT REASONING FRAMEWORK
+================================================================================
+
+When evaluating documents, think like an embassy officer:
+
+1. FINANCIAL SUFFICIENCY REASONING:
+   - Calculate: Does applicant have sufficient funds? (availableFunds / requiredFunds ratio)
+   - If ratio < 1.0: Financial documents are CRITICAL, emphasize importance
+   - If sponsor: Evaluate sponsor credibility (income, relationship, dependents)
+   - Consider: Income stability, savings growth trend, account age, source of funds
+   - Red flags: Sudden large deposits, inconsistent income, weak sponsor
+
+2. TIES ASSESSMENT:
+   - Property: Ownership duration, value, location (stronger if owned long-term)
+   - Employment: Duration, stability, industry (government/established > startup)
+   - Family: Spouse, children, dependent family (children = strongest tie)
+   - Ties strength score: 0.0-1.0 (higher = stronger return intention)
+   - If ties < 0.5: Emphasize documents that strengthen ties
+
+3. RISK FACTOR MITIGATION:
+   - Previous refusals: Include explanation letter, additional financial proof
+   - Weak finances: Require stronger guarantees, sponsor letters, property docs
+   - Unclear purpose: Emphasize detailed itinerary, invitation letters, travel plans
+   - Immigration intent concerns: Add employment letters, property docs, family ties
+
+4. EMBASSY OFFICER PERSPECTIVE:
+   - What would an officer check first? (Financial capacity, ties, purpose clarity)
+   - What documents reduce suspicion? (Employment proof, property docs, travel history)
+   - What documents address common refusal reasons? (Country-specific patterns)
+   - What makes an application "low risk"? (Strong finances + strong ties + clear purpose)
+
 KEY RULES:
 
 1. SOURCE OF TRUTH
@@ -522,21 +808,28 @@ KEY RULES:
 - You may add at most a few "extraRecommended" documents IF they are logically implied by:
   - riskScore is high,
   - previousRefusals exist,
-  - weak ties to home country.
+  - weak ties to home country,
+  - financial sufficiency ratio < 1.0,
+  - ties strength score < 0.5.
 - Any "extraRecommended" document MUST have extraRecommended = true and category != "required".
 
-2. PERSONALIZATION USING AI_USER_CONTEXT
+2. EXPERT PERSONALIZATION USING AI_USER_CONTEXT
 - For each requiredDocument in VISA_RULE_SET:
-  - Decide if it applies based on AI_USER_CONTEXT.
+  - Apply expert reasoning (financial sufficiency, ties assessment, risk mitigation)
   - Examples:
     - Sponsor-related documents apply only if sponsorType is not "self".
-    - Employer letter applies only if employmentStatus is "employed".
+    - Employer letter applies only if employmentStatus is "employed" AND employment duration is stable.
     - Student documents apply only if the applicant is a student or has admission.
-    - Extra financial proof may apply when riskScore is high or sponsor income is low.
+    - Extra financial proof may apply when:
+      * riskScore is high,
+      * sponsor income is low,
+      * financial sufficiency ratio < 1.0,
+      * savings growth is "decreasing".
+    - Property documents apply if ties strength < 0.5 OR riskScore is high.
 - Set:
   - required = true only if this document is mandatory for this applicant.
-  - appliesToThisApplicant = true if they must or strongly should submit it.
-  - extraRecommended = true if not mandatory but helpful for approval.
+  - appliesToThisApplicant = true if they must or strongly should submit it (use expert reasoning).
+  - extraRecommended = true if not mandatory but helpful for approval (addresses risk factors).
 
 3. CATEGORIES AND GROUPS
 - Map documents into groups consistently:
@@ -575,21 +868,70 @@ Return ONLY valid JSON matching the schema, no other text.`;
   }
 
   /**
+   * Apply risk-weighted prioritization to checklist items (Phase 3)
+   * Adjusts priority based on risk factors, financial sufficiency, and ties strength
+   */
+  private static applyRiskWeightedPrioritization(
+    checklist: ChecklistItem[],
+    canonical: CanonicalAIUserContext
+  ): ChecklistItem[] {
+    const riskLevel = canonical.riskScore.level;
+    const financialRatio = canonical.applicantProfile.financial?.financialSufficiencyRatio;
+    const tiesStrength = canonical.applicantProfile.ties?.tiesStrengthScore;
+    const hasPreviousRefusals = canonical.applicantProfile.previousVisaRejections;
+
+    return checklist
+      .map((item) => {
+        let adjustedPriority = item.priority;
+
+        // Risk-based adjustments
+        if (riskLevel === 'high') {
+          // High risk: prioritize documents that address risk factors
+          if (item.group === 'financial' || item.group === 'ties' || item.group === 'employment') {
+            adjustedPriority = Math.max(1, item.priority - 1); // Increase priority (lower number = higher priority)
+          }
+        }
+
+        // Financial sufficiency adjustments
+        if (financialRatio !== null && financialRatio < 1.0 && item.group === 'financial') {
+          adjustedPriority = Math.max(1, item.priority - 1); // Critical if insufficient funds
+        }
+
+        // Ties strength adjustments
+        if (tiesStrength !== undefined && tiesStrength < 0.5 && item.group === 'ties') {
+          adjustedPriority = Math.max(1, item.priority - 1); // Critical if weak ties
+        }
+
+        // Previous refusals adjustments
+        if (hasPreviousRefusals && (item.group === 'financial' || item.group === 'ties')) {
+          adjustedPriority = Math.max(1, item.priority - 1); // Critical to address refusal reasons
+        }
+
+        return {
+          ...item,
+          priority: adjustedPriority,
+        };
+      })
+      .sort((a, b) => a.priority - b.priority); // Sort by priority (ascending)
+  }
+
+  /**
    * Build user prompt with base documents (COMPACT VERSION)
    * GPT only enriches, does NOT decide which documents to include
    */
-  private static buildUserPrompt(
+  private static async buildUserPrompt(
     aiUserContext: AIUserContext,
     baseDocuments: Array<{ documentType: string; category: string; required: boolean }>,
     previousChecklist?: ChecklistItem[]
-  ): string {
+  ): Promise<string> {
     // Convert to canonical format for consistent GPT input
-    const canonical = buildCanonicalAIUserContext(aiUserContext);
+    const canonical = await buildCanonicalAIUserContext(aiUserContext);
     const profile = canonical.applicantProfile;
     const riskScore = canonical.riskScore;
 
-    // Compact applicant context
+    // Expert applicant context (Phase 3: includes expert fields)
     const applicantContext = {
+      // Basic fields
       sponsorType: profile.sponsorType,
       currentStatus: profile.currentStatus,
       hasInternationalTravel: profile.hasInternationalTravel,
@@ -601,6 +943,38 @@ Return ONLY valid JSON matching the schema, no other text.`;
       hasChildren: profile.hasChildren,
       riskLevel: riskScore.level,
       riskProbability: riskScore.probabilityPercent,
+      // Expert fields (Phase 3)
+      financial: profile.financial
+        ? {
+            requiredFundsEstimate: profile.financial.requiredFundsEstimate,
+            financialSufficiencyRatio: profile.financial.financialSufficiencyRatio,
+            savingsGrowth: profile.financial.savingsGrowth,
+            sourceOfFunds: profile.financial.sourceOfFunds,
+            sponsor: profile.financial.sponsor,
+          }
+        : undefined,
+      employment: profile.employment
+        ? {
+            employerName: profile.employment.employerName,
+            employmentDurationMonths: profile.employment.employmentDurationMonths,
+            employerStability: profile.employment.employerStability,
+          }
+        : undefined,
+      ties: profile.ties
+        ? {
+            tiesStrengthScore: profile.ties.tiesStrengthScore,
+            tiesFactors: profile.ties.tiesFactors,
+          }
+        : undefined,
+      property: profile.property,
+      embassyContext: canonical.embassyContext
+        ? {
+            minimumFundsRequired: canonical.embassyContext.minimumFundsRequired,
+            minimumStatementMonths: canonical.embassyContext.minimumStatementMonths,
+            commonRefusalReasons: canonical.embassyContext.commonRefusalReasons,
+            officerEvaluationCriteria: canonical.embassyContext.officerEvaluationCriteria,
+          }
+        : undefined,
     };
 
     let prompt = `BASE_DOCUMENTS (enrich these exact documents, no additions/removals):
@@ -632,13 +1006,13 @@ Return ONLY valid JSON.`;
   /**
    * OLD USER PROMPT (kept for reference/rollback)
    */
-  private static buildUserPromptLegacy(
+  private static async buildUserPromptLegacy(
     aiUserContext: AIUserContext,
     ruleSet: VisaRuleSetData,
     previousChecklist?: ChecklistItem[]
-  ): string {
+  ): Promise<string> {
     // Convert to canonical format for consistent GPT input
-    const canonical = buildCanonicalAIUserContext(aiUserContext);
+    const canonical = await buildCanonicalAIUserContext(aiUserContext);
     const profile = canonical.applicantProfile;
     const riskScore = canonical.riskScore;
 

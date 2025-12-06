@@ -61,6 +61,378 @@ export interface ApplicantProfile {
 const prisma = new PrismaClient();
 
 /**
+ * Calculate required funds estimate for a visa application
+ * Based on destination country, visa type, and duration
+ */
+function calculateRequiredFundsEstimate(
+  countryCode: string,
+  visaType: 'student' | 'tourist',
+  duration: string
+): number | null {
+  // Country-specific cost estimates (USD)
+  const costEstimates: Record<
+    string,
+    { tourist: Record<string, number>; student: Record<string, number> }
+  > = {
+    US: {
+      tourist: {
+        less_than_1_month: 3000,
+        '1_3_months': 5000,
+        '3_6_months': 8000,
+        '6_12_months': 12000,
+        more_than_1_year: 20000,
+      },
+      student: {
+        less_than_1_month: 10000, // Not typical for student
+        '1_3_months': 15000,
+        '3_6_months': 25000,
+        '6_12_months': 35000,
+        more_than_1_year: 50000, // Typical for 1 year of study
+      },
+    },
+    UK: {
+      tourist: {
+        less_than_1_month: 2500,
+        '1_3_months': 4000,
+        '3_6_months': 7000,
+        '6_12_months': 10000,
+        more_than_1_year: 15000,
+      },
+      student: {
+        less_than_1_month: 8000,
+        '1_3_months': 12000,
+        '3_6_months': 20000,
+        '6_12_months': 30000,
+        more_than_1_year: 40000,
+      },
+    },
+    CA: {
+      tourist: {
+        less_than_1_month: 2500,
+        '1_3_months': 4000,
+        '3_6_months': 7000,
+        '6_12_months': 10000,
+        more_than_1_year: 15000,
+      },
+      student: {
+        less_than_1_month: 8000,
+        '1_3_months': 12000,
+        '3_6_months': 20000,
+        '6_12_months': 30000,
+        more_than_1_year: 40000,
+      },
+    },
+    DE: {
+      tourist: {
+        less_than_1_month: 2000,
+        '1_3_months': 3000,
+        '3_6_months': 5000,
+        '6_12_months': 8000,
+        more_than_1_year: 12000,
+      },
+      student: {
+        less_than_1_month: 5000,
+        '1_3_months': 8000,
+        '3_6_months': 15000,
+        '6_12_months': 25000,
+        more_than_1_year: 35000,
+      },
+    },
+    ES: {
+      tourist: {
+        less_than_1_month: 1500,
+        '1_3_months': 2500,
+        '3_6_months': 4000,
+        '6_12_months': 6000,
+        more_than_1_year: 10000,
+      },
+      student: {
+        less_than_1_month: 4000,
+        '1_3_months': 6000,
+        '3_6_months': 12000,
+        '6_12_months': 20000,
+        more_than_1_year: 30000,
+      },
+    },
+  };
+
+  const countryEstimate = costEstimates[countryCode];
+  if (!countryEstimate) {
+    return null; // Unknown country
+  }
+
+  const visaEstimate = countryEstimate[visaType];
+  if (!visaEstimate) {
+    return null;
+  }
+
+  // Map duration to key
+  const durationKey =
+    duration === 'less_than_1_month'
+      ? 'less_than_1_month'
+      : duration === '1_3_months'
+        ? '1_3_months'
+        : duration === '3_6_months'
+          ? '3_6_months'
+          : duration === '6_12_months'
+            ? '6_12_months'
+            : duration === 'more_than_1_year'
+              ? 'more_than_1_year'
+              : null;
+
+  if (!durationKey) {
+    return null;
+  }
+
+  return visaEstimate[durationKey] || null;
+}
+
+/**
+ * Calculate financial sufficiency ratio
+ * Returns availableFunds / requiredFunds (0.0-1.0+)
+ */
+function calculateFinancialSufficiencyRatio(
+  availableFunds: number | null,
+  requiredFunds: number | null
+): number | null {
+  if (availableFunds === null || requiredFunds === null || requiredFunds === 0) {
+    return null;
+  }
+  return availableFunds / requiredFunds;
+}
+
+/**
+ * Calculate ties strength score (0.0-1.0)
+ * Based on property, employment, family, and children
+ */
+function calculateTiesStrengthScore(
+  hasProperty: boolean,
+  isEmployed: boolean,
+  employmentDurationMonths: number | null,
+  hasFamily: boolean,
+  hasChildren: boolean,
+  maritalStatus: string
+): {
+  score: number;
+  factors: { property: number; employment: number; family: number; children: number };
+} {
+  let score = 0.0;
+  const factors = {
+    property: 0.0,
+    employment: 0.0,
+    family: 0.0,
+    children: 0.0,
+  };
+
+  // Property contribution (0.0-0.3)
+  if (hasProperty) {
+    factors.property = 0.3;
+    score += 0.3;
+  }
+
+  // Employment contribution (0.0-0.3)
+  if (isEmployed) {
+    if (employmentDurationMonths !== null && employmentDurationMonths >= 24) {
+      factors.employment = 0.3; // Strong employment (24+ months)
+    } else if (employmentDurationMonths !== null && employmentDurationMonths >= 12) {
+      factors.employment = 0.2; // Moderate employment (12-23 months)
+    } else {
+      factors.employment = 0.1; // Weak employment (<12 months)
+    }
+    score += factors.employment;
+  }
+
+  // Family contribution (0.0-0.2)
+  if (hasFamily) {
+    factors.family = 0.2;
+    score += 0.2;
+  }
+
+  // Children contribution (0.0-0.2)
+  if (hasChildren) {
+    factors.children = 0.2;
+    score += 0.2;
+  } else if (maritalStatus === 'married') {
+    // Married without children still shows ties
+    factors.family += 0.1;
+    score += 0.1;
+  }
+
+  // Clamp to 0.0-1.0
+  score = Math.min(Math.max(score, 0.0), 1.0);
+
+  return { score, factors };
+}
+
+/**
+ * Get embassy context from VisaRuleSet
+ * Fetches financial requirements and common refusal reasons
+ */
+async function getEmbassyContext(
+  countryCode: string,
+  visaType: string
+): Promise<CanonicalAIUserContext['embassyContext']> {
+  try {
+    const { VisaRulesService } = await import('./visa-rules.service');
+    const ruleSet = await VisaRulesService.getActiveRuleSet(
+      countryCode.toUpperCase(),
+      visaType.toLowerCase()
+    );
+
+    if (!ruleSet) {
+      return undefined;
+    }
+
+    const financialReqs = ruleSet.financialRequirements;
+    const commonRefusalReasons = getCommonRefusalReasons(countryCode, visaType);
+    const officerCriteria = getOfficerEvaluationCriteria(countryCode, visaType);
+
+    return {
+      minimumFundsRequired: financialReqs?.minimumBalance ?? null,
+      minimumStatementMonths: financialReqs?.bankStatementMonths ?? null,
+      currency: financialReqs?.currency ?? null,
+      commonRefusalReasons,
+      officerEvaluationCriteria: officerCriteria,
+    };
+  } catch (error) {
+    logError('Failed to get embassy context', error as Error, { countryCode, visaType });
+    return undefined;
+  }
+}
+
+/**
+ * Get common refusal reasons for a country/visa type
+ * Country-specific patterns
+ */
+function getCommonRefusalReasons(countryCode: string, visaType: string): string[] {
+  const reasons: Record<string, Record<string, string[]>> = {
+    US: {
+      tourist: [
+        'Insufficient funds to cover trip expenses',
+        'Weak ties to home country (risk of overstay)',
+        'Unclear travel purpose or unrealistic itinerary',
+        'Previous visa refusals or immigration violations',
+        'Incomplete or inconsistent documentation',
+      ],
+      student: [
+        'Insufficient funds for tuition and living expenses',
+        'Weak ties to home country (immigration intent concerns)',
+        'Unclear study plans or weak academic background',
+        'Previous visa refusals or immigration violations',
+        'Incomplete documentation (I-20, SEVIS, financial proof)',
+      ],
+    },
+    UK: {
+      tourist: [
+        'Insufficient funds (28-day rule not met)',
+        'Weak ties to home country',
+        'Unclear travel purpose',
+        'Previous refusals or overstays',
+        'Incomplete documentation',
+      ],
+      student: [
+        'Insufficient funds (CAS requirements not met)',
+        'Weak academic background or unclear study plans',
+        'Immigration intent concerns',
+        'Previous refusals',
+        'Missing CAS or financial documentation',
+      ],
+    },
+    DE: {
+      tourist: [
+        'Insufficient financial means',
+        'Weak ties to home country',
+        'Missing travel insurance (€30,000 coverage)',
+        'Incomplete accommodation proof',
+        'Previous Schengen violations',
+      ],
+      student: [
+        'Insufficient funds for study and living',
+        'Weak academic background',
+        'Missing acceptance letter or enrollment proof',
+        'Immigration intent concerns',
+        'Incomplete documentation',
+      ],
+    },
+  };
+
+  return (
+    reasons[countryCode]?.[visaType] ?? [
+      'Insufficient funds',
+      'Weak ties to home country',
+      'Unclear travel purpose',
+      'Incomplete documentation',
+    ]
+  );
+}
+
+/**
+ * Get officer evaluation criteria for a country/visa type
+ * What embassy officers check
+ */
+function getOfficerEvaluationCriteria(countryCode: string, visaType: string): string[] {
+  const criteria: Record<string, Record<string, string[]>> = {
+    US: {
+      tourist: [
+        'Financial capacity (sufficient funds for trip duration)',
+        'Strong ties to home country (employment, property, family)',
+        'Clear travel purpose and realistic itinerary',
+        'Return intention evidence',
+        'Travel history and visa compliance',
+      ],
+      student: [
+        'Financial capacity (1 year of tuition + living expenses)',
+        'Academic background and study plans',
+        'Ties to home country (return intention)',
+        'I-20 validity and SEVIS compliance',
+        'Immigration intent assessment',
+      ],
+    },
+    UK: {
+      tourist: [
+        'Financial capacity (28-day rule compliance)',
+        'Ties to home country',
+        'Travel purpose clarity',
+        'Accommodation and itinerary',
+        'Previous travel history',
+      ],
+      student: [
+        'Financial capacity (CAS requirements)',
+        'Academic qualifications and study plans',
+        'CAS validity and enrollment',
+        'Ties to home country',
+        'Immigration intent',
+      ],
+    },
+    DE: {
+      tourist: [
+        'Financial means (sufficient for trip)',
+        'Travel insurance (€30,000 minimum)',
+        'Accommodation proof',
+        'Ties to home country',
+        'Schengen compliance history',
+      ],
+      student: [
+        'Financial capacity for study period',
+        'Acceptance letter and enrollment',
+        'Academic background',
+        'Ties to home country',
+        'Study purpose clarity',
+      ],
+    },
+  };
+
+  return (
+    criteria[countryCode]?.[visaType] ?? [
+      'Financial capacity',
+      'Ties to home country',
+      'Travel/study purpose clarity',
+      'Document completeness',
+    ]
+  );
+}
+
+/**
  * Calculate visa probability based on questionnaire summary
  * Rule-based calculator tuned for common Uzbek cases
  *
@@ -468,11 +840,14 @@ export async function buildAIUserContext(
  * Build Canonical AI User Context
  * Rock-solid interface with no nullable core fields and explicit defaults
  * This is the preferred format for GPT services
+ * Phase 3: Now includes expert fields (financial, employment, education, travel, family, property, ties, embassy context)
  *
  * @param currentContext - AIUserContext from buildAIUserContext()
- * @returns CanonicalAIUserContext with all fields filled
+ * @returns CanonicalAIUserContext with all fields filled (including expert fields)
  */
-export function buildCanonicalAIUserContext(currentContext: AIUserContext): CanonicalAIUserContext {
+export async function buildCanonicalAIUserContext(
+  currentContext: AIUserContext
+): Promise<CanonicalAIUserContext> {
   const summary = currentContext.questionnaireSummary;
   const warnings: string[] = [];
   const fallbacks: string[] = [];
@@ -594,6 +969,181 @@ export function buildCanonicalAIUserContext(currentContext: AIUserContext): Cano
   const hasUniversityInvitation = summary?.hasUniversityInvitation ?? false;
   const hasOtherInvitation = summary?.hasOtherInvitation ?? false;
 
+  // ============================================
+  // PHASE 3: EXPERT FIELDS EXTRACTION
+  // ============================================
+
+  // Financial expert fields
+  const financial = {
+    incomeHistory: summary?.employment?.monthlySalaryUSD
+      ? [summary.employment.monthlySalaryUSD] // Single value for now, could be extended
+      : undefined,
+    savingsGrowth:
+      bankBalanceUSD !== null && monthlyIncomeUSD !== null && monthlyIncomeUSD > 0
+        ? bankBalanceUSD >= monthlyIncomeUSD * 6
+          ? 'increasing'
+          : bankBalanceUSD >= monthlyIncomeUSD * 3
+            ? 'stable'
+            : 'decreasing'
+        : undefined,
+    accountAgeMonths: null, // Not available in questionnaire
+    sourceOfFunds:
+      sponsorType !== 'self'
+        ? 'sponsor'
+        : isEmployed
+          ? 'employment'
+          : currentStatus === 'self_employed'
+            ? 'business'
+            : 'unknown',
+    sponsor:
+      sponsorType !== 'self' && summary?.financialInfo?.sponsorDetails
+        ? {
+            income: summary.financialInfo.sponsorDetails.annualIncomeUSD ?? null,
+            savings: null, // Not available
+            dependents: null, // Not available
+            relationship: summary.financialInfo.sponsorDetails.relationship ?? null,
+          }
+        : undefined,
+    requiredFundsEstimate: null, // Will be calculated below
+    financialSufficiencyRatio: null, // Will be calculated below
+  };
+
+  // Calculate required funds and sufficiency ratio
+  const requiredFunds = calculateRequiredFundsEstimate(
+    currentContext.application.country,
+    currentContext.application.visaType,
+    duration
+  );
+  if (requiredFunds !== null) {
+    financial.requiredFundsEstimate = requiredFunds;
+    const availableFunds = bankBalanceUSD ?? 0;
+    financial.financialSufficiencyRatio = calculateFinancialSufficiencyRatio(
+      availableFunds,
+      requiredFunds
+    );
+    if (financial.financialSufficiencyRatio !== null && financial.financialSufficiencyRatio < 1.0) {
+      warnings.push(
+        `Financial sufficiency ratio is ${(financial.financialSufficiencyRatio * 100).toFixed(0)}% - may need additional funds`
+      );
+    }
+  }
+
+  // Employment expert fields
+  const employment =
+    isEmployed || currentStatus === 'employed' || currentStatus === 'self_employed'
+      ? {
+          employerName: summary?.employment?.employerName ?? null,
+          industry: null, // Not available in questionnaire
+          employmentDurationMonths: null, // Not available in questionnaire
+          salaryHistory: summary?.employment?.monthlySalaryUSD
+            ? [summary.employment.monthlySalaryUSD]
+            : undefined,
+          contractType: currentStatus === 'self_employed' ? 'freelance' : 'permanent',
+          employerStability: 'unknown' as const,
+        }
+      : undefined;
+
+  // Education expert fields
+  const education =
+    isStudent || currentStatus === 'student'
+      ? {
+          degreeLevel:
+            summary?.education?.programType === 'bachelor'
+              ? 'bachelor'
+              : summary?.education?.programType === 'master'
+                ? 'master'
+                : summary?.education?.programType === 'phd'
+                  ? 'phd'
+                  : summary?.education?.programType === 'language'
+                    ? 'certificate'
+                    : 'unknown',
+          institution: summary?.education?.university ?? null,
+          graduationDate: summary?.education?.hasGraduated ? null : null, // Not available
+          fieldOfStudy: null, // Not available
+          gpa: null, // Not available
+        }
+      : undefined;
+
+  // Travel history expert fields
+  const travelHistory = hasInternationalTravel
+    ? {
+        countries: summary?.travelHistory?.visitedCountries
+          ? summary.travelHistory.visitedCountries.map((country) => ({
+              country,
+              dates: undefined,
+              visaType: undefined,
+              outcome: 'approved' as const, // Assume approved if traveled
+            }))
+          : undefined,
+        previousVisaTypes: summary?.travelHistory?.visitedCountries
+          ? summary.travelHistory.visitedCountries.map(() => 'tourist')
+          : undefined,
+        previousVisaResults: summary?.travelHistory?.hasRefusals
+          ? [
+              {
+                country: currentContext.application.country,
+                visaType: currentContext.application.visaType,
+                outcome: 'rejected' as const,
+                date: undefined,
+              },
+            ]
+          : undefined,
+      }
+    : undefined;
+
+  // Family expert fields
+  const family = {
+    spouse:
+      maritalStatus === 'married'
+        ? {
+            citizenship: null, // Not available
+            employed: null, // Not available
+            income: null, // Not available
+          }
+        : null,
+    children: hasChildren
+      ? [
+          {
+            age: null, // Not available
+            citizenship: null, // Not available
+            dependent: true,
+          },
+        ]
+      : undefined,
+    dependentFamily: undefined, // Not available
+    familyAbroad: undefined, // Not available
+  };
+
+  // Property expert fields
+  const property = hasPropertyInUzbekistan
+    ? {
+        valueUSD: null, // Not available
+        type: 'apartment' as const, // Default assumption
+        ownershipDurationMonths: null, // Not available
+        location: null, // Not available
+      }
+    : undefined;
+
+  // Calculate ties strength
+  const tiesStrength = calculateTiesStrengthScore(
+    hasPropertyInUzbekistan,
+    isEmployed,
+    employment?.employmentDurationMonths ?? null,
+    hasFamilyInUzbekistan,
+    hasChildren,
+    maritalStatus
+  );
+  const ties = {
+    tiesStrengthScore: tiesStrength.score,
+    tiesFactors: tiesStrength.factors,
+  };
+
+  // Get embassy context (async)
+  const embassyContext = await getEmbassyContext(
+    currentContext.application.country,
+    currentContext.application.visaType
+  );
+
   // Always calculate risk score (even if questionnaire is missing)
   let riskScore: CanonicalAIUserContext['riskScore'];
   if (summary) {
@@ -672,6 +1222,14 @@ export function buildCanonicalAIUserContext(currentContext: AIUserContext): Cano
       hasUniversityInvitation,
       hasOtherInvitation,
       documents,
+      // Phase 3: Expert fields
+      financial: Object.keys(financial).length > 0 ? financial : undefined,
+      employment,
+      education,
+      travelHistory,
+      family: Object.keys(family).length > 0 ? family : undefined,
+      property,
+      ties,
     },
     riskScore,
     uploadedDocuments: currentContext.uploadedDocuments,
@@ -681,6 +1239,7 @@ export function buildCanonicalAIUserContext(currentContext: AIUserContext): Cano
       extractionWarnings: warnings.length > 0 ? warnings : undefined,
       fallbackFieldsUsed: fallbacks.length > 0 ? fallbacks : undefined,
     },
+    embassyContext,
   };
 }
 

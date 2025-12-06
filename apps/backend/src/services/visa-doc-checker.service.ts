@@ -12,10 +12,11 @@ import { buildCanonicalAIUserContext } from './ai-context.service';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 import { logDocumentVerification, extractApplicationId } from '../utils/gpt-logging';
 import { z } from 'zod';
+import { PROMPT_VERSIONS } from '../ai-training/config';
 
 /**
- * Document Check Result Schema (IMPROVED VERSION)
- * Includes tri-language notes and stronger validation
+ * Document Check Result Schema (EXPERT VERSION - Phase 3)
+ * Includes tri-language notes, expert validation details, and embassy officer assessment
  */
 const DocumentCheckResultSchema = z.object({
   status: z.enum(['APPROVED', 'NEED_FIX', 'REJECTED']),
@@ -29,6 +30,42 @@ const DocumentCheckResultSchema = z.object({
     .optional(),
   embassy_risk_level: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   technical_notes: z.string().max(1000).nullable().optional(),
+  // Phase 3: Expert validation fields (optional for backward compatibility)
+  validationDetails: z
+    .object({
+      documentTypeMatch: z.boolean().optional(), // Does document type match requirement?
+      contentComplete: z.boolean().optional(), // Are all required fields present?
+      financialValid: z.boolean().nullable().optional(), // Financial validation (null if not applicable)
+      dateValidation: z.boolean().optional(), // Date validation passed?
+      formatValidation: z.boolean().optional(), // Format compliance?
+      issues: z.array(z.string()).optional(), // Array of specific issues found
+      recommendations: z.array(z.string()).optional(), // Actionable recommendations
+    })
+    .optional(),
+  embassyOfficerAssessment: z.string().optional(), // Expert perspective on document quality
+  financialValidation: z
+    .object({
+      balanceMeetsRequirement: z.boolean().optional(), // Balance meets minimum?
+      currencyCorrect: z.boolean().optional(), // Currency correct?
+      statementMonthsSufficient: z.boolean().optional(), // Statement months sufficient?
+      incomeStable: z.boolean().optional(), // Income stable?
+    })
+    .optional(),
+  dateValidation: z
+    .object({
+      expiryValid: z.boolean().optional(), // Expiry date valid?
+      issueDateValid: z.boolean().optional(), // Issue date valid?
+      validityPeriodMeetsRequirement: z.boolean().optional(), // Validity period sufficient?
+    })
+    .optional(),
+  formatValidation: z
+    .object({
+      languageCorrect: z.boolean().optional(), // Language correct?
+      translationPresent: z.boolean().optional(), // Translation present if required?
+      apostillePresent: z.boolean().optional(), // Apostille present if required?
+      originalFormat: z.boolean().optional(), // Original/certified copy format correct?
+    })
+    .optional(),
 });
 
 export type DocumentCheckResult = z.infer<typeof DocumentCheckResultSchema>;
@@ -87,7 +124,7 @@ export class VisaDocCheckerService {
       let canonicalContext: CanonicalAIUserContext | null = null;
       if (aiUserContext) {
         try {
-          canonicalContext = buildCanonicalAIUserContext(aiUserContext);
+          canonicalContext = await buildCanonicalAIUserContext(aiUserContext);
         } catch (error) {
           logWarn('[VisaDocChecker] Failed to build canonical context', {
             error: error instanceof Error ? error.message : String(error),
@@ -118,18 +155,26 @@ export class VisaDocCheckerService {
 
       const startTime = Date.now();
 
-      // Call GPT-4 with structured output using centralized config
+      // Resolve model from registry (with fallback)
       const aiConfig = getAIConfig('docVerification');
+      // Access private method via type assertion (registry integration)
+      const modelRouting = await (AIOpenAIService as any).resolveModelForTask(
+        'document_check',
+        aiConfig.model
+      );
+      const docCheckModel = modelRouting.modelName;
+      const modelVersionId = modelRouting.modelVersionId;
 
       logInfo('[VisaDocChecker] Calling GPT-4 for document verification', {
-        model: aiConfig.model,
+        model: docCheckModel,
+        modelVersionId,
         documentType: requiredDocumentRule.documentType,
         temperature: aiConfig.temperature,
         maxTokens: aiConfig.maxTokens,
       });
 
       const response = await AIOpenAIService.getOpenAIClient().chat.completions.create({
-        model: aiConfig.model,
+        model: docCheckModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -268,6 +313,42 @@ export class VisaDocCheckerService {
         riskLevel: result.embassy_risk_level,
       });
 
+      // Record AI interaction for training data pipeline
+      const userId = aiUserContext ? (aiUserContext as any)?.userProfile?.userId : null;
+      const promptVersion =
+        process.env.USE_COMPACT_DOC_VERIFICATION_PROMPTS !== 'false'
+          ? PROMPT_VERSIONS.DOC_CHECK_PROMPT_V2_EXPERT
+          : PROMPT_VERSIONS.DOC_CHECK_PROMPT_V1;
+      const source = process.env.AI_EVAL_MODE === 'true' ? ('eval' as const) : ('prod' as const);
+
+      await AIOpenAIService['recordAIInteraction']({
+        taskType: 'document_check',
+        model: docCheckModel,
+        promptVersion,
+        source,
+        modelVersionId,
+        requestPayload: {
+          systemPrompt,
+          userPrompt,
+          requiredDocumentRule,
+          userDocumentText,
+          metadata,
+          canonicalAIUserContext: canonicalContext,
+        },
+        responsePayload: result,
+        success: true,
+        contextMeta: {
+          countryCode: countryCode !== 'unknown' ? countryCode : null,
+          visaType: visaType !== 'unknown' ? visaType : null,
+          applicationId: applicationId !== 'unknown' ? applicationId : null,
+          userId,
+        },
+      }).catch((err) => {
+        logWarn('[VisaDocChecker] Failed to record AI interaction', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
       return result;
     } catch (error) {
       const applicationId = aiUserContext ? extractApplicationId(aiUserContext) : 'unknown';
@@ -306,9 +387,76 @@ export class VisaDocCheckerService {
    * Build compact system prompt for document checking (COMPACT VERSION)
    */
   private static buildSystemPromptCompact(): string {
-    return `You are a visa document verifier. Compare USER_DOCUMENT_TEXT against REQUIRED_DOCUMENT_RULE.
+    return `You are an EXPERT VISA DOCUMENT VERIFIER with 15+ years of experience reviewing visa documents for embassy submissions.
 
-OUTPUT SCHEMA:
+================================================================================
+YOUR EXPERTISE
+================================================================================
+
+You have deep knowledge of:
+- Document type accuracy (identifying correct vs incorrect document types)
+- Content completeness (checking all required fields, dates, amounts, signatures)
+- Format compliance (embassy-specific requirements, language, validity periods)
+- Financial validation (balance verification, currency conversion, statement months)
+- Date validation (expiry dates, issue dates, validity periods, travel dates)
+- Embassy-specific requirements (country-specific formats, apostilles, translations)
+- Risk assessment (identifying documents that raise red flags)
+- Fraud detection (inconsistencies, impossible dates, mismatched information)
+
+================================================================================
+EXPERT VALIDATION FRAMEWORK
+================================================================================
+
+When verifying documents, check:
+
+1. DOCUMENT TYPE ACCURACY:
+   - Is this the correct document type for the requirement?
+   - Does it match the REQUIRED_DOCUMENT_RULE documentType?
+   - Are there any mismatches (e.g., employment letter vs bank statement)?
+
+2. CONTENT COMPLETENESS:
+   - Are all required fields present? (name, dates, amounts, signatures, stamps)
+   - Is the information sufficient for embassy evaluation?
+   - Are there missing critical elements?
+
+3. FINANCIAL VALIDATION (for financial documents):
+   - Balance verification: Does the balance meet minimum requirements?
+   - Currency: Is the currency correct? (convert if needed)
+   - Statement months: Does it cover the required period?
+   - Income stability: Is income consistent? Any suspicious patterns?
+   - Source of funds: Is the source clear and legitimate?
+
+4. DATE VALIDATION:
+   - Expiry dates: Is the document still valid?
+   - Issue dates: Are dates logical and consistent?
+   - Validity periods: Does validity meet embassy requirements?
+   - Travel dates: Do dates align with visa application dates?
+
+5. FORMAT COMPLIANCE:
+   - Language: Is it in the required language(s)?
+   - Translation: Is translation required and present?
+   - Apostille: Is apostille required and present?
+   - Original vs copy: Is the format correct (original/certified copy)?
+
+6. SIGNATURES AND STAMPS:
+   - Are required signatures present?
+   - Are official stamps/seals present?
+   - Are signatures/stamps from authorized entities?
+
+7. EMBASSY-SPECIFIC REQUIREMENTS:
+   - Country-specific formats (e.g., UK 28-day rule, Schengen insurance)
+   - Specific terminology and document names
+   - Additional requirements for the destination country
+
+8. RISK ASSESSMENT:
+   - Are there red flags? (suspicious patterns, inconsistencies, fraud indicators)
+   - Does the document raise immigration intent concerns?
+   - Is the document likely to be accepted by embassy officers?
+
+================================================================================
+OUTPUT SCHEMA
+================================================================================
+
 {
   "status": "APPROVED" | "NEED_FIX" | "REJECTED",
   "short_reason": "string (max 200 chars)",
@@ -318,18 +466,53 @@ OUTPUT SCHEMA:
     "ru": "string (optional, max 500 chars)"
   },
   "embassy_risk_level": "LOW" | "MEDIUM" | "HIGH",
-  "technical_notes": "string | null (optional, max 1000 chars)"
+  "technical_notes": "string | null (optional, max 1000 chars)",
+  "validationDetails": {
+    "documentTypeMatch": boolean,
+    "contentComplete": boolean,
+    "financialValid": boolean | null,
+    "dateValid": boolean,
+    "formatCompliant": boolean,
+    "signaturesPresent": boolean,
+    "issues": string[],
+    "recommendations": string[]
+  },
+  "embassyOfficerAssessment": "string (expert perspective on document quality)",
+  "actionableSteps": string[] (specific steps to fix issues)
 }
 
-DECISION RULES:
-- APPROVED: Document satisfies REQUIRED_DOCUMENT_RULE key conditions
-- NEED_FIX: Document has correctable issues (missing months, wrong language, low amount)
-- REJECTED: Document is unusable (wrong type, expired, far below requirements)
+================================================================================
+DECISION RULES
+================================================================================
 
-RISK LEVEL:
-- LOW: Solid and compliant
-- MEDIUM: Some weaknesses but might be accepted
-- HIGH: Serious issues likely to cause refusal
+STATUS:
+- APPROVED: Document satisfies ALL key conditions, no critical issues
+- NEED_FIX: Document has correctable issues (missing months, wrong language, low amount, missing signatures)
+- REJECTED: Document is unusable (wrong type, expired, far below requirements, fraud indicators)
+
+EMBASSY_RISK_LEVEL:
+- LOW: Solid and compliant, likely to be accepted
+- MEDIUM: Some weaknesses but might be accepted with additional documents
+- HIGH: Serious issues likely to cause refusal or additional scrutiny
+
+VALIDATION DETAILS:
+- documentTypeMatch: true if document type matches requirement
+- contentComplete: true if all required fields present
+- financialValid: true if financial requirements met (null if not applicable)
+- dateValid: true if dates are valid and meet requirements
+- formatCompliant: true if format meets embassy requirements
+- signaturesPresent: true if required signatures/stamps present
+- issues: Array of specific issues found
+- recommendations: Array of actionable recommendations
+
+EMBASSY OFFICER ASSESSMENT:
+Provide expert perspective: "This document [strengths/weaknesses]. Embassy officers will likely [accept/reject/request additional documents] because [reasoning]."
+
+ACTIONABLE STEPS:
+Provide specific, actionable steps to fix issues, e.g.:
+- "Obtain bank statement covering last 3 months (currently only 1 month)"
+- "Translate document to English and add apostille"
+- "Update document to show minimum balance of $X (currently $Y)"
 
 Return ONLY valid JSON.`;
   }
@@ -445,15 +628,32 @@ ${truncatedText}`;
     }
 
     if (canonicalContext) {
-      // Include only relevant context for document verification
+      // Include expert context for document verification (Phase 3)
       const relevantContext = {
         sponsorType: canonicalContext.applicantProfile.sponsorType,
         currentStatus: canonicalContext.applicantProfile.currentStatus,
         bankBalanceUSD: canonicalContext.applicantProfile.bankBalanceUSD,
         monthlyIncomeUSD: canonicalContext.applicantProfile.monthlyIncomeUSD,
         riskLevel: canonicalContext.riskScore.level,
+        // Expert fields (Phase 3)
+        financial: canonicalContext.applicantProfile.financial
+          ? {
+              requiredFundsEstimate:
+                canonicalContext.applicantProfile.financial.requiredFundsEstimate,
+              financialSufficiencyRatio:
+                canonicalContext.applicantProfile.financial.financialSufficiencyRatio,
+              minimumFundsRequired: canonicalContext.embassyContext?.minimumFundsRequired,
+              minimumStatementMonths: canonicalContext.embassyContext?.minimumStatementMonths,
+            }
+          : undefined,
+        embassyContext: canonicalContext.embassyContext
+          ? {
+              commonRefusalReasons: canonicalContext.embassyContext.commonRefusalReasons,
+              officerEvaluationCriteria: canonicalContext.embassyContext.officerEvaluationCriteria,
+            }
+          : undefined,
       };
-      prompt += `\n\nAPPLICANT_CONTEXT:\n${JSON.stringify(relevantContext, null, 2)}`;
+      prompt += `\n\nAPPLICANT_CONTEXT (expert fields for validation):\n${JSON.stringify(relevantContext, null, 2)}`;
     }
 
     prompt += `\n\nEvaluate and return JSON result.`;
