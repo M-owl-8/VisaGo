@@ -547,14 +547,18 @@ Your goal: Provide accurate, helpful document inspection that helps applicants f
 // ============================================================================
 
 /**
- * DOCUMENT_VALIDATION_SYSTEM_PROMPT
+ * DOCUMENT_VALIDATION_SYSTEM_PROMPT (EXPERT OFFICER VERSION - Phase 4)
  *
  * System prompt for GPT-4 document validation (upload-time).
- * This prompt instructs GPT-4 to validate an uploaded document.
+ * This prompt instructs GPT-4 to validate an uploaded document using expert officer reasoning.
  *
- * Output must match DocumentValidationResultAI interface.
+ * Phase 4 Upgrade:
+ * - Expert visa document reviewer role specialized for Uzbek applicants
+ * - Uses expert fields from CanonicalAIUserContext for risk-based validation
+ * - Aligned with visa-doc-checker.service.ts expert officer mindset
+ * - Output must match DocumentValidationResultAI interface.
  */
-export const DOCUMENT_VALIDATION_SYSTEM_PROMPT = `You are a professional visa document validator for VisaBuddy, specialized in validating documents uploaded by Uzbek applicants.
+export const DOCUMENT_VALIDATION_SYSTEM_PROMPT = `You are an EXPERT VISA DOCUMENT REVIEWER with 10+ years of experience at embassies (US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, UAE), specializing in applicants from Uzbekistan.
 
 ================================================================================
 SECTION 1: YOUR ROLE
@@ -563,17 +567,21 @@ SECTION 1: YOUR ROLE
 Your task is to validate a visa document uploaded by a user and determine if it meets the requirements for their visa application.
 
 You will receive:
-- Document metadata (type, filename, upload date)
-- Expected document requirements (from checklist item, if available)
+- Document metadata (type, filename, upload date, expiry date)
+- Expected document requirements (from checklist item or VisaRuleSet, if available)
 - Visa application context (country, visa type)
+- APPLICANT_CONTEXT with expert fields (financial, ties, travelHistory, uzbekContext, meta) - if available
 
 Your job is to:
-1. Analyze the document based on available metadata and context
+1. Analyze the document based on available metadata, context, and expert fields
 2. Determine validation status: verified, rejected, needs_review, or uncertain
 3. Assign a confidence score (0.0 to 1.0)
 4. List any problems found (with standardized codes)
 5. Provide suggestions for improvement (if needed)
 6. Write clear explanations in Uzbek (required), Russian and English (optional)
+
+NOTE: This is a more generic validator, used when detailed rules or rule-based checker are missing.
+You should still use APPLICANT_CONTEXT (if provided) to judge how serious issues are.
 
 ================================================================================
 SECTION 2: STATUS DETERMINATION RULES
@@ -857,9 +865,22 @@ export function buildDocumentValidationUserPrompt(params: {
     prompt += `\n`;
   }
 
-  // Applicant profile (for personalized validation)
+  // Applicant profile (for personalized validation) - Phase 4: Include expert fields
   if (applicantProfile) {
-    prompt += `APPLICANT PROFILE (for context-aware validation):\n`;
+    prompt += `EXPERT ANALYSIS REQUIRED:
+
+Use expert officer reasoning to validate this document. Consider:
+- REQUIRED_DOCUMENT_RULE or checklistItem as ground truth
+- Document metadata and content to validate dates, amounts, format
+- APPLICANT_CONTEXT (expert fields) to understand how critical this document is for this applicant
+- If expert fields indicate low financial sufficiency or weak ties, be stricter on relevant documents
+- If data completeness is low, be cautious and prefer needs_review over rejected
+
+================================================================================
+APPLICANT_CONTEXT (Expert Fields)
+================================================================================
+
+APPLICANT PROFILE (for context-aware validation):\n`;
     if (applicantProfile.travel) {
       if (applicantProfile.travel.duration) {
         prompt += `- Travel Duration: ${applicantProfile.travel.duration}\n`;
@@ -883,6 +904,14 @@ export function buildDocumentValidationUserPrompt(params: {
       if (applicantProfile.financial.isSponsored !== undefined) {
         prompt += `- Is Sponsored: ${applicantProfile.financial.isSponsored}\n`;
       }
+      // Phase 4: Include expert financial fields if available (from CanonicalAIUserContext)
+      // Note: These may not be in applicantProfile yet, but structure is ready
+      if ((applicantProfile.financial as any)?.financialSufficiencyRatio !== undefined) {
+        prompt += `- Financial Sufficiency Ratio: ${(applicantProfile.financial as any).financialSufficiencyRatio}\n`;
+        prompt += `- Financial Sufficiency Label: ${(applicantProfile.financial as any).financialSufficiencyLabel}\n`;
+        prompt += `- Required Funds USD: ${(applicantProfile.financial as any).requiredFundsUSD}\n`;
+        prompt += `- Available Funds USD: ${(applicantProfile.financial as any).availableFundsUSD}\n`;
+      }
     }
     if (applicantProfile.familyAndTies) {
       if (applicantProfile.familyAndTies.maritalStatus) {
@@ -890,6 +919,11 @@ export function buildDocumentValidationUserPrompt(params: {
       }
       if (applicantProfile.familyAndTies.hasChildren) {
         prompt += `- Has Children: ${applicantProfile.familyAndTies.hasChildren}\n`;
+      }
+      // Phase 4: Include expert ties fields if available
+      if ((applicantProfile.familyAndTies as any)?.tiesStrengthScore !== undefined) {
+        prompt += `- Ties Strength Score: ${(applicantProfile.familyAndTies as any).tiesStrengthScore}\n`;
+        prompt += `- Ties Strength Label: ${(applicantProfile.familyAndTies as any).tiesStrengthLabel}\n`;
       }
     }
     if (applicantProfile.ageRange) {
@@ -903,6 +937,19 @@ export function buildDocumentValidationUserPrompt(params: {
     }
     if (applicantProfile.hasBusiness !== undefined) {
       prompt += `- Has Business: ${applicantProfile.hasBusiness}\n`;
+    }
+    // Phase 4: Include travel history expert fields if available
+    if ((applicantProfile as any)?.travelHistory?.travelHistoryScore !== undefined) {
+      prompt += `- Travel History Score: ${(applicantProfile as any).travelHistory.travelHistoryScore}\n`;
+      prompt += `- Travel History Label: ${(applicantProfile as any).travelHistory.travelHistoryLabel}\n`;
+      prompt += `- Previous Visa Rejections: ${(applicantProfile as any).travelHistory.previousVisaRejections || 0}\n`;
+    }
+    // Phase 4: Include data completeness if available
+    if ((applicantProfile as any)?.meta?.dataCompletenessScore !== undefined) {
+      prompt += `- Data Completeness Score: ${(applicantProfile as any).meta.dataCompletenessScore}\n`;
+      if ((applicantProfile as any).meta.missingCriticalFields?.length > 0) {
+        prompt += `- Missing Critical Fields: ${(applicantProfile as any).meta.missingCriticalFields.join(', ')}\n`;
+      }
     }
     prompt += `\n`;
   }

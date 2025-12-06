@@ -318,8 +318,12 @@ export async function validateDocumentWithAI(params: {
       const aiConfig = getAIConfig('docVerification');
 
       logInfo('[DocumentValidation] Calling GPT-4 for document validation', {
+        task: 'docVerification',
+        applicationId: application.id,
         model: aiConfig.model,
         documentType: document.documentType,
+        countryCode: application.country.code,
+        visaType: application.visaType.name,
         temperature: aiConfig.temperature,
         maxTokens: aiConfig.maxTokens,
       });
@@ -342,6 +346,15 @@ export async function validateDocumentWithAI(params: {
 
       const content = response.choices[0]?.message?.content || '{}';
 
+      logInfo('[DocumentValidation] GPT-4 response received', {
+        task: 'docVerification',
+        applicationId: application.id,
+        model: aiConfig.model,
+        documentType: document.documentType,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
+      });
+
       let parsed: any;
       try {
         parsed = JSON.parse(content);
@@ -350,8 +363,10 @@ export async function validateDocumentWithAI(params: {
           '[AI_DOC_VALIDATION_PARSE_ERROR] Failed to parse AI response',
           parseError as Error,
           {
-            documentType: document.documentType,
+            task: 'docVerification',
             applicationId: application.id,
+            model: aiConfig.model,
+            documentType: document.documentType,
             rawContent: content.substring(0, 200),
           }
         );

@@ -389,9 +389,11 @@ RISK LEVEL DETERMINATION:
 SUMMARY REQUIREMENTS:
 - summaryEn/Uz/Ru: 2-3 sentences each
 - MUST explicitly reference:
-  * Financial sufficiency (e.g., "Your financial capacity is borderline because you have X vs required Y.")
-  * Ties (strong/weak)
+  * Financial sufficiency (e.g., "Your financial capacity is borderline because you have X vs required Y." OR "Financial data is incomplete, so assessment is approximate.")
+  * Ties (strong/medium/weak) - reference property, employment, family explicitly
   * Travel history (none/limited/good)
+- CRITICAL: Only say "you are currently unemployed" if currentStatus is actually 'unemployed'. If currentStatus is 'employed' or 'student', say that instead.
+- If employment status is 'unknown' or missing, say "employment information is incomplete" rather than assuming unemployed.
 - If data is incomplete, mention that it's an estimate
 - Uzbek (Uz): Simple, clear language with common terminology (bank hisoboti, ish joyidan ma'lumotnoma, kadastr hujjati)
 - Russian (Ru): Formal but simple
@@ -488,7 +490,7 @@ ${
 - Has Property in Uzbekistan: ${(profile as any).hasPropertyInUzbekistan ? 'Yes' : 'No'}
 - Has Family in Uzbekistan: ${(profile as any).hasFamilyInUzbekistan ? 'Yes' : 'No'}
 - Has Children: ${(profile as any).hasChildren ? 'Yes' : 'No'}
-- Is Employed: ${profile.ties.isEmployed ? 'Yes' : 'No'}
+- Current Employment Status: ${profile.currentStatus || 'Unknown'} (${profile.isEmployed ? 'Employed' : profile.currentStatus === 'student' ? 'Student' : profile.currentStatus === 'unemployed' ? 'Unemployed' : 'Unknown'})
 - Employment Duration (months): ${profile.ties.employmentDurationMonths ?? 'N/A'}`
     : '- Ties metrics: Not available'
 }

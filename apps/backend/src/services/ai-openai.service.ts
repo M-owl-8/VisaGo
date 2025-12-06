@@ -332,22 +332,33 @@ export class AIOpenAIService {
     const startTime = Date.now();
 
     try {
+      // Use centralized config for chat
+      const aiConfig = getAIConfig('chat');
+
       const systemMessage = systemPrompt || this.getDefaultSystemPrompt();
 
       if (!AIOpenAIService.openai) {
         throw new Error('OpenAI client not initialized');
       }
 
+      logInfo('[AIOpenAIService] Calling GPT for chat', {
+        task: 'chat',
+        model: aiConfig.model,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
+      });
+
       const response = await AIOpenAIService.openai.chat.completions.create({
-        model: this.MODEL,
+        model: aiConfig.model,
         messages: [{ role: 'system', content: systemMessage }, ...messages],
-        max_tokens: this.MAX_TOKENS,
-        temperature: 0.7,
+        max_tokens: aiConfig.maxTokens,
+        temperature: aiConfig.temperature,
       });
 
       const responseTime = Date.now() - startTime;
       const inputTokens = response.usage?.prompt_tokens || 0;
       const outputTokens = response.usage?.completion_tokens || 0;
+      const totalTokens = inputTokens + outputTokens;
       const cost = this.calculateCost(inputTokens, outputTokens);
 
       const aiMessage = response.choices[0]?.message?.content || '';
@@ -355,16 +366,23 @@ export class AIOpenAIService {
       if (!aiMessage) {
         console.error('[AIOpenAIService] Empty response from OpenAI:', {
           choices: response.choices,
-          model: this.MODEL,
+          model: aiConfig.model,
         });
         throw new Error('Received empty response from AI service');
       }
 
+      logInfo('[AIOpenAIService] Chat response received', {
+        task: 'chat',
+        model: aiConfig.model,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
+      });
+
       return {
         message: aiMessage,
-        tokensUsed: inputTokens + outputTokens,
+        tokensUsed: totalTokens,
         cost,
-        model: this.MODEL,
+        model: aiConfig.model,
         responseTime,
       };
     } catch (error: any) {
@@ -372,11 +390,14 @@ export class AIOpenAIService {
       const statusCode = error?.status || error?.response?.status;
       const errorMessage = error?.message || String(error);
 
+      // Get config for logging
+      const aiConfig = getAIConfig('chat');
       logError(
         '[OpenAI_API_ERROR] Chat completion failed',
         error instanceof Error ? error : new Error(errorMessage),
         {
-          model: this.MODEL,
+          task: 'chat',
+          model: aiConfig.model,
           errorType,
           statusCode,
           errorMessage,
@@ -400,7 +421,11 @@ export class AIOpenAIService {
           error.message.includes('401') ||
           statusCode === 401
         ) {
-          logError('[OPENAI_CONFIG_ERROR] Invalid API key', error, { model: this.MODEL });
+          const aiConfig = getAIConfig('chat');
+          logError('[OPENAI_CONFIG_ERROR] Invalid API key', error, {
+            task: 'chat',
+            model: aiConfig.model,
+          });
           throw new Error('AI service configuration error. Please contact support.');
         }
         if (
@@ -408,7 +433,11 @@ export class AIOpenAIService {
           error.message.includes('insufficient_quota') ||
           statusCode === 429
         ) {
-          logError('[OPENAI_QUOTA_ERROR] Quota exceeded', error, { model: this.MODEL });
+          const aiConfig = getAIConfig('chat');
+          logError('[OPENAI_QUOTA_ERROR] Quota exceeded', error, {
+            task: 'chat',
+            model: aiConfig.model,
+          });
           throw new Error('AI service quota exceeded. Please try again later.');
         }
       }
@@ -470,21 +499,35 @@ export class AIOpenAIService {
 
 When answering questions, cite the sources from the knowledge base when relevant.`;
 
+      // Use centralized config for chat
+      const aiConfig = getAIConfig('chat');
+
       // Call GPT-4
       if (!AIOpenAIService.openai) {
         throw new Error('OpenAI client not initialized');
       }
 
+      logInfo('[AIOpenAIService] Calling GPT for RAG chat', {
+        task: 'chat_rag',
+        model: aiConfig.model,
+        userId,
+        applicationId,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
+        sourcesCount: ragSources.length,
+      });
+
       const response = await AIOpenAIService.openai.chat.completions.create({
-        model: this.MODEL,
+        model: aiConfig.model,
         messages: [{ role: 'system', content: systemMessage }, ...messages],
-        max_tokens: this.MAX_TOKENS,
-        temperature: 0.7,
+        max_tokens: aiConfig.maxTokens,
+        temperature: aiConfig.temperature,
       });
 
       const responseTime = Date.now() - startTime;
       const inputTokens = response.usage?.prompt_tokens || 0;
       const outputTokens = response.usage?.completion_tokens || 0;
+      const totalTokens = inputTokens + outputTokens;
       const cost = this.calculateCost(inputTokens, outputTokens);
 
       const aiMessage = response.choices[0]?.message?.content || '';
@@ -492,17 +535,27 @@ When answering questions, cite the sources from the knowledge base when relevant
       if (!aiMessage) {
         console.error('[AIOpenAIService] Empty response from OpenAI (RAG):', {
           choices: response.choices,
-          model: this.MODEL,
+          model: aiConfig.model,
         });
         throw new Error('Received empty response from AI service');
       }
 
+      logInfo('[AIOpenAIService] RAG chat response received', {
+        task: 'chat_rag',
+        model: aiConfig.model,
+        userId,
+        applicationId,
+        tokensUsed: totalTokens,
+        responseTimeMs: responseTime,
+        sourcesCount: ragSources.length,
+      });
+
       return {
         message: aiMessage,
         sources: ragSources,
-        tokensUsed: inputTokens + outputTokens,
+        tokensUsed: totalTokens,
         cost,
-        model: this.MODEL,
+        model: aiConfig.model,
         responseTime,
       };
     } catch (error) {
@@ -2568,9 +2621,11 @@ You MUST:
       const aiConfig = getAIConfig('checklistLegacy');
 
       logInfo('[OpenAI][Checklist][Legacy] Calling GPT-4 with centralized config', {
+        task: 'checklistLegacy',
         model: aiConfig.model,
         country,
         visaType,
+        countryCode,
         temperature: aiConfig.temperature,
         maxTokens: aiConfig.maxTokens,
       });
@@ -2595,11 +2650,15 @@ You MUST:
       const rawContent = response.choices[0]?.message?.content || '{}';
       const responseTime = Date.now() - startTime;
 
+      const tokensUsed = response.usage?.total_tokens || 0;
       logInfo('[OpenAI][Checklist][Legacy] GPT-4 response received', {
-        model: response?.model || this.getChecklistModel(),
+        task: 'checklistLegacy',
+        model: response?.model || aiConfig.model,
         country,
         visaType,
+        countryCode,
         responseLength: rawContent.length,
+        tokensUsed,
         responseTimeMs: responseTime,
       });
 
@@ -2630,9 +2689,14 @@ You MUST:
       }
 
       logInfo('[OpenAI][Checklist][Legacy] Checklist generated successfully', {
+        task: 'checklistLegacy',
+        model: aiConfig.model,
         country,
         visaType,
+        countryCode,
         itemCount: parsed.checklist.length,
+        tokensUsed,
+        responseTimeMs: responseTime,
       });
 
       return {

@@ -1,6 +1,33 @@
 /**
  * Document Checklist Service
  * AI-powered document checklist generation for visa applications
+ *
+ * ========================================================================
+ * CHECKLIST GENERATION MODE SELECTION LOGIC
+ * ========================================================================
+ *
+ * This service orchestrates checklist generation using three modes in order:
+ *
+ * 1. RULES MODE (Primary - Default)
+ *    - Uses VisaChecklistEngineService (rules + AI enrichment)
+ *    - Triggered when: VisaRuleSet exists for country+visaType
+ *    - Returns: Enriched checklist with expert reasoning
+ *    - Model: gpt-4o (via getAIConfig('checklist'))
+ *
+ * 2. LEGACY_GPT MODE (Fallback)
+ *    - Uses AIOpenAIService.generateChecklistLegacy()
+ *    - Triggered when: No VisaRuleSet exists OR rules mode returns null/fails
+ *    - Returns: GPT-generated checklist from scratch
+ *    - Model: gpt-4o (via getAIConfig('checklistLegacy'))
+ *
+ * 3. STATIC_FALLBACK MODE (Last Resort)
+ *    - Uses fallback-checklists.ts::getFallbackChecklist()
+ *    - Triggered when: Both RULES and LEGACY_GPT fail (errors, timeouts, invalid JSON)
+ *    - Returns: Pre-defined static checklist
+ *    - Model: None (static data)
+ *
+ * Mode selection is explicit, logged, and persisted in checklistData.generationMode
+ * ========================================================================
  */
 // Change summary (2025-11-24): Added OpenAI latency warnings and enforced country-specific terminology (e.g., LOA vs I-20).
 
@@ -14,6 +41,7 @@ import { getDocumentTranslation } from '../data/document-translations';
 import { buildAIUserContext } from './ai-context.service';
 import { inferCategory, normalizePriority } from '../utils/checklist-helpers';
 import { MIN_ITEMS_HARD, IDEAL_MIN_ITEMS } from '../config/checklist-config';
+import type { ChecklistGenerationMode, ChecklistMetadata } from '../types/checklist';
 
 const prisma = new PrismaClient();
 
@@ -126,6 +154,16 @@ export class DocumentChecklistService {
             const items = Array.isArray(checklistData) ? checklistData : checklistData.items || [];
             const aiFallbackUsed = checklistData.aiFallbackUsed || false;
             const aiErrorOccurred = checklistData.aiErrorOccurred || false;
+            const generationMode = checklistData.generationMode || 'static_fallback'; // Default for old checklists
+            const modelName = checklistData.modelName;
+
+            logInfo('[Checklist][Cache] Returning stored checklist', {
+              applicationId,
+              generationMode,
+              model: modelName,
+              itemCount: items.length,
+            });
+
             return this.buildChecklistResponse(
               applicationId,
               application.countryId,
@@ -328,6 +366,8 @@ export class DocumentChecklistService {
       let aiGenerated = false;
       let aiFallbackUsed = false;
       let aiErrorOccurred = false;
+      let generationMode: ChecklistGenerationMode = 'static_fallback'; // Default to fallback
+      let modelName: string | undefined = undefined; // Track model used for AI generation
 
       // Build AI user context with questionnaire summary (needed for all modes)
       const userContext = await buildAIUserContext(userId, applicationId);
@@ -394,6 +434,12 @@ export class DocumentChecklistService {
 
         try {
           const { VisaChecklistEngineService } = await import('./visa-checklist-engine.service');
+          const { getAIConfig } = await import('../config/ai-models');
+
+          // Get model name for logging (rules mode uses checklist config)
+          const aiConfig = getAIConfig('checklist');
+          modelName = aiConfig.model;
+
           const engineResponse = await VisaChecklistEngineService.generateChecklistForApplication(
             application,
             userContext
@@ -410,6 +456,7 @@ export class DocumentChecklistService {
               existingDocumentsMap
             );
             aiGenerated = true;
+            generationMode = 'rules';
 
             // Log structured checklist generation
             logChecklistGeneration({
@@ -425,6 +472,10 @@ export class DocumentChecklistService {
 
             logInfo('[Checklist][Mode] Rules mode succeeded', {
               applicationId,
+              countryCode,
+              visaType: visaTypeName,
+              generationMode,
+              model: modelName,
               itemCount: items.length,
             });
           } else {
@@ -513,6 +564,12 @@ export class DocumentChecklistService {
 
         try {
           const { AIOpenAIService } = await import('./ai-openai.service');
+          const { getAIConfig } = await import('../config/ai-models');
+
+          // Get model name for logging (legacy mode uses checklistLegacy config)
+          const aiConfig = getAIConfig('checklistLegacy');
+          modelName = aiConfig.model;
+
           const legacyResponse = await AIOpenAIService.generateChecklistLegacy(
             application,
             userContext
@@ -528,6 +585,7 @@ export class DocumentChecklistService {
               existingDocumentsMap
             );
             aiGenerated = true;
+            generationMode = 'legacy_gpt';
 
             // Log structured checklist generation (legacy mode)
             logChecklistGeneration({
@@ -543,8 +601,40 @@ export class DocumentChecklistService {
 
             logInfo('[Checklist][Mode] Legacy mode succeeded', {
               applicationId,
+              countryCode,
+              visaType: visaTypeName,
+              generationMode,
+              model: modelName,
               itemCount: items.length,
             });
+
+            // SAFETY NET: If rules were available but failed, and legacy produced < IDEAL_MIN_ITEMS,
+            // mark for static fallback to ensure quality
+            if (
+              ruleSet &&
+              ruleSet.requiredDocuments &&
+              ruleSet.requiredDocuments.length >= IDEAL_MIN_ITEMS
+            ) {
+              const ruleSetDocumentCount = ruleSet.requiredDocuments.length;
+              if (items.length < IDEAL_MIN_ITEMS) {
+                logWarn(
+                  '[Checklist][Mode] SAFETY NET: Rules were available but legacy produced insufficient items, will fallback to static',
+                  {
+                    applicationId,
+                    countryCode,
+                    visaType: visaTypeName,
+                    ruleSetDocumentCount,
+                    legacyItemCount: items.length,
+                    idealMinItems: IDEAL_MIN_ITEMS,
+                    decisionChain:
+                      'rules_available -> rules_failed -> legacy_insufficient -> static_fallback',
+                  }
+                );
+                // Clear items to trigger static fallback below
+                items = [];
+                aiFallbackUsed = true;
+              }
+            }
           } else {
             logWarn(
               '[Checklist][Mode] Legacy mode returned insufficient items, using static fallback',
@@ -579,10 +669,14 @@ export class DocumentChecklistService {
           itemCount: 0, // Will be set after generation
         });
 
+        generationMode = 'static_fallback';
+        modelName = undefined; // Static fallback doesn't use AI
+
         logInfo('[Checklist][Mode] Using STATIC FALLBACK mode', {
           applicationId,
           countryCode,
           visaType: visaTypeName,
+          generationMode,
         });
 
         const { buildFallbackChecklistFromStaticConfig } = await import(
@@ -623,6 +717,9 @@ export class DocumentChecklistService {
 
         logInfo('[Checklist][Mode] Static fallback generated', {
           applicationId,
+          countryCode,
+          visaType: visaTypeName,
+          generationMode,
           itemCount: items.length,
         });
       }
@@ -681,20 +778,20 @@ export class DocumentChecklistService {
       );
 
       // Store checklist in database with status 'ready'
-      // Include metadata about AI fallback usage
-      const checklistMetadata = {
+      // Include metadata about AI fallback usage and generation mode
+      const checklistMetadata: ChecklistMetadata = {
+        items: sanitizedItems,
         aiGenerated,
         aiFallbackUsed,
         aiErrorOccurred,
+        generationMode,
+        modelName, // Model used for AI generation (if applicable)
       };
       await prisma.documentChecklist.update({
         where: { applicationId },
         data: {
           status: 'ready',
-          checklistData: JSON.stringify({
-            items: sanitizedItems,
-            ...checklistMetadata,
-          }),
+          checklistData: JSON.stringify(checklistMetadata),
           aiGenerated,
           generatedAt: new Date(),
           errorMessage: null,
@@ -703,8 +800,13 @@ export class DocumentChecklistService {
 
       logInfo('[Checklist][Async] Checklist generated and stored', {
         applicationId,
+        countryCode,
+        visaType: visaTypeName,
+        generationMode,
+        model: modelName,
         itemCount: sanitizedItems.length,
         aiGenerated,
+        aiFallbackUsed,
       });
     } catch (error: any) {
       // CRITICAL: Even if everything fails, generate a basic fallback checklist
@@ -776,16 +878,19 @@ export class DocumentChecklistService {
 
         // Store checklist with status 'ready' (not 'failed')
         // Include metadata about emergency fallback usage
+        const emergencyMetadata: ChecklistMetadata = {
+          items: sanitizedItems,
+          aiGenerated: false,
+          aiFallbackUsed: true,
+          aiErrorOccurred: true,
+          generationMode: 'static_fallback',
+          modelName: undefined, // Emergency fallback doesn't use AI
+        };
         await prisma.documentChecklist.update({
           where: { applicationId },
           data: {
             status: 'ready',
-            checklistData: JSON.stringify({
-              items: sanitizedItems,
-              aiGenerated: false,
-              aiFallbackUsed: true,
-              aiErrorOccurred: true,
-            }),
+            checklistData: JSON.stringify(emergencyMetadata),
             aiGenerated: false,
             generatedAt: new Date(),
             errorMessage: null, // Clear error message since we have a fallback
@@ -794,6 +899,7 @@ export class DocumentChecklistService {
 
         logInfo('[Checklist][Async] Emergency fallback checklist generated and stored', {
           applicationId,
+          generationMode: 'static_fallback',
           itemCount: sanitizedItems.length,
         });
       } catch (fallbackError: any) {

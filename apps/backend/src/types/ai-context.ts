@@ -206,6 +206,11 @@ export interface CanonicalAIUserContext {
       };
       requiredFundsEstimate?: number | null; // Estimated funds needed for trip
       financialSufficiencyRatio?: number | null; // availableFunds / requiredFunds (0.0-1.0+)
+      // Phase 2: Extended expert fields
+      sponsorHasSufficientFunds?: boolean | null;
+      requiredFundsUSD?: number | null; // Alias for requiredFundsEstimate (for consistency)
+      availableFundsUSD?: number | null; // balance + maybe some income
+      financialSufficiencyLabel?: 'low' | 'borderline' | 'sufficient' | 'strong' | null;
     };
 
     // Employment/Education (basic - kept for backward compatibility)
@@ -257,6 +262,11 @@ export interface CanonicalAIUserContext {
         outcome: 'approved' | 'rejected';
         date?: string;
       }>;
+      // Phase 2: Extended expert fields
+      previousVisaRejections?: number | null; // Count if possible, else 0/1
+      hasOverstayHistory?: boolean | null;
+      travelHistoryScore?: number | null; // 0.0-1.0
+      travelHistoryLabel?: 'none' | 'limited' | 'good' | 'strong' | null;
     };
 
     // Family (expert fields - Phase 3)
@@ -305,6 +315,10 @@ export interface CanonicalAIUserContext {
         family?: number; // 0.0-1.0 contribution
         children?: number; // 0.0-1.0 contribution
       };
+      // Phase 2: Extended expert fields
+      propertyValueUSD?: number | null;
+      employmentDurationMonths?: number | null;
+      tiesStrengthLabel?: 'weak' | 'medium' | 'strong' | null;
     };
 
     // Invitations
@@ -357,5 +371,18 @@ export interface CanonicalAIUserContext {
     currency?: string | null; // From VisaRuleSet.financialRequirements.currency
     commonRefusalReasons?: string[]; // Country-specific common refusal reasons
     officerEvaluationCriteria?: string[]; // What officers check for this country/visa type
+  };
+
+  // Phase 2: Uzbek context (expert fields)
+  uzbekContext?: {
+    isUzbekCitizen: boolean; // user.citizenship === 'UZ' or similar
+    residesInUzbekistan: boolean; // homeCountry === 'UZ' or address includes Uzbekistan
+    typicalBankNamesIncluded?: boolean; // later for prompts if needed
+  };
+
+  // Phase 2: Meta information (expert fields)
+  meta?: {
+    dataCompletenessScore?: number | null; // 0.0-1.0, how complete context is
+    missingCriticalFields?: string[]; // high-level names of important missing fields
   };
 }

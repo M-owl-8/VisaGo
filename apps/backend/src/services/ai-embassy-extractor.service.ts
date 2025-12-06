@@ -182,9 +182,11 @@ export class AIEmbassyExtractorService {
       const aiConfig = getAIConfig('rulesExtraction');
 
       logInfo('[AIEmbassyExtractor] Calling GPT-4 for rules extraction', {
+        task: 'rulesExtraction',
         model: aiConfig.model,
         countryCode,
         visaType,
+        sourceUrl,
         temperature: aiConfig.temperature,
         maxTokens: aiConfig.maxTokens,
       });
@@ -205,8 +207,11 @@ export class AIEmbassyExtractorService {
       const extractionTime = Date.now() - startTime;
 
       logInfo('[AIEmbassyExtractor] GPT-4 response received', {
+        task: 'rulesExtraction',
+        model: aiConfig.model,
         countryCode,
         visaType,
+        sourceUrl,
         tokensUsed,
         extractionTime,
         responseLength: rawContent.length,
@@ -272,10 +277,14 @@ export class AIEmbassyExtractorService {
       const ruleSet = parsed as VisaRuleSetData;
 
       logInfo('[AIEmbassyExtractor] Extraction successful', {
+        task: 'rulesExtraction',
+        model: aiConfig.model,
         countryCode,
         visaType,
         documentsCount: ruleSet.requiredDocuments?.length || 0,
         confidence: ruleSet.sourceInfo?.confidence,
+        tokensUsed,
+        extractionTime,
       });
 
       return {
@@ -294,24 +303,197 @@ export class AIEmbassyExtractorService {
   }
 
   /**
-   * Build system prompt for GPT-4
+   * Build system prompt for GPT-4 (EXPERT EXTRACTION ENGINE VERSION - Phase 6)
+   *
+   * Phase 6 Upgrade:
+   * - Expert visa rules extraction engine role specialized for 10 countries × 2 visa types
+   * - Explicit extraction rules with confidence scoring
+   * - No hallucination policy - extract only what's explicitly stated
+   * - Standard documentType slugs and categorization
    */
   private static buildSystemPrompt(
     countryCode: string,
     visaType: string,
     previousRules?: VisaRuleSetData
   ): string {
-    return `You are an expert visa rules extraction engine for VisaBuddy. Your task is to extract structured visa requirements from official embassy/consulate web pages.
+    return `You are an EXPERT VISA RULES EXTRACTION ENGINE with 10+ years experience extracting visa requirements from official embassy websites for US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, UAE, especially for applications from Uzbekistan.
 
-CRITICAL REQUIREMENTS:
-1. You MUST return ONLY valid JSON matching the exact schema below (no markdown, no explanations, no extra text).
-2. Extract ONLY information that is explicitly stated on the page. Do NOT infer or assume requirements.
-3. If information is not available, use null or omit the field (do NOT make up values).
-4. Be precise with document types - use standard slugs like "passport", "bank_statement", "i20_form", "loa_letter", etc.
-5. Categorize documents correctly:
-   - "required": Mandatory documents that must be submitted
-   - "highly_recommended": Documents that significantly improve approval chances
-   - "optional": Supporting documents that may help but are not required
+================================================================================
+YOUR ROLE
+================================================================================
+
+Your task is to extract structured visa requirements from official embassy/consulate web pages with high accuracy and confidence.
+
+================================================================================
+INPUTS YOU WILL RECEIVE
+================================================================================
+
+- URL (sourceUrl): The embassy/consulate page URL
+- pageTitle: Title of the page (if available)
+- pageText: Truncated HTML/text content from the page
+- countryCode: ISO country code (US, UK, DE, ES, CA, AU, JP, KR, AE, etc.)
+- visaType: 'tourist' or 'student'
+
+================================================================================
+EXTRACTION RULES
+================================================================================
+
+1. EXTRACT ONLY EXPLICITLY STATED INFORMATION:
+   - Extract ONLY information that is explicitly stated on the page
+   - Do NOT infer, assume, or guess requirements
+   - If information is not available, use null or omit the field (do NOT make up values)
+   - If information is contradictory, pick the most recent/explicit version and reduce confidence
+
+2. USE STANDARD DOCUMENT TYPE SLUGS:
+   Use these standard documentType slugs where possible:
+   - Core: passport, passport_photos, passport_biometric
+   - Financial: bank_statements_applicant, sponsor_bank_statements, financial_guarantee, proof_of_funds
+   - Employment: employment_letter, employment_contract, salary_certificate
+   - Property: property_documents, property_ownership, kadastr_document
+   - Family: family_ties_documents, marriage_certificate, birth_certificate
+   - Travel: travel_insurance, travel_itinerary, accommodation_proof, flight_reservation, return_ticket
+   - Invitation: invitation_letter, sponsor_letter, host_letter
+   - Student-specific: i20_form, ds2019_form, cas_letter, loa_letter, gic_proof, sevis_fee_receipt, tuition_payment_receipt, coe_letter, dli_letter
+   - Medical: tb_test_certificate, medical_exam, health_insurance
+   - Other: visa_application_form, biometric_data, police_clearance
+
+3. CATEGORIZE DOCUMENTS CORRECTLY:
+   - "required": Mandatory documents that must be submitted (explicitly stated as required)
+   - "highly_recommended": Documents that significantly improve approval chances (stated as recommended/strongly advised)
+   - "optional": Supporting documents that may help but are not required (stated as optional/may be helpful)
+
+4. EXTRACT CONDITIONS WHEN DOCUMENTS ARE CONDITIONAL:
+   - Extract condition field when documents are conditional:
+     * e.g., "if sponsorType !== 'self'", "if sponsored", "if minor", "if staying with family", "if student"
+   - Examples:
+     * "sponsor_bank_statements" → condition: "if sponsored or sponsorType !== 'self'"
+     * "parental_consent" → condition: "if minor or age < 18"
+     * "accommodation_proof" → condition: "if staying with family or host"
+
+5. EXTRACT FINANCIAL REQUIREMENTS:
+   - minimumBalance: Extract if given (convert to USD if needed)
+   - currency: Extract currency code (USD, EUR, GBP, CAD, AUD, JPY, KRW, AED)
+   - bankStatementMonths: Extract how many months of statements required (e.g., 3, 6, 12)
+   - sponsorRequirements: Extract if described:
+     * allowed: boolean (is sponsorship allowed?)
+     * requiredDocuments: array of sponsor document types
+
+6. EXTRACT PROCESSING INFO:
+   - typical processing time: Extract as processingDays (number)
+   - interview required?: Extract as interviewRequired (yes/no/unknown)
+   - biometrics required?: Extract as biometricsRequired (yes/no/unknown)
+   - appointment required?: Extract as appointmentRequired (yes/no/unknown)
+
+7. EXTRACT FEES:
+   - application fee: Extract as visaFee (amount, currency)
+   - any extra fees mentioned: Extract as serviceFee or additional fees (SEVIS, GIC, etc.)
+   - payment methods: Extract if mentioned (cash, card, bank_transfer, online)
+
+8. EXTRACT ADDITIONAL REQUIREMENTS:
+   - insurance minimums: Extract travelInsurance.minimumCoverage (e.g., €30,000 for Schengen)
+   - COE/CAS/I-20 references: Extract if mentioned
+   - TB test, medical exam: Extract if required
+   - language requirements: Extract if mentioned
+   - accommodation proof: Extract types (hotel_booking, invitation_letter, etc.)
+   - return ticket: Extract if required, refundable status
+
+================================================================================
+CONFIDENCE & COMPLETENESS
+================================================================================
+
+You MUST set sourceInfo.confidence between 0.0-1.0 based on:
+
+- How clear and structured the page is:
+  * Well-structured, official embassy page with clear sections → 0.8-1.0
+  * Unclear or mixed content → 0.5-0.7
+  * Poor quality or incomplete → 0.3-0.5
+
+- How many required sections were found:
+  * All sections found (docs, financial, processing, fees) → +0.2
+  * Most sections found → +0.1
+  * Few sections found → +0.0
+
+- Information quality:
+  * Clear, explicit requirements → +0.1
+  * Vague or ambiguous → -0.1
+  * Contradictory information → -0.2
+
+- If something is clearly missing (e.g., fees not on page):
+  * Leave that section null/empty
+  * DO NOT invent values
+  * Reduce confidence accordingly
+
+- If information is contradictory:
+  * Pick the most recent/explicit version
+  * Reduce confidence by 0.1-0.2
+  * Note in description if needed
+
+================================================================================
+OUTPUT REQUIREMENTS
+================================================================================
+
+You MUST return ONLY valid JSON matching the VisaRuleSetData schema exactly:
+
+{
+  "requiredDocuments": [
+    {
+      "documentType": "string (standard slug)",
+      "category": "required" | "highly_recommended" | "optional",
+      "description": "string (what the document is and why it's needed)",
+      "validityRequirements": "string (e.g., '6 months validity remaining')",
+      "formatRequirements": "string (e.g., 'Original + 2 copies')",
+      "condition": "string (optional, e.g., 'if sponsored')"
+    }
+  ],
+  "financialRequirements": {
+    "minimumBalance": number (in specified currency, null if not stated),
+    "currency": "string (e.g., 'USD', 'EUR')",
+    "bankStatementMonths": number (how many months, null if not stated),
+    "sponsorRequirements": {
+      "allowed": boolean (null if not stated),
+      "requiredDocuments": ["string"] (list of sponsor document types)
+    }
+  },
+  "processingInfo": {
+    "processingDays": number (null if not stated),
+    "appointmentRequired": boolean (null if not stated),
+    "interviewRequired": boolean (null if not stated),
+    "biometricsRequired": boolean (null if not stated)
+  },
+  "fees": {
+    "visaFee": number (null if not stated),
+    "serviceFee": number (null if not stated),
+    "currency": "string",
+    "paymentMethods": ["string"]
+  },
+  "additionalRequirements": {
+    "travelInsurance": {
+      "required": boolean (null if not stated),
+      "minimumCoverage": number (null if not stated),
+      "currency": "string"
+    },
+    "accommodationProof": {
+      "required": boolean (null if not stated),
+      "types": ["string"]
+    },
+    "returnTicket": {
+      "required": boolean (null if not stated),
+      "refundable": boolean (null if not stated)
+    }
+  },
+  "sourceInfo": {
+    "extractedFrom": "string (URL)",
+    "extractedAt": "string (ISO timestamp)",
+    "confidence": number (0.0-1.0, REQUIRED)
+  }
+}
+
+CRITICAL OUTPUT RULES:
+- sourceInfo.extractedFrom = URL (from input)
+- sourceInfo.extractedAt = ISO timestamp string (use current timestamp)
+- sourceInfo.confidence MUST be present (0.0-1.0)
+- No markdown, no prose outside JSON
+- Return ONLY valid JSON, no code blocks, no explanations
 
 OUTPUT SCHEMA (JSON):
 {
@@ -371,7 +553,12 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanations.`;
   }
 
   /**
-   * Build user prompt with page content
+   * Build user prompt with page content (EXPERT EXTRACTION VERSION - Phase 6)
+   *
+   * Phase 6 Upgrade:
+   * - Explicit extraction checklist
+   * - Clear instructions on what to extract
+   * - Emphasis on no hallucination
    */
   private static buildUserPrompt(
     countryCode: string,
@@ -380,22 +567,77 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanations.`;
     pageText: string,
     pageTitle?: string
   ): string {
-    return `Extract visa requirements from the following official embassy/consulate page:
+    return `Extract visa rules for this specific country + visaType only.
 
-URL: ${sourceUrl}
-${pageTitle ? `Title: ${pageTitle}` : ''}
+================================================================================
+EXTRACTION TARGET
+================================================================================
 
-Page Content:
+- Country Code: ${countryCode}
+- Visa Type: ${visaType}
+- Source URL: ${sourceUrl}
+${pageTitle ? `- Page Title: ${pageTitle}` : ''}
+
+================================================================================
+PAGE CONTENT
+================================================================================
+
 ${pageText.substring(0, 40000)}${pageText.length > 40000 ? '\n\n[Content truncated for length]' : ''}
 
-Extract all visa requirements and return them in the exact JSON schema format specified. Focus on:
-- Required documents
-- Financial requirements
-- Processing times and procedures
-- Fees
-- Additional requirements (insurance, accommodation, tickets, etc.)
+================================================================================
+EXTRACTION CHECKLIST
+================================================================================
 
-Return ONLY valid JSON, no markdown, no explanations.`;
+Make sure to:
+
+1. List all required documents:
+   - Extract document types using standard slugs (passport, bank_statements_applicant, i20_form, etc.)
+   - Categorize correctly (required/highly_recommended/optional)
+   - Extract conditions if documents are conditional (e.g., "if sponsored", "if minor")
+
+2. Extract any financial thresholds (if present):
+   - Minimum balance requirements
+   - Currency
+   - Bank statement months (e.g., 3, 6, 12 months)
+   - Sponsor requirements (if allowed, what documents needed)
+
+3. Extract statement month requirements:
+   - How many months of bank statements are required?
+   - Any specific period (e.g., "last 3 months", "last 6 months")?
+
+4. Mention insurance requirements (if present):
+   - Is travel insurance required?
+   - Minimum coverage amount and currency (e.g., €30,000 for Schengen)
+   - Any specific insurance providers mentioned?
+
+5. Mention interviews/biometrics (if present):
+   - Is interview required? (yes/no/unknown)
+   - Is biometrics required? (yes/no/unknown)
+   - Is appointment required? (yes/no/unknown)
+   - Typical processing time in days
+
+6. Extract fees (if present):
+   - Application fee amount and currency
+   - Service fees
+   - Payment methods
+
+7. Extract additional requirements:
+   - Accommodation proof (hotel booking, invitation, etc.)
+   - Return ticket requirements
+   - Medical exams, TB tests
+   - Language requirements
+   - Student-specific (I-20, CAS, LOA, GIC, SEVIS, COE, DLI, etc.)
+
+8. Keep all unexplained/unknown fields as null:
+   - Do NOT invent values
+   - Do NOT infer requirements not explicitly stated
+   - If not found, set to null or omit the field
+
+================================================================================
+
+Extract all visa requirements and return them in the exact JSON schema format specified in the system prompt.
+
+Return ONLY valid JSON matching the VisaRuleSetData schema, no markdown, no explanations, no code blocks.`;
   }
 
   /**

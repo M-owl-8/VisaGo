@@ -13,6 +13,7 @@ import {
   VisaProbabilityResult,
 } from '../types/ai-context';
 import type { ApplicantProfile as VisaBrainApplicantProfile } from '../types/visa-brain';
+import { getVisaCountryProfile } from '../config/visa-country-profiles';
 
 /**
  * Structured Applicant Profile for Checklist Personalization
@@ -202,8 +203,132 @@ function calculateFinancialSufficiencyRatio(
 }
 
 /**
+ * Classify financial sufficiency with ratio and label
+ * Phase 2: Extended expert field calculation
+ */
+function classifyFinancialSufficiency(
+  required: number | null,
+  available: number | null
+): {
+  ratio: number | null;
+  label: 'low' | 'borderline' | 'sufficient' | 'strong' | null;
+} {
+  if (required === null || available === null || required === 0) {
+    return { ratio: null, label: null };
+  }
+
+  const ratio = available / required;
+  let label: 'low' | 'borderline' | 'sufficient' | 'strong' | null = null;
+
+  if (ratio < 0.7) {
+    label = 'low';
+  } else if (ratio < 1.0) {
+    label = 'borderline';
+  } else if (ratio < 1.3) {
+    label = 'sufficient';
+  } else {
+    label = 'strong';
+  }
+
+  return { ratio, label };
+}
+
+/**
+ * Estimate required funds in USD based on country, visa type, and duration
+ * Phase 2: Enhanced calculation with daily cost estimates
+ */
+function estimateRequiredFundsUSD(
+  countryCode: string,
+  visaType: 'student' | 'tourist',
+  plannedDurationDays: number | null
+): number | null {
+  // Base daily cost estimates by destination region (USD)
+  const baseDailyCosts: Record<string, { tourist: number; student: number }> = {
+    US: { tourist: 100, student: 150 },
+    CA: { tourist: 90, student: 140 },
+    GB: { tourist: 90, student: 130 },
+    AU: { tourist: 80, student: 120 },
+    DE: { tourist: 70, student: 100 },
+    ES: { tourist: 60, student: 90 },
+    FR: { tourist: 70, student: 100 },
+    IT: { tourist: 70, student: 100 },
+    JP: { tourist: 80, student: 120 },
+    KR: { tourist: 70, student: 110 },
+    AE: { tourist: 70, student: 100 },
+  };
+
+  const costs = baseDailyCosts[countryCode];
+  if (!costs) {
+    // Global default for unknown countries
+    return visaType === 'tourist' ? 70 * (plannedDurationDays || 14) + 500 : null;
+  }
+
+  const dailyCost = costs[visaType];
+  let durationDays = plannedDurationDays;
+
+  // If duration is unknown, use defaults
+  if (durationDays === null) {
+    durationDays = visaType === 'tourist' ? 14 : 365;
+  }
+
+  if (visaType === 'tourist') {
+    // Tourist: daily cost * duration + safety buffer
+    return dailyCost * durationDays + 500;
+  } else {
+    // Student: annual tuition estimate + living cost per year
+    // For now, use a simplified estimate based on country
+    const annualTuitionEstimates: Record<string, number> = {
+      US: 25000,
+      CA: 20000,
+      GB: 18000,
+      AU: 20000,
+      DE: 0, // Often free/low cost
+      ES: 5000,
+      FR: 0,
+      IT: 5000,
+      JP: 15000,
+      KR: 12000,
+      AE: 15000,
+    };
+
+    const tuition = annualTuitionEstimates[countryCode] || 15000;
+    const livingCost = dailyCost * 365; // Annual living cost
+    return tuition + livingCost;
+  }
+}
+
+/**
+ * Compute available funds USD
+ * Phase 2: Enhanced calculation including income multiplier
+ */
+function computeAvailableFundsUSD(
+  bankBalanceUSD: number | null,
+  monthlyIncomeUSD: number | null,
+  sponsorType: string,
+  sponsorBankBalanceUSD?: number | null,
+  sponsorIncomeUSD?: number | null
+): number | null {
+  let available = bankBalanceUSD ?? 0;
+
+  // Add income multiplier (2-3 months of income)
+  if (monthlyIncomeUSD !== null && monthlyIncomeUSD > 0) {
+    available += monthlyIncomeUSD * 2.5; // Conservative multiplier
+  }
+
+  // If sponsored, factor in sponsor funds
+  if (sponsorType !== 'self') {
+    const sponsorFunds = sponsorBankBalanceUSD ?? 0;
+    const sponsorIncomeMultiplier = sponsorIncomeUSD ? sponsorIncomeUSD * 2.5 : 0;
+    available += sponsorFunds + sponsorIncomeMultiplier;
+  }
+
+  return available > 0 ? available : null;
+}
+
+/**
  * Calculate ties strength score (0.0-1.0)
  * Based on property, employment, family, and children
+ * Phase 2: Returns label as well
  */
 function calculateTiesStrengthScore(
   hasProperty: boolean,
@@ -214,6 +339,7 @@ function calculateTiesStrengthScore(
   maritalStatus: string
 ): {
   score: number;
+  label: 'weak' | 'medium' | 'strong';
   factors: { property: number; employment: number; family: number; children: number };
 } {
   let score = 0.0;
@@ -230,14 +356,12 @@ function calculateTiesStrengthScore(
     score += 0.3;
   }
 
-  // Employment contribution (0.0-0.3)
+  // Employment contribution (0.0-0.2)
   if (isEmployed) {
     if (employmentDurationMonths !== null && employmentDurationMonths >= 24) {
-      factors.employment = 0.3; // Strong employment (24+ months)
-    } else if (employmentDurationMonths !== null && employmentDurationMonths >= 12) {
-      factors.employment = 0.2; // Moderate employment (12-23 months)
+      factors.employment = 0.2; // Strong employment (24+ months)
     } else {
-      factors.employment = 0.1; // Weak employment (<12 months)
+      factors.employment = 0.2; // Employment shows ties regardless of duration
     }
     score += factors.employment;
   }
@@ -261,7 +385,141 @@ function calculateTiesStrengthScore(
   // Clamp to 0.0-1.0
   score = Math.min(Math.max(score, 0.0), 1.0);
 
-  return { score, factors };
+  // Determine label
+  let label: 'weak' | 'medium' | 'strong';
+  if (score < 0.4) {
+    label = 'weak';
+  } else if (score < 0.7) {
+    label = 'medium';
+  } else {
+    label = 'strong';
+  }
+
+  return { score, label, factors };
+}
+
+/**
+ * Compute ties strength with score and label
+ * Phase 2: Wrapper for calculateTiesStrengthScore
+ */
+function computeTiesStrengthScore(context: {
+  hasProperty: boolean;
+  isEmployed: boolean;
+  employmentDurationMonths: number | null;
+  hasFamily: boolean;
+  hasChildren: boolean;
+  maritalStatus: string;
+}): {
+  score: number | null;
+  label: 'weak' | 'medium' | 'strong' | null;
+} {
+  try {
+    const result = calculateTiesStrengthScore(
+      context.hasProperty,
+      context.isEmployed,
+      context.employmentDurationMonths,
+      context.hasFamily,
+      context.hasChildren,
+      context.maritalStatus
+    );
+    return { score: result.score, label: result.label };
+  } catch (error) {
+    logError('Failed to compute ties strength', error as Error);
+    return { score: null, label: null };
+  }
+}
+
+/**
+ * Compute travel history score and label
+ * Phase 2: Expert field calculation
+ */
+function computeTravelHistoryScore(context: {
+  hasInternationalTravel: boolean;
+  previousVisaRejections: boolean | number;
+  hasOverstay: boolean;
+}): {
+  score: number | null;
+  label: 'none' | 'limited' | 'good' | 'strong' | null;
+} {
+  try {
+    const hasTravel = context.hasInternationalTravel;
+    const rejections =
+      typeof context.previousVisaRejections === 'number'
+        ? context.previousVisaRejections
+        : context.previousVisaRejections
+          ? 1
+          : 0;
+    const hasOverstay = context.hasOverstay;
+
+    // If no travel and no rejections → 'none'
+    if (!hasTravel && rejections === 0) {
+      return { score: 0.0, label: 'none' };
+    }
+
+    // If rejections exist, adjust score down
+    if (rejections > 0) {
+      const baseScore = hasTravel ? 0.3 : 0.0;
+      const adjustedScore = Math.max(0.0, baseScore - rejections * 0.2);
+      return {
+        score: adjustedScore,
+        label: adjustedScore < 0.2 ? 'none' : 'limited',
+      };
+    }
+
+    // If overstay exists, significantly reduce score
+    if (hasOverstay) {
+      return { score: 0.1, label: 'limited' };
+    }
+
+    // If has travel but no rejections → 'limited' to 'good'
+    if (hasTravel) {
+      // For now, assume limited (could be enhanced with trip count later)
+      return { score: 0.4, label: 'limited' };
+    }
+
+    return { score: null, label: null };
+  } catch (error) {
+    logError('Failed to compute travel history score', error as Error);
+    return { score: null, label: null };
+  }
+}
+
+/**
+ * Compute data completeness score
+ * Phase 2: Expert field calculation
+ */
+function computeDataCompleteness(context: {
+  bankBalanceUSD: number | null;
+  monthlyIncomeUSD: number | null;
+  sponsorType: string;
+  currentStatus: string;
+  hasProperty: boolean;
+  hasFamily: boolean;
+  hasInternationalTravel: boolean;
+}): {
+  score: number | null;
+  missingCriticalFields: string[];
+} {
+  const criticalFields = [
+    { name: 'bankBalanceUSD', present: context.bankBalanceUSD !== null },
+    { name: 'monthlyIncomeUSD', present: context.monthlyIncomeUSD !== null },
+    {
+      name: 'sponsorType',
+      present: context.sponsorType !== 'unknown' && context.sponsorType !== '',
+    },
+    { name: 'currentStatus', present: context.currentStatus !== 'unknown' },
+    { name: 'hasPropertyInUzbekistan', present: true }, // Boolean is always present
+    { name: 'hasFamilyInUzbekistan', present: true }, // Boolean is always present
+    { name: 'hasInternationalTravel', present: true }, // Boolean is always present
+  ];
+
+  const presentCount = criticalFields.filter((f) => f.present).length;
+  const totalCount = criticalFields.length;
+  const score = presentCount / totalCount;
+
+  const missingFields = criticalFields.filter((f) => !f.present).map((f) => f.name);
+
+  return { score, missingCriticalFields: missingFields };
 }
 
 /**
@@ -445,7 +703,8 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
   const positiveFactors: string[] = [];
 
   // Money - Bank Balance
-  if (summary.bankBalanceUSD !== undefined) {
+  // Only penalize if balance is explicitly low, not if it's just missing/unknown
+  if (summary.bankBalanceUSD !== undefined && summary.bankBalanceUSD !== null) {
     if (summary.visaType === 'tourist' && summary.bankBalanceUSD < 2000) {
       score -= 10;
       riskFactors.push('Bank balance is relatively low for a tourist trip.');
@@ -455,6 +714,7 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
       riskFactors.push('Savings may be low compared to common student visa expectations.');
     }
   }
+  // If bank balance is missing/unknown, don't penalize - it's just incomplete data
 
   // Rejections / overstays
   if (summary.previousVisaRejections) {
@@ -466,21 +726,73 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
     riskFactors.push('Previous overstay strongly reduces chances of approval.');
   }
 
-  // Ties to Uzbekistan
+  // Ties to Uzbekistan (strong positive factors)
+  let tiesStrength = 0;
   if (summary.hasPropertyInUzbekistan) {
     score += 5;
+    tiesStrength += 1;
     positiveFactors.push('Property in Uzbekistan strengthens your ties to home country.');
   }
   if (summary.hasFamilyInUzbekistan) {
     score += 5;
+    tiesStrength += 1;
     positiveFactors.push('Close family in Uzbekistan is a strong tie to home country.');
+  }
+  // Check employment status - if employed, that's also a tie
+  const isEmployed =
+    summary.employment?.isEmployed ||
+    summary.employment?.currentStatus === 'employed' ||
+    summary.employment?.currentStatus === 'self_employed';
+  if (isEmployed) {
+    score += 3;
+    tiesStrength += 0.5;
+    positiveFactors.push('Employment demonstrates ties to home country.');
+  }
+  // Check if has children
+  if (summary.hasChildren && summary.hasChildren !== 'no') {
+    score += 3;
+    tiesStrength += 0.5;
+    positiveFactors.push('Children in Uzbekistan strengthen ties to home country.');
+  }
+
+  // IMPROVED RISK LOGIC: If ties are strong and finances are just unknown (not bad),
+  // don't mark as high risk
+  const hasStrongTies = tiesStrength >= 1.5; // Property + family, or property + employment, etc.
+  const financesAreUnknown =
+    summary.bankBalanceUSD === undefined || summary.bankBalanceUSD === null;
+  const financesAreBad =
+    summary.bankBalanceUSD !== undefined &&
+    summary.bankBalanceUSD !== null &&
+    ((summary.visaType === 'tourist' && summary.bankBalanceUSD < 2000) ||
+      (summary.visaType === 'student' && summary.bankBalanceUSD < 10000));
+
+  // If ties are strong, finances are unknown (not bad), and no serious negatives,
+  // cap the risk at medium instead of high
+  if (
+    hasStrongTies &&
+    financesAreUnknown &&
+    !financesAreBad &&
+    !summary.previousVisaRejections &&
+    !summary.previousOverstay
+  ) {
+    // Ensure score is at least 50 (medium risk threshold)
+    if (score < 50) {
+      score = 50;
+      // Remove any "low balance" risk factors that might have been added incorrectly
+      const balanceRiskIndex = riskFactors.findIndex(
+        (f) => f.includes('balance') || f.includes('Savings')
+      );
+      if (balanceRiskIndex >= 0) {
+        riskFactors.splice(balanceRiskIndex, 1);
+      }
+    }
   }
 
   // Clamp score to valid range
   if (score < 10) score = 10;
   if (score > 90) score = 90;
 
-  // Determine level
+  // Determine level (improved logic)
   let level: 'low' | 'medium' | 'high';
   if (score < 40) {
     level = 'low';
@@ -488,6 +800,22 @@ export function calculateVisaProbability(summary: VisaQuestionnaireSummary): Vis
     level = 'medium';
   } else {
     level = 'high';
+  }
+
+  // Override: If ties are strong and finances are unknown (not bad), cap at medium
+  if (
+    hasStrongTies &&
+    financesAreUnknown &&
+    !financesAreBad &&
+    !summary.previousVisaRejections &&
+    !summary.previousOverstay &&
+    level === 'high'
+  ) {
+    level = 'medium';
+    // Adjust score to match medium range
+    if (score >= 70) {
+      score = 69; // Just below high threshold
+    }
   }
 
   return { score, level, riskFactors, positiveFactors };
@@ -1013,24 +1341,57 @@ export async function buildCanonicalAIUserContext(
     financialSufficiencyRatio: undefined, // Will be calculated below
   };
 
-  // Calculate required funds and sufficiency ratio
-  const requiredFunds = calculateRequiredFundsEstimate(
-    currentContext.application.country,
-    currentContext.application.visaType,
-    duration
+  // Calculate required funds and sufficiency ratio (Phase 2: Enhanced)
+  const requiredFunds =
+    calculateRequiredFundsEstimate(
+      currentContext.application.country,
+      currentContext.application.visaType,
+      duration
+    ) ??
+    estimateRequiredFundsUSD(
+      currentContext.application.country,
+      currentContext.application.visaType,
+      null // Duration in days not available, will use defaults
+    );
+
+  // Calculate available funds (Phase 2: Enhanced)
+  const sponsorBankBalance = summary?.financialInfo?.sponsorDetails
+    ? null // Not available in questionnaire
+    : null;
+  const sponsorIncome = summary?.financialInfo?.sponsorDetails?.annualIncomeUSD
+    ? summary.financialInfo.sponsorDetails.annualIncomeUSD / 12 // Convert annual to monthly
+    : null;
+
+  const availableFunds = computeAvailableFundsUSD(
+    bankBalanceUSD,
+    monthlyIncomeUSD,
+    sponsorType,
+    sponsorBankBalance,
+    sponsorIncome
   );
+
   if (requiredFunds !== null) {
     financial.requiredFundsEstimate = requiredFunds;
-    const availableFunds = bankBalanceUSD ?? 0;
-    const ratio = calculateFinancialSufficiencyRatio(availableFunds, requiredFunds);
-    if (ratio !== null) {
-      financial.financialSufficiencyRatio = ratio;
-      if (ratio < 1.0) {
-        warnings.push(
-          `Financial sufficiency ratio is ${(ratio * 100).toFixed(0)}% - may need additional funds`
-        );
-      }
+    financial.requiredFundsUSD = requiredFunds; // Alias for consistency
+  }
+
+  financial.availableFundsUSD = availableFunds;
+
+  // Classify financial sufficiency (Phase 2: Enhanced with label)
+  const sufficiency = classifyFinancialSufficiency(requiredFunds, availableFunds);
+  if (sufficiency.ratio !== null) {
+    financial.financialSufficiencyRatio = sufficiency.ratio;
+    financial.financialSufficiencyLabel = sufficiency.label;
+    if (sufficiency.ratio < 1.0) {
+      warnings.push(
+        `Financial sufficiency is ${sufficiency.label} (${(sufficiency.ratio * 100).toFixed(0)}%) - may need additional funds`
+      );
     }
+  }
+
+  // Check sponsor sufficiency (Phase 2)
+  if (sponsorType !== 'self' && sponsorIncome !== null) {
+    financial.sponsorHasSufficientFunds = sponsorIncome * 12 >= (requiredFunds ?? 0) * 0.5; // Sponsor should cover at least 50%
   }
 
   // Employment expert fields
@@ -1069,8 +1430,8 @@ export async function buildCanonicalAIUserContext(
         }
       : undefined;
 
-  // Travel history expert fields
-  const travelHistory = hasInternationalTravel
+  // Travel history expert fields (Phase 2: Enhanced with score and label)
+  const travelHistoryBase = hasInternationalTravel
     ? {
         countries: summary?.travelHistory?.visitedCountries
           ? summary.travelHistory.visitedCountries.map((country) => ({
@@ -1095,6 +1456,28 @@ export async function buildCanonicalAIUserContext(
           : undefined,
       }
     : undefined;
+
+  // Compute travel history score and label (Phase 2)
+  const travelHistoryScore = computeTravelHistoryScore({
+    hasInternationalTravel,
+    previousVisaRejections: previousVisaRejections ? 1 : 0,
+    hasOverstay: previousOverstay,
+  });
+
+  const travelHistory = travelHistoryBase
+    ? {
+        ...travelHistoryBase,
+        previousVisaRejections: previousVisaRejections ? 1 : 0, // Phase 2: Added count
+        hasOverstayHistory: previousOverstay, // Phase 2: Added
+        travelHistoryScore: travelHistoryScore.score, // Phase 2: Added
+        travelHistoryLabel: travelHistoryScore.label, // Phase 2: Added
+      }
+    : {
+        previousVisaRejections: previousVisaRejections ? 1 : 0,
+        hasOverstayHistory: previousOverstay,
+        travelHistoryScore: travelHistoryScore.score,
+        travelHistoryLabel: travelHistoryScore.label,
+      };
 
   // Family expert fields
   const family = {
@@ -1129,7 +1512,7 @@ export async function buildCanonicalAIUserContext(
       }
     : undefined;
 
-  // Calculate ties strength
+  // Calculate ties strength (Phase 2: Enhanced with label)
   const tiesStrength = calculateTiesStrengthScore(
     hasPropertyInUzbekistan,
     isEmployed,
@@ -1140,7 +1523,10 @@ export async function buildCanonicalAIUserContext(
   );
   const ties = {
     tiesStrengthScore: tiesStrength.score,
+    tiesStrengthLabel: tiesStrength.label, // Phase 2: Added label
     tiesFactors: tiesStrength.factors,
+    propertyValueUSD: property?.valueUSD ?? null, // Phase 2: Added
+    employmentDurationMonths: employment?.employmentDurationMonths ?? null, // Phase 2: Added
   };
 
   // Get embassy context (async)
@@ -1148,6 +1534,37 @@ export async function buildCanonicalAIUserContext(
     currentContext.application.country,
     currentContext.application.visaType
   );
+
+  // Phase 2: Uzbek context
+  const uzbekContext: CanonicalAIUserContext['uzbekContext'] = {
+    isUzbekCitizen:
+      citizenship === 'UZ' || citizenship === 'UZB' || citizenship?.toUpperCase().includes('UZBEK'),
+    residesInUzbekistan:
+      summary?.currentCountry === 'UZ' ||
+      summary?.personalInfo?.currentResidenceCountry === 'UZ' ||
+      citizenship === 'UZ' ||
+      citizenship === 'UZB',
+    typicalBankNamesIncluded: false, // Can be enhanced later
+  };
+
+  // Phase 2: Meta information (data completeness)
+  const dataCompleteness = computeDataCompleteness({
+    bankBalanceUSD,
+    monthlyIncomeUSD,
+    sponsorType,
+    currentStatus,
+    hasProperty: hasPropertyInUzbekistan,
+    hasFamily: hasFamilyInUzbekistan,
+    hasInternationalTravel,
+  });
+
+  const meta: CanonicalAIUserContext['meta'] = {
+    dataCompletenessScore: dataCompleteness.score,
+    missingCriticalFields:
+      dataCompleteness.missingCriticalFields.length > 0
+        ? dataCompleteness.missingCriticalFields
+        : undefined,
+  };
 
   // Always calculate risk score (even if questionnaire is missing)
   let riskScore: CanonicalAIUserContext['riskScore'];
@@ -1191,6 +1608,25 @@ export async function buildCanonicalAIUserContext(
     });
   }
 
+  // Phase 2: Log derived metrics (non-sensitive) + debug info for employment/ties
+  const applicationId = currentContext.application.applicationId;
+  logInfo('[AI Context] Canonical context built with expert fields', {
+    applicationId,
+    employmentStatus: currentStatus,
+    isEmployed,
+    tiesStrengthLabel: ties?.tiesStrengthLabel || 'unknown',
+    hasProperty: hasPropertyInUzbekistan,
+    hasFamilyInHomeCountry: hasFamilyInUzbekistan,
+    financialSufficiencyLabel: financial?.financialSufficiencyLabel || 'unknown',
+    dataCompletenessScore: meta?.dataCompletenessScore || null,
+    riskLevel: riskScore.level,
+    riskScore: riskScore.probabilityPercent,
+    financialSufficiencyRatio: financial.financialSufficiencyRatio ?? null,
+    tiesStrengthScore: ties.tiesStrengthScore ?? null,
+    travelHistoryScore: travelHistory.travelHistoryScore ?? null,
+    travelHistoryLabel: travelHistory.travelHistoryLabel ?? null,
+  });
+
   return {
     userProfile: {
       userId: currentContext.userProfile.userId,
@@ -1227,7 +1663,7 @@ export async function buildCanonicalAIUserContext(
       hasUniversityInvitation,
       hasOtherInvitation,
       documents,
-      // Phase 3: Expert fields
+      // Phase 3: Expert fields (Phase 2: Enhanced)
       financial: Object.keys(financial).length > 0 ? financial : undefined,
       employment,
       education,
@@ -1245,6 +1681,9 @@ export async function buildCanonicalAIUserContext(
       fallbackFieldsUsed: fallbacks.length > 0 ? fallbacks : undefined,
     },
     embassyContext,
+    // Phase 2: New expert fields
+    uzbekContext,
+    meta,
   };
 }
 

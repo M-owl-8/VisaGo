@@ -287,39 +287,48 @@ export class VisaChecklistEngineService {
         responseTimeMs: responseTime,
       });
 
-      // Step 5: Parse and validate JSON
+      // Step 5: Parse and validate JSON (using robust extraction)
       let parsed: any;
       let jsonValidationRetries = 0;
       let jsonValidationPassed = false;
+
+      // Use robust JSON extraction from json-validator
+      const { extractJsonFromResponse } = await import('../utils/json-validator');
+      const extractedJson = extractJsonFromResponse(rawContent);
+
+      if (!extractedJson) {
+        // Log response preview for debugging (non-PII)
+        const responsePreview = rawContent.substring(0, 500);
+        logError(
+          '[VisaChecklistEngine] No valid JSON found in response',
+          new Error('No valid JSON found in response'),
+          {
+            countryCode,
+            visaType,
+            responseLength: rawContent.length,
+            responsePreview: responsePreview.replace(/\n/g, ' ').substring(0, 200), // First 200 chars, no newlines
+          }
+        );
+        throw new Error('No valid JSON found in response');
+      }
+
       try {
-        parsed = JSON.parse(rawContent);
+        parsed = JSON.parse(extractedJson);
         jsonValidationPassed = true;
       } catch (parseError) {
         jsonValidationRetries++;
-        // Try to extract JSON from markdown code blocks
-        const jsonMatch = rawContent.match(/```json\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch) {
-          try {
-            parsed = JSON.parse(jsonMatch[1]);
-            jsonValidationPassed = true;
-          } catch (e) {
-            // Continue to next attempt
+        logError(
+          '[VisaChecklistEngine] JSON parse failed after extraction',
+          parseError instanceof Error ? parseError : new Error(String(parseError)),
+          {
+            countryCode,
+            visaType,
+            extractedJsonPreview: extractedJson.substring(0, 200),
           }
-        }
-        if (!jsonValidationPassed) {
-          const objectMatch = rawContent.match(/\{[\s\S]*\}/);
-          if (objectMatch) {
-            try {
-              parsed = JSON.parse(objectMatch[0]);
-              jsonValidationPassed = true;
-            } catch (e) {
-              // Continue
-            }
-          }
-        }
-        if (!jsonValidationPassed) {
-          throw new Error('No valid JSON found in response');
-        }
+        );
+        throw new Error(
+          `Failed to parse extracted JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        );
       }
 
       // Step 6: Validate against schema

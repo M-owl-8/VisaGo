@@ -72,12 +72,16 @@ export class ChatEnhancedService {
       // Build messages for OpenAI
       const messages = this.buildMessageArray(history, userMessage, session.systemPrompt);
 
+      // Use centralized config for chat
+      const { getAIConfig } = await import('../config/ai-models');
+      const aiConfig = getAIConfig('chat');
+
       // Call OpenAI API
       const response = await this.openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4',
+        model: aiConfig.model,
         messages,
-        max_tokens: this.maxTokensPerRequest,
-        temperature: 0.7,
+        max_tokens: aiConfig.maxTokens,
+        temperature: aiConfig.temperature,
         top_p: 0.9,
       });
 
