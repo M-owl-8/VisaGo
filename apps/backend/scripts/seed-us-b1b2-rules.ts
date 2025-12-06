@@ -15,68 +15,122 @@ const prisma = new PrismaClient();
 
 /**
  * Create comprehensive US B1/B2 Tourist Visa Rule Set
+ * 
+ * IMPORTANT DESIGN DECISION: Core documents intentionally have NO conditions to avoid 
+ * under-generation. We rely on GPT's appliesToThisApplicant field to filter appropriately.
+ * 
+ * Core documents with NO conditions (always included):
+ * - passport_international
+ * - ds160_confirmation
+ * - visa_fee_receipt
+ * - appointment_confirmation
+ * - photo_passport
+ * - travel_itinerary
+ * - accommodation_proof
+ * - return_ticket
+ * - bank_statements_applicant (always include, even if sponsored - applicant may still need to show own funds)
+ * - employment_letter (always include - GPT will determine if it applies based on currentStatus)
+ * 
+ * Documents with conditions (only truly conditional):
+ * - Sponsor docs: bank_statements_sponsor, sponsor_affidavit, sponsor_employment_letter, sponsor_tax_returns
+ * - Student docs: student_enrollment_letter, student_transcript
+ * - Invitation docs: invitation_letter, host_passport_copy, host_status_documents
+ * - Ties docs: property_documents, family_ties_documents, travel_history_evidence
+ * - Risk docs: refusal_explanation, additional_financial_docs
+ * - Business docs: business_registration, business_bank_statements (for self-employed only)
+ * 
+ * This ensures we don't over-filter and miss essential documents due to condition evaluation failures.
  */
 function createUSTouristRuleSet(): VisaRuleSetData {
   return {
-    version: 2,
+    version: 3, // Version 3: Core documents have NO conditions to avoid under-generation
 
     requiredDocuments: [
-      // Core Required Documents (always required)
+      // ============================================================================
+      // CORE REQUIRED DOCUMENTS (NO CONDITIONS - Always included)
+      // These are always required for US B1/B2 visas, regardless of applicant profile.
+      // GPT will set appliesToThisApplicant based on context.
+      // ============================================================================
       {
         documentType: 'passport_international',
         category: 'required',
-        name: 'Valid International Passport',
         description: 'Passport must be valid for at least 6 months beyond intended stay in the US',
         validityRequirements: 'Minimum 6 months validity remaining from date of entry',
         formatRequirements: 'Original passport with at least 2 blank pages',
+        // NO CONDITION - Always required
       },
       {
         documentType: 'ds160_confirmation',
         category: 'required',
-        name: 'DS-160 Confirmation Page',
         description: 'Completed and submitted DS-160 nonimmigrant visa application form',
         validityRequirements: 'Must be submitted online before appointment',
         formatRequirements: 'Print confirmation page with barcode',
+        // NO CONDITION - Always required
       },
       {
         documentType: 'visa_fee_receipt',
         category: 'required',
-        name: 'Visa Application Fee Receipt',
         description: 'Proof of payment for visa application fee (MRV fee)',
         validityRequirements: 'Valid receipt from authorized payment location',
         formatRequirements: 'Original receipt or printed confirmation',
+        // NO CONDITION - Always required
       },
       {
         documentType: 'appointment_confirmation',
         category: 'required',
-        name: 'Interview Appointment Confirmation',
         description: 'Confirmation of scheduled visa interview appointment',
         validityRequirements: 'Must match scheduled appointment date and time',
         formatRequirements: 'Print confirmation email or appointment letter',
+        // NO CONDITION - Always required
       },
       {
         documentType: 'photo_passport',
         category: 'required',
-        name: 'Passport-Style Photograph',
         description: 'Recent color photograph meeting US visa photo requirements',
         validityRequirements: 'Taken within last 6 months',
         formatRequirements: '2x2 inches, white background, no glasses, neutral expression',
+        // NO CONDITION - Always required
+      },
+      {
+        documentType: 'travel_itinerary',
+        category: 'highly_recommended',
+        description: 'Detailed travel itinerary including flight reservations, accommodation bookings, and planned activities',
+        validityRequirements: 'Tentative itinerary (can be refundable bookings)',
+        formatRequirements: 'Print or digital itinerary with dates and locations',
+        // NO CONDITION - Always recommended
+      },
+      {
+        documentType: 'accommodation_proof',
+        category: 'highly_recommended',
+        description: 'Hotel bookings, Airbnb reservations, or host accommodation confirmation',
+        validityRequirements: 'Valid accommodation bookings for intended stay',
+        formatRequirements: 'Booking confirmations with dates and addresses',
+        // NO CONDITION - Always recommended
+      },
+      {
+        documentType: 'return_ticket',
+        category: 'optional',
+        description: 'Round-trip or return flight ticket showing intent to return',
+        validityRequirements: 'Valid flight booking (can be refundable)',
+        formatRequirements: 'Flight reservation or booking confirmation',
+        // NO CONDITION - Always optional (GPT can decide if needed)
       },
 
-      // Financial Documents - Applicant (self-funded)
+      // ============================================================================
+      // FINANCIAL DOCUMENTS - Less strict conditions
+      // ============================================================================
       {
         documentType: 'bank_statements_applicant',
         category: 'required',
-        name: 'Bank Statements (Applicant)',
         description: 'Personal bank statements showing sufficient funds for trip',
         validityRequirements: 'Last 3 months of statements',
         formatRequirements: 'Original statements from bank, stamped and signed',
-        condition: "sponsorType === 'self'",
+        // NO CONDITION - Always include applicant bank statements (even if sponsored, applicant may still need to show own funds)
+        // GPT will determine if this applies based on sponsorType context
       },
       {
         documentType: 'bank_statements_sponsor',
         category: 'required',
-        name: 'Bank Statements (Sponsor)',
         description: 'Sponsor bank statements showing ability to support applicant',
         validityRequirements: 'Last 3 months of statements',
         formatRequirements: 'Original statements from bank, stamped and signed',
@@ -85,7 +139,6 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'sponsor_affidavit',
         category: 'required',
-        name: 'Affidavit of Support (I-134)',
         description: 'Form I-134 Affidavit of Support from sponsor (if applicable)',
         validityRequirements: 'Must be notarized and signed by sponsor',
         formatRequirements: 'Original notarized form with supporting documents',
@@ -94,7 +147,6 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'sponsor_employment_letter',
         category: 'highly_recommended',
-        name: 'Sponsor Employment Letter',
         description: 'Letter from sponsor employer confirming employment and income',
         validityRequirements: 'Recent letter (within 3 months)',
         formatRequirements: 'On company letterhead, signed by authorized person',
@@ -103,27 +155,28 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'sponsor_tax_returns',
         category: 'highly_recommended',
-        name: 'Sponsor Tax Returns',
         description: 'Most recent tax returns from sponsor (if available)',
         validityRequirements: 'Most recent year tax return',
         formatRequirements: 'Copy of filed tax return with W-2 forms',
         condition: "sponsorType !== 'self'",
       },
 
-      // Employment/Status Documents
+      // ============================================================================
+      // EMPLOYMENT/STATUS DOCUMENTS - Less strict conditions
+      // ============================================================================
       {
         documentType: 'employment_letter',
         category: 'required',
-        name: 'Employment Letter',
         description: 'Letter from current employer confirming employment, position, salary, and leave approval',
         validityRequirements: 'Recent letter (within 3 months)',
         formatRequirements: 'On company letterhead, signed by HR or supervisor',
-        condition: "currentStatus === 'employed'",
+        // NO CONDITION - Always include for employed/self-employed applicants
+        // GPT will determine if this applies based on currentStatus context
+        // We use OR condition but make it less strict by including it always
       },
       {
         documentType: 'business_registration',
         category: 'required',
-        name: 'Business Registration Documents',
         description: 'Business license, registration certificate, and tax documents for self-employed applicants',
         validityRequirements: 'Current and valid registration',
         formatRequirements: 'Original or certified copies of business documents',
@@ -132,7 +185,6 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'business_bank_statements',
         category: 'required',
-        name: 'Business Bank Statements',
         description: 'Business bank statements showing business activity and income',
         validityRequirements: 'Last 3 months of business account statements',
         formatRequirements: 'Original statements from bank, stamped and signed',
@@ -141,7 +193,6 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'student_enrollment_letter',
         category: 'required',
-        name: 'Student Enrollment Letter',
         description: 'Letter from educational institution confirming enrollment and leave approval',
         validityRequirements: 'Recent letter (within 3 months)',
         formatRequirements: 'On institution letterhead, signed by registrar or dean',
@@ -150,18 +201,18 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'student_transcript',
         category: 'highly_recommended',
-        name: 'Academic Transcript',
         description: 'Official academic transcript showing current enrollment status',
         validityRequirements: 'Most recent transcript',
         formatRequirements: 'Official transcript from educational institution',
         condition: "currentStatus === 'student'",
       },
 
-      // Invitation Documents
+      // ============================================================================
+      // INVITATION DOCUMENTS - Conditional (only if has invitation)
+      // ============================================================================
       {
         documentType: 'invitation_letter',
         category: 'highly_recommended',
-        name: 'Invitation Letter from US Host',
         description: 'Letter from US host inviting applicant, including purpose of visit and accommodation details',
         validityRequirements: 'Recent letter (within 3 months)',
         formatRequirements: 'Signed letter with host contact information and address',
@@ -170,7 +221,6 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'host_passport_copy',
         category: 'highly_recommended',
-        name: 'Host Passport Copy',
         description: 'Copy of US host passport or US ID (if US citizen/permanent resident)',
         validityRequirements: 'Valid passport or ID',
         formatRequirements: 'Clear copy of passport bio page or US ID',
@@ -179,18 +229,18 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'host_status_documents',
         category: 'highly_recommended',
-        name: 'Host Status Documents',
         description: 'Documents proving host legal status in US (visa, green card, etc.)',
         validityRequirements: 'Valid and current status documents',
         formatRequirements: 'Copy of visa, green card, or other status documents',
         condition: "hasOtherInvitation === true",
       },
 
-      // Ties to Home Country
+      // ============================================================================
+      // TIES TO HOME COUNTRY - Conditional (only if applicant has ties)
+      // ============================================================================
       {
         documentType: 'property_documents',
         category: 'highly_recommended',
-        name: 'Property Ownership Documents',
         description: 'Documents proving property ownership in Uzbekistan (deed, registration, etc.)',
         validityRequirements: 'Current property ownership documents',
         formatRequirements: 'Original or certified copies of property documents',
@@ -199,7 +249,6 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'family_ties_documents',
         category: 'highly_recommended',
-        name: 'Family Ties Documents',
         description: 'Documents showing family relationships and ties to Uzbekistan (marriage certificate, birth certificates of children, etc.)',
         validityRequirements: 'Current and valid family documents',
         formatRequirements: 'Original or certified copies of family documents',
@@ -208,18 +257,18 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'travel_history_evidence',
         category: 'highly_recommended',
-        name: 'Travel History Evidence',
         description: 'Previous passport pages showing travel history, visas, and entry/exit stamps',
         validityRequirements: 'Previous passport or travel documents',
         formatRequirements: 'Copy of passport pages with travel history',
         condition: "hasInternationalTravel === true",
       },
 
-      // Risk-Based Documents
+      // ============================================================================
+      // RISK-BASED DOCUMENTS - Conditional (only if applicable)
+      // ============================================================================
       {
         documentType: 'refusal_explanation',
         category: 'required',
-        name: 'Previous Refusal Explanation Letter',
         description: 'Detailed explanation letter addressing previous visa refusal reasons',
         validityRequirements: 'Recent letter addressing refusal',
         formatRequirements: 'Written explanation with supporting documents if applicable',
@@ -228,57 +277,30 @@ function createUSTouristRuleSet(): VisaRuleSetData {
       {
         documentType: 'additional_financial_docs',
         category: 'highly_recommended',
-        name: 'Additional Financial Documents',
         description: 'Extra financial documents such as property valuation, investment statements, or additional bank accounts',
         validityRequirements: 'Recent financial documents',
         formatRequirements: 'Original or certified copies',
         condition: "riskScore.level === 'high'",
       },
 
-      // Travel Documents
-      {
-        documentType: 'travel_itinerary',
-        category: 'highly_recommended',
-        name: 'Travel Itinerary',
-        description: 'Detailed travel itinerary including flight reservations, accommodation bookings, and planned activities',
-        validityRequirements: 'Tentative itinerary (can be refundable bookings)',
-        formatRequirements: 'Print or digital itinerary with dates and locations',
-      },
-      {
-        documentType: 'accommodation_proof',
-        category: 'highly_recommended',
-        name: 'Accommodation Proof',
-        description: 'Hotel bookings, Airbnb reservations, or host accommodation confirmation',
-        validityRequirements: 'Valid accommodation bookings for intended stay',
-        formatRequirements: 'Booking confirmations with dates and addresses',
-      },
-      {
-        documentType: 'return_ticket',
-        category: 'optional',
-        name: 'Return Flight Ticket',
-        description: 'Round-trip or return flight ticket showing intent to return',
-        validityRequirements: 'Valid flight booking (can be refundable)',
-        formatRequirements: 'Flight reservation or booking confirmation',
-      },
-
-      // Minor-Specific Documents (Note: condition evaluator doesn't support isMinor, so these are optional without condition)
+      // ============================================================================
+      // MINOR-SPECIFIC DOCUMENTS - Optional (no condition, GPT will decide)
+      // ============================================================================
       {
         documentType: 'parental_consent',
         category: 'optional',
-        name: 'Parental Consent Letter',
         description: 'Notarized consent letter from both parents for minor applicant traveling alone or with one parent',
         validityRequirements: 'Recent notarized consent (within 3 months)',
         formatRequirements: 'Original notarized letter with both parents signatures',
-        // Note: Condition evaluator doesn't support isMinor, so this is optional without condition
+        // NO CONDITION - Condition evaluator doesn't support isMinor, so GPT will decide based on age
       },
       {
         documentType: 'birth_certificate',
         category: 'optional',
-        name: 'Birth Certificate',
         description: 'Original birth certificate for minor applicant',
         validityRequirements: 'Valid birth certificate',
         formatRequirements: 'Original or certified copy of birth certificate',
-        // Note: Condition evaluator doesn't support isMinor, so this is optional without condition
+        // NO CONDITION - Condition evaluator doesn't support isMinor, so GPT will decide based on age
       },
     ],
 
