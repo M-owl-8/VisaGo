@@ -127,7 +127,7 @@ async function verifyUSB1B2Rules() {
     };
 
     // Build base checklist from rules
-    const baseChecklist = buildBaseChecklistFromRules(testContext, ruleSet);
+    const baseChecklist = await buildBaseChecklistFromRules(testContext, ruleSet);
 
     console.log(`✅ Checklist generated with ${baseChecklist.length} items`);
 

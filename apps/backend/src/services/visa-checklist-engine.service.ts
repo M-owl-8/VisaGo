@@ -6,6 +6,7 @@
 
 import { AIOpenAIService } from './ai-openai.service';
 import { getAIConfig } from '../config/ai-models';
+import { getEnvConfig } from '../config/env';
 import { VisaRulesService, VisaRuleSetData } from './visa-rules.service';
 import { AIUserContext, CanonicalAIUserContext } from '../types/ai-context';
 import { buildCanonicalAIUserContext } from './ai-context.service';
@@ -61,10 +62,67 @@ export class VisaChecklistEngineService {
       });
 
       // Step 1: Get approved VisaRuleSet from database
-      const ruleSet = await VisaRulesService.getActiveRuleSet(
-        countryCode.toUpperCase(),
-        visaType.toLowerCase()
-      );
+      // Check if catalog mode is enabled and if we need references
+      let useCatalog = false;
+      try {
+        const config = getEnvConfig();
+        useCatalog = config.USE_GLOBAL_DOCUMENT_CATALOG === true;
+      } catch (error) {
+        // If config parsing fails, fall back to direct env read (for safety)
+        useCatalog = process.env.USE_GLOBAL_DOCUMENT_CATALOG === 'true';
+      }
+
+      let ruleSet: VisaRuleSetData | null = null;
+      let ruleSetId: string | undefined;
+      let ruleSetCountryCode: string | undefined;
+      let ruleSetVisaType: string | undefined;
+      let documentReferences:
+        | Array<{
+            id: string;
+            documentId: string;
+            condition?: string | null;
+            categoryOverride?: string | null;
+          }>
+        | undefined;
+
+      if (useCatalog) {
+        // Get full ruleSet with references for catalog mode (if available)
+        const ruleSetWithRefs = await VisaRulesService.getActiveRuleSetWithReferences(
+          countryCode.toUpperCase(),
+          visaType.toLowerCase()
+        );
+
+        if (ruleSetWithRefs) {
+          ruleSet = ruleSetWithRefs.data;
+          ruleSetId = ruleSetWithRefs.id;
+          ruleSetCountryCode = ruleSetWithRefs.countryCode;
+          ruleSetVisaType = ruleSetWithRefs.visaType;
+          // Only use catalog if references exist
+          if (ruleSetWithRefs.documentReferences && ruleSetWithRefs.documentReferences.length > 0) {
+            documentReferences = ruleSetWithRefs.documentReferences.map((ref) => ({
+              id: ref.id,
+              documentId: ref.documentId,
+              condition: ref.condition,
+              categoryOverride: ref.categoryOverride,
+            }));
+          }
+        } else {
+          // No rule set found, will fall back to legacy mode
+          useCatalog = false;
+        }
+      }
+
+      // If catalog mode not enabled or no references, get just the data
+      if (!useCatalog || !documentReferences || documentReferences.length === 0) {
+        if (!ruleSet) {
+          ruleSet = await VisaRulesService.getActiveRuleSet(
+            countryCode.toUpperCase(),
+            visaType.toLowerCase()
+          );
+        }
+        // Clear references if we're not using catalog mode
+        documentReferences = undefined;
+      }
 
       if (!ruleSet) {
         logInfo('[VisaChecklistEngine] No approved rule set found, returning null for fallback', {
@@ -77,7 +135,12 @@ export class VisaChecklistEngineService {
 
       // Step 2: Build base checklist from rules (documents are determined here)
       const { buildBaseChecklistFromRules } = await import('./checklist-rules.service');
-      const baseDocuments = buildBaseChecklistFromRules(aiUserContext, ruleSet);
+      const baseDocuments = await buildBaseChecklistFromRules(aiUserContext, ruleSet, {
+        ruleSetId,
+        countryCode: ruleSetCountryCode,
+        visaType: ruleSetVisaType,
+        documentReferences,
+      });
 
       if (baseDocuments.length === 0) {
         logWarn('[VisaChecklistEngine] Base checklist is empty', {

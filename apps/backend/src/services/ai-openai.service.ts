@@ -1088,7 +1088,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           // Fall through to legacy mode
         } else {
           // Build base checklist from rules
-          const baseChecklist = buildBaseChecklistFromRules(userContext, ruleSetData);
+          const baseChecklist = await buildBaseChecklistFromRules(userContext, ruleSetData);
 
           if (baseChecklist.length === 0) {
             logWarn('[OpenAI][Checklist] Base checklist is empty, falling back to legacy mode', {

@@ -44,11 +44,17 @@
     "check:launch-readiness": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/check-launch-readiness.ts",
     "eval:checklists": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/eval-checklists.ts",
     "analyze:visas": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/analyze-supported-visas.ts",
+    "analyze:fallback-coverage": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/analyze-fallback-coverage.ts",
     "seed:us-b1b2-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-us-b1b2-rules.ts",
     "verify:us-b1b2-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/verify-us-b1b2-rules.ts",
     "test:us-b1b2-checklist": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/test-us-b1b2-checklist.ts",
     "seed:de-tourist-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-de-tourist-rules.ts",
-    "verify:de-tourist-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/verify-de-tourist-rules.ts"
+    "verify:de-tourist-rules": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/verify-de-tourist-rules.ts",
+    "seed:document-catalog": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-document-catalog.ts",
+    "verify:document-catalog": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/seed-document-catalog.ts --dry-run",
+    "migrate:ruleset-to-references": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/migrate-ruleset-to-references.ts",
+    "verify:ruleset-references": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/verify-ruleset-references.ts",
+    "test:catalog-mode": "node prisma/schema-selector.js && prisma generate && ts-node --project scripts/tsconfig.json scripts/test-catalog-mode.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.21.1",

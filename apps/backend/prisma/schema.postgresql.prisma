@@ -601,6 +601,7 @@ model VisaRuleSet {
   countryCode   String   // ISO 3166-1 alpha-2
   visaType      String   // "student" | "tourist" | "work" | etc.
   data          Json     // Structured visa rules (see VisaRuleSetData type)
+  data_legacy   Json?    // Backup for rollback and migration
   version       Int      @default(1) // Incremental version number
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -616,6 +617,7 @@ model VisaRuleSet {
   source EmbassySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   versions VisaRuleVersion[]
   changeLogs VisaRuleSetChangeLog[]
+  documentReferences VisaRuleReference[]
 
   @@unique([countryCode, visaType, version])
   @@index([countryCode, visaType])
@@ -743,4 +745,49 @@ model ChecklistFeedback {
   @@index([countryCode, visaType])
   @@index([feedbackType])
   @@index([createdAt])
+}
+
+// ============================================================================
+// GLOBAL DOCUMENT CATALOG (Phase 1)
+// ============================================================================
+
+model DocumentCatalog {
+  id                   String   @id @default(cuid())
+  documentType         String   @unique
+  nameEn               String
+  nameUz               String
+  nameRu               String
+  descriptionEn        String   @db.Text
+  descriptionUz        String   @db.Text
+  descriptionRu        String   @db.Text
+  defaultCategory      String
+  group                String
+  validityRequirements String?  @db.Text
+  formatRequirements   String?  @db.Text
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  ruleReferences VisaRuleReference[]
+
+  @@index([documentType])
+  @@index([group])
+  @@index([isActive])
+}
+
+model VisaRuleReference {
+  id                  String   @id @default(cuid())
+  ruleSetId           String
+  documentId          String
+  condition           String?
+  categoryOverride    String?
+  descriptionOverride String? @db.Text
+  createdAt           DateTime @default(now())
+
+  ruleSet  VisaRuleSet    @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+  document DocumentCatalog @relation(fields: [documentId], references: [id])
+
+  @@unique([ruleSetId, documentId])
+  @@index([ruleSetId])
+  @@index([documentId])
 }

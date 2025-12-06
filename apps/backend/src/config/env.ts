@@ -65,6 +65,11 @@ const envSchema = z.object({
   // Feature Flags
   ENABLE_RECONCILIATION: z.string().optional(),
   ENABLE_MOCK_PAYMENTS: z.string().optional(),
+  USE_GLOBAL_DOCUMENT_CATALOG: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('false')
+    .optional(),
 
   // Payment Freeze (for free trial periods)
   // Default to enabled for first 3 months free period

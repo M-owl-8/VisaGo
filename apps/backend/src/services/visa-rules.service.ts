@@ -149,6 +149,61 @@ export class VisaRulesService {
   }
 
   /**
+   * Get the full approved rule set with document references (for catalog mode)
+   */
+  static async getActiveRuleSetWithReferences(
+    countryCode: string,
+    visaType: string
+  ): Promise<{
+    id: string;
+    countryCode: string;
+    visaType: string;
+    data: VisaRuleSetData;
+    documentReferences: any[];
+  } | null> {
+    try {
+      const normalizedVisaType = normalizeVisaTypeForRules(countryCode, visaType);
+
+      const ruleSet = await prisma.visaRuleSet.findFirst({
+        where: {
+          countryCode: countryCode.toUpperCase(),
+          visaType: normalizedVisaType,
+          isApproved: true,
+        },
+        orderBy: {
+          version: 'desc',
+        },
+        include: {
+          documentReferences: {
+            include: {
+              document: true,
+            },
+          },
+        },
+      });
+
+      if (!ruleSet) {
+        return null;
+      }
+
+      const data = typeof ruleSet.data === 'string' ? JSON.parse(ruleSet.data) : ruleSet.data;
+      return {
+        id: ruleSet.id,
+        countryCode: ruleSet.countryCode,
+        visaType: ruleSet.visaType,
+        data: data as VisaRuleSetData,
+        documentReferences: ruleSet.documentReferences,
+      };
+    } catch (error) {
+      logError('[VisaRules] Error getting active rule set with references', error as Error, {
+        countryCode,
+        visaType,
+      });
+      return null;
+    }
+  }
+
+  /**
    * Get the latest rule set (approved or pending) for a country/visa type
    */
   static async getLatestRuleSet(
