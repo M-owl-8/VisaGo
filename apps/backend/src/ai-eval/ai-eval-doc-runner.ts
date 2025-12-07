@@ -171,7 +171,7 @@ async function testDocCheck(
     docType,
     docFixtureKey,
     decision: 'NEED_FIX',
-    riskDrivers: scenario.context.riskDrivers || [],
+    riskDrivers: scenario.context.riskScore?.riskFactors || [],
     violatesObviousLogic: false,
   };
 

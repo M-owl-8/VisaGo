@@ -241,8 +241,11 @@ export class EmbassyCrawlerService {
             while (next.length > 0 && depth < 10) {
               // Stop at next heading of same or higher level
               if (next.is('h1, h2, h3, h4, h5, h6')) {
-                const nextLevel = parseInt(next.prop('tagName').charAt(1));
-                const headingLevel = parseInt($(heading).prop('tagName').charAt(1));
+                const nextTagName = next.prop('tagName');
+                const headingTagName = $(heading).prop('tagName');
+                if (!nextTagName || !headingTagName) break;
+                const nextLevel = parseInt(nextTagName.charAt(1) || '0');
+                const headingLevel = parseInt(headingTagName.charAt(1) || '0');
                 if (nextLevel <= headingLevel) {
                   break;
                 }
@@ -429,7 +432,7 @@ export class EmbassyCrawlerService {
         url,
         httpStatus,
         errorType: error instanceof AxiosError ? 'axios_error' : 'unknown_error',
-        errorCode: error instanceof AxiosError ? axiosError.code : undefined,
+        errorCode: error instanceof AxiosError ? error.code : undefined,
       });
 
       return {

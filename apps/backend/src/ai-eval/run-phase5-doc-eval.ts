@@ -11,13 +11,15 @@
 
 import { runDocCheckEval } from './ai-eval-doc-runner';
 import { AIOpenAIService } from '../services/ai-openai.service';
+import { PrismaClient } from '@prisma/client';
 
 async function main() {
   console.log('Initializing OpenAI service...');
 
   // Initialize OpenAI service if needed
   if (!AIOpenAIService.isInitialized()) {
-    await AIOpenAIService.initialize();
+    const prisma = new PrismaClient();
+    AIOpenAIService.initialize(prisma);
   }
 
   console.log('Running Phase 5 document check evaluation...');

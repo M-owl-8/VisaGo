@@ -275,7 +275,7 @@ export class AIEmbassyExtractorService {
       }
 
       // Phase 4: Enhanced confidence calculation and source info
-      const confidence = this.calculateConfidence(parsed, pageText);
+      let confidence = this.calculateConfidence(parsed, pageText);
 
       // Phase 4: Check if page has explicit documents section
       const hasExplicitDocumentsSection = this.hasExplicitDocumentsSection(pageText);

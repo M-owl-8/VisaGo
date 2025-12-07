@@ -394,7 +394,7 @@ export class VisaRiskExplanationService {
       if (countryMismatches.length > 0) {
         logWarn('[VisaRiskExplanation] Country name mismatch detected and corrected', {
           applicationId,
-          countryCode,
+          countryCode: normalizedCountryCode,
           countryName,
           visaType: visaTypeName,
           mismatches: countryMismatches,

@@ -182,7 +182,7 @@ export class VisaChecklistExplanationService {
         task: 'checklistExplanation',
         applicationId,
         documentType,
-        countryCode,
+        countryCode: normalizedCountryCode,
         visaType: visaTypeName,
         hasRuleDefinition: !!documentRule,
         model: aiConfig.model,
@@ -210,7 +210,7 @@ export class VisaChecklistExplanationService {
         task: 'checklistExplanation',
         applicationId,
         documentType,
-        countryCode,
+        countryCode: normalizedCountryCode,
         visaType: visaTypeName,
         model: aiConfig.model,
         tokensUsed,
@@ -249,7 +249,7 @@ export class VisaChecklistExplanationService {
         task: 'checklistExplanation',
         applicationId,
         documentType,
-        countryCode,
+        countryCode: normalizedCountryCode,
         visaType: visaTypeName,
         model: aiConfig.model,
         tokensUsed,
@@ -419,6 +419,7 @@ FINAL INSTRUCTIONS
     context: any,
     documentType: string,
     documentRule: any,
+    countryCode: string,
     countryName: string,
     visaTypeName: string,
     ruleSet?: any,
@@ -457,7 +458,7 @@ APPLICATION CONTEXT
 - Country Name: ${countryName}
 - Visa Type: ${visaTypeName}
 
-CRITICAL: You must ALWAYS refer to the exact country name "${countryName}" (${countryCode}) when writing explanations. NEVER mention any other country (e.g., do not mention "UK" or "United Kingdom" if the country is "Spain", do not mention "Spain" if the country is "United Kingdom"). Use the exact country name provided above.
+CRITICAL: You must ALWAYS refer to the exact country name "${countryName}" (${countryCode || 'Unknown'}) when writing explanations. NEVER mention any other country (e.g., do not mention "UK" or "United Kingdom" if the country is "Spain", do not mention "Spain" if the country is "United Kingdom"). Use the exact country name provided above.
 
 ================================================================================
 APPLICANT PROFILE

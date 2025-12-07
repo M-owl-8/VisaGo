@@ -15,7 +15,11 @@ import {
 } from '../types/ai-context';
 import type { ApplicantProfile as VisaBrainApplicantProfile } from '../types/visa-brain';
 import { getVisaCountryProfile } from '../config/visa-country-profiles';
-import { buildCanonicalCountryContext, normalizeCountryCode } from '../config/country-registry';
+import {
+  buildCanonicalCountryContext,
+  normalizeCountryCode,
+  getCountryNameFromCode,
+} from '../config/country-registry';
 
 /**
  * Structured Applicant Profile for Checklist Personalization

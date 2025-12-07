@@ -25,6 +25,7 @@ import { VISA_CHAT_SYSTEM_PROMPT, VISA_CHAT_SELF_CHECK_PROMPT } from '../config/
 import { logInfo, logWarn, logError } from '../middleware/logger';
 import { logChat } from '../utils/gpt-logging';
 import { normalizeDocumentType } from '../config/document-types-map';
+import { CanonicalAIUserContext } from '../types/ai-context';
 import {
   normalizeCountryCode,
   getCountryNameFromCode,
@@ -379,20 +380,6 @@ export class VisaConversationOrchestratorService {
       context.countryCode = normalizedCountryCode;
       context.countryName = countryContext?.countryName || application.country.name;
 
-      // Assert consistency
-      const consistency = assertCountryConsistency(
-        normalizedCountryCode,
-        application.country.code,
-        canonicalContext?.application.country,
-        canonicalContext?.countryContext?.countryCode
-      );
-      if (!consistency.consistent) {
-        logWarn('[VisaChatOrchestrator] Country consistency check failed', {
-          mismatches: consistency.mismatches,
-          normalizedCountryCode,
-          originalCountryCode: application.country.code,
-        });
-      }
       context.visaType = application.visaType.name.toLowerCase();
 
       // Derive visaCategory
@@ -405,19 +392,35 @@ export class VisaConversationOrchestratorService {
           : 'tourist';
 
       // Build canonical AI user context (includes risk drivers, expert fields)
+      let canonicalContext: CanonicalAIUserContext | null = null;
       try {
         const aiUserContext = await buildAIUserContext(userId, applicationId);
-        const canonicalContext = await buildCanonicalAIUserContext(aiUserContext);
+        canonicalContext = await buildCanonicalAIUserContext(aiUserContext);
 
         context.riskLevel = canonicalContext.riskScore?.level;
         context.riskScore = canonicalContext.riskScore?.probabilityPercent;
         context.riskDrivers = canonicalContext.riskDrivers || [];
-        context.financial = canonicalContext.financial;
-        context.ties = canonicalContext.ties;
-        context.travelHistory = canonicalContext.travelHistory;
+        context.financial = (canonicalContext.applicantProfile as any).financial;
+        context.ties = (canonicalContext.applicantProfile as any).ties;
+        context.travelHistory = (canonicalContext.applicantProfile as any).travelHistory;
       } catch (error) {
         logWarn('[VisaChatOrchestrator] Failed to build canonical context', {
           error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      // Assert consistency
+      const consistency = assertCountryConsistency(
+        normalizedCountryCode,
+        application.country.code,
+        canonicalContext?.application.country,
+        canonicalContext?.countryContext?.countryCode
+      );
+      if (!consistency.consistent) {
+        logWarn('[VisaChatOrchestrator] Country consistency check failed', {
+          mismatches: consistency.mismatches,
+          normalizedCountryCode,
+          originalCountryCode: application.country.code,
         });
       }
 
@@ -464,8 +467,10 @@ export class VisaConversationOrchestratorService {
 
       // Fetch risk explanation (if available)
       try {
-        const riskExplanation =
-          await VisaRiskExplanationService.generateRiskExplanation(applicationId);
+        const riskExplanation = await VisaRiskExplanationService.generateRiskExplanation(
+          applicationId,
+          userId
+        );
         if (riskExplanation) {
           context.riskExplanation = {
             summaryEn: riskExplanation.summaryEn,

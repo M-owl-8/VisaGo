@@ -112,8 +112,7 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
 
     // Save messages to database (for history)
     try {
-      const chatServiceInstance = new ChatService();
-      const sessionId = await chatServiceInstance.getOrCreateSession(userId, applicationId);
+      const sessionId = await ChatService.getOrCreateSession(userId, applicationId);
 
       // Save user message
       const { PrismaClient } = await import('@prisma/client');

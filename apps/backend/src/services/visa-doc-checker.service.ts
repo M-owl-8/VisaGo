@@ -253,7 +253,7 @@ export class VisaDocCheckerService {
             ruleSet || undefined,
             playbook || undefined,
             normalizedCountryCodeForRules || countryCodeForRules,
-            countryNameForRules,
+            countryNameForRules || undefined,
             countryContextForRules?.schengen || false
           )
         : this.buildSystemPromptLegacy();
@@ -268,7 +268,7 @@ export class VisaDocCheckerService {
             ruleSet || undefined,
             playbook || undefined,
             normalizedCountryCodeForRules || countryCodeForRules,
-            countryNameForRules,
+            countryNameForRules || undefined,
             countryContextForRules?.schengen || false,
             visaCategory
           )
@@ -419,17 +419,20 @@ export class VisaDocCheckerService {
 
       // Extract application context for logging
       const applicationId = aiUserContext ? extractApplicationId(aiUserContext) : 'unknown';
-      const countryCode = (aiUserContext as any)?.application?.country?.code || 'unknown';
-      const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
-      const visaType = (aiUserContext as any)?.application?.visaType?.name || 'unknown';
+      const extractedCountryCode =
+        (aiUserContext as any)?.application?.country?.code || countryCode || 'unknown';
+      const extractedCountryName =
+        (aiUserContext as any)?.application?.country?.name || extractedCountryCode;
+      const extractedVisaType =
+        (aiUserContext as any)?.application?.visaType?.name || visaType || 'unknown';
 
       // Log structured document verification
       logDocumentVerification({
         applicationId,
         documentType: requiredDocumentRule.documentType,
-        country: countryName,
-        countryCode,
-        visaType,
+        country: extractedCountryName,
+        countryCode: extractedCountryCode,
+        visaType: extractedVisaType,
         status: result.status,
         embassyRiskLevel: result.embassy_risk_level,
         jsonValidationPassed,
@@ -473,8 +476,8 @@ export class VisaDocCheckerService {
         responsePayload: result,
         success: true,
         contextMeta: {
-          countryCode: countryCode !== 'unknown' ? countryCode : null,
-          visaType: visaType !== 'unknown' ? visaType : null,
+          countryCode: extractedCountryCode !== 'unknown' ? extractedCountryCode : null,
+          visaType: extractedVisaType !== 'unknown' ? extractedVisaType : null,
           applicationId: applicationId !== 'unknown' ? applicationId : null,
           userId,
         },
@@ -487,16 +490,19 @@ export class VisaDocCheckerService {
       return result;
     } catch (error) {
       const applicationId = aiUserContext ? extractApplicationId(aiUserContext) : 'unknown';
-      const countryCode = (aiUserContext as any)?.application?.country?.code || 'unknown';
-      const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
-      const visaType = (aiUserContext as any)?.application?.visaType?.name || 'unknown';
+      const extractedCountryCode =
+        (aiUserContext as any)?.application?.country?.code || countryCode || 'unknown';
+      const extractedCountryName =
+        (aiUserContext as any)?.application?.country?.name || extractedCountryCode;
+      const extractedVisaType =
+        (aiUserContext as any)?.application?.visaType?.name || visaType || 'unknown';
 
       logDocumentVerification({
         applicationId,
         documentType: requiredDocumentRule.documentType,
-        country: countryName,
-        countryCode,
-        visaType,
+        country: extractedCountryName,
+        countryCode: extractedCountryCode,
+        visaType: extractedVisaType,
         status: 'NEED_FIX',
         embassyRiskLevel: 'MEDIUM',
         jsonValidationPassed: false,

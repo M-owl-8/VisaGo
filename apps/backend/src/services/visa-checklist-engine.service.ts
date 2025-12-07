@@ -102,7 +102,7 @@ export class VisaChecklistEngineService {
   ): Promise<ChecklistResponse> {
     // Phase 7: Normalize country code using CountryRegistry
     const normalizedCountryCode = normalizeCountryCode(countryCode) || countryCode.toUpperCase();
-    const countryName = getCountryNameFromCode(normalizedCountryCode);
+    const canonicalCountryName = getCountryNameFromCode(normalizedCountryCode);
 
     // Assert consistency
     const consistency = assertCountryConsistency(
@@ -125,7 +125,7 @@ export class VisaChecklistEngineService {
     try {
       logInfo('[VisaChecklistEngine] Generating checklist', {
         countryCode: normalizedCountryCode,
-        countryName,
+        countryName: canonicalCountryName,
         visaType,
         hasPreviousChecklist: !!previousChecklist,
       });
@@ -624,7 +624,7 @@ export class VisaChecklistEngineService {
       const applicationId = extractApplicationId(aiUserContext);
 
       // Get country name (try to get from context or use code)
-      const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
+      const contextCountryName = (aiUserContext as any)?.application?.country?.name || countryName;
 
       // Phase 3: Get risk drivers and risk level for logging
       const riskDrivers = (canonical as any)?.riskDrivers || [];
