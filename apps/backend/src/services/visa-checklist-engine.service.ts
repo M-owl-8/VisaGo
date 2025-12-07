@@ -624,7 +624,8 @@ export class VisaChecklistEngineService {
       const applicationId = extractApplicationId(aiUserContext);
 
       // Get country name (try to get from context or use code)
-      const contextCountryName = (aiUserContext as any)?.application?.country?.name || countryName;
+      const contextCountryName =
+        (aiUserContext as any)?.application?.country?.name || canonicalCountryName;
 
       // Phase 3: Get risk drivers and risk level for logging
       const riskDrivers = (canonical as any)?.riskDrivers || [];
@@ -633,7 +634,7 @@ export class VisaChecklistEngineService {
       // Log structured checklist generation
       logChecklistGeneration({
         applicationId,
-        country: countryName,
+        country: contextCountryName,
         countryCode,
         visaType,
         mode: 'rules',
@@ -752,7 +753,7 @@ export class VisaChecklistEngineService {
 
       logChecklistGeneration({
         applicationId,
-        country: countryName,
+        country: contextCountryName,
         countryCode,
         visaType,
         mode: 'rules',
