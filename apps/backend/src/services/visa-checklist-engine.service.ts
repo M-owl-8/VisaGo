@@ -185,10 +185,18 @@ export class VisaChecklistEngineService {
       capturedRuleSetId = ruleSetId || null;
 
       if (baseDocuments.length === 0) {
-        logWarn('[VisaChecklistEngine] Base checklist is empty', {
-          countryCode,
-          visaType,
-        });
+        const ruleSetDocumentCount = ruleSet?.requiredDocuments?.length || 0;
+        logError(
+          '[ChecklistRules] Rules misconfigured: produced 0 items with ruleSetDocumentCount > 0',
+          new Error('Base checklist is empty despite available rules'),
+          {
+            countryCode,
+            visaType,
+            ruleSetDocumentCount,
+            ruleSetId: ruleSetId || 'unknown',
+            suggestion: 'Check rule set configuration and document catalog references',
+          }
+        );
         return null as any;
       }
 

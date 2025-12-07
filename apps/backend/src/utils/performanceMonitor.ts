@@ -49,8 +49,23 @@ class BackendPerformanceMonitor {
     }
 
     // Log slow operations
-    if (duration > 5000) {
-      console.warn(`[Performance] Slow operation: ${name} took ${duration}ms`, metric.metadata);
+    // GPT-4 endpoints typically take 5-10 seconds, so use higher threshold for them
+    const isGPTEndpoint =
+      name.includes('risk-explanation') ||
+      name.includes('checklist') ||
+      name.includes('doc-check') ||
+      name.includes('rules-extraction') ||
+      name.includes('checklist-explanation');
+    const slowThreshold = isGPTEndpoint ? 12000 : 5000; // 12s for GPT-4, 5s for others
+
+    if (duration > slowThreshold) {
+      const logLevel = duration > (isGPTEndpoint ? 15000 : 8000) ? 'error' : 'warn';
+      const logMessage = `[Performance] Slow operation: ${name} took ${duration}ms`;
+      if (logLevel === 'error') {
+        console.error(logMessage, metric.metadata);
+      } else {
+        console.warn(logMessage, metric.metadata);
+      }
 
       // Report to Sentry
       Sentry.captureMessage(`Slow operation: ${name}`, {

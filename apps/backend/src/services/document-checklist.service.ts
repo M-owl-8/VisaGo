@@ -1596,25 +1596,24 @@ Only return the JSON object, no other text.`;
         };
       } else {
         unmatchedItems.push(item.documentType);
-        if (applicationId) {
-          logWarn('[Checklist][Merge] No uploaded document found for item', {
-            applicationId,
-            documentType: item.documentType,
-          });
-        }
+        // Reduced log level: missing uploaded docs is normal, not a warning
+        // Only log at debug level for individual items
       }
       return item;
     });
 
     // Log merge statistics for debugging
     if (applicationId) {
+      const missingDocs = unmatchedItems.length > 0 ? unmatchedItems.slice(0, 10) : []; // Limit to first 10 for log size
       logInfo('[Checklist][Merge] Document merge completed', {
         applicationId,
         documentsFound,
         merged,
         totalItems: items.length,
+        unmatchedCount: unmatchedItems.length,
         unmatchedDocuments: documentsFound - merged,
-        unmatchedItems: unmatchedItems.length > 0 ? unmatchedItems : undefined,
+        ...(unmatchedItems.length > 0 && { missingDocs }), // Only include if there are missing docs
+        ...(unmatchedItems.length > 0 && { unmatchedItems }), // Only include if there are unmatched items
       });
     }
 

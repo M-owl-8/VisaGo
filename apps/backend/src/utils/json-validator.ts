@@ -1,7 +1,7 @@
 /**
  * JSON Validator and Sanity Checker
  * Ensures GPT-4 responses are valid JSON and meet all requirements
- * 
+ *
  * EXPECTED JSON STRUCTURE:
  * The validator expects GPT-4 to return a JSON object with this exact structure:
  * {
@@ -9,7 +9,7 @@
  *   "country": string (optional),        // Country name (e.g., "United States", "Germany")
  *   "checklist": Array<ChecklistItem>    // REQUIRED: Must be an array, never an object
  * }
- * 
+ *
  * The "checklist" field MUST be a JSON array of checklist item objects.
  * Each item must have:
  *   - document: string (required)
@@ -18,7 +18,7 @@
  *   - required: boolean (required)
  *   - priority: "high" | "medium" | "low" (required)
  *   - nameUz, nameRu, description, descriptionUz, descriptionRu, etc. (optional but recommended)
- * 
+ *
  * Common validation failures:
  * - "checklist: Missing or invalid (must be an array)" - checklist is missing, null, or not an array
  * - "Too few items" - checklist has fewer than MIN_ITEMS_HARD items (validation error)
@@ -26,7 +26,12 @@
  */
 
 import { logError, logWarn, logInfo } from '../middleware/logger';
-import { MIN_ITEMS_HARD, IDEAL_MIN_ITEMS, MAX_ITEMS_HARD, IDEAL_MAX_ITEMS } from '../config/checklist-config';
+import {
+  MIN_ITEMS_HARD,
+  IDEAL_MIN_ITEMS,
+  MAX_ITEMS_HARD,
+  IDEAL_MAX_ITEMS,
+} from '../config/checklist-config';
 
 export interface ChecklistValidationResult {
   isValid: boolean;
@@ -148,9 +153,11 @@ export function validateChecklistResponse(
   if (itemCount < MIN_ITEMS_HARD) {
     errors.push(`Too few items: ${itemCount} (minimum ${MIN_ITEMS_HARD} required)`);
   } else if (itemCount < IDEAL_MIN_ITEMS) {
-    warnings.push(`Checklist has fewer than ${IDEAL_MIN_ITEMS} items (got ${itemCount}). This is acceptable but suboptimal.`);
+    warnings.push(
+      `Checklist has fewer than ${IDEAL_MIN_ITEMS} items (got ${itemCount}). This is acceptable but suboptimal.`
+    );
   }
-  
+
   if (itemCount > MAX_ITEMS_HARD) {
     errors.push(`Too many items: ${itemCount} (maximum ${MAX_ITEMS_HARD} allowed)`);
   } else if (itemCount > IDEAL_MAX_ITEMS) {
@@ -221,6 +228,8 @@ export function validateChecklistResponse(
   });
 
   // Validate all three categories are present
+  // "required" and "highly_recommended" are mandatory
+  // "optional" is nice-to-have but not required - default to empty array if missing
   if (!categories.has('required')) {
     errors.push('Missing "required" category');
   }
@@ -228,7 +237,18 @@ export function validateChecklistResponse(
     errors.push('Missing "highly_recommended" category');
   }
   if (!categories.has('optional')) {
-    errors.push('Missing "optional" category');
+    // Missing "optional" is a warning, not an error - we'll default to empty array
+    warnings.push('Missing "optional" category in GPT response, defaulting to empty array');
+    logWarn(
+      '[JSON Validator] Missing "optional" category in GPT response, defaulting to empty array',
+      {
+        country,
+        visaType,
+        requiredCount: categoryCounts.required,
+        highlyRecommendedCount: categoryCounts.highly_recommended,
+        optionalCount: 0,
+      }
+    );
   }
 
   // Validate country-specific terminology
@@ -442,12 +462,19 @@ export function parseAndValidateChecklistResponse(
     };
   }
 
-  // Auto-correct warnings
+  // Normalize response: if optional category is missing, it's acceptable (just a warning)
+  // The response is still valid, we just note the missing category
+  let normalizedParsed = parsed;
+  if (validation.corrected) {
+    normalizedParsed = validation.corrected;
+  }
+
+  // Auto-correct warnings (including missing optional category)
   if (validation.warnings.length > 0) {
     logInfo('[JSON Validator] Auto-correcting warnings', {
       warnings: validation.warnings,
     });
-    const corrected = autoCorrectChecklist(parsed, country, visaType);
+    const corrected = autoCorrectChecklist(normalizedParsed, country, visaType);
     return {
       parsed: corrected,
       validation: {

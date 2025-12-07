@@ -243,7 +243,120 @@ export class VisaRiskExplanationService {
         );
       }
 
-      const explanation = validationResult.data;
+      let explanation = validationResult.data;
+
+      // Post-processing: Fix country name mismatches and ensure riskLevel consistency
+      const countryName = application.country.name;
+      const countryCode = application.country.code.toUpperCase();
+      const visaTypeName = application.visaType.name;
+
+      // Use already-built canonical context for risk level (source of truth)
+      const canonicalRiskLevel = canonicalContext?.riskScore?.level || 'medium';
+
+      // Check for country name mismatches in text
+      const countryMismatches: string[] = [];
+      const commonCountryNames: Record<string, string[]> = {
+        ES: ['Spain', 'Ispaniya', 'Испания'],
+        GB: ['UK', 'United Kingdom', 'United Kingdom', 'Великобритания'],
+        US: ['USA', 'United States', 'US', 'Америка'],
+        DE: ['Germany', 'Germaniya', 'Германия'],
+        CA: ['Canada', 'Kanada', 'Канада'],
+        AU: ['Australia', 'Avstraliya', 'Австралия'],
+        JP: ['Japan', 'Yaponiya', 'Япония'],
+        KR: ['South Korea', 'Koreya', 'Корея'],
+        AE: ['UAE', 'United Arab Emirates', 'ОАЭ'],
+      };
+
+      const correctNames = commonCountryNames[countryCode] || [countryName];
+      const incorrectNames = Object.entries(commonCountryNames)
+        .filter(([code]) => code !== countryCode)
+        .flatMap(([, names]) => names);
+
+      // Check summaries for incorrect country mentions
+      const checkText = (text: string, fieldName: string) => {
+        if (!text) return;
+        const textLower = text.toLowerCase();
+        for (const incorrectName of incorrectNames) {
+          if (textLower.includes(incorrectName.toLowerCase())) {
+            countryMismatches.push(
+              `${fieldName} mentions "${incorrectName}" but country is ${countryName}`
+            );
+            // Replace incorrect country name with correct one
+            const regex = new RegExp(incorrectName, 'gi');
+            explanation = {
+              ...explanation,
+              [fieldName]: text.replace(regex, countryName),
+            };
+          }
+        }
+      };
+
+      checkText(explanation.summaryEn, 'summaryEn');
+      checkText(explanation.summaryUz, 'summaryUz');
+      checkText(explanation.summaryRu, 'summaryRu');
+
+      // Check recommendations
+      if (explanation.recommendations) {
+        explanation.recommendations = explanation.recommendations.map((rec: any) => {
+          let fixedRec = { ...rec };
+          checkText(rec.titleEn, 'recommendations[].titleEn');
+          checkText(rec.titleUz, 'recommendations[].titleUz');
+          checkText(rec.titleRu, 'recommendations[].titleRu');
+          checkText(rec.detailsEn, 'recommendations[].detailsEn');
+          checkText(rec.detailsUz, 'recommendations[].detailsUz');
+          checkText(rec.detailsRu, 'recommendations[].detailsRu');
+          return fixedRec;
+        });
+      }
+
+      if (countryMismatches.length > 0) {
+        logWarn('[VisaRiskExplanation] Country name mismatch detected and corrected', {
+          applicationId,
+          countryCode,
+          countryName,
+          visaType: visaTypeName,
+          mismatches: countryMismatches,
+        });
+      }
+
+      // Ensure riskLevel consistency: use canonical risk level as source of truth
+      // Map numeric riskScore to riskLevel if needed
+      const riskScorePercent = canonicalContext.riskScore?.probabilityPercent || 50;
+      let expectedRiskLevel: 'low' | 'medium' | 'high' = 'medium';
+      if (riskScorePercent >= 75) {
+        expectedRiskLevel = 'high';
+      } else if (riskScorePercent <= 40) {
+        expectedRiskLevel = 'low';
+      }
+
+      // If GPT's riskLevel differs significantly from canonical, use canonical
+      const riskLevelMap: Record<string, number> = { low: 1, medium: 2, high: 3 };
+      const gptLevel = riskLevelMap[explanation.riskLevel] || 2;
+      const canonicalLevel = riskLevelMap[canonicalRiskLevel] || 2;
+
+      if (Math.abs(gptLevel - canonicalLevel) > 1) {
+        // Significant mismatch - use canonical
+        logWarn('[VisaRiskExplanation] Risk level mismatch: using canonical risk level', {
+          applicationId,
+          gptRiskLevel: explanation.riskLevel,
+          canonicalRiskLevel,
+          riskScorePercent,
+          decision: 'using_canonical',
+        });
+        explanation = {
+          ...explanation,
+          riskLevel: canonicalRiskLevel as 'low' | 'medium' | 'high',
+        };
+      } else if (
+        explanation.riskLevel !== expectedRiskLevel &&
+        Math.abs(gptLevel - riskLevelMap[expectedRiskLevel]) <= 1
+      ) {
+        // Minor mismatch - prefer expected based on numeric score
+        explanation = {
+          ...explanation,
+          riskLevel: expectedRiskLevel,
+        };
+      }
 
       // Store in database
       await prisma.visaRiskExplanation.upsert({
@@ -453,8 +566,11 @@ APPLICATION CONTEXT
 ================================================================================
 
 - Country: ${context.application?.country || profile.targetCountry || 'Unknown'}
+- Country Name: ${context.application?.country || context.application?.country?.name || profile.targetCountry || 'Unknown'}
 - Visa Type: ${profile.visaType}
 - Country Code: ${(context.application as any)?.countryCode || profile.targetCountry || 'Unknown'}
+
+CRITICAL: You must ALWAYS refer to the exact country name "${context.application?.country || context.application?.country?.name || profile.targetCountry || 'Unknown'}" when writing summaries and recommendations. NEVER mention any other country (e.g., do not mention "UK" if the country is "Spain", do not mention "Spain" if the country is "UK"). Use the exact country name provided above.
 - Duration: ${profile.duration || 'Unknown'}
 
 ================================================================================
