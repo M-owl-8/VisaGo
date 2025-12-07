@@ -753,7 +753,7 @@ export class VisaChecklistEngineService {
 
       logChecklistGeneration({
         applicationId,
-        country: contextCountryName,
+        country: countryName,
         countryCode,
         visaType,
         mode: 'rules',
