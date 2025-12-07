@@ -331,8 +331,81 @@ export class VisaChecklistEngineService {
         );
       }
 
-      // Step 6: Validate against schema
-      let validationResult = ChecklistResponseSchema.safeParse(parsed);
+      // Step 6: Debug logging - inspect parsed JSON shape (DEV ONLY, no PII)
+      const parsedKeys = Object.keys(parsed || {});
+      const isArray = Array.isArray(parsed);
+      const hasChecklist = !!(parsed as any)?.checklist;
+      const hasItems = Array.isArray((parsed as any)?.items);
+      const hasDocuments = Array.isArray((parsed as any)?.documents);
+
+      logWarn('[VisaChecklistEngine][Debug] Raw GPT JSON shape', {
+        countryCode,
+        visaType,
+        keys: parsedKeys,
+        isArray,
+        hasChecklist,
+        hasItems,
+        hasDocuments,
+        topLevelType: typeof parsed,
+        sampleKey: parsedKeys[0] || 'none',
+      });
+
+      // Step 6.5: Tolerant adapter - try to find checklist array under different keys
+      let normalizedParsed = parsed;
+      if (!hasChecklist) {
+        // Try to find the checklist array under common alternative keys
+        if (isArray) {
+          // If parsed is directly an array, wrap it
+          normalizedParsed = { checklist: parsed };
+          logWarn('[VisaChecklistEngine][Adapter] Wrapped array response', {
+            countryCode,
+            visaType,
+            arrayLength: parsed.length,
+          });
+        } else if (hasItems && Array.isArray((parsed as any).items)) {
+          // If it's under "items" key
+          normalizedParsed = { checklist: (parsed as any).items };
+          logWarn('[VisaChecklistEngine][Adapter] Mapped items -> checklist', {
+            countryCode,
+            visaType,
+            itemsLength: (parsed as any).items.length,
+          });
+        } else if (hasDocuments && Array.isArray((parsed as any).documents)) {
+          // If it's under "documents" key
+          normalizedParsed = { checklist: (parsed as any).documents };
+          logWarn('[VisaChecklistEngine][Adapter] Mapped documents -> checklist', {
+            countryCode,
+            visaType,
+            documentsLength: (parsed as any).documents.length,
+          });
+        } else {
+          // Try to find any array-valued property
+          for (const key of parsedKeys) {
+            const value = (parsed as any)[key];
+            if (Array.isArray(value) && value.length > 0) {
+              // Check if first item looks like a checklist item (has documentType or similar)
+              const firstItem = value[0];
+              if (
+                firstItem &&
+                typeof firstItem === 'object' &&
+                (firstItem.documentType || firstItem.document || firstItem.id || firstItem.name)
+              ) {
+                normalizedParsed = { checklist: value };
+                logWarn('[VisaChecklistEngine][Adapter] Mapped array property to checklist', {
+                  countryCode,
+                  visaType,
+                  sourceKey: key,
+                  arrayLength: value.length,
+                });
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Step 6: Validate against schema (with normalized response)
+      let validationResult = ChecklistResponseSchema.safeParse(normalizedParsed);
 
       if (!validationResult.success) {
         jsonValidationRetries++;
@@ -343,6 +416,12 @@ export class VisaChecklistEngineService {
             countryCode,
             visaType,
             errors: validationResult.error.errors,
+            normalizedKeys: Object.keys(normalizedParsed || {}),
+            normalizedHasChecklist: !!(normalizedParsed as any)?.checklist,
+            normalizedChecklistIsArray: Array.isArray((normalizedParsed as any)?.checklist),
+            normalizedChecklistLength: Array.isArray((normalizedParsed as any)?.checklist)
+              ? (normalizedParsed as any).checklist.length
+              : 'not-array',
           }
         );
       } else {
@@ -390,9 +469,9 @@ export class VisaChecklistEngineService {
             }
           }
 
-          parsed = { checklist: filtered };
+          normalizedParsed = { checklist: filtered };
           // Re-validate after fix
-          validationResult = ChecklistResponseSchema.safeParse(parsed);
+          validationResult = ChecklistResponseSchema.safeParse(normalizedParsed);
         }
       }
 
@@ -400,7 +479,7 @@ export class VisaChecklistEngineService {
         jsonValidationRetries++;
 
         // Try to fix common issues
-        const fixed = this.fixCommonIssues(parsed);
+        const fixed = this.fixCommonIssues(normalizedParsed);
         const fixedValidation = ChecklistResponseSchema.safeParse(fixed);
 
         if (!fixedValidation.success) {
@@ -409,10 +488,11 @@ export class VisaChecklistEngineService {
           );
         }
 
-        parsed = fixedValidation.data;
+        normalizedParsed = fixedValidation.data;
+        parsed = normalizedParsed;
         jsonValidationPassed = true;
       } else {
-        parsed = validationResult.data;
+        parsed = normalizedParsed;
         jsonValidationPassed = true;
       }
 
