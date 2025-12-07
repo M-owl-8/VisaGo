@@ -14,6 +14,18 @@ import { logInfo, logError, logWarn } from '../middleware/logger';
 import { logChecklistGeneration, extractApplicationId } from '../utils/gpt-logging';
 import { z } from 'zod';
 import { PROMPT_VERSIONS } from '../ai-training/config';
+import { getDocumentTranslation } from '../data/document-translations';
+import { BaseChecklistItem } from './checklist-rules.service';
+import {
+  getCountryVisaPlaybook,
+  type VisaCategory,
+  type CountryVisaPlaybook,
+} from '../config/country-visa-playbooks';
+import {
+  normalizeCountryCode,
+  getCountryNameFromCode,
+  assertCountryConsistency,
+} from '../config/country-registry';
 
 /**
  * Checklist Item Schema (using Zod for validation)
@@ -88,13 +100,32 @@ export class VisaChecklistEngineService {
     aiUserContext: AIUserContext,
     previousChecklist?: ChecklistItem[]
   ): Promise<ChecklistResponse> {
+    // Phase 7: Normalize country code using CountryRegistry
+    const normalizedCountryCode = normalizeCountryCode(countryCode) || countryCode.toUpperCase();
+    const countryName = getCountryNameFromCode(normalizedCountryCode);
+
+    // Assert consistency
+    const consistency = assertCountryConsistency(
+      normalizedCountryCode,
+      countryCode,
+      aiUserContext.application.country
+    );
+    if (!consistency.consistent) {
+      logWarn('[VisaChecklistEngine] Country consistency check failed', {
+        mismatches: consistency.mismatches,
+        normalizedCountryCode,
+        originalCountryCode: countryCode,
+      });
+    }
+
     // Variables for error handling (declared outside try block for catch access)
     let capturedBaseDocuments: any[] = [];
     let capturedRuleSetId: string | null = null;
 
     try {
       logInfo('[VisaChecklistEngine] Generating checklist', {
-        countryCode,
+        countryCode: normalizedCountryCode,
+        countryName,
         visaType,
         hasPreviousChecklist: !!previousChecklist,
       });
@@ -126,7 +157,7 @@ export class VisaChecklistEngineService {
       if (useCatalog) {
         // Get full ruleSet with references for catalog mode (if available)
         const ruleSetWithRefs = await VisaRulesService.getActiveRuleSetWithReferences(
-          countryCode.toUpperCase(),
+          normalizedCountryCode,
           visaType.toLowerCase()
         );
 
@@ -154,7 +185,7 @@ export class VisaChecklistEngineService {
       if (!useCatalog || !documentReferences || documentReferences.length === 0) {
         if (!ruleSet) {
           ruleSet = await VisaRulesService.getActiveRuleSet(
-            countryCode.toUpperCase(),
+            normalizedCountryCode,
             visaType.toLowerCase()
           );
         }
@@ -204,12 +235,23 @@ export class VisaChecklistEngineService {
       // Phase 6: Also extract embassy rules confidence
       let embassySummary: string | undefined;
       let embassyRulesConfidence: number | null = ruleSet.sourceInfo?.confidence ?? null;
+
+      // Phase 3: Get country visa playbook
+      // Derive visaCategory from visaType (tourist vs student)
+      const visaCategory: VisaCategory =
+        visaType.toLowerCase().includes('student') ||
+        visaType.toLowerCase().includes('study') ||
+        visaType.toLowerCase() === 'f-1' ||
+        visaType.toLowerCase() === 'j-1'
+          ? 'student'
+          : 'tourist';
+      const playbook = getCountryVisaPlaybook(normalizedCountryCode, visaCategory);
       try {
         const { PrismaClient } = await import('@prisma/client');
         const prisma = new PrismaClient();
         const source = await prisma.embassySource.findFirst({
           where: {
-            countryCode: countryCode.toUpperCase(),
+            countryCode: normalizedCountryCode,
             visaType: visaType.toLowerCase(),
             isActive: true,
           },
@@ -235,8 +277,14 @@ export class VisaChecklistEngineService {
       // Step 4: Build compact system prompt
       const useCompactPrompts = process.env.USE_COMPACT_CHECKLIST_PROMPTS !== 'false'; // Default: true
       const systemPrompt = useCompactPrompts
-        ? this.buildSystemPrompt(countryCode, visaType, ruleSet, embassySummary)
-        : this.buildSystemPromptLegacy(countryCode, visaType, ruleSet);
+        ? this.buildSystemPrompt(
+            countryCode,
+            visaType,
+            ruleSet,
+            embassySummary,
+            playbook || undefined
+          )
+        : this.buildSystemPromptLegacy(countryCode, visaType, ruleSet, playbook || undefined);
 
       // Step 5: Build compact user prompt with base documents
       const userPrompt = await this.buildUserPrompt(
@@ -486,17 +534,77 @@ export class VisaChecklistEngineService {
       if (!validationResult.success) {
         jsonValidationRetries++;
 
+        // Phase 1: Distinguish hard failures vs soft issues
+        const hardFailures = validationResult.error.errors.filter((e) => {
+          const path = e.path.join('.');
+          // Hard failures: missing checklist array, invalid structure, empty checklist
+          return (
+            (path.includes('checklist') &&
+              e.code === 'invalid_type' &&
+              e.received === 'undefined') ||
+            (path === '' && e.message.includes('Required')) ||
+            (normalizedParsed &&
+              (normalizedParsed as any).checklist &&
+              Array.isArray((normalizedParsed as any).checklist) &&
+              (normalizedParsed as any).checklist.length === 0)
+          );
+        });
+
+        // If hard failure, throw immediately (will trigger base-rules fallback)
+        if (hardFailures.length > 0) {
+          logError(
+            '[VisaChecklistEngine] Hard validation failure - checklist structure broken',
+            new Error('Hard validation failure'),
+            {
+              countryCode,
+              visaType,
+              hardFailures: hardFailures.map((e) => e.message),
+              allErrors: validationResult.error.errors.map((e) => e.message),
+            }
+          );
+          throw new Error(
+            `Hard validation failure: ${hardFailures.map((e) => e.message).join(', ')}`
+          );
+        }
+
+        // Soft issues: missing optional fields, minor schema issues - try to fix
+        logWarn('[VisaChecklistEngine] Soft validation issues detected, attempting auto-fix', {
+          countryCode,
+          visaType,
+          errors: validationResult.error.errors.map((e) => e.message),
+        });
+
         // Try to fix common issues
         const fixed = this.fixCommonIssues(normalizedParsed);
         const fixedValidation = ChecklistResponseSchema.safeParse(fixed);
 
         if (!fixedValidation.success) {
-          throw new Error(
-            `Schema validation failed: ${validationResult.error.errors.map((e) => e.message).join(', ')}`
-          );
+          // If auto-fix failed, check if it's still a hard failure
+          const stillHardFailures = fixedValidation.error.errors.filter((e) => {
+            const path = e.path.join('.');
+            return (
+              (path.includes('checklist') &&
+                e.code === 'invalid_type' &&
+                e.received === 'undefined') ||
+              (path === '' && e.message.includes('Required'))
+            );
+          });
+
+          if (stillHardFailures.length > 0) {
+            throw new Error(
+              `Hard validation failure after fix attempt: ${stillHardFailures.map((e) => e.message).join(', ')}`
+            );
+          }
+
+          // If it's still soft issues after fix, log but don't fail - we'll use what we have
+          logWarn('[VisaChecklistEngine] Auto-fix partially succeeded, using corrected checklist', {
+            countryCode,
+            visaType,
+            remainingErrors: fixedValidation.error.errors.map((e) => e.message),
+          });
         }
 
-        normalizedParsed = fixedValidation.data;
+        normalizedParsed = fixedValidation.success ? fixedValidation.data : fixed;
         parsed = normalizedParsed;
         jsonValidationPassed = true;
       } else {
@@ -518,6 +626,10 @@ export class VisaChecklistEngineService {
       // Get country name (try to get from context or use code)
       const countryName = (aiUserContext as any)?.application?.country?.name || countryCode;
 
+      // Phase 3: Get risk drivers and risk level for logging
+      const riskDrivers = (canonical as any)?.riskDrivers || [];
+      const riskLevel = canonical?.riskScore?.level || 'medium';
+
       // Log structured checklist generation
       logChecklistGeneration({
         applicationId,
@@ -531,6 +643,16 @@ export class VisaChecklistEngineService {
         conditionWarnings: conditionWarnings.length > 0 ? conditionWarnings : undefined,
         tokensUsed: totalTokens,
         responseTimeMs: responseTime,
+        // Phase 2: Risk drivers and risk level
+        riskDrivers: riskDrivers.length > 0 ? riskDrivers : undefined,
+        riskLevel,
+        // Phase 3: Embassy rules and playbook metadata
+        hasVisaRuleSet: !!ruleSet,
+        hasEmbassyContent: !!embassySummary,
+        hasCountryPlaybook: !!playbook,
+        rulesConfidence: ruleSet?.sourceInfo?.confidence ?? null,
+        playbookCountryCode: playbook?.countryCode,
+        playbookVisaCategory: playbook?.visaCategory,
       });
 
       logInfo('[VisaChecklistEngine] Checklist generated successfully', {
@@ -644,9 +766,274 @@ export class VisaChecklistEngineService {
         countryCode,
         visaType,
       });
-      // Return null on error so caller can fall back
+
+      // Phase 1: Rules-first fallback - if we have base documents, return base-rules checklist
+      if (capturedBaseDocuments && capturedBaseDocuments.length > 0) {
+        logWarn('[VisaChecklistEngine] GPT enrichment failed, using base-rules fallback', {
+          countryCode,
+          visaType,
+          baseDocumentCount: capturedBaseDocuments.length,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        const baseRulesChecklist = this.buildBaseRulesChecklist(
+          capturedBaseDocuments,
+          countryCode,
+          visaType
+        );
+
+        // Phase 2: Get risk drivers and risk level from canonical context
+        // Try to build canonical context if we have aiUserContext
+        let riskDrivers: string[] = [];
+        let riskLevel: 'low' | 'medium' | 'high' = 'medium';
+        try {
+          const { buildCanonicalAIUserContext } = await import('./ai-context.service');
+          const fallbackCanonicalContext = await buildCanonicalAIUserContext(aiUserContext);
+          riskDrivers = (fallbackCanonicalContext as any)?.riskDrivers || [];
+          riskLevel = fallbackCanonicalContext?.riskScore?.level || 'medium';
+        } catch (err) {
+          // If we can't build canonical context, use defaults
+          logWarn('[VisaChecklistEngine] Could not build canonical context for risk drivers', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+
+        // Log the fallback
+        logChecklistGeneration({
+          applicationId,
+          country: countryName,
+          countryCode,
+          visaType,
+          mode: 'rules_base_fallback',
+          jsonValidationPassed: true,
+          jsonValidationRetries: 0,
+          itemCount: baseRulesChecklist.checklist.length,
+          fallbackReason: 'GPT enrichment failed, using base rules',
+          // Phase 2: Risk drivers and risk level
+          riskDrivers: riskDrivers.length > 0 ? riskDrivers : undefined,
+          riskLevel,
+        });
+
+        logInfo('[VisaChecklistEngine] Base-rules checklist generated (fallback)', {
+          countryCode,
+          visaType,
+          itemCount: baseRulesChecklist.checklist.length,
+          generationMode: 'rules_base_fallback',
+        });
+
+        return baseRulesChecklist;
+      }
+
+      // No base documents available - return null so caller can fall back to legacy/static
       return null as any;
     }
+  }
+
+  /**
+   * Build base-rules checklist from BaseChecklistItem[] (Phase 1: Rules-first fallback)
+   *
+   * This function converts base rules documents into a full ChecklistResponse
+   * without GPT enrichment. Used when GPT enrichment fails but rules are available.
+   *
+   * Features:
+   * - Uses document translations for names/descriptions
+   * - Includes Uzbek context in descriptions ("Obtain from your bank in Uzbekistan")
+   * - Sets appliesToThisApplicant = true for all documents (conservative approach)
+   * - Generates simple but professional tri-language content
+   * - Maintains document priority based on category
+   */
+  private static buildBaseRulesChecklist(
+    baseDocuments: BaseChecklistItem[],
+    countryCode: string,
+    visaType: string
+  ): ChecklistResponse {
+    const checklist: ChecklistItem[] = baseDocuments.map((baseDoc, index) => {
+      const translation = getDocumentTranslation(baseDoc.documentType);
+
+      // Infer document group from documentType
+      const group = this.inferDocumentGroup(baseDoc.documentType);
+
+      // Calculate priority: required = 1-10, highly_recommended = 11-20, optional = 21+
+      let priority = index + 1;
+      if (baseDoc.category === 'required') {
+        priority = index + 1; // 1, 2, 3, ...
+      } else if (baseDoc.category === 'highly_recommended') {
+        priority = 10 + (index + 1); // 11, 12, 13, ...
+      } else {
+        priority = 20 + (index + 1); // 21, 22, 23, ...
+      }
+
+      // Build description with Uzbek context
+      const description = this.buildBaseDescription(
+        baseDoc.documentType,
+        translation.descriptionEn,
+        countryCode,
+        visaType
+      );
+      const descriptionUz = this.buildBaseDescriptionUz(
+        baseDoc.documentType,
+        translation.descriptionUz,
+        countryCode,
+        visaType
+      );
+      const descriptionRu = this.buildBaseDescriptionRu(
+        baseDoc.documentType,
+        translation.descriptionRu,
+        countryCode,
+        visaType
+      );
+
+      return {
+        id: `DOC_${baseDoc.documentType}_${index + 1}`,
+        documentType: baseDoc.documentType,
+        category: baseDoc.category,
+        required: baseDoc.required,
+        name: translation.nameEn || baseDoc.documentType,
+        nameUz: translation.nameUz || baseDoc.documentType,
+        nameRu: translation.nameRu || baseDoc.documentType,
+        description,
+        descriptionUz,
+        descriptionRu,
+        appliesToThisApplicant: true, // Conservative: include all base documents
+        reasonIfApplies: this.buildBaseReasonIfApplies(baseDoc, countryCode, visaType),
+        extraRecommended: baseDoc.category === 'highly_recommended',
+        group,
+        priority,
+        dependsOn: [],
+      };
+    });
+
+    return { checklist };
+  }
+
+  /**
+   * Infer document group from documentType
+   */
+  private static inferDocumentGroup(documentType: string): ChecklistItem['group'] {
+    const type = documentType.toLowerCase();
+    if (type.includes('passport') || type.includes('photo') || type.includes('identity')) {
+      return 'identity';
+    }
+    if (
+      type.includes('bank') ||
+      type.includes('financial') ||
+      type.includes('sponsor') ||
+      type.includes('income')
+    ) {
+      return 'financial';
+    }
+    if (
+      type.includes('travel') ||
+      type.includes('itinerary') ||
+      type.includes('hotel') ||
+      type.includes('flight')
+    ) {
+      return 'travel';
+    }
+    if (
+      type.includes('education') ||
+      type.includes('academic') ||
+      type.includes('student') ||
+      type.includes('degree') ||
+      type.includes('i20') ||
+      type.includes('acceptance')
+    ) {
+      return 'education';
+    }
+    if (type.includes('employment') || type.includes('job') || type.includes('work')) {
+      return 'employment';
+    }
+    if (
+      type.includes('property') ||
+      type.includes('family') ||
+      type.includes('marriage') ||
+      type.includes('birth') ||
+      type.includes('ties')
+    ) {
+      return 'ties';
+    }
+    return 'other';
+  }
+
+  /**
+   * Build base description with country/visa context
+   */
+  private static buildBaseDescription(
+    documentType: string,
+    baseDescription: string,
+    countryCode: string,
+    visaType: string
+  ): string {
+    // Enhance description with country-specific context
+    if (documentType.includes('bank_statement')) {
+      return `${baseDescription} For ${countryCode} ${visaType} visa, typically required for the last 3-6 months. Obtain from your bank in Uzbekistan.`;
+    }
+    if (documentType.includes('property')) {
+      return `${baseDescription} Obtain property documents (kadastr) from the cadastral office in Uzbekistan.`;
+    }
+    if (documentType.includes('employment')) {
+      return `${baseDescription} Obtain from your employer in Uzbekistan. Should be on company letterhead with official seal.`;
+    }
+    return baseDescription;
+  }
+
+  /**
+   * Build base description in Uzbek
+   */
+  private static buildBaseDescriptionUz(
+    documentType: string,
+    baseDescription: string,
+    countryCode: string,
+    visaType: string
+  ): string {
+    if (documentType.includes('bank_statement')) {
+      return `${baseDescription} ${countryCode} ${visaType} viza uchun odatda oxirgi 3-6 oy talab qilinadi. O'zbekistondagi bankingizdan oling.`;
+    }
+    if (documentType.includes('property')) {
+      return `${baseDescription} Mulk hujjatlari (kadastr) O'zbekistondagi kadastr idorasidan oling.`;
+    }
+    if (documentType.includes('employment')) {
+      return `${baseDescription} O'zbekistondagi ish beruvchingizdan oling. Kompaniya blankasida va rasmiy muhr bilan bo'lishi kerak.`;
+    }
+    return baseDescription;
+  }
+
+  /**
+   * Build base description in Russian
+   */
+  private static buildBaseDescriptionRu(
+    documentType: string,
+    baseDescription: string,
+    countryCode: string,
+    visaType: string
+  ): string {
+    if (documentType.includes('bank_statement')) {
+      return `${baseDescription} Для визы ${countryCode} ${visaType} обычно требуется за последние 3-6 месяцев. Получите в вашем банке в Узбекистане.`;
+    }
+    if (documentType.includes('property')) {
+      return `${baseDescription} Получите документы на недвижимость (кадастр) в кадастровом офисе в Узбекистане.`;
+    }
+    if (documentType.includes('employment')) {
+      return `${baseDescription} Получите от вашего работодателя в Узбекистане. Должно быть на бланке компании с официальной печатью.`;
+    }
+    return baseDescription;
+  }
+
+  /**
+   * Build reasonIfApplies for base rules checklist
+   */
+  private static buildBaseReasonIfApplies(
+    baseDoc: BaseChecklistItem,
+    countryCode: string,
+    visaType: string
+  ): string {
+    if (baseDoc.category === 'required') {
+      return `Required by ${countryCode} embassy for ${visaType} visa applications. This document is mandatory and must be included.`;
+    }
+    if (baseDoc.category === 'highly_recommended') {
+      return `Highly recommended for ${countryCode} ${visaType} visa. This document strengthens your application and demonstrates compliance with embassy requirements.`;
+    }
+    return `Optional but recommended for ${countryCode} ${visaType} visa. This document may help strengthen your application.`;
   }
 
   /**
@@ -689,7 +1076,8 @@ export class VisaChecklistEngineService {
     countryCode: string,
     visaType: string,
     ruleSet: VisaRuleSetData,
-    embassySummary?: string
+    embassySummary?: string,
+    playbook?: CountryVisaPlaybook
   ): string {
     // Phase 6: Check embassy rules confidence
     const embassyRulesConfidence = ruleSet.sourceInfo?.confidence ?? null;
@@ -698,6 +1086,12 @@ export class VisaChecklistEngineService {
     const embassyContext = embassySummary
       ? `\nEMBASSY SUMMARY:\n${embassySummary.substring(0, 2000)}\n`
       : '';
+
+    // Phase 3: Build OFFICIAL_RULES section
+    const officialRulesSection = this.buildOfficialRulesSection(ruleSet, embassySummary);
+
+    // Phase 3: Build COUNTRY_VISA_PLAYBOOK section
+    const playbookSection = playbook ? this.buildPlaybookSection(playbook) : '';
 
     // Phase 6: Add embassy rules confidence guidance
     const embassyRulesGuidance = hasHighConfidenceRules
@@ -817,6 +1211,50 @@ You receive pre-computed expert fields in APPLICANT_CONTEXT that summarize key v
 Use these fields as your starting point for reasoning. They are calculated from questionnaire data and represent what a visa officer would assess.
 
 ================================================================================
+RISK-DRIVEN DOCUMENT SELECTION (Phase 2)
+================================================================================
+
+You receive a list of RISK_DRIVERS in APPLICANT_CONTEXT – for example: ["low_funds", "weak_ties", "limited_travel_history"].
+
+Your job is to:
+(a) Ensure that for each significant risk driver, there are enough documents that help mitigate that risk
+(b) Mark those documents with high priority and required or highly_recommended category
+(c) Use both OFFICIAL_RULES and COUNTRY_VISA_PLAYBOOK to select documents and set priority
+(d) If OFFICIAL_RULES require certain documents, they must be included regardless of playbook
+
+EXPLICIT RISK DRIVER → DOCUMENT MAPPING:
+
+low_funds / borderline_funds:
+→ Critical docs: bank_statement, sponsor_financial_documents, income_certificate, tax_returns, scholarship_proof (for students)
+→ Mark as required or highly_recommended, priority 1-5
+→ ReasonIfApplies: "Required to demonstrate financial sufficiency. Your available funds are [low/borderline] compared to required funds."
+
+weak_ties / no_property / no_employment:
+→ Critical docs: property_documents (kadastr in Uzbekistan), employment_letter, family_composition_documents, marriage_certificate, business_registration
+→ Mark as required or highly_recommended, priority 1-5
+→ ReasonIfApplies: "Strengthens ties to home country. Your ties strength is weak, and this document helps demonstrate return intention to Uzbekistan."
+
+limited_travel_history / previous_visa_refusals:
+→ Critical docs: travel_itinerary, accommodation_proof, invitation_letter, cover_letter, additional_ties_documents
+→ Mark as required or highly_recommended, priority 1-5
+→ ReasonIfApplies: "Addresses travel history concerns. This document helps demonstrate genuine travel purpose and reduces immigration intent concerns."
+
+is_minor:
+→ Critical docs: birth_certificate, parental_consent, guardian_documents, parents_financial_proof
+→ Mark as required, priority 1-3
+→ ReasonIfApplies: "Required for minor applicants. Demonstrates parental consent and guardianship arrangements."
+
+sponsor_based_finance:
+→ Critical docs: sponsor_financial_documents, sponsor_letter, sponsor_relationship_proof, sponsor_income_proof
+→ Mark as required, priority 1-3
+→ ReasonIfApplies: "Required for sponsored applications. Demonstrates sponsor's financial capacity and relationship to applicant."
+
+For each checklist item, internally decide which riskDrivers it helps with, and use that to set priority and required vs highly_recommended vs optional.
+
+Use COUNTRY_VISA_PLAYBOOK document hints to understand what officers typically focus on for each document type.
+If embassy rules conflict with playbook, embassy rules win.
+
+================================================================================
 EXPERT REASONING FRAMEWORK
 ================================================================================
 
@@ -859,17 +1297,114 @@ When evaluating appliesToThisApplicant, think like an embassy officer evaluating
      * Additional financial proof and ties documents are CRITICAL
      * ReasonIfApplies: "Addresses previous visa refusal/overstay. This document helps mitigate concerns and demonstrate improved circumstances."
 
-4. COUNTRY-SPECIFIC PATTERNS:
-${countryCode === 'US' ? '   - US B1/B2: Strong emphasis on ties (property, employment, family), financial capacity (1 year of expenses), clear travel purpose\n   - Student: I-20, SEVIS fee, DS-160, strong academic background, financial capacity for full program' : ''}
-${countryCode === 'GB' || countryCode === 'UK' ? '   - UK: 28-day bank statement rule (funds must be in account for 28 days), CAS for students, strong ties requirement\n   - Student: CAS letter, tuition payment proof, accommodation proof, financial capacity' : ''}
-${isSchengen ? '   - Schengen: Travel insurance (€30,000 minimum coverage), accommodation proof, sufficient funds, round-trip booking\n   - Student: Acceptance letter, financial capacity, accommodation proof, travel insurance' : ''}
-${countryCode === 'CA' ? '   - Canada: DLI acceptance letter (LOA) for students, sufficient funds for study period, strong ties, no immigration intent\n   - Tourist: Strong ties, financial capacity, clear travel purpose' : ''}
-${countryCode === 'AU' ? '   - Australia: COE for students, Genuine Temporary Entrant (GTE) requirement, financial capacity\n   - Tourist: Strong ties, financial capacity, clear travel purpose' : ''}
-${countryCode === 'JP' ? '   - Japan: Certificate of Eligibility (COE) for students, sufficient funds, clear purpose, no overstay history\n   - Tourist: Strong ties, financial capacity, detailed itinerary' : ''}
-${countryCode === 'KR' ? '   - South Korea: D-2/D-4 for students, sufficient funds, clear study plans, no overstay history\n   - Tourist: Strong ties, financial capacity, accommodation proof' : ''}
-${countryCode === 'AE' ? '   - UAE: Tourist/Student visa requirements, sufficient funds, accommodation proof, no overstay history\n   - Strong ties, financial capacity, clear purpose' : ''}
+4. COUNTRY-SPECIFIC PATTERNS (10 Priority Countries):
+${
+  countryCode === 'US'
+    ? `   - US B1/B2 Tourist: Strong emphasis on ties (property, employment, family), financial capacity (typically 1 year of expenses), clear travel purpose, DS-160 form, visa fee receipt, interview typically required
+   - US Student (F-1): I-20 form (Certificate of Eligibility), SEVIS fee (I-901), DS-160, strong academic background, financial capacity for full program duration, interview typically required`
+    : ''
+}
+${
+  countryCode === 'GB' || countryCode === 'UK'
+    ? `   - UK Standard Visitor: 28-day bank statement rule (funds must be in account for 28 consecutive days), strong ties requirement, travel itinerary, accommodation proof, online application
+   - UK Student: CAS (Confirmation of Acceptance for Studies) letter, tuition payment proof, accommodation proof, financial capacity, TB test certificate may be required`
+    : ''
+}
+${
+  isSchengen
+    ? `   - Schengen Tourist: Travel health insurance (minimum €30,000 coverage), accommodation proof (hotel booking, invitation, Airbnb), sufficient funds (typically 3-6 months bank statements), round-trip flight reservation, Schengen visa application form
+   - Schengen Student: Acceptance letter from university, financial capacity (blocked account/Sperrkonto for Germany), accommodation proof, travel health insurance (€30,000 minimum), student residence permit application`
+    : ''
+}
+${
+  countryCode === 'CA'
+    ? `   - Canada Visitor: Strong ties to home country, financial capacity, clear travel purpose, travel itinerary, accommodation proof
+   - Canada Student: LOA (Letter of Acceptance) from DLI (Designated Learning Institution), proof of funds for first year (tuition + living), GIC (Guaranteed Investment Certificate) may be required for SDS, study permit application`
+    : ''
+}
+${
+  countryCode === 'AU'
+    ? `   - Australia Visitor: Strong ties, financial capacity, clear travel purpose, travel itinerary, accommodation proof, travel insurance recommended
+   - Australia Student: COE (Confirmation of Enrolment), OSHC (Overseas Student Health Cover) insurance, GTE (Genuine Temporary Entrant) statement may be required, financial capacity for first year (tuition + living expenses), student visa application`
+    : ''
+}
+${
+  countryCode === 'JP'
+    ? `   - Japan Tourist: Detailed itinerary with specific dates and locations, accommodation proof (hotel reservations or invitation), sponsor proof if sponsored, stable income and ties, tourist visa application
+   - Japan Student: Certificate of Eligibility (COE), admission letter from Japanese school/university, sufficient funds for tuition and living expenses, student visa application`
+    : ''
+}
+${
+  countryCode === 'KR'
+    ? `   - South Korea Tourist: Travel itinerary, accommodation proof, sponsor proof if sponsored, strong ties, financial capacity, tourist visa application
+   - South Korea Student: Admission letter from Korean school/university, D-2 (university) or D-4 (language school) visa, clear study plans, financial proof for tuition and living expenses, student visa application`
+    : ''
+}
+${
+  countryCode === 'AE'
+    ? `   - UAE Tourist: Hotel booking confirmation, sponsor letter if invited, proof of financial means, travel insurance may be required, strong ties, clear purpose, tourist visa application
+   - UAE Student: Admission letter from UAE school/university, sponsor letter if sponsored, financial proof for tuition and living expenses, student visa application`
+    : ''
+}
+${
+  countryCode === 'FR'
+    ? `   - France Tourist (Schengen): Travel health insurance (€30,000 minimum), accommodation proof, sufficient funds, round-trip booking, Schengen visa application form
+   - France Student: Acceptance letter from French university, financial capacity, accommodation proof, travel health insurance, student visa application`
+    : ''
+}
 
-5. DATA COMPLETENESS AWARENESS (Use meta.dataCompletenessScore):
+5. DECISION TREE RULES (Explicit Logic):
+   - IF financialSufficiencyRatio < 1.0 AND document is financial-related (bank_statement, sponsor_financial_documents, income_certificate):
+     → appliesToThisApplicant = true
+     → reasonIfApplies: "Required to demonstrate financial sufficiency. Applicant has $X available vs $Y required (ratio: Z%). Additional proof needed."
+   
+   - IF tiesStrengthScore < 0.5 AND document is ties-related (property_documents, employment_letter, family_ties_proof):
+     → appliesToThisApplicant = true
+     → reasonIfApplies: "Strengthens ties to home country. Applicant's ties strength is weak (score: X/1.0). This document helps demonstrate return intention to Uzbekistan."
+   
+   - IF travelHistoryLabel is 'none' OR 'limited' AND document is travel/itinerary-related (travel_itinerary, hotel_reservations, invitation_letter):
+     → appliesToThisApplicant = true
+     → reasonIfApplies: "Applicant has limited/no previous travel history. This document helps demonstrate genuine travel purpose and reduces immigration intent concerns."
+   
+   - IF previousVisaRejections > 0 OR hasOverstayHistory:
+     → explanation_letter appliesToThisApplicant = true
+     → additional financial proof appliesToThisApplicant = true
+     → additional ties documents appliesToThisApplicant = true
+     → reasonIfApplies: "Addresses previous visa refusal/overstay. This document helps mitigate concerns and demonstrate improved circumstances."
+   
+   - IF applicant is minor (age < 18) OR hasChildren:
+     → parental_consent appliesToThisApplicant = true
+     → birth_certificate appliesToThisApplicant = true
+     → guardianship_documents appliesToThisApplicant = true (if applicable)
+     → reasonIfApplies: "Required for minor applicants. Demonstrates parental consent and guardianship arrangements."
+   
+   - IF sponsorType !== 'self':
+     → sponsor_letter appliesToThisApplicant = true
+     → sponsor_financial_documents appliesToThisApplicant = true
+     → sponsor_relationship_proof appliesToThisApplicant = true (if available)
+     → reasonIfApplies: "Required for sponsored applications. Demonstrates sponsor's financial capacity and relationship to applicant."
+   
+   - IF isEmployed === true:
+     → employment_letter appliesToThisApplicant = true
+     → employment_contract appliesToThisApplicant = true (if available)
+     → reasonIfApplies: "Strengthens ties to home country. Demonstrates stable employment in Uzbekistan and return intention."
+   
+   - IF hasPropertyInUzbekistan === true:
+     → property_documents appliesToThisApplicant = true
+     → kadastr_documents appliesToThisApplicant = true (if available)
+     → reasonIfApplies: "Strengthens ties to home country. Property ownership in Uzbekistan demonstrates strong return intention."
+
+6. UZBEKISTAN-SPECIFIC CONTEXT:
+   - Applicants are typically from Uzbekistan, with documents from Uzbek institutions
+   - Bank statements: Reference "Uzbek banks" (e.g., Kapital Bank, Uzsanoatqurilishbank, Ipak Yuli, etc.) generically
+   - Property documents: Reference "kadastr" (Uzbek cadastral office), not Western property terms
+   - Employment: Reference "Uzbek employers", typical Uzbek employment patterns, company letterhead with official seal
+   - Family ties: Reference "family composition certificates", "marriage certificates from ZAGS" (Uzbek civil registry)
+   - Documents may need translation: Uzbek/Russian documents may require English translation for embassy submission
+   - Financial context: Be aware of realistic funds vs declared income patterns in Uzbekistan
+   - Tone: Formal but understandable for average Uzbek users with basic English
+
+7. DATA COMPLETENESS AWARENESS (Use meta.dataCompletenessScore):
    - If dataCompletenessScore < 0.7:
      * Be conservative in appliesToThisApplicant decisions
      * Avoid overconfident language in reasonIfApplies
@@ -1064,7 +1599,8 @@ FINAL INSTRUCTIONS
   private static buildSystemPromptLegacy(
     countryCode: string,
     visaType: string,
-    ruleSet: VisaRuleSetData
+    ruleSet: VisaRuleSetData,
+    playbook?: any
   ): string {
     // Map country code to country name for context
     const countryNames: Record<string, string> = {
@@ -1105,6 +1641,17 @@ You are specialized in:
 
 NOTE: In legacy mode, some expert fields (financialSufficiencyRatio, tiesStrengthScore, travelHistoryScore) may be missing from APPLICANT_CONTEXT.
 When expert fields are missing, be conservative in your reasoning and mark more documents as appliesToThisApplicant = true.
+
+${
+  playbook
+    ? `\n\nCOUNTRY_VISA_PLAYBOOK (Typical Patterns - Phase 3):
+This playbook provides typical patterns for ${countryName} ${visaTypeLabel} visas. It is based on typical practice and may be less precise than official rules for countries where rules are not available.
+
+${this.buildPlaybookSection(playbook)}
+
+IMPORTANT: This playbook is supplementary guidance. If official rules (VisaRuleSet) are available, they take precedence.`
+    : ''
+}
 
 ================================================================================
 YOUR ROLE: EXPERT CHECKLIST GENERATION
@@ -1431,25 +1978,30 @@ Return ONLY valid JSON matching the schema, no other text.`;
       embassyContext: applicantContext.embassyContext,
       // Phase 6: Embassy rules confidence
       embassyRulesConfidence: (aiUserContext as any).ruleSet?.sourceInfo?.confidence ?? null,
+      // Phase 2: Risk drivers
+      riskDrivers: (canonical as any).riskDrivers || [],
     };
 
     let prompt = `EXPERT ANALYSIS REQUIRED:
 
 For each BASE_DOCUMENT, you must:
-1. Decide appliesToThisApplicant using expert visa officer reasoning:
+1. Check which RISK_DRIVERS this document addresses (see RISK_DRIVERS list below)
+2. Decide appliesToThisApplicant using expert visa officer reasoning:
    - Use financial metrics (financialSufficiencyRatio, financialSufficiencyLabel) when document is financial-related
    - Use ties metrics (tiesStrengthScore, tiesStrengthLabel) when document is ties-related
    - Use travel history metrics (travelHistoryScore, travelHistoryLabel) when document is travel/itinerary-related
    - For high-risk profiles (low funds, weak ties, no travel history), almost all financial and ties docs should apply
    - Reference Uzbek applicant perspective in your reasoning
+   - If document addresses a significant RISK_DRIVER, mark it as appliesToThisApplicant = true with high priority
 
-2. Write reasonIfApplies that:
+3. Write reasonIfApplies that:
+   - Explicitly mentions which RISK_DRIVER(s) this document addresses (e.g., "Addresses low_funds risk driver...")
    - References specific risk factors (low funds, weak ties, no travel history, previous refusals)
    - Explains how this document helps mitigate risk or strengthen the application
    - Mentions Uzbek context when relevant ("as an applicant from Uzbekistan...")
    - Uses country-specific requirements and terminology
 
-3. Generate tri-language fields (name, nameUz, nameRu, description, descriptionUz, descriptionRu):
+4. Generate tri-language fields (name, nameUz, nameRu, description, descriptionUz, descriptionRu):
    - Use correct country-specific terminology (e.g., US: "Form I-20", Canada: "LOA", UK: "CAS")
    - Keep tone formal but understandable for average Uzbek users
    - Reference Uzbek context naturally (Uzbek banks, kadastr documents, etc.)
@@ -1459,6 +2011,16 @@ ${JSON.stringify(baseDocuments, null, 2)}
 
 APPLICANT_CONTEXT (structured with expert fields):
 ${JSON.stringify(structuredContext, null, 2)}
+
+RISK_DRIVERS (Phase 2: Explicit risk factors - use these to prioritize documents):
+${JSON.stringify((canonical as any).riskDrivers || [], null, 2)}
+
+RISK DRIVER → DOCUMENT MAPPING GUIDE:
+- low_funds / borderline_funds → bank_statement, sponsor_financial_documents, income_certificate (mark as required/highly_recommended, priority 1-5)
+- weak_ties / no_property / no_employment → property_documents, employment_letter, family_documents (mark as required/highly_recommended, priority 1-5)
+- limited_travel_history / previous_visa_refusals → travel_itinerary, accommodation_proof, invitation_letter, cover_letter (mark as required/highly_recommended, priority 1-5)
+- is_minor → birth_certificate, parental_consent, guardian_documents (mark as required, priority 1-3)
+- sponsor_based_finance → sponsor_financial_documents, sponsor_letter, sponsor_relationship_proof (mark as required, priority 1-3)
 
 ${(() => {
   const embassyRulesConfidence = (aiUserContext as any).ruleSet?.sourceInfo?.confidence ?? null;
@@ -1609,5 +2171,105 @@ If expert fields are missing, be conservative and mark more documents as applies
     });
 
     return fixed;
+  }
+
+  /**
+   * Build OFFICIAL_RULES section for system prompt (Phase 3)
+   * Extracts and formats official embassy rules from VisaRuleSet
+   */
+  private static buildOfficialRulesSection(
+    ruleSet: VisaRuleSetData,
+    embassySummary?: string
+  ): string {
+    const sourceUrl = ruleSet.sourceInfo?.extractedFrom || 'Unknown';
+    const extractedAt = ruleSet.sourceInfo?.extractedAt || 'Unknown';
+    const confidence = ruleSet.sourceInfo?.confidence ?? null;
+    const confidencePercent = confidence ? (confidence * 100).toFixed(0) : 'Unknown';
+
+    let rulesText = `OFFICIAL EMBASSY RULES (Authoritative)
+Source: ${sourceUrl}
+Last updated: ${extractedAt}
+Confidence: ${confidencePercent}%
+
+You MUST strictly follow these rules and must not contradict them.
+If there is any conflict between these rules and your general knowledge, obey these rules.
+
+REQUIRED DOCUMENTS:
+${ruleSet.requiredDocuments
+  .map(
+    (doc) =>
+      `- ${doc.documentType} (${doc.category}): ${doc.description || 'No description'}${doc.validityRequirements ? ` | Validity: ${doc.validityRequirements}` : ''}${doc.formatRequirements ? ` | Format: ${doc.formatRequirements}` : ''}${doc.condition ? ` | Condition: ${doc.condition}` : ''}`
+  )
+  .join('\n')}
+
+${
+  ruleSet.financialRequirements
+    ? `FINANCIAL REQUIREMENTS:
+- Minimum Balance: ${ruleSet.financialRequirements.minimumBalance || 'Not specified'} ${ruleSet.financialRequirements.currency || 'USD'}
+- Bank Statement Months: ${ruleSet.financialRequirements.bankStatementMonths || 'Not specified'}
+- Sponsor Allowed: ${ruleSet.financialRequirements.sponsorRequirements?.allowed ? 'Yes' : 'No'}
+${
+  ruleSet.financialRequirements.sponsorRequirements?.requiredDocuments
+    ? `- Sponsor Required Documents: ${ruleSet.financialRequirements.sponsorRequirements.requiredDocuments.join(', ')}`
+    : ''
+}`
+    : ''
+}
+
+${
+  ruleSet.additionalRequirements
+    ? `ADDITIONAL REQUIREMENTS:
+${
+  ruleSet.additionalRequirements.travelInsurance
+    ? `- Travel Insurance: ${ruleSet.additionalRequirements.travelInsurance.required ? 'Required' : 'Optional'}${ruleSet.additionalRequirements.travelInsurance.minimumCoverage ? ` (Minimum: ${ruleSet.additionalRequirements.travelInsurance.minimumCoverage} ${ruleSet.additionalRequirements.travelInsurance.currency || 'USD'})` : ''}`
+    : ''
+}
+${
+  ruleSet.additionalRequirements.accommodationProof
+    ? `- Accommodation Proof: ${ruleSet.additionalRequirements.accommodationProof.required ? 'Required' : 'Optional'}${ruleSet.additionalRequirements.accommodationProof.types ? ` (Types: ${ruleSet.additionalRequirements.accommodationProof.types.join(', ')})` : ''}`
+    : ''
+}
+${
+  ruleSet.additionalRequirements.returnTicket
+    ? `- Return Ticket: ${ruleSet.additionalRequirements.returnTicket.required ? 'Required' : 'Optional'}${ruleSet.additionalRequirements.returnTicket.refundable ? ' (Refundable preferred)' : ''}`
+    : ''
+}`
+    : ''
+}
+
+${embassySummary ? `\nEMBASSY SUMMARY EXCERPT:\n${embassySummary.substring(0, 1000)}` : ''}`;
+
+    return rulesText;
+  }
+
+  /**
+   * Build COUNTRY_VISA_PLAYBOOK section for system prompt (Phase 3)
+   * Formats playbook data for GPT consumption
+   */
+  private static buildPlaybookSection(playbook: CountryVisaPlaybook): string {
+    if (!playbook) {
+      return '';
+    }
+
+    return `COUNTRY_VISA_PLAYBOOK (Typical Patterns - Not Law)
+These are typical patterns based on general visa practice and Uzbek applicant context.
+If embassy rules conflict with playbook, embassy rules win.
+
+TYPICAL REFUSAL REASONS:
+${playbook.typicalRefusalReasonsEn.map((reason: string) => `- ${reason}`).join('\n')}
+
+KEY OFFICER FOCUS:
+${playbook.keyOfficerFocusEn.map((focus: string) => `- ${focus}`).join('\n')}
+
+UZBEK CONTEXT HINTS:
+${playbook.uzbekContextHintsEn.map((hint: string) => `- ${hint}`).join('\n')}
+
+DOCUMENT HINTS:
+${playbook.documentHints
+  .map(
+    (hint) =>
+      `- ${hint.documentType} (${hint.importance}): ${hint.officerFocusHintEn}${hint.typicalFor.length > 0 ? ` | Typical for: ${hint.typicalFor.join(', ')}` : ''}`
+  )
+  .join('\n')}`;
   }
 }

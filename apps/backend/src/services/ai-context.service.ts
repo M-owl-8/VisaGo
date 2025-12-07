@@ -11,9 +11,11 @@ import {
   CanonicalAIUserContext,
   VisaQuestionnaireSummary,
   VisaProbabilityResult,
+  RiskDriver,
 } from '../types/ai-context';
 import type { ApplicantProfile as VisaBrainApplicantProfile } from '../types/visa-brain';
 import { getVisaCountryProfile } from '../config/visa-country-profiles';
+import { buildCanonicalCountryContext, normalizeCountryCode } from '../config/country-registry';
 
 /**
  * Structured Applicant Profile for Checklist Personalization
@@ -520,6 +522,134 @@ function computeDataCompleteness(context: {
   const missingFields = criticalFields.filter((f) => !f.present).map((f) => f.name);
 
   return { score, missingCriticalFields: missingFields };
+}
+
+/**
+ * Compute risk drivers (Phase 2)
+ * Explicit risk factors that make an applicant risky or safe
+ */
+function computeRiskDrivers(context: {
+  financialSufficiencyRatio: number | null;
+  financialSufficiencyLabel: 'low' | 'borderline' | 'sufficient' | 'strong' | null;
+  tiesStrengthScore: number | null;
+  tiesStrengthLabel: 'weak' | 'medium' | 'strong' | null;
+  travelHistoryScore: number | null;
+  travelHistoryLabel: 'none' | 'limited' | 'good' | 'strong' | null;
+  hasPropertyInUzbekistan: boolean;
+  isEmployed: boolean;
+  currentStatus: string;
+  monthlyIncomeUSD: number | null;
+  hasInternationalTravel: boolean;
+  previousVisaRejections: boolean | number;
+  hasOverstayHistory: boolean;
+  sponsorType: string;
+  age: number | null;
+  availableFundsUSD: number | null;
+}): RiskDriver[] {
+  const drivers: RiskDriver[] = [];
+
+  // Financial risk drivers
+  if (context.financialSufficiencyRatio !== null) {
+    if (context.financialSufficiencyRatio < 0.8) {
+      drivers.push('low_funds');
+    } else if (context.financialSufficiencyRatio < 1.1) {
+      drivers.push('borderline_funds');
+    }
+  }
+
+  // Ties risk drivers
+  if (context.tiesStrengthScore !== null && context.tiesStrengthScore < 0.5) {
+    drivers.push('weak_ties');
+  }
+  if (!context.hasPropertyInUzbekistan) {
+    drivers.push('no_property');
+  }
+  if (
+    !context.isEmployed &&
+    context.currentStatus !== 'student' &&
+    context.currentStatus !== 'employed' &&
+    (context.monthlyIncomeUSD === null || context.monthlyIncomeUSD === 0)
+  ) {
+    drivers.push('no_employment');
+  }
+
+  // Travel history risk drivers
+  if (
+    !context.hasInternationalTravel ||
+    context.travelHistoryLabel === 'none' ||
+    context.travelHistoryLabel === 'limited'
+  ) {
+    drivers.push('limited_travel_history');
+  }
+
+  // Previous refusals/overstays
+  const rejectionCount =
+    typeof context.previousVisaRejections === 'number'
+      ? context.previousVisaRejections
+      : context.previousVisaRejections
+        ? 1
+        : 0;
+  if (rejectionCount > 0) {
+    drivers.push('previous_visa_refusals');
+  }
+  if (context.hasOverstayHistory) {
+    drivers.push('previous_visa_refusals'); // Overstay is also a refusal risk
+  }
+
+  // Minor risk driver
+  if (context.age !== null && context.age < 18) {
+    drivers.push('is_minor');
+  }
+
+  // Sponsor-based finance risk
+  if (context.sponsorType !== 'self' && context.sponsorType !== 'unknown') {
+    drivers.push('sponsor_based_finance');
+  }
+
+  // Self-employed without proof
+  if (
+    context.currentStatus === 'self_employed' &&
+    (context.monthlyIncomeUSD === null || context.monthlyIncomeUSD === 0)
+  ) {
+    drivers.push('self_employed_without_proof');
+  }
+
+  // Big funds vs low income (sudden money appearance risk)
+  if (
+    context.availableFundsUSD !== null &&
+    context.monthlyIncomeUSD !== null &&
+    context.monthlyIncomeUSD > 0
+  ) {
+    const monthsOfIncome = context.availableFundsUSD / context.monthlyIncomeUSD;
+    // If available funds are more than 24 months of income, it's suspicious
+    if (monthsOfIncome > 24) {
+      drivers.push('big_funds_vs_low_income');
+    }
+  }
+
+  // Short preparation time (if we had this data, we'd check it here)
+  // For now, we don't have this in the context, so we skip it
+
+  // If no risk drivers, return 'none' to indicate genuinely low risk
+  if (drivers.length === 0) {
+    return ['none'];
+  }
+
+  return drivers;
+}
+
+/**
+ * Compute risk level from risk score (Phase 2)
+ * Centralized mapping to ensure consistency across all services
+ */
+export function computeRiskLevel(riskScore: number): 'low' | 'medium' | 'high' {
+  if (riskScore < 40) {
+    return 'low';
+  }
+  if (riskScore < 70) {
+    return 'medium';
+  }
+  return 'high';
 }
 
 /**
@@ -1046,7 +1176,9 @@ export async function buildAIUserContext(
 
     // Get app language from user or default to 'en'
     const appLanguage = (application.user.language as 'uz' | 'ru' | 'en') || 'en';
-    let countryCode = application.country.code;
+    // Phase 7: Normalize country code using CountryRegistry
+    let countryCode =
+      normalizeCountryCode(application.country.code) || application.country.code.toUpperCase();
 
     // Extract questionnaire summary from user bio (with context for legacy conversion)
     const questionnaireSummary = extractQuestionnaireSummary(
@@ -1570,9 +1702,11 @@ export async function buildCanonicalAIUserContext(
   let riskScore: CanonicalAIUserContext['riskScore'];
   if (summary) {
     const probability = calculateVisaProbability(summary);
+    // Phase 2: Use centralized computeRiskLevel for consistency
+    const canonicalRiskLevel = computeRiskLevel(probability.score);
     riskScore = {
       probabilityPercent: probability.score,
-      level: probability.level,
+      level: canonicalRiskLevel, // Use centralized function
       riskFactors: probability.riskFactors,
       positiveFactors: probability.positiveFactors,
     };
@@ -1580,12 +1714,32 @@ export async function buildCanonicalAIUserContext(
     // Default risk score for missing questionnaire
     riskScore = {
       probabilityPercent: 70,
-      level: 'medium',
+      level: computeRiskLevel(70), // Use centralized function
       riskFactors: ['Questionnaire data incomplete - using default risk assessment'],
       positiveFactors: [],
     };
     warnings.push('Questionnaire missing - using default risk score');
   }
+
+  // Phase 2: Compute risk drivers
+  const riskDrivers = computeRiskDrivers({
+    financialSufficiencyRatio: financial.financialSufficiencyRatio ?? null,
+    financialSufficiencyLabel: financial.financialSufficiencyLabel ?? null,
+    tiesStrengthScore: ties.tiesStrengthScore ?? null,
+    tiesStrengthLabel: ties.tiesStrengthLabel ?? null,
+    travelHistoryScore: travelHistory.travelHistoryScore ?? null,
+    travelHistoryLabel: travelHistory.travelHistoryLabel ?? null,
+    hasPropertyInUzbekistan,
+    isEmployed,
+    currentStatus,
+    monthlyIncomeUSD,
+    hasInternationalTravel,
+    previousVisaRejections,
+    hasOverstayHistory: previousOverstay,
+    sponsorType,
+    age,
+    availableFundsUSD: financial.availableFundsUSD ?? null,
+  });
 
   // Determine source format
   let sourceFormat: 'v2' | 'legacy' | 'hybrid' | 'unknown' = 'unknown';
@@ -1608,7 +1762,7 @@ export async function buildCanonicalAIUserContext(
     });
   }
 
-  // Phase 2: Log derived metrics (non-sensitive) + debug info for employment/ties
+  // Phase 2: Log derived metrics (non-sensitive) + debug info for employment/ties + risk drivers
   const applicationId = currentContext.application.applicationId;
   logInfo('[AI Context] Canonical context built with expert fields', {
     applicationId,
@@ -1625,6 +1779,7 @@ export async function buildCanonicalAIUserContext(
     tiesStrengthScore: ties.tiesStrengthScore ?? null,
     travelHistoryScore: travelHistory.travelHistoryScore ?? null,
     travelHistoryLabel: travelHistory.travelHistoryLabel ?? null,
+    riskDrivers, // Phase 2: Log risk drivers
   });
 
   return {
@@ -1684,6 +1839,16 @@ export async function buildCanonicalAIUserContext(
     // Phase 2: New expert fields
     uzbekContext,
     meta,
+    // Phase 2: Risk drivers
+    riskDrivers,
+    // Phase 8: Canonical country context (MANDATORY - single source of truth)
+    countryContext: buildCanonicalCountryContext(currentContext.application.country) || {
+      countryCode:
+        normalizeCountryCode(currentContext.application.country) ||
+        currentContext.application.country.toUpperCase(),
+      countryName: getCountryNameFromCode(currentContext.application.country),
+      schengen: false,
+    },
   };
 }
 
@@ -1897,7 +2062,9 @@ export function buildApplicantProfileFromQuestionnaire(
     questionnaireData?.ties?.familyTies === true;
 
   // Extract country code and visa type from application
-  const countryCode = application.country.code.toUpperCase();
+  // Phase 7: Normalize country code using CountryRegistry
+  const countryCode =
+    normalizeCountryCode(application.country.code) || application.country.code.toUpperCase();
   const visaTypeName = application.visaType.name.toLowerCase();
   const visaType =
     visaTypeName.includes('student') || visaTypeName.includes('study')
@@ -1952,7 +2119,9 @@ export function buildApplicantProfileFromQuestionnaire(
       sevisId: questionnaireData?.education?.sevisId || questionnaireData?.summary?.sevisId,
     };
   }
-  if (countryCode === 'GB' || countryCode === 'UK') {
+  // Phase 7: Normalize GB/UK to canonical GB
+  const normalizedCode = normalizeCountryCode(countryCode) || countryCode;
+  if (normalizedCode === 'GB' || countryCode === 'GB' || countryCode === 'UK') {
     countrySpecific.uk = {
       casNumber: questionnaireData?.education?.casNumber || questionnaireData?.summary?.casNumber,
     };

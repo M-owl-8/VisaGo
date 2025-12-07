@@ -68,11 +68,17 @@ export class EmbassyCrawlerService {
         const html = response.data;
         const cleaned = this.cleanHtml(html, metadata);
 
+        // Phase 4: Enhanced logging
         logInfo('[EmbassyCrawler] Successfully fetched and cleaned', {
           url,
           htmlLength: html.length,
           cleanedLength: cleaned.text.length,
           title: cleaned.title,
+          httpStatus: response.status,
+          contentType: response.headers['content-type'],
+          contentLength: response.headers['content-length']
+            ? parseInt(response.headers['content-length'])
+            : undefined,
         });
 
         return {
@@ -139,7 +145,12 @@ export class EmbassyCrawlerService {
   }
 
   /**
-   * Clean HTML and extract main text content
+   * Clean HTML and extract main text content (Phase 4: Enhanced)
+   *
+   * Phase 4 improvements:
+   * - Better removal of navigation, headers, footers, cookie banners
+   * - Preserves sections with visa-related headings
+   * - Better content extraction focusing on visa requirements
    */
   private static cleanHtml(html: string, metadata?: any): { text: string; title: string } {
     try {
@@ -148,15 +159,33 @@ export class EmbassyCrawlerService {
       // Remove script and style tags
       $('script, style, noscript, iframe, embed, object').remove();
 
-      // Remove navigation, headers, footers, ads
+      // Phase 4: Enhanced removal of boilerplate
+      // Remove navigation, headers, footers, ads, cookie banners
       $(
-        'nav, header, footer, .nav, .navigation, .header, .footer, .sidebar, .ad, .advertisement, .cookie-banner, .cookie-consent, .popup, .modal'
+        'nav, header, footer, .nav, .navigation, .header, .footer, .sidebar, .ad, .advertisement, ' +
+          '.cookie-banner, .cookie-consent, .cookie-notice, .popup, .modal, .overlay, ' +
+          '.social-share, .share-buttons, .breadcrumb, .menu, .menu-item, ' +
+          '.skip-link, .accessibility-menu, .language-selector'
       ).remove();
+
+      // Phase 4: Remove repeated "contact us" and footer sections
+      $('*').each((_, element) => {
+        const $el = $(element);
+        const text = $el.text().toLowerCase();
+        // Remove elements that are clearly footer/contact sections
+        if (
+          text.includes('contact us') &&
+          text.length < 500 && // Short contact sections
+          ($el.is('div, section, aside') || $el.hasClass('contact') || $el.hasClass('footer'))
+        ) {
+          $el.remove();
+        }
+      });
 
       // Extract title
       const title = $('title').text().trim() || $('h1').first().text().trim() || 'Untitled';
 
-      // Try to find main content area
+      // Phase 4: Try to find main content area, prioritizing visa-related sections
       let mainContent = '';
       const contentSelectors = [
         'main',
@@ -166,6 +195,8 @@ export class EmbassyCrawlerService {
         '#content',
         '#main',
         '.page-content',
+        '.visa-content', // Phase 4: Specific visa content selector
+        '.application-content',
         'body',
       ];
 
@@ -182,11 +213,79 @@ export class EmbassyCrawlerService {
         mainContent = $('body').text();
       }
 
+      // Phase 4: Preserve sections with visa-related headings
+      // Look for headings that indicate important content
+      const visaKeywords = [
+        'required documents',
+        'visa application requirements',
+        'financial requirements',
+        'documents to submit',
+        'supporting documents',
+        'application process',
+        'visa fees',
+        'processing time',
+        'interview',
+        'biometrics',
+      ];
+
+      // Extract text from sections with relevant headings
+      let relevantSections = '';
+      $('h1, h2, h3, h4, h5, h6').each((_, heading) => {
+        const headingText = $(heading).text().toLowerCase();
+        for (const keyword of visaKeywords) {
+          if (headingText.includes(keyword)) {
+            // Get content following this heading
+            let sectionContent = '';
+            let next = $(heading).next();
+            let depth = 0;
+            while (next.length > 0 && depth < 10) {
+              // Stop at next heading of same or higher level
+              if (next.is('h1, h2, h3, h4, h5, h6')) {
+                const nextLevel = parseInt(next.prop('tagName').charAt(1));
+                const headingLevel = parseInt($(heading).prop('tagName').charAt(1));
+                if (nextLevel <= headingLevel) {
+                  break;
+                }
+              }
+              sectionContent += ' ' + next.text();
+              next = next.next();
+              depth++;
+            }
+            if (sectionContent.trim().length > 100) {
+              relevantSections += '\n\n' + $(heading).text() + '\n' + sectionContent.trim();
+            }
+            break;
+          }
+        }
+      });
+
+      // Combine main content with relevant sections
+      if (relevantSections) {
+        mainContent = relevantSections + '\n\n' + mainContent;
+      }
+
       // Clean up whitespace
       let cleanedText = mainContent
         .replace(/\s+/g, ' ') // Multiple spaces to single space
         .replace(/\n\s*\n/g, '\n\n') // Multiple newlines to double newline
         .trim();
+
+      // Phase 4: Log content quality metrics
+      const hasVisaKeywords = visaKeywords.some((keyword) =>
+        cleanedText.toLowerCase().includes(keyword)
+      );
+      const hasDocumentSection =
+        /required documents|documents to submit|supporting documents/i.test(cleanedText);
+      const hasFinancialSection = /financial|funds|bank statement|minimum balance/i.test(
+        cleanedText
+      );
+
+      logInfo('[EmbassyCrawler] Content quality metrics', {
+        textLength: cleanedText.length,
+        hasVisaKeywords,
+        hasDocumentSection,
+        hasFinancialSection,
+      });
 
       // Limit length (keep first 50000 characters to avoid token limits)
       if (cleanedText.length > 50000) {
@@ -324,10 +423,13 @@ export class EmbassyCrawlerService {
         },
       });
 
+      // Phase 4: Enhanced error logging
       logError('[EmbassyCrawler] Failed to crawl and store', error as Error, {
         sourceId,
         url,
         httpStatus,
+        errorType: error instanceof AxiosError ? 'axios_error' : 'unknown_error',
+        errorCode: error instanceof AxiosError ? axiosError.code : undefined,
       });
 
       return {

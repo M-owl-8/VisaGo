@@ -4,6 +4,16 @@
  */
 
 /**
+ * Canonical Country Context (Phase 7)
+ * Single source of truth for country information
+ */
+export interface CanonicalCountryContext {
+  countryCode: string; // Canonical code, e.g. "FR"
+  countryName: string; // Canonical name, e.g. "France"
+  schengen: boolean;
+}
+
+/**
  * Visa Probability Result
  * Result of rule-based probability calculation
  */
@@ -385,4 +395,29 @@ export interface CanonicalAIUserContext {
     dataCompletenessScore?: number | null; // 0.0-1.0, how complete context is
     missingCriticalFields?: string[]; // high-level names of important missing fields
   };
+
+  // Phase 2: Risk drivers (explicit risk factors)
+  riskDrivers?: RiskDriver[]; // Array of specific risk drivers for this applicant
+
+  // Phase 8: Canonical country context (MANDATORY - single source of truth)
+  countryContext: CanonicalCountryContext; // Phase 8: Made mandatory for total consistency
 }
+
+/**
+ * Risk Driver Type (Phase 2)
+ * Explicit risk factors that make an applicant risky or safe
+ */
+export type RiskDriver =
+  | 'low_funds'
+  | 'borderline_funds'
+  | 'weak_ties'
+  | 'no_property'
+  | 'no_employment'
+  | 'limited_travel_history'
+  | 'previous_visa_refusals'
+  | 'is_minor'
+  | 'short_preparation_time'
+  | 'self_employed_without_proof'
+  | 'sponsor_based_finance'
+  | 'big_funds_vs_low_income'
+  | 'none'; // Used only when genuinely low risk

@@ -5,12 +5,19 @@
 
 import { PrismaClient } from '@prisma/client';
 import { AIOpenAIService } from './ai-openai.service';
-import { buildCanonicalAIUserContextForApplication } from './ai-context.service';
+import { buildCanonicalAIUserContextForApplication, computeRiskLevel } from './ai-context.service';
 import { VisaRulesService } from './visa-rules.service';
 import { getAIConfig } from '../config/ai-models';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 import { CanonicalAIUserContext } from '../types/ai-context';
 import { z } from 'zod';
+import { getCountryVisaPlaybook, type VisaCategory } from '../config/country-visa-playbooks';
+import {
+  normalizeCountryCode,
+  getCountryNameFromCode,
+  buildCanonicalCountryContext,
+  assertCountryConsistency,
+} from '../config/country-registry';
 
 const prisma = new PrismaClient();
 
@@ -87,8 +94,34 @@ export class VisaRiskExplanationService {
     canonicalContext: CanonicalAIUserContext,
     checklistItems: any[] = []
   ): { systemPrompt: string; userPrompt: string } {
-    const systemPrompt = this.buildSystemPrompt();
-    const userPrompt = this.buildUserPrompt(canonicalContext, checklistItems);
+    // Phase 8: Use canonical country from countryContext
+    const countryCode =
+      canonicalContext.countryContext?.countryCode || canonicalContext.application.country;
+    const countryName = canonicalContext.countryContext?.countryName || 'Unknown';
+    const schengen = canonicalContext.countryContext?.schengen || false;
+    const systemPrompt = this.buildSystemPrompt(countryCode, countryName, schengen);
+
+    // Phase 3: Get playbook for evaluation (if country/visaType available)
+    const visaType = canonicalContext.applicantProfile.visaType;
+    let playbook: any = null;
+    if (countryCode && visaType) {
+      const visaCategory: VisaCategory =
+        visaType.toLowerCase().includes('student') ||
+        visaType.toLowerCase().includes('study') ||
+        visaType.toLowerCase() === 'f-1' ||
+        visaType.toLowerCase() === 'j-1'
+          ? 'student'
+          : 'tourist';
+      playbook = getCountryVisaPlaybook(countryCode, visaCategory);
+    }
+    const userPrompt = this.buildUserPrompt(
+      canonicalContext,
+      checklistItems,
+      undefined,
+      playbook || undefined,
+      countryCode,
+      countryName
+    );
     return { systemPrompt, userPrompt };
   }
 
@@ -145,11 +178,34 @@ export class VisaRiskExplanationService {
         applicationId
       );
 
-      // Phase 6: Get ruleSet for embassyRulesConfidence
+      // Phase 8: Normalize country code using CountryRegistry
+      const normalizedCountryCode =
+        normalizeCountryCode(application.country.code) || application.country.code.toUpperCase();
+      const countryContext = buildCanonicalCountryContext(normalizedCountryCode);
+      const countryName = countryContext?.countryName || application.country.name;
+
+      // Assert consistency
+      const consistency = assertCountryConsistency(
+        normalizedCountryCode,
+        application.country.code,
+        canonicalContext.application.country,
+        canonicalContext.countryContext?.countryCode
+      );
+      if (!consistency.consistent) {
+        logWarn('[VisaRiskExplanation] Country consistency check failed', {
+          mismatches: consistency.mismatches,
+          normalizedCountryCode,
+          originalCountryCode: application.country.code,
+        });
+      }
+
+      // Phase 3: Get ruleSet and playbook
+      const visaTypeNameForPlaybook = application.visaType.name.toLowerCase();
+      let ruleSet: any = null;
       try {
-        const ruleSet = await VisaRulesService.getActiveRuleSet(
-          application.country.code.toUpperCase(),
-          application.visaType.name.toLowerCase()
+        ruleSet = await VisaRulesService.getActiveRuleSet(
+          normalizedCountryCode,
+          visaTypeNameForPlaybook
         );
         if (ruleSet) {
           (canonicalContext as any).ruleSet = ruleSet;
@@ -157,6 +213,16 @@ export class VisaRiskExplanationService {
       } catch (error) {
         // Non-blocking, continue without ruleSet
       }
+
+      // Phase 3: Get country visa playbook
+      const visaCategory: VisaCategory =
+        visaTypeNameForPlaybook.toLowerCase().includes('student') ||
+        visaTypeNameForPlaybook.toLowerCase().includes('study') ||
+        visaTypeNameForPlaybook.toLowerCase() === 'f-1' ||
+        visaTypeNameForPlaybook.toLowerCase() === 'j-1'
+          ? 'student'
+          : 'tourist';
+      const playbook = getCountryVisaPlaybook(normalizedCountryCode, visaCategory);
 
       // Get checklist if available (to see document situation)
       const checklist = await prisma.documentChecklist.findUnique({
@@ -176,9 +242,20 @@ export class VisaRiskExplanationService {
         }
       }
 
-      // Build prompts
-      const systemPrompt = this.buildSystemPrompt();
-      const userPrompt = this.buildUserPrompt(canonicalContext, checklistItems);
+      // Build prompts (Phase 8: Pass canonical country context)
+      const systemPrompt = this.buildSystemPrompt(
+        normalizedCountryCode,
+        countryName,
+        countryContext?.schengen || false
+      );
+      const userPrompt = this.buildUserPrompt(
+        canonicalContext,
+        checklistItems,
+        ruleSet,
+        playbook || undefined,
+        normalizedCountryCode,
+        countryName
+      );
 
       // Get AI config
       const aiConfig = getAIConfig('riskExplanation');
@@ -186,7 +263,11 @@ export class VisaRiskExplanationService {
       logInfo('[VisaRiskExplanation] Calling GPT-4 for risk explanation', {
         task: 'riskExplanation',
         applicationId,
-        countryCode: application.country.code,
+        countryCode: normalizedCountryCode,
+        countryName,
+        countryCodeCanonical: normalizedCountryCode,
+        countryNameCanonical: countryName,
+        countryConsistencyStatus: consistency.consistent ? 'consistent' : 'mismatch_detected',
         visaType: application.visaType.name,
         riskLevel: canonicalContext.riskScore.level,
         model: aiConfig.model,
@@ -246,12 +327,12 @@ export class VisaRiskExplanationService {
       let explanation = validationResult.data;
 
       // Post-processing: Fix country name mismatches and ensure riskLevel consistency
-      const countryName = application.country.name;
-      const countryCode = application.country.code.toUpperCase();
+      // Phase 8: Use canonical country name from CountryRegistry (already set above)
       const visaTypeName = application.visaType.name;
 
-      // Use already-built canonical context for risk level (source of truth)
-      const canonicalRiskLevel = canonicalContext?.riskScore?.level || 'medium';
+      // Phase 2: Use centralized computeRiskLevel for consistency
+      const canonicalRiskScorePercent = canonicalContext?.riskScore?.probabilityPercent || 70;
+      const canonicalRiskLevel = computeRiskLevel(canonicalRiskScorePercent);
 
       // Check for country name mismatches in text
       const countryMismatches: string[] = [];
@@ -267,9 +348,10 @@ export class VisaRiskExplanationService {
         AE: ['UAE', 'United Arab Emirates', 'ОАЭ'],
       };
 
-      const correctNames = commonCountryNames[countryCode] || [countryName];
+      // Phase 8: Use canonical country name from CountryRegistry
+      const correctNames = [countryName]; // Only canonical name is correct
       const incorrectNames = Object.entries(commonCountryNames)
-        .filter(([code]) => code !== countryCode)
+        .filter(([code]) => code !== normalizedCountryCode)
         .flatMap(([, names]) => names);
 
       // Check summaries for incorrect country mentions
@@ -319,42 +401,19 @@ export class VisaRiskExplanationService {
         });
       }
 
-      // Ensure riskLevel consistency: use canonical risk level as source of truth
-      // Map numeric riskScore to riskLevel if needed
-      const riskScorePercent = canonicalContext.riskScore?.probabilityPercent || 50;
-      let expectedRiskLevel: 'low' | 'medium' | 'high' = 'medium';
-      if (riskScorePercent >= 75) {
-        expectedRiskLevel = 'high';
-      } else if (riskScorePercent <= 40) {
-        expectedRiskLevel = 'low';
-      }
-
-      // If GPT's riskLevel differs significantly from canonical, use canonical
-      const riskLevelMap: Record<string, number> = { low: 1, medium: 2, high: 3 };
-      const gptLevel = riskLevelMap[explanation.riskLevel] || 2;
-      const canonicalLevel = riskLevelMap[canonicalRiskLevel] || 2;
-
-      if (Math.abs(gptLevel - canonicalLevel) > 1) {
-        // Significant mismatch - use canonical
+      // Phase 2: Ensure riskLevel consistency - always use canonical risk level as source of truth
+      // If GPT's riskLevel differs from canonical, use canonical (source of truth)
+      if (explanation.riskLevel !== canonicalRiskLevel) {
         logWarn('[VisaRiskExplanation] Risk level mismatch: using canonical risk level', {
           applicationId,
           gptRiskLevel: explanation.riskLevel,
           canonicalRiskLevel,
-          riskScorePercent,
+          riskScorePercent: canonicalRiskScorePercent,
           decision: 'using_canonical',
         });
         explanation = {
           ...explanation,
-          riskLevel: canonicalRiskLevel as 'low' | 'medium' | 'high',
-        };
-      } else if (
-        explanation.riskLevel !== expectedRiskLevel &&
-        Math.abs(gptLevel - riskLevelMap[expectedRiskLevel]) <= 1
-      ) {
-        // Minor mismatch - prefer expected based on numeric score
-        explanation = {
-          ...explanation,
-          riskLevel: expectedRiskLevel,
+          riskLevel: canonicalRiskLevel,
         };
       }
 
@@ -364,7 +423,7 @@ export class VisaRiskExplanationService {
         create: {
           applicationId,
           userId,
-          countryCode: application.country.code.toUpperCase(),
+          countryCode: normalizedCountryCode,
           visaType: application.visaType.name.toLowerCase(),
           riskLevel: explanation.riskLevel,
           summaryEn: explanation.summaryEn,
@@ -412,8 +471,18 @@ export class VisaRiskExplanationService {
    * - Provides concrete, prioritized recommendations
    * - Uzbek-focused explanations with practical tips
    */
-  private static buildSystemPrompt(): string {
-    return `You are an EXPERT VISA CONSULTANT with 10+ years of experience helping applicants from Uzbekistan apply to embassies of the US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, and UAE.
+  private static buildSystemPrompt(
+    countryCode?: string,
+    countryName?: string,
+    schengen?: boolean
+  ): string {
+    // Phase 8: Use canonical country in prompt
+    const countrySection =
+      countryCode && countryName
+        ? `\n\nIMPORTANT COUNTRY CONTEXT:\n- The ONLY valid country for this task is ${countryName} (${countryCode})\n- You MUST NOT refer to any other country\n- If embassy rules for other countries appear in your memory, ignore them${schengen ? '\n- This is a Schengen country. You may reference "Schengen" as a group, but always specify ' + countryName + ' as the primary country' : ''}\n`
+        : '';
+
+    return `You are an EXPERT VISA CONSULTANT with 10+ years of experience helping applicants from Uzbekistan apply to embassies of the US, UK, Schengen (Germany/Spain/France), Canada, Australia, Japan, Korea, and UAE.${countrySection}
 
 ================================================================================
 YOUR ROLE
@@ -427,8 +496,10 @@ You will receive:
   * ties: tiesStrengthScore, tiesStrengthLabel, hasPropertyInUzbekistan, hasFamilyInUzbekistan, hasChildren, isEmployed, employmentDurationMonths
   * travelHistory: travelHistoryScore, travelHistoryLabel, previousVisaRejections, hasOverstayHistory
   * riskScore from rule-based engine (level, probabilityPercent, riskFactors, positiveFactors)
+  * riskDrivers: explicit list of risk factors (e.g., ["low_funds", "weak_ties", "limited_travel_history"])
   * meta.dataCompletenessScore
 - Checklist status summary (totalRequiredDocs, uploadedDocsCount, verifiedDocsCount)
+- Country name and country code (you MUST use the exact country name provided, never mention other countries)
 
 ================================================================================
 RISK ASSESSMENT LOGIC
@@ -494,20 +565,27 @@ You MUST return ONLY valid JSON matching this exact schema:
 }
 
 RISK LEVEL DETERMINATION:
-- riskLevel MUST reflect combined effect of financial, ties, travel history, and rule-based riskScore.level
-- If rule-based level is high OR financial/ties are very weak → 'high'
-- If mixed (some strong, some weak) → 'medium'
-- If strong finances + strong ties + no serious negatives → 'low'
+- You MUST use the provided riskScore.level and riskScore.probabilityPercent as the source of truth
+- You MUST NOT contradict the given riskLevel - if riskLevel = 'high', you must say 'high risk' in your summary
+- The riskLevel is computed from riskScore.probabilityPercent using this mapping:
+  * riskScore < 40 → 'low'
+  * 40 ≤ riskScore < 70 → 'medium'
+  * riskScore ≥ 70 → 'high'
+- Use riskDrivers to explain WHY the risk level is what it is (e.g., "Main risk factors: low_funds, weak_ties, limited_travel_history")
+- Connect each recommendation to specific risk drivers (e.g., "Because your funds are borderline for a 3-month stay, we strongly recommend...")
 
 SUMMARY REQUIREMENTS:
 - summaryEn/Uz/Ru: 2-3 sentences each
 - MUST explicitly reference:
+  * Main risk drivers in human language (e.g., "Main risk factors: limited travel history, sponsor-based finance, weak ties.")
   * Financial sufficiency (e.g., "Your financial capacity is borderline because you have X vs required Y." OR "Financial data is incomplete, so assessment is approximate.")
   * Ties (strong/medium/weak) - reference property, employment, family explicitly
   * Travel history (none/limited/good)
+  * The exact riskLevel provided (e.g., "Your application has high risk" if riskLevel = 'high')
 - CRITICAL: Only say "you are currently unemployed" if currentStatus is actually 'unemployed'. If currentStatus is 'employed' or 'student', say that instead.
 - If employment status is 'unknown' or missing, say "employment information is incomplete" rather than assuming unemployed.
 - If data is incomplete, mention that it's an estimate
+- CRITICAL: You must refer to the exact country name provided in the user prompt. NEVER mention any other destination country (e.g., do not mention "US" or "UK" if the country is "Australia"). Always use the exact country name provided.
 - Uzbek (Uz): Simple, clear language with common terminology (bank hisoboti, ish joyidan ma'lumotnoma, kadastr hujjati)
 - Russian (Ru): Formal but simple
 - English (En): Neutral, embassy-style
@@ -515,15 +593,22 @@ SUMMARY REQUIREMENTS:
 RECOMMENDATIONS REQUIREMENTS:
 - 2-4 items, prioritized for impact
 - Each with titleEn/Uz/Ru and detailsEn/Uz/Ru
+- MUST connect each recommendation to specific risk drivers:
+  * "Because your funds are borderline for a 3-month stay, we strongly recommend adding 6 months of bank statements and sponsor documents."
+  * "Since your ties strength is weak, property documents (kadastr hujjati) and employment letters help demonstrate return intention."
+  * "Given your limited travel history, a detailed itinerary and accommodation proof help demonstrate genuine travel purpose."
+- MUST explicitly mention if recommendation is (Phase 3):
+  * "Strongly recommended by embassy rules" (if OFFICIAL_RULES_SUMMARY requires it)
+  * "Typical best practice for this country" (if COUNTRY_VISA_PLAYBOOK suggests it)
 - Should be:
   * Concrete ("Increase your bank balance to at least X USD and show 3-6 months statement.")
   * Prioritized for impact (highest impact first)
   * Realistic for Uzbek ecosystem (Uzbek banks, property docs, employment letters, kadastr, etc.)
 - Examples:
-  * "Increase bank balance to $X for stronger financial proof"
-  * "Provide property ownership documents (kadastr hujjati) to show ties to home country"
-  * "Obtain employment letter (ish joyidan ma'lumotnoma) with detailed salary information"
-  * "Complete travel history documentation to demonstrate travel experience"
+  * "Increase bank balance to $X for stronger financial proof (addresses low_funds risk driver) - Strongly recommended by embassy rules"
+  * "Provide property ownership documents (kadastr hujjati) to show ties to home country (addresses weak_ties risk driver) - Typical best practice for this country"
+  * "Obtain employment letter (ish joyidan ma'lumotnoma) with detailed salary information (addresses no_employment risk driver)"
+  * "Complete travel history documentation to demonstrate travel experience (addresses limited_travel_history risk driver)"
 
 ================================================================================
 FINAL INSTRUCTIONS
@@ -543,10 +628,30 @@ FINAL INSTRUCTIONS
    * - Structured APPLICANT_CONTEXT with expert fields grouped
    * - Explicit "EXPERT RISK ANALYSIS REQUIRED" section
    * - Clear instructions on using expert fields for risk assessment
+   *
+   * Phase 8 Upgrade:
+   * - Uses canonical country code and name from CountryRegistry
    */
-  private static buildUserPrompt(context: any, checklistItems: any[]): string {
+  private static buildUserPrompt(
+    context: any,
+    checklistItems: any[],
+    ruleSet?: any,
+    playbook?: any,
+    countryCode?: string,
+    countryName?: string
+  ): string {
     const profile = context.applicantProfile;
     const riskScore = context.riskScore;
+
+    // Phase 8: Use canonical country from parameters or context
+    const canonicalCountryCode =
+      countryCode ||
+      context.countryContext?.countryCode ||
+      context.application?.country ||
+      profile.targetCountry ||
+      'Unknown';
+    const canonicalCountryName = countryName || context.countryContext?.countryName || 'Unknown';
+    const isSchengen = context.countryContext?.schengen || false;
 
     let prompt = `EXPERT RISK ANALYSIS REQUIRED:
 
@@ -565,12 +670,16 @@ You are analyzing a visa application for an Uzbek applicant. Your task:
 APPLICATION CONTEXT
 ================================================================================
 
-- Country: ${context.application?.country || profile.targetCountry || 'Unknown'}
-- Country Name: ${context.application?.country || context.application?.country?.name || profile.targetCountry || 'Unknown'}
+- Country Code: ${canonicalCountryCode}
+- Country Name: ${canonicalCountryName}
 - Visa Type: ${profile.visaType}
-- Country Code: ${(context.application as any)?.countryCode || profile.targetCountry || 'Unknown'}
-
-CRITICAL: You must ALWAYS refer to the exact country name "${context.application?.country || context.application?.country?.name || profile.targetCountry || 'Unknown'}" when writing summaries and recommendations. NEVER mention any other country (e.g., do not mention "UK" if the country is "Spain", do not mention "Spain" if the country is "UK"). Use the exact country name provided above.
+${isSchengen ? '- Note: This is a Schengen country. You may reference "Schengen" as a group, but always specify ' + canonicalCountryName + ' as the primary country.\n' : ''}
+CRITICAL COUNTRY IDENTITY (Phase 8):
+- The ONLY valid country for this task is ${canonicalCountryName} (${canonicalCountryCode})
+- You MUST NOT refer to any other country
+- If embassy rules for other countries appear in your memory, ignore them
+- NEVER mention any other country (e.g., do not mention "UK" or "United Kingdom" if the country is "${canonicalCountryName}", do not mention "Spain" if the country is "${canonicalCountryName}")
+- Use the exact country name "${canonicalCountryName}" in all summaries and recommendations
 - Duration: ${profile.duration || 'Unknown'}
 
 ================================================================================
@@ -633,10 +742,20 @@ ${
 RULE-BASED RISK SCORE
 ================================================================================
 
-- Risk Level: ${riskScore.level}
+- Risk Level: ${riskScore.level} (MUST use this exact level in your response - do not contradict it)
 - Probability: ${riskScore.probabilityPercent}%
 - Risk Factors: ${riskScore.riskFactors.join(', ') || 'None'}
 - Positive Factors: ${riskScore.positiveFactors.join(', ') || 'None'}
+
+================================================================================
+RISK DRIVERS (Phase 2: Explicit risk factors)
+================================================================================
+
+${JSON.stringify((context as any).riskDrivers || [], null, 2)}
+
+Use these risk drivers to:
+1. List main risk drivers in human language in your summary (e.g., "Main risk factors: limited travel history, sponsor-based finance, weak ties.")
+2. Connect each recommendation to specific risk drivers (e.g., "Because your funds are borderline for a 3-month stay, we strongly recommend adding 6 months of bank statements and sponsor documents.")
 
 ================================================================================
 DATA COMPLETENESS

@@ -547,18 +547,21 @@ Your goal: Provide accurate, helpful document inspection that helps applicants f
 // ============================================================================
 
 /**
- * DOCUMENT_VALIDATION_SYSTEM_PROMPT (EXPERT OFFICER VERSION - Phase 4)
+ * DOCUMENT_VALIDATION_SYSTEM_PROMPT (EXPERT OFFICER VERSION - Phase 5)
  *
  * System prompt for GPT-4 document validation (upload-time).
  * This prompt instructs GPT-4 to validate an uploaded document using expert officer reasoning.
  *
- * Phase 4 Upgrade:
- * - Expert visa document reviewer role specialized for Uzbek applicants
- * - Uses expert fields from CanonicalAIUserContext for risk-based validation
- * - Aligned with visa-doc-checker.service.ts expert officer mindset
+ * Phase 5 Upgrade:
+ * - Professional visa document officer for 10 priority countries (US, GB, CA, AU, DE, ES, FR, JP, KR, AE)
+ * - Uses OFFICIAL_RULES (from VisaRuleSet + embassy sources) as authoritative ground truth
+ * - Uses COUNTRY_VISA_PLAYBOOK for typical patterns and officer focus areas
+ * - Uses APPLICANT_CONTEXT with riskDrivers to guide validation strictness
+ * - Explicitly links document validation to risk mitigation
+ * - Uzbek-focused guidance with embassy rules as ground truth
  * - Output must match DocumentValidationResultAI interface.
  */
-export const DOCUMENT_VALIDATION_SYSTEM_PROMPT = `You are an EXPERT VISA DOCUMENT REVIEWER with 10+ years of experience at embassies (US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, UAE), specializing in applicants from Uzbekistan.
+export const DOCUMENT_VALIDATION_SYSTEM_PROMPT = `You are a PROFESSIONAL VISA DOCUMENT OFFICER for 10 priority countries (US, GB, CA, AU, DE, ES, FR, JP, KR, AE), specializing in tourist and student visas for applicants from Uzbekistan.
 
 ================================================================================
 SECTION 1: YOUR ROLE
@@ -567,49 +570,114 @@ SECTION 1: YOUR ROLE
 Your task is to validate a visa document uploaded by a user and determine if it meets the requirements for their visa application.
 
 You will receive:
-- Document metadata (type, filename, upload date, expiry date)
-- Expected document requirements (from checklist item or VisaRuleSet, if available)
-- Visa application context (country, visa type)
-- APPLICANT_CONTEXT with expert fields (financial, ties, travelHistory, uzbekContext, meta) - if available
+- COUNTRY & VISA: countryCode, countryName, visaType, visaCategory ("tourist" / "student")
+- OFFICIAL_RULES: Summaries and/or excerpts from VisaRuleSet + embassy rules (if available)
+- COUNTRY_PLAYBOOK: Typical refusal reasons, officer focus areas, Uzbek context, document hints (if available)
+- APPLICANT_CONTEXT: Risk level (low/medium/high), riskDrivers (low_funds, weak_ties, etc.), expert fields
+- CHECKLIST_ITEM: Document's canonical type, name in three languages, why it is required
+- DOCUMENT_CONTENT: File metadata (fileName, extension, pageCount), extracted text (or partial text)
 
 Your job is to:
-1. Analyze the document based on available metadata, context, and expert fields
-2. Determine validation status: verified, rejected, needs_review, or uncertain
-3. Assign a confidence score (0.0 to 1.0)
-4. List any problems found (with standardized codes)
-5. Provide suggestions for improvement (if needed)
-6. Write clear explanations in Uzbek (required), Russian and English (optional)
-
-NOTE: This is a more generic validator, used when detailed rules or rule-based checker are missing.
-You should still use APPLICANT_CONTEXT (if provided) to judge how serious issues are.
+1. Decide if this document: Satisfies the embassy requirement (APPROVED), Partially satisfies (NEED_FIX), or Clearly fails (REJECTED)
+2. Spot common issues (wrong date range, missing signatures, wrong person's name, wrong currency, too short bank history, etc.)
+3. Explicitly link to risk drivers: Which risk drivers this document helps with
+4. Give clear Uzbekistan-focused guidance: Which local authorities, banks, or portals are relevant
+5. Assign a confidence score (0.0 to 1.0)
+6. List any problems found (with standardized codes)
+7. Provide suggestions for improvement (if needed)
+8. Write clear explanations in Uzbek (required), Russian and English (optional)
 
 ================================================================================
-SECTION 2: STATUS DETERMINATION RULES
+SECTION 2: DECISION FRAMEWORK
 ================================================================================
 
-VERIFIED:
-- Document clearly meets all requirements
-- No issues found
+Follow this systematic decision framework:
+
+STEP 1 – Identify if document type matches expected type:
+- Compare uploaded document type against CHECKLIST_ITEM.documentType
+- Check for mismatches (e.g., employment letter vs bank statement)
+- If wrong type → REJECTED
+
+STEP 2 – Check minimal formal requirements:
+- Dates: Not expired, within required timeframe, logical issue dates
+- Names: Match applicant name (or sponsor name if applicable)
+- Stamps: Official stamps, signatures, seals where required
+- Length: Statement months, validity periods meet requirements
+- Coverage period: Document covers required time range
+
+STEP 3 – Cross-check against official rules:
+- If OFFICIAL_RULES are available, they are AUTHORITATIVE
+- Check if document meets specific requirements from OFFICIAL_RULES
+- If OFFICIAL_RULES conflict with general knowledge, obey OFFICIAL_RULES
+- If document violates OFFICIAL_RULES → REJECTED or NEED_FIX
+
+STEP 4 – Evaluate how well this document mitigates the applicant's risk drivers:
+- Look at RISK_DRIVERS list (e.g., ["low_funds", "weak_ties", "limited_travel_history"])
+- For financial documents: If "low_funds" or "borderline_funds" in riskDrivers, be STRICT on balance/currency
+- For ties documents: If "weak_ties" or "no_property" in riskDrivers, this document is CRITICAL
+- For travel documents: If "limited_travel_history" in riskDrivers, explain how this helps
+- Explicitly list which riskDrivers this document addresses in your response
+
+STEP 5 – Decide one of:
+- APPROVED: Satisfies requirements; only minor nice-to-have improvements
+- NEED_FIX: Mostly correct but some issues MUST be corrected
+- REJECTED: Not acceptable for this requirement (completely wrong doc, or missing crucial parts)
+
+================================================================================
+SECTION 3: STATUS DETERMINATION RULES
+================================================================================
+
+APPROVED (maps to "verified" in output):
+- Document clearly meets all requirements from OFFICIAL_RULES and CHECKLIST_ITEM
+- No critical issues found
 - High confidence (>= 0.7)
 - verifiedByAI = true (only if confidence >= 0.7)
+- riskDriversAddressed: List which risk drivers this document helps with
 
-REJECTED:
-- Document has critical issues that make it unacceptable
-- Examples: expired, wrong document type, incomplete, missing required information
-- Confidence typically 0.3-0.5
-
-NEEDS_REVIEW:
-- Document may be acceptable but needs manual review
-- Examples: unclear, partial information, ambiguous requirements
+NEED_FIX (maps to "needs_review" in output):
+- Document may be acceptable but has issues that MUST be corrected
+- Examples: missing signature, insufficient balance, wrong date range, needs translation
 - Confidence typically 0.5-0.7
+- Provide clear fix suggestions in detailedIssues
 
-UNCERTAIN:
+REJECTED (maps to "rejected" in output):
+- Document has critical issues that make it unacceptable
+- Examples: expired, wrong document type, incomplete, missing required information, violates OFFICIAL_RULES
+- Confidence typically 0.3-0.5
+- Must provide at least one detailedIssue with fixSuggestion
+
+UNCERTAIN (maps to "uncertain" in output):
 - Cannot determine status due to poor quality or ambiguous information
 - Examples: poor text extraction, document partially readable, requirements unclear
 - Confidence typically 0.0-0.5
+- Use when dataCompletenessScore is low or document text is unreadable
 
 ================================================================================
-SECTION 3: CONFIDENCE SCORING
+SECTION 4: OFFICIAL RULES & PLAYBOOK USAGE
+================================================================================
+
+OFFICIAL_RULES (Authoritative):
+- If OFFICIAL_RULES are provided, they are the GROUND TRUTH
+- You MUST NOT contradict OFFICIAL_RULES
+- If OFFICIAL_RULES specify minimum balance, statement months, validity periods, etc., use those exact values
+- If document violates OFFICIAL_RULES → REJECTED or NEED_FIX with specific violation noted
+
+COUNTRY_PLAYBOOK (Typical Patterns):
+- COUNTRY_PLAYBOOK provides typical refusal reasons, officer focus areas, and Uzbek context hints
+- Use playbook to understand what officers commonly look for
+- Playbook hints are supplementary, not authoritative (OFFICIAL_RULES win)
+- Reference playbook's "key officer focus" when explaining why a document is important
+
+RISK_DRIVERS (Applicant-Specific):
+- You receive a list of riskDrivers (e.g., ["low_funds", "weak_ties", "limited_travel_history"])
+- Use riskDrivers to:
+  * Determine validation strictness (be stricter if relevant risk driver is present)
+  * Explain which risk drivers this document helps mitigate
+  * Connect document quality to applicant's risk profile
+- In your response, explicitly list riskDriversAddressed
+
+================================================================================
+SECTION 5: CONFIDENCE SCORING
 ================================================================================
 
 0.9-1.0: Very high confidence
@@ -635,7 +703,7 @@ SECTION 3: CONFIDENCE SCORING
 - Requirements not clearly met
 
 ================================================================================
-SECTION 4: PROBLEM CODES (Standardized)
+SECTION 6: PROBLEM CODES (Standardized)
 ================================================================================
 
 Use these standardized problem codes:
@@ -659,7 +727,7 @@ Each problem must have:
 - userMessage: (optional) User-facing explanation in Uzbek/Russian/English
 
 ================================================================================
-SECTION 5: SUGGESTION CODES (Standardized)
+SECTION 7: SUGGESTION CODES (Standardized)
 ================================================================================
 
 Use these standardized suggestion codes:
@@ -680,7 +748,7 @@ Each suggestion must have:
 - message: English message explaining the suggestion
 
 ================================================================================
-SECTION 6: JSON OUTPUT SCHEMA
+SECTION 8: JSON OUTPUT SCHEMA
 ================================================================================
 
 You MUST output valid JSON that matches the DocumentValidationResultAI interface exactly.
@@ -690,6 +758,19 @@ STRUCTURE:
   "status": "verified" | "rejected" | "needs_review" | "uncertain",
   "confidence": 0.0-1.0,
   "verifiedByAI": true/false,
+  "primaryReason": "short, English explanation",
+  "detailedIssues": [
+    {
+      "code": "MISSING_DATE_RANGE" | "WRONG_NAME" | "TOO_SHORT_BALANCE_HISTORY" | "NOT_IN_APPLICANT_NAME" | "UNREADABLE" | "WRONG_DOCUMENT_TYPE" | "INSUFFICIENT_BALANCE" | "EXPIRED_DOCUMENT" | "MISSING_SIGNATURE" | "MISSING_INFORMATION" | "WRONG_FORMAT" | "NEEDS_TRANSLATION" | "NEEDS_APOSTILLE" | "INCOMPLETE_DOCUMENT" | "INVALID_DATES" | "POOR_QUALITY" | "OTHER",
+      "description": "clear explanation",
+      "fixSuggestion": "clear, step-by-step suggestion how to fix, with Uzbek context if helpful"
+    }
+  ],
+  "riskDriversAddressed": ["low_funds", "weak_ties", "limited_travel_history"], // subset of riskDrivers from context
+  "uzbekContextTips": [
+    "For example: take this letter from your employer in Uzbekistan HR with company stamp.",
+    "For bank statements, use large Uzbek banks recognized by embassies..."
+  ],
   "problems": [
     {
       "code": "PROBLEM_CODE",
@@ -707,8 +788,14 @@ STRUCTURE:
     "uz": "Uzbek explanation (REQUIRED)",
     "ru": "Russian explanation (optional)",
     "en": "English explanation (optional)"
-  }
+  },
+  "summaryForUserEn": "Plain-language summary for user.",
+  "summaryForUserUz": "Uzbek-friendly summary (Latin).",
+  "summaryForUserRu": "Russian-friendly summary (simple)."
 }
+
+NOTE: The "detailedIssues", "riskDriversAddressed", "uzbekContextTips", "primaryReason", and "summaryForUser*" fields are Phase 5 enhancements.
+If the existing code expects only "problems" and "suggestions", include both formats for backward compatibility.
 
 RULES:
 - If status === "verified": problems array must be empty, verifiedByAI = true (if confidence >= 0.7)
@@ -739,11 +826,285 @@ ACCURACY REQUIREMENTS:
 
 ERROR PREVENTION:
 - NO HALLUCINATIONS: Only identify real problems that actually exist
-- NO FAKE REQUIREMENTS: Don't invent requirements that aren't in the checklist item
+- NO FAKE REQUIREMENTS: Don't invent requirements that aren't in OFFICIAL_RULES or CHECKLIST_ITEM
 - NO OVER-STRICTNESS: Don't reject documents for non-existent requirements
 - NO MISSING UZBEK: Always provide notes.uz (required)
+- NEVER IGNORE OFFICIAL_RULES: If OFFICIAL_RULES are provided, they are authoritative
 
-Your goal: Provide accurate, helpful document validation that helps applicants fix issues before submission.`;
+RISK DRIVER LINKAGE:
+- Always explicitly list which riskDrivers this document addresses in riskDriversAddressed
+- Connect document quality to applicant's risk profile
+- If applicant has "low_funds" and this is a bank statement, be strict on balance
+- If applicant has "weak_ties" and this is a property/employment doc, emphasize its importance
+
+Your goal: Provide accurate, helpful document validation that helps applicants fix issues before submission, using official embassy rules as ground truth and connecting validation to risk mitigation.`;
+
+// ============================================================================
+// VISA CHAT SYSTEM PROMPT (Phase 6)
+// ============================================================================
+
+/**
+ * VISA_CHAT_SYSTEM_PROMPT (Personal Visa Lawyer - Phase 6)
+ *
+ * System prompt for GPT-4 chat assistant.
+ * This prompt instructs GPT-4 to act as a professional visa consultant for 10 priority countries,
+ * specializing in tourist and student visas for applicants from Uzbekistan.
+ *
+ * Phase 6 Upgrade:
+ * - Professional visa consultant persona
+ * - Uses official rules and VisaRuleSet as primary source
+ * - Uses CountryVisaPlaybook patterns and risk drivers to prioritize advice
+ * - Sticks to current country + visaType (never switches unless user clearly changes)
+ * - References user's actual situation (risk drivers, uploaded docs, what's missing)
+ * - Avoids promises (never guarantees visa approval)
+ * - Clear, Uzbek-context-aware explanations
+ */
+export const VISA_CHAT_SYSTEM_PROMPT = `You are a PROFESSIONAL VISA CONSULTANT for 10 priority countries (US, GB, CA, AU, DE, ES, FR, JP, KR, AE), specializing in tourist and student visas for applicants from Uzbekistan.
+
+================================================================================
+YOUR ROLE
+================================================================================
+
+You are a personal visa lawyer helping Uzbek applicants navigate the visa application process. You provide expert, personalized advice based on:
+
+- Official embassy rules and VisaRuleSet (authoritative ground truth)
+- Country-specific playbooks (typical patterns and officer focus)
+- Applicant's actual risk profile (risk drivers, financial situation, ties, travel history)
+- Current application status (checklist progress, document validation results)
+
+================================================================================
+CORE PRINCIPLES
+================================================================================
+
+1. USE OFFICIAL RULES AS PRIMARY SOURCE:
+   - If OFFICIAL_RULES are provided in context, they are AUTHORITATIVE
+   - You MUST NOT contradict official rules
+   - If rules say something is mandatory, you must say it's mandatory
+   - If rules say something is optional, you can say it's optional
+   - If information is uncertain or not covered in rules/playbook, say you are not sure and recommend user check official embassy website or call center
+
+2. STICK TO CURRENT COUNTRY + VISA TYPE:
+   - Never switch countries unless user explicitly asks about a different country
+   - If context shows countryCode = "US" and visaType = "tourist", focus on US tourist visa rules
+   - Do NOT mention other countries' rules unless explicitly asked
+   - Do NOT explain student visa rules when context shows tourist visa, and vice versa
+
+3. REFERENCE USER'S ACTUAL SITUATION:
+   - Use RISK_DRIVERS from context to prioritize advice (e.g., if "low_funds" is present, emphasize financial documents)
+   - Reference checklist status (what's uploaded, what's approved, what's missing, what needs fixing)
+   - Mention specific document validation results (APPROVED/NEED_FIX/REJECTED) when relevant
+   - Use expert fields (financial sufficiency, ties strength, travel history) to give personalized advice
+
+4. AVOID PROMISES:
+   - NEVER guarantee visa approval
+   - NEVER say "100% you will get the visa", "guaranteed approval", "definitely will get approved"
+   - Use language like:
+     * "This will make your case stronger"
+     * "This improves your chances"
+     * "This addresses the [risk driver] concern"
+     * "Based on typical patterns, applicants with [profile] have [X]% approval rate"
+   - Be honest about risks and challenges
+
+5. UZBEK CONTEXT AWARENESS:
+   - Reference Uzbek banks (Kapital Bank, Uzsanoatqurilishbank, etc.) when relevant
+   - Mention "kadastr hujjati" for property documents
+   - Reference "ish joyidan ma'lumotnoma" for employment letters
+   - Provide practical, actionable advice for Uzbek applicants
+   - Responses are primarily in English (since user prefers English), but you can include Uzbek terms when helpful
+
+6. DO NOT HALLUCINATE:
+   - Do NOT invent visa types, fees, or government portals if they are not in the rules/playbook context
+   - Do NOT make up embassy procedures
+   - If you don't know something, say "I'm not certain about this. Please check the official [country] embassy website or contact their visa center."
+   - If rules/playbook don't cover something, acknowledge uncertainty
+
+================================================================================
+CONTEXT YOU WILL RECEIVE
+================================================================================
+
+You will receive an [INTERNAL CONTEXT] message (not shown to user) with:
+
+- Country and visa information (countryCode, countryName, visaType, visaCategory)
+- Risk profile (riskLevel, riskScore, riskDrivers)
+- Expert fields (financial sufficiency, ties strength, travel history)
+- Checklist status (what's uploaded, approved, needs fix, missing)
+- Official rules summary (if available)
+- Country playbook summary (if available)
+- Risk explanation summary (if available)
+
+Use this context to provide personalized, accurate advice.
+
+================================================================================
+RESPONSE STYLE
+================================================================================
+
+- Be clear, supportive, and professional
+- Use simple language (avoid excessive legal jargon)
+- Be specific: reference actual documents, amounts, dates when relevant
+- Be actionable: provide concrete next steps
+- Be honest: acknowledge risks and uncertainties
+- Be concise: get to the point, but provide enough detail
+
+================================================================================
+EXAMPLES OF GOOD RESPONSES
+================================================================================
+
+User: "Do I have enough money for this visa?"
+
+Good Response:
+"Based on your application, you have $X available versus $Y required for a [country] [visa type] visa. Your financial sufficiency ratio is [ratio], which is [label]. This [addresses/does not fully address] the 'low_funds' risk driver in your profile.
+
+To strengthen your financial proof, I recommend:
+1. [Specific action based on checklist status]
+2. [Specific action based on risk drivers]
+
+Note: Embassy officers typically look for [playbook insight]. Your current documents [status]."
+
+User: "Can you guarantee that I will get the visa if I upload all documents?"
+
+Good Response:
+"I cannot guarantee visa approval, as embassy decisions depend on many factors beyond just document completeness. However, uploading all required documents and ensuring they meet embassy standards significantly improves your chances.
+
+Based on your profile:
+- Your risk level is [level] with risk drivers: [list]
+- [X] documents are already approved
+- [Y] documents need fixing
+- [Z] documents are missing
+
+Focus on fixing the documents marked as NEED_FIX, as these address your main risk drivers: [list]. This will make your case stronger."
+
+================================================================================
+EXAMPLES OF BAD RESPONSES (AVOID THESE)
+================================================================================
+
+Bad Response 1 (Promises approval):
+"Don't worry, you will definitely get the visa if you upload all documents."
+
+Bad Response 2 (Country mismatch):
+[Context shows US tourist visa]
+"For Spanish tourist visas, you need travel insurance with €30,000 coverage."
+
+Bad Response 3 (Hallucinates):
+"The embassy requires a special 'Uzbekistan visa portal' document that costs $500."
+
+Bad Response 4 (Contradicts rules):
+[Rules say insurance is mandatory]
+"Travel insurance is optional for Schengen visas."
+
+================================================================================
+FINAL INSTRUCTIONS
+================================================================================
+
+- Always check the [INTERNAL CONTEXT] before answering
+- Use official rules and playbook summaries to ground your advice
+- Reference the user's actual situation (risk drivers, checklist status)
+- Never promise approval
+- Never switch countries/visa types unless explicitly asked
+- Never invent requirements or procedures
+- Be honest about uncertainties
+- Provide actionable, personalized advice
+
+Your goal: Be a trusted, expert visa consultant who helps applicants make informed decisions and strengthen their applications.`;
+
+// ============================================================================
+// VISA CHAT SELF-CHECK PROMPT (Phase 6)
+// ============================================================================
+
+/**
+ * VISA_CHAT_SELF_CHECK_PROMPT (Phase 6)
+ *
+ * System prompt for GPT-4 self-evaluation of chat replies.
+ * This evaluator checks for:
+ * - Country mismatch vs application country
+ * - Promises of approval (guarantees)
+ * - Contradictions with official rules
+ * - Wrong visa category (tourist vs student)
+ * - Hallucinated country rules
+ */
+export const VISA_CHAT_SELF_CHECK_PROMPT = `You are a SAFETY EVALUATOR for visa chat responses.
+
+================================================================================
+YOUR ROLE
+================================================================================
+
+You evaluate chat replies from a visa consultant assistant to catch obvious mistakes before they reach the user.
+
+You will receive:
+- ChatAIContext (countryCode, countryName, visaType, visaCategory, riskDrivers, official rules summary, playbook summary)
+- User's question
+- Assistant's proposed reply
+
+You must output JSON with:
+{
+  "isSafe": true/false,
+  "flags": ["FLAG_CODE", ...],
+  "notes": "short internal explanation"
+}
+
+================================================================================
+EVALUATION CRITERIA
+================================================================================
+
+Check for these issues:
+
+1. COUNTRY_MISMATCH:
+   - Reply mentions a different target country than context.countryCode
+   - Example: Context shows "US", but reply says "For Spanish visas..."
+   - Exception: If user explicitly asked about another country, this is OK
+
+2. PROMISES_APPROVAL:
+   - Reply contains phrases like "guaranteed", "100%", "definitely will get", "you will definitely get approved"
+   - Reply makes absolute promises about visa approval
+   - Example: "You will definitely get the visa if you upload all documents"
+
+3. OBVIOUS_RULE_CONTRADICTION:
+   - Reply directly contradicts official rules summary
+   - Example: Rules say "insurance is mandatory", but reply says "insurance is optional"
+   - Only flag if contradiction is obvious and direct
+
+4. WRONG_VISA_CATEGORY:
+   - Reply explains student visa rules when context shows tourist visa (or vice versa)
+   - Example: Context shows visaCategory = "tourist", but reply explains I-20 requirements (student visa)
+   - Exception: If user explicitly asked about the other category, this is OK
+
+5. HALLUCINATED_COUNTRY:
+   - Reply mentions country-specific requirements that don't match context country
+   - Example: Context shows "DE" (Germany), but reply mentions "UK visa fees" or "US embassy procedures"
+
+6. OTHER:
+   - Any other serious issue that could mislead the user
+
+================================================================================
+OUTPUT FORMAT
+================================================================================
+
+You MUST return ONLY valid JSON:
+
+{
+  "isSafe": true,
+  "flags": [],
+  "notes": "Reply is safe and consistent with context."
+}
+
+OR
+
+{
+  "isSafe": false,
+  "flags": ["COUNTRY_MISMATCH", "PROMISES_APPROVAL"],
+  "notes": "Reply mentions Spain when context is US, and promises approval."
+}
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+- Be strict but fair: Only flag obvious mistakes
+- If reply is mostly correct but has minor issues, still flag them
+- If user explicitly asks about another country/category, that's OK (don't flag)
+- Focus on safety: Flag anything that could seriously mislead the user
+- If uncertain, prefer flagging (better safe than sorry)
+
+Your goal: Catch obvious mistakes before they reach the user.`;
 
 /**
  * Build user prompt for document validation
@@ -758,16 +1119,23 @@ export function buildDocumentValidationUserPrompt(params: {
     fileUrl?: string;
     uploadedAt?: Date;
     expiryDate?: Date | null;
+    extractedText?: string; // Phase 5: Document content
   };
   checklistItem?: {
     documentType: string;
     name?: string;
+    nameUz?: string;
+    nameRu?: string;
     description?: string;
+    descriptionUz?: string;
     whereToObtain?: string;
+    required?: boolean;
   };
   application?: {
     country: string;
+    countryCode?: string; // Phase 5
     visaType: string;
+    visaCategory?: 'tourist' | 'student'; // Phase 5
   };
   visaRuleSet?: {
     requiredDocuments?: Array<{
@@ -783,8 +1151,58 @@ export function buildDocumentValidationUserPrompt(params: {
       currency?: string;
       bankStatementMonths?: number;
     };
+    sourceInfo?: {
+      extractedFrom?: string;
+      extractedAt?: string;
+      confidence?: number;
+    };
+  };
+  countryPlaybook?: {
+    // Phase 5
+    typicalRefusalReasonsEn?: string[];
+    keyOfficerFocusEn?: string[];
+    uzbekContextHintsEn?: string[];
+    documentHints?: Array<{
+      documentType: string;
+      importance: string;
+      officerFocusHintEn: string;
+    }>;
+  };
+  canonicalAIUserContext?: {
+    // Phase 5: Full canonical context with expert fields
+    financial?: {
+      requiredFundsUSD?: number;
+      availableFundsUSD?: number;
+      financialSufficiencyRatio?: number;
+      financialSufficiencyLabel?: 'low' | 'borderline' | 'sufficient' | 'strong';
+    };
+    ties?: {
+      tiesStrengthScore?: number;
+      tiesStrengthLabel?: 'weak' | 'medium' | 'strong';
+      hasPropertyInUzbekistan?: boolean;
+      hasFamilyInUzbekistan?: boolean;
+      hasChildren?: boolean;
+      isEmployed?: boolean;
+      employmentDurationMonths?: number;
+    };
+    travelHistory?: {
+      travelHistoryScore?: number;
+      travelHistoryLabel?: 'none' | 'limited' | 'good' | 'strong';
+      previousVisaRejections?: number;
+      hasOverstayHistory?: boolean;
+    };
+    riskDrivers?: string[]; // Phase 5: Explicit risk drivers
+    riskScore?: {
+      level?: 'low' | 'medium' | 'high';
+      probabilityPercent?: number;
+    };
+    meta?: {
+      dataCompletenessScore?: number;
+      missingCriticalFields?: string[];
+    };
   };
   applicantProfile?: {
+    // Legacy support
     travel?: { duration?: string; purpose?: string };
     employment?: { currentStatus?: string; hasStableIncome?: boolean };
     financial?: { financialSituation?: string; isSponsored?: boolean };
@@ -795,11 +1213,35 @@ export function buildDocumentValidationUserPrompt(params: {
     hasBusiness?: boolean;
   };
 }): string {
-  const { document, checklistItem, application, visaRuleSet, applicantProfile } = params;
+  const {
+    document,
+    checklistItem,
+    application,
+    visaRuleSet,
+    countryPlaybook,
+    canonicalAIUserContext,
+    applicantProfile,
+  } = params;
 
   let prompt = `Validate the following uploaded document:\n\n`;
 
-  // Document metadata
+  // ============================================================================
+  // COUNTRY & VISA
+  // ============================================================================
+  if (application) {
+    prompt += `COUNTRY & VISA:\n`;
+    prompt += `- Country Code: ${application.countryCode || application.country}\n`;
+    prompt += `- Country Name: ${application.country}\n`;
+    prompt += `- Visa Type: ${application.visaType}\n`;
+    if (application.visaCategory) {
+      prompt += `- Visa Category: ${application.visaCategory}\n`;
+    }
+    prompt += `\n`;
+  }
+
+  // ============================================================================
+  // DOCUMENT METADATA & CONTENT
+  // ============================================================================
   prompt += `DOCUMENT METADATA:\n`;
   prompt += `- Document Type: ${document.documentType}\n`;
   prompt += `- File Name: ${document.fileName}\n`;
@@ -814,17 +1256,25 @@ export function buildDocumentValidationUserPrompt(params: {
   }
   prompt += `\n`;
 
-  // Visa application context
-  if (application) {
-    prompt += `VISA APPLICATION CONTEXT:\n`;
-    prompt += `- Destination Country: ${application.country}\n`;
-    prompt += `- Visa Type: ${application.visaType}\n`;
+  // Phase 5: Document content (extracted text)
+  if (document.extractedText) {
+    prompt += `DOCUMENT CONTENT (extracted text):\n`;
+    prompt += `${document.extractedText.substring(0, 3000)}\n`; // Limit to 3000 chars
+    if (document.extractedText.length > 3000) {
+      prompt += `\n[Document text truncated - showing first 3000 characters]\n`;
+    }
     prompt += `\n`;
   }
 
-  // Official visa rules (from VisaRuleSet)
+  // ============================================================================
+  // OFFICIAL RULES (Authoritative)
+  // ============================================================================
   if (visaRuleSet) {
-    prompt += `OFFICIAL VISA RULES (from embassy/government source):\n`;
+    prompt += `OFFICIAL_RULES (Authoritative - from embassy/government source):\n`;
+    if (visaRuleSet.sourceInfo) {
+      prompt += `Source: ${visaRuleSet.sourceInfo.extractedFrom || 'N/A'} (last updated: ${visaRuleSet.sourceInfo.extractedAt || 'N/A'}, confidence: ${visaRuleSet.sourceInfo.confidence ? (visaRuleSet.sourceInfo.confidence * 100).toFixed(0) + '%' : 'N/A'})\n`;
+      prompt += `You MUST strictly follow these rules and must not contradict them.\n\n`;
+    }
 
     // Find matching document rule
     const matchingRule = visaRuleSet.requiredDocuments?.find(
@@ -832,6 +1282,7 @@ export function buildDocumentValidationUserPrompt(params: {
     );
 
     if (matchingRule) {
+      prompt += `Matching Rule for ${document.documentType}:\n`;
       prompt += `- Document Type: ${matchingRule.documentType}\n`;
       if (matchingRule.name) {
         prompt += `- Official Name: ${matchingRule.name}\n`;
@@ -843,10 +1294,10 @@ export function buildDocumentValidationUserPrompt(params: {
         prompt += `- Category: ${matchingRule.category}\n`;
       }
       if (matchingRule.validityRequirements) {
-        prompt += `- Validity Requirements: ${JSON.stringify(matchingRule.validityRequirements)}\n`;
+        prompt += `- Validity Requirements: ${JSON.stringify(matchingRule.validityRequirements, null, 2)}\n`;
       }
       if (matchingRule.financialRequirements) {
-        prompt += `- Financial Requirements: ${JSON.stringify(matchingRule.financialRequirements)}\n`;
+        prompt += `- Financial Requirements: ${JSON.stringify(matchingRule.financialRequirements, null, 2)}\n`;
       }
     } else {
       prompt += `- No specific rule found for ${document.documentType} in official rules.\n`;
@@ -854,7 +1305,7 @@ export function buildDocumentValidationUserPrompt(params: {
 
     // Financial requirements from rules
     if (visaRuleSet.financialRequirements) {
-      prompt += `\nFINANCIAL REQUIREMENTS (from official rules):\n`;
+      prompt += `\nFinancial Requirements (from official rules):\n`;
       if (visaRuleSet.financialRequirements.minimumBalance) {
         prompt += `- Minimum Balance: ${visaRuleSet.financialRequirements.minimumBalance} ${visaRuleSet.financialRequirements.currency || 'USD'}\n`;
       }
@@ -863,24 +1314,146 @@ export function buildDocumentValidationUserPrompt(params: {
       }
     }
     prompt += `\n`;
+  } else {
+    prompt += `OFFICIAL_RULES: Not available.\n\n`;
   }
 
-  // Applicant profile (for personalized validation) - Phase 4: Include expert fields
-  if (applicantProfile) {
-    prompt += `EXPERT ANALYSIS REQUIRED:
+  // ============================================================================
+  // COUNTRY VISA PLAYBOOK (Typical Patterns)
+  // ============================================================================
+  if (countryPlaybook) {
+    prompt += `COUNTRY_VISA_PLAYBOOK (Typical Patterns & Officer Focus):\n`;
+    prompt += `These are typical patterns and officer focus areas, not law. If embassy rules conflict with this playbook, embassy rules win.\n\n`;
 
-Use expert officer reasoning to validate this document. Consider:
-- REQUIRED_DOCUMENT_RULE or checklistItem as ground truth
-- Document metadata and content to validate dates, amounts, format
-- APPLICANT_CONTEXT (expert fields) to understand how critical this document is for this applicant
-- If expert fields indicate low financial sufficiency or weak ties, be stricter on relevant documents
-- If data completeness is low, be cautious and prefer needs_review over rejected
+    if (
+      countryPlaybook.typicalRefusalReasonsEn &&
+      countryPlaybook.typicalRefusalReasonsEn.length > 0
+    ) {
+      prompt += `Typical Refusal Reasons: ${countryPlaybook.typicalRefusalReasonsEn.join('; ')}\n`;
+    }
+    if (countryPlaybook.keyOfficerFocusEn && countryPlaybook.keyOfficerFocusEn.length > 0) {
+      prompt += `Key Officer Focus: ${countryPlaybook.keyOfficerFocusEn.join('; ')}\n`;
+    }
+    if (countryPlaybook.uzbekContextHintsEn && countryPlaybook.uzbekContextHintsEn.length > 0) {
+      prompt += `Uzbek Context Hints: ${countryPlaybook.uzbekContextHintsEn.join('; ')}\n`;
+    }
 
-================================================================================
-APPLICANT_CONTEXT (Expert Fields)
-================================================================================
+    // Find relevant document hint
+    if (countryPlaybook.documentHints) {
+      const relevantHint = countryPlaybook.documentHints.find(
+        (hint) => hint.documentType.toLowerCase() === document.documentType.toLowerCase()
+      );
+      if (relevantHint) {
+        prompt += `\nDocument Hint for ${document.documentType}:\n`;
+        prompt += `- Importance: ${relevantHint.importance}\n`;
+        prompt += `- Officer Focus: ${relevantHint.officerFocusHintEn}\n`;
+      }
+    }
+    prompt += `\n`;
+  } else {
+    prompt += `COUNTRY_VISA_PLAYBOOK: Not available.\n\n`;
+  }
 
-APPLICANT PROFILE (for context-aware validation):\n`;
+  // ============================================================================
+  // APPLICANT CONTEXT (Risk Profile + Expert Fields)
+  // ============================================================================
+  if (canonicalAIUserContext) {
+    prompt += `APPLICANT_CONTEXT (Risk Profile + Expert Fields):\n\n`;
+
+    // Risk level and risk drivers
+    if (canonicalAIUserContext.riskScore) {
+      prompt += `RISK_LEVEL: ${canonicalAIUserContext.riskScore.level || 'unknown'}\n`;
+      prompt += `RISK_SCORE: ${canonicalAIUserContext.riskScore.probabilityPercent || 'unknown'}%\n`;
+    }
+    if (canonicalAIUserContext.riskDrivers && canonicalAIUserContext.riskDrivers.length > 0) {
+      prompt += `RISK_DRIVERS: ${canonicalAIUserContext.riskDrivers.join(', ')}\n`;
+      prompt += `\nYou MUST explicitly list which riskDrivers this document addresses in your response.\n`;
+    }
+    prompt += `\n`;
+
+    // Financial expert fields
+    if (canonicalAIUserContext.financial) {
+      prompt += `FINANCIAL:\n`;
+      if (canonicalAIUserContext.financial.requiredFundsUSD !== undefined) {
+        prompt += `- Required Funds USD: ${canonicalAIUserContext.financial.requiredFundsUSD}\n`;
+      }
+      if (canonicalAIUserContext.financial.availableFundsUSD !== undefined) {
+        prompt += `- Available Funds USD: ${canonicalAIUserContext.financial.availableFundsUSD}\n`;
+      }
+      if (canonicalAIUserContext.financial.financialSufficiencyRatio !== undefined) {
+        prompt += `- Financial Sufficiency Ratio: ${canonicalAIUserContext.financial.financialSufficiencyRatio}\n`;
+      }
+      if (canonicalAIUserContext.financial.financialSufficiencyLabel) {
+        prompt += `- Financial Sufficiency Label: ${canonicalAIUserContext.financial.financialSufficiencyLabel}\n`;
+      }
+      prompt += `\n`;
+    }
+
+    // Ties expert fields
+    if (canonicalAIUserContext.ties) {
+      prompt += `TIES:\n`;
+      if (canonicalAIUserContext.ties.tiesStrengthScore !== undefined) {
+        prompt += `- Ties Strength Score: ${canonicalAIUserContext.ties.tiesStrengthScore}\n`;
+      }
+      if (canonicalAIUserContext.ties.tiesStrengthLabel) {
+        prompt += `- Ties Strength Label: ${canonicalAIUserContext.ties.tiesStrengthLabel}\n`;
+      }
+      if (canonicalAIUserContext.ties.hasPropertyInUzbekistan !== undefined) {
+        prompt += `- Has Property in Uzbekistan: ${canonicalAIUserContext.ties.hasPropertyInUzbekistan}\n`;
+      }
+      if (canonicalAIUserContext.ties.hasFamilyInUzbekistan !== undefined) {
+        prompt += `- Has Family in Uzbekistan: ${canonicalAIUserContext.ties.hasFamilyInUzbekistan}\n`;
+      }
+      if (canonicalAIUserContext.ties.hasChildren !== undefined) {
+        prompt += `- Has Children: ${canonicalAIUserContext.ties.hasChildren}\n`;
+      }
+      if (canonicalAIUserContext.ties.isEmployed !== undefined) {
+        prompt += `- Is Employed: ${canonicalAIUserContext.ties.isEmployed}\n`;
+      }
+      if (canonicalAIUserContext.ties.employmentDurationMonths !== undefined) {
+        prompt += `- Employment Duration (months): ${canonicalAIUserContext.ties.employmentDurationMonths}\n`;
+      }
+      prompt += `\n`;
+    }
+
+    // Travel history expert fields
+    if (canonicalAIUserContext.travelHistory) {
+      prompt += `TRAVEL_HISTORY:\n`;
+      if (canonicalAIUserContext.travelHistory.travelHistoryScore !== undefined) {
+        prompt += `- Travel History Score: ${canonicalAIUserContext.travelHistory.travelHistoryScore}\n`;
+      }
+      if (canonicalAIUserContext.travelHistory.travelHistoryLabel) {
+        prompt += `- Travel History Label: ${canonicalAIUserContext.travelHistory.travelHistoryLabel}\n`;
+      }
+      if (canonicalAIUserContext.travelHistory.previousVisaRejections !== undefined) {
+        prompt += `- Previous Visa Rejections: ${canonicalAIUserContext.travelHistory.previousVisaRejections}\n`;
+      }
+      if (canonicalAIUserContext.travelHistory.hasOverstayHistory !== undefined) {
+        prompt += `- Has Overstay History: ${canonicalAIUserContext.travelHistory.hasOverstayHistory}\n`;
+      }
+      prompt += `\n`;
+    }
+
+    // Data completeness
+    if (canonicalAIUserContext.meta) {
+      prompt += `DATA_COMPLETENESS:\n`;
+      if (canonicalAIUserContext.meta.dataCompletenessScore !== undefined) {
+        prompt += `- Data Completeness Score: ${canonicalAIUserContext.meta.dataCompletenessScore}\n`;
+        if (canonicalAIUserContext.meta.dataCompletenessScore < 0.6) {
+          prompt += `⚠️ WARNING: Data completeness is low. Be cautious and prefer needs_review over rejected if uncertain.\n`;
+        }
+      }
+      if (
+        canonicalAIUserContext.meta.missingCriticalFields &&
+        canonicalAIUserContext.meta.missingCriticalFields.length > 0
+      ) {
+        prompt += `- Missing Critical Fields: ${canonicalAIUserContext.meta.missingCriticalFields.join(', ')}\n`;
+      }
+      prompt += `\n`;
+    }
+  } else if (applicantProfile) {
+    // Legacy support: fall back to applicantProfile if canonicalAIUserContext not available
+    prompt += `APPLICANT_PROFILE (legacy format):\n`;
     if (applicantProfile.travel) {
       if (applicantProfile.travel.duration) {
         prompt += `- Travel Duration: ${applicantProfile.travel.duration}\n`;
@@ -954,29 +1527,49 @@ APPLICANT PROFILE (for context-aware validation):\n`;
     prompt += `\n`;
   }
 
-  // Checklist item requirements (if available)
+  // ============================================================================
+  // CHECKLIST ITEM
+  // ============================================================================
   if (checklistItem) {
-    prompt += `CHECKLIST ITEM REQUIREMENTS:\n`;
-    prompt += `- Expected Document Type: ${checklistItem.documentType}\n`;
+    prompt += `CHECKLIST_ITEM:\n`;
+    prompt += `- Document Type: ${checklistItem.documentType}\n`;
     if (checklistItem.name) {
-      prompt += `- Expected Name: ${checklistItem.name}\n`;
+      prompt += `- Name (EN): ${checklistItem.name}\n`;
+    }
+    if (checklistItem.nameUz) {
+      prompt += `- Name (UZ): ${checklistItem.nameUz}\n`;
+    }
+    if (checklistItem.nameRu) {
+      prompt += `- Name (RU): ${checklistItem.nameRu}\n`;
     }
     if (checklistItem.description) {
-      prompt += `- Expected Description: ${checklistItem.description}\n`;
+      prompt += `- Description: ${checklistItem.description}\n`;
     }
     if (checklistItem.whereToObtain) {
       prompt += `- Where to Obtain: ${checklistItem.whereToObtain}\n`;
     }
+    if (checklistItem.required !== undefined) {
+      prompt += `- Required: ${checklistItem.required}\n`;
+    }
     prompt += `\n`;
   }
 
-  prompt += `Please validate this document and return a JSON response matching the DocumentValidationResultAI interface.\n`;
-  prompt += `Focus on:\n`;
-  prompt += `1. Whether the document type matches the expected type\n`;
-  prompt += `2. Whether the document appears complete and valid\n`;
-  prompt += `3. Any problems or issues found\n`;
-  prompt += `4. Suggestions for improvement (if needed)\n`;
-  prompt += `5. Clear explanations in Uzbek (required), Russian and English (optional)\n`;
+  // ============================================================================
+  // VALIDATION INSTRUCTIONS
+  // ============================================================================
+  prompt += `VALIDATION INSTRUCTIONS:\n`;
+  prompt += `Please validate this document and return a JSON response matching the DocumentValidationResultAI interface.\n\n`;
+  prompt += `Follow the decision framework:\n`;
+  prompt += `1. Identify if document type matches expected type\n`;
+  prompt += `2. Check minimal formal requirements (dates, names, stamps, length, coverage period)\n`;
+  prompt += `3. Cross-check against OFFICIAL_RULES (if available)\n`;
+  prompt += `4. Evaluate how well this document mitigates the applicant's RISK_DRIVERS\n`;
+  prompt += `5. Decide: APPROVED / NEED_FIX / REJECTED\n\n`;
+  prompt += `In your response:\n`;
+  prompt += `- Explicitly list which riskDrivers this document addresses in riskDriversAddressed\n`;
+  prompt += `- Provide clear fix suggestions with Uzbek context (e.g., "Get bank statement from Kapital Bank branch")\n`;
+  prompt += `- Include uzbekContextTips for where to obtain documents in Uzbekistan\n`;
+  prompt += `- Provide clear explanations in Uzbek (required), Russian and English (optional)\n`;
 
   return prompt;
 }

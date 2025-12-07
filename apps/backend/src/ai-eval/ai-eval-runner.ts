@@ -42,6 +42,11 @@ import {
 } from '../services/visa-checklist-explanation.service';
 import { logInfo, logWarn, logError } from '../middleware/logger';
 import { z } from 'zod';
+import {
+  getCountryNameFromCode,
+  normalizeCountryCode,
+  getAllPriorityCountryCodes,
+} from '../config/country-registry';
 
 /**
  * Logger interface for evaluation output
@@ -62,6 +67,121 @@ interface EvalTestResult {
   errors: string[];
   summary: string;
   details?: any;
+  // Phase 8: Country invariant violations
+  violatedInvariants?: string[];
+  countryMismatches?: Array<{ found: string; expected: string }>;
+}
+
+/**
+ * Phase 8: Check country invariant in text response
+ *
+ * Scans text for wrong country names/codes and returns violations
+ */
+function checkCountryInvariant(
+  text: string,
+  expectedCountryCode: string,
+  expectedCountryName: string,
+  isSchengen: boolean
+): {
+  violated: boolean;
+  violations: string[];
+  mismatches: Array<{ found: string; expected: string }>;
+} {
+  const violations: string[] = [];
+  const mismatches: Array<{ found: string; expected: string }> = [];
+  const textLower = text.toLowerCase();
+
+  // Get canonical country name
+  const canonicalName = getCountryNameFromCode(expectedCountryCode);
+  const expectedNameLower = canonicalName.toLowerCase();
+
+  // Priority country names to check (excluding expected country)
+  const priorityCountries = getAllPriorityCountryCodes();
+  const countryNames: Record<string, string[]> = {
+    US: ['united states', 'usa', 'us', 'america', 'american'],
+    GB: ['united kingdom', 'uk', 'britain', 'british', 'england'],
+    CA: ['canada', 'canadian'],
+    AU: ['australia', 'australian'],
+    DE: ['germany', 'german'],
+    ES: ['spain', 'spanish'],
+    FR: ['france', 'french'],
+    JP: ['japan', 'japanese'],
+    KR: ['south korea', 'korea', 'korean'],
+    AE: ['united arab emirates', 'uae', 'emirates'],
+  };
+
+  // Check for wrong country mentions
+  for (const [code, names] of Object.entries(countryNames)) {
+    if (code === expectedCountryCode) continue; // Skip expected country
+
+    for (const name of names) {
+      if (textLower.includes(name.toLowerCase())) {
+        // Check if it's in a context that suggests it's the primary country
+        // (not just a comparison or example)
+        const nameIndex = textLower.indexOf(name.toLowerCase());
+        const contextBefore = textLower.substring(Math.max(0, nameIndex - 50), nameIndex);
+        const contextAfter = textLower.substring(
+          nameIndex + name.length,
+          Math.min(textLower.length, nameIndex + name.length + 50)
+        );
+
+        // If it appears with words like "for", "in", "to", "visa", "embassy", it's likely wrong
+        const wrongContextIndicators = [
+          'for ',
+          'in ',
+          'to ',
+          'visa',
+          'embassy',
+          'application',
+          'country',
+        ];
+        const isWrongContext = wrongContextIndicators.some(
+          (indicator) => contextBefore.includes(indicator) || contextAfter.includes(indicator)
+        );
+
+        if (isWrongContext) {
+          violations.push(`COUNTRY_INVARIANT`);
+          mismatches.push({
+            found: name,
+            expected: canonicalName,
+          });
+        }
+      }
+    }
+  }
+
+  // Check for Schengen confusion (for DE, ES, FR only)
+  if (isSchengen) {
+    // Allowed: "Schengen area", "Schengen visa", "Schengen countries"
+    // Not allowed: replacing FR with ES, or ES with DE as primary country
+    // This is handled by the country name check above
+  } else {
+    // For non-Schengen countries, check if "Schengen" is mentioned as primary
+    if (
+      textLower.includes('schengen') &&
+      !textLower.includes('not schengen') &&
+      !textLower.includes('non-schengen')
+    ) {
+      const schengenIndex = textLower.indexOf('schengen');
+      const contextBefore = textLower.substring(Math.max(0, schengenIndex - 50), schengenIndex);
+      const wrongContext = ['for ', 'in ', 'to ', 'visa', 'embassy', 'application'].some(
+        (indicator) => contextBefore.includes(indicator)
+      );
+      if (wrongContext) {
+        violations.push(`SCHENGEN_LABELING`);
+        mismatches.push({
+          found: 'Schengen',
+          expected: canonicalName,
+        });
+      }
+    }
+  }
+
+  return {
+    violated: violations.length > 0,
+    violations,
+    mismatches,
+  };
 }
 
 /**
@@ -284,7 +404,21 @@ async function testChecklistGeneration(
       reasonIfApplies: item.reasonIfApplies?.substring(0, 100),
     }));
 
-    summary = `✓ JSON valid, ${checklist.length} documents, ${appliesCount} apply, ${hasReasons} have reasons`;
+    // Phase 8: Check country invariant
+    const countryCheck = checkCountryInvariant(
+      JSON.stringify(checklistResponse),
+      scenario.countryCode,
+      getCountryNameFromCode(scenario.countryCode),
+      ['DE', 'ES', 'FR'].includes(scenario.countryCode)
+    );
+    if (countryCheck.violated) {
+      errors.push(`Country invariant violation: ${countryCheck.violations.join(', ')}`);
+      for (const mismatch of countryCheck.mismatches) {
+        errors.push(`Found "${mismatch.found}" but expected "${mismatch.expected}"`);
+      }
+    }
+
+    summary = `✓ JSON valid, ${checklist.length} documents, ${appliesCount} apply, ${hasReasons} have reasons${countryCheck.violated ? ' (COUNTRY_INVARIANT VIOLATION)' : ''}`;
     details = {
       documentCount: checklist.length,
       appliesCount,
@@ -293,6 +427,7 @@ async function testChecklistGeneration(
       missingUzCount: missingUz.length,
       missingRuCount: missingRu.length,
       missingDescCount: missingDesc.length,
+      countryCheck: countryCheck.violated ? countryCheck : undefined,
     };
 
     logger.log(`  [CHECKLIST] ${summary}`);
@@ -311,6 +446,16 @@ async function testChecklistGeneration(
     errors,
     summary,
     details,
+    violatedInvariants: errors.filter(
+      (e) => e.includes('COUNTRY_INVARIANT') || e.includes('SCHENGEN_LABELING')
+    ),
+    countryMismatches: errors
+      .filter((e) => e.includes('Found "'))
+      .map((e) => {
+        const match = e.match(/Found "([^"]+)" but expected "([^"]+)"/);
+        return match ? { found: match[1], expected: match[2] } : null;
+      })
+      .filter(Boolean) as Array<{ found: string; expected: string }>,
   };
 }
 
@@ -443,7 +588,23 @@ async function testRiskExplanation(
         summaryEnPreview: parsed.summaryEn?.substring(0, 100),
       };
 
-      logger.log(`  [RISK] ${summary}`);
+      // Phase 8: Check country invariant in risk explanation text
+      const countryCheck = checkCountryInvariant(
+        `${parsed.summaryEn || ''} ${parsed.summaryUz || ''} ${parsed.summaryRu || ''} ${parsed.recommendations?.map((r: any) => `${r.titleEn || ''} ${r.detailsEn || ''}`).join(' ') || ''}`,
+        scenario.countryCode,
+        getCountryNameFromCode(scenario.countryCode),
+        ['DE', 'ES', 'FR'].includes(scenario.countryCode)
+      );
+      if (countryCheck.violated) {
+        errors.push(`Country invariant violation: ${countryCheck.violations.join(', ')}`);
+        for (const mismatch of countryCheck.mismatches) {
+          errors.push(`Found "${mismatch.found}" but expected "${mismatch.expected}"`);
+        }
+      }
+
+      logger.log(
+        `  [RISK] ${summary}${countryCheck.violated ? ' (COUNTRY_INVARIANT VIOLATION)' : ''}`
+      );
       logger.log(`  [RISK] Summary (EN): ${parsed.summaryEn?.substring(0, 150)}...`);
     }
   } catch (error) {
@@ -458,6 +619,16 @@ async function testRiskExplanation(
     errors,
     summary,
     details,
+    violatedInvariants: errors.filter(
+      (e) => e.includes('COUNTRY_INVARIANT') || e.includes('SCHENGEN_LABELING')
+    ),
+    countryMismatches: errors
+      .filter((e) => e.includes('Found "'))
+      .map((e) => {
+        const match = e.match(/Found "([^"]+)" but expected "([^"]+)"/);
+        return match ? { found: match[1], expected: match[2] } : null;
+      })
+      .filter(Boolean) as Array<{ found: string; expected: string }>,
   };
 }
 
@@ -576,11 +747,26 @@ async function testDocumentExplanation(
         errors.push(`tipsRu count invalid: ${parsed.tipsRu?.length || 0} (expected >= 2)`);
       }
 
-      summary = `✓ Document: ${documentType}, ${parsed.tipsEn?.length || 0} tips`;
+      // Phase 8: Check country invariant in explanation text
+      const countryCheck = checkCountryInvariant(
+        `${parsed.whyEn || ''} ${parsed.whyUz || ''} ${parsed.whyRu || ''} ${parsed.tipsEn?.join(' ') || ''}`,
+        scenario.countryCode,
+        getCountryNameFromCode(scenario.countryCode),
+        ['DE', 'ES', 'FR'].includes(scenario.countryCode)
+      );
+      if (countryCheck.violated) {
+        errors.push(`Country invariant violation: ${countryCheck.violations.join(', ')}`);
+        for (const mismatch of countryCheck.mismatches) {
+          errors.push(`Found "${mismatch.found}" but expected "${mismatch.expected}"`);
+        }
+      }
+
+      summary = `✓ Document: ${documentType}, ${parsed.tipsEn?.length || 0} tips${countryCheck.violated ? ' (COUNTRY_INVARIANT VIOLATION)' : ''}`;
       details = {
         documentType,
         whyEnPreview: parsed.whyEn?.substring(0, 100),
         tipsCount: parsed.tipsEn?.length || 0,
+        countryCheck: countryCheck.violated ? countryCheck : undefined,
       };
 
       logger.log(`  [DOC-EXPLANATION] ${summary}`);
@@ -598,6 +784,16 @@ async function testDocumentExplanation(
     errors,
     summary,
     details,
+    violatedInvariants: errors.filter(
+      (e) => e.includes('COUNTRY_INVARIANT') || e.includes('SCHENGEN_LABELING')
+    ),
+    countryMismatches: errors
+      .filter((e) => e.includes('Found "'))
+      .map((e) => {
+        const match = e.match(/Found "([^"]+)" but expected "([^"]+)"/);
+        return match ? { found: match[1], expected: match[2] } : null;
+      })
+      .filter(Boolean) as Array<{ found: string; expected: string }>,
   };
 }
 
@@ -719,7 +915,23 @@ Current Balance: $${scenario.context.financial?.bankBalanceUSD || 3000}
         hasNotesUz: !!parsed.notes?.uz,
       };
 
-      logger.log(`  [DOC-CHECK] ${summary}`);
+      // Phase 8: Check country invariant in doc check text
+      const countryCheck = checkCountryInvariant(
+        `${parsed.short_reason || ''} ${parsed.notes?.en || ''} ${parsed.notes?.uz || ''} ${parsed.notes?.ru || ''} ${parsed.technical_notes || ''}`,
+        scenario.countryCode,
+        getCountryNameFromCode(scenario.countryCode),
+        ['DE', 'ES', 'FR'].includes(scenario.countryCode)
+      );
+      if (countryCheck.violated) {
+        errors.push(`Country invariant violation: ${countryCheck.violations.join(', ')}`);
+        for (const mismatch of countryCheck.mismatches) {
+          errors.push(`Found "${mismatch.found}" but expected "${mismatch.expected}"`);
+        }
+      }
+
+      logger.log(
+        `  [DOC-CHECK] ${summary}${countryCheck.violated ? ' (COUNTRY_INVARIANT VIOLATION)' : ''}`
+      );
       logger.log(`  [DOC-CHECK] Reason: ${parsed.short_reason?.substring(0, 150)}...`);
     }
   } catch (error) {
@@ -734,6 +946,16 @@ Current Balance: $${scenario.context.financial?.bankBalanceUSD || 3000}
     errors,
     summary,
     details,
+    violatedInvariants: errors.filter(
+      (e) => e.includes('COUNTRY_INVARIANT') || e.includes('SCHENGEN_LABELING')
+    ),
+    countryMismatches: errors
+      .filter((e) => e.includes('Found "'))
+      .map((e) => {
+        const match = e.match(/Found "([^"]+)" but expected "([^"]+)"/);
+        return match ? { found: match[1], expected: match[2] } : null;
+      })
+      .filter(Boolean) as Array<{ found: string; expected: string }>,
   };
 }
 

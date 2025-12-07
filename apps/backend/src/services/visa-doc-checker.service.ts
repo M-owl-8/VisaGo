@@ -6,13 +6,25 @@
 
 import { AIOpenAIService } from './ai-openai.service';
 import { getAIConfig } from '../config/ai-models';
-import { VisaRuleSetData } from './visa-rules.service';
-import { AIUserContext, CanonicalAIUserContext } from '../types/ai-context';
+import { VisaRuleSetData, VisaRulesService } from './visa-rules.service';
+import { AIUserContext, CanonicalAIUserContext, RiskDriver } from '../types/ai-context';
 import { buildCanonicalAIUserContext } from './ai-context.service';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 import { logDocumentVerification, extractApplicationId } from '../utils/gpt-logging';
 import { z } from 'zod';
 import { PROMPT_VERSIONS } from '../ai-training/config';
+import {
+  getCountryVisaPlaybook,
+  type VisaCategory,
+  type CountryVisaPlaybook,
+} from '../config/country-visa-playbooks';
+import { normalizeDocumentType } from '../config/document-types-map';
+import {
+  normalizeCountryCode,
+  getCountryNameFromCode,
+  buildCanonicalCountryContext,
+  assertCountryConsistency,
+} from '../config/country-registry';
 
 /**
  * Document Check Result Schema (EXPERT VERSION - Phase 3)
@@ -135,6 +147,8 @@ export class VisaDocCheckerService {
    * @param userDocumentText - Full text of uploaded document (or best OCR output)
    * @param aiUserContext - AIUserContext (will be converted to CanonicalAIUserContext)
    * @param metadata - Optional document metadata
+   * @param countryCode - Country code (e.g., 'US', 'GB') for fetching embassy rules and playbooks
+   * @param visaType - Visa type ('tourist' | 'student') for fetching embassy rules and playbooks
    */
   static async checkDocument(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -147,13 +161,17 @@ export class VisaDocCheckerService {
       amounts?: Array<{ value: number; currency: string }>;
       bankName?: string;
       accountHolder?: string;
-    }
+    },
+    countryCode?: string,
+    visaType?: 'tourist' | 'student'
   ): Promise<DocumentCheckResult> {
     try {
       logInfo('[VisaDocChecker] Checking document', {
         documentType: requiredDocumentRule.documentType,
         textLength: userDocumentText.length,
         hasMetadata: !!metadata,
+        countryCode,
+        visaType,
       });
 
       // Convert to CanonicalAIUserContext for consistent input
@@ -168,19 +186,91 @@ export class VisaDocCheckerService {
         }
       }
 
-      // Build compact system prompt
+      // Phase 5: Fetch embassy rules and playbook
+      // Phase 8: Normalize country code using CountryRegistry
+      let ruleSet: VisaRuleSetData | null = null;
+      let playbook: CountryVisaPlaybook | null = null;
+      let countryCodeForRules = countryCode;
+      let visaCategory: VisaCategory | undefined = visaType;
+
+      // Try to get country/visaType from context if not provided
+      if (!countryCodeForRules && canonicalContext) {
+        countryCodeForRules =
+          canonicalContext.countryContext?.countryCode ||
+          (canonicalContext.applicantProfile as any).countryCode ||
+          canonicalContext.applicantProfile.targetCountry;
+      }
+      if (!visaCategory && canonicalContext) {
+        visaCategory = canonicalContext.applicantProfile.visaType;
+      }
+
+      // Phase 8: Normalize country code
+      const normalizedCountryCodeForRules = countryCodeForRules
+        ? normalizeCountryCode(countryCodeForRules) || countryCodeForRules.toUpperCase()
+        : null;
+      const countryContextForRules = normalizedCountryCodeForRules
+        ? buildCanonicalCountryContext(normalizedCountryCodeForRules)
+        : null;
+      const countryNameForRules = countryContextForRules?.countryName || null;
+
+      // Assert consistency if we have multiple country sources
+      if (
+        normalizedCountryCodeForRules &&
+        countryCode &&
+        countryCode !== normalizedCountryCodeForRules
+      ) {
+        const consistency = assertCountryConsistency(normalizedCountryCodeForRules, countryCode);
+        if (!consistency.consistent) {
+          logWarn('[VisaDocChecker] Country consistency check failed', {
+            mismatches: consistency.mismatches,
+            normalizedCountryCodeForRules,
+            originalCountryCode: countryCode,
+          });
+        }
+      }
+
+      if (normalizedCountryCodeForRules && visaCategory) {
+        try {
+          ruleSet = await VisaRulesService.getActiveRuleSet(
+            normalizedCountryCodeForRules,
+            visaCategory
+          );
+          playbook = getCountryVisaPlaybook(normalizedCountryCodeForRules, visaCategory);
+        } catch (error) {
+          logWarn('[VisaDocChecker] Failed to fetch embassy rules or playbook', {
+            error: error instanceof Error ? error.message : String(error),
+            countryCode: countryCodeForRules,
+            visaCategory,
+          });
+        }
+      }
+
+      // Build compact system prompt (Phase 5: includes embassy rules and playbook)
+      // Phase 8: Pass canonical country context
       const useCompactPrompts = process.env.USE_COMPACT_DOC_VERIFICATION_PROMPTS !== 'false'; // Default: true
       const systemPrompt = useCompactPrompts
-        ? this.buildSystemPromptCompact()
+        ? this.buildSystemPromptCompact(
+            ruleSet || undefined,
+            playbook || undefined,
+            normalizedCountryCodeForRules || countryCodeForRules,
+            countryNameForRules,
+            countryContextForRules?.schengen || false
+          )
         : this.buildSystemPromptLegacy();
 
-      // Build compact user prompt
+      // Build compact user prompt (Phase 5: includes embassy rules, playbook, and risk drivers)
       const userPrompt = useCompactPrompts
         ? this.buildUserPromptCompact(
             requiredDocumentRule,
             userDocumentText,
             canonicalContext,
-            metadata
+            metadata,
+            ruleSet || undefined,
+            playbook || undefined,
+            normalizedCountryCodeForRules || countryCodeForRules,
+            countryNameForRules,
+            countryContextForRules?.schengen || false,
+            visaCategory
           )
         : this.buildUserPromptLegacy(
             requiredDocumentRule,
@@ -429,18 +519,29 @@ export class VisaDocCheckerService {
   }
 
   /**
-   * Build compact system prompt for document checking (EXPERT OFFICER VERSION - Phase 4)
+   * Build compact system prompt for document checking (EXPERT OFFICER VERSION - Phase 5)
    * GPT acts as an expert embassy document reviewer with deep knowledge of 10 countries × 2 visa types
    *
-   * Phase 4 Upgrade:
-   * - Expert visa document reviewer role specialized for Uzbek applicants
-   * - Country-specific patterns (US, UK, Germany, Spain, Canada, Australia, Japan, Korea, UAE, Schengen)
-   * - Uses expert fields from CanonicalAIUserContext for risk-based validation
-   * - Clear status semantics: APPROVED / NEED_FIX / REJECTED
-   * - Tri-language notes (UZ/RU/EN) with Uzbek as primary
+   * Phase 5 Upgrade:
+   * - Includes OFFICIAL_RULES from embassy sources (VisaRuleSet)
+   * - Includes COUNTRY_VISA_PLAYBOOK for country-specific patterns
+   * - Explicitly uses riskDrivers to guide validation strictness
+   * - Uzbek-focused guidance with embassy rules as ground truth
    */
-  private static buildSystemPromptCompact(): string {
-    return `You are an EXPERT VISA DOCUMENT REVIEWER with 10+ years of experience at embassies (US, UK, Schengen (Germany/Spain), Canada, Australia, Japan, Korea, UAE), specializing in applicants from Uzbekistan.
+  private static buildSystemPromptCompact(
+    ruleSet?: VisaRuleSetData,
+    playbook?: CountryVisaPlaybook,
+    countryCode?: string,
+    countryName?: string,
+    schengen?: boolean
+  ): string {
+    // Phase 8: Use canonical country in prompt
+    const countrySection =
+      countryCode && countryName
+        ? `\n\nIMPORTANT COUNTRY CONTEXT:\n- The ONLY valid country for this task is ${countryName} (${countryCode})\n- You MUST NOT refer to any other country\n- If embassy rules for other countries appear in your memory, ignore them${schengen ? '\n- This is a Schengen country. You may reference "Schengen" as a group, but always specify ' + countryName + ' as the primary country' : ''}\n`
+        : '';
+
+    return `You are an EXPERT VISA DOCUMENT REVIEWER with 10+ years of experience at embassies (US, UK, Schengen (Germany/Spain/France), Canada, Australia, Japan, Korea, UAE), specializing in applicants from Uzbekistan.${countrySection}
 
 ================================================================================
 YOUR EXPERTISE
@@ -596,59 +697,99 @@ SHORT_REASON:
 - Neutral, professional tone
 
 ================================================================================
-COUNTRY-SPECIFIC PATTERNS (for context)
+OFFICIAL EMBASSY RULES (Phase 5)
 ================================================================================
 
-US (B1/B2 Tourist, F-1/J-1 Student):
-- Bank statements: 3-6 months history, sufficient funds for duration
-- I-20/DS-2019: Must be valid, SEVIS fee paid
-- Strong ties emphasis for tourist visas
+${
+  ruleSet && ruleSet.sourceInfo?.extractedFrom
+    ? `OFFICIAL_RULES: Rules extracted from ${ruleSet.sourceInfo.extractedFrom} (confidence: ${(ruleSet.sourceInfo.confidence! * 100).toFixed(0)}%).
 
-UK (Tourist, Student):
-- 28-day rule: Bank statements must show funds for 28+ consecutive days
-- CAS letter required for students
-- TB test certificate if required
+These are AUTHORITATIVE requirements from the official embassy/consulate website. You MUST use these as ground truth when validating documents.
 
-Schengen (Germany, Spain, etc.):
-- Travel insurance: Minimum €30,000 coverage
-- Accommodation proof required
-- Round-trip flight reservation
+Key requirements from official rules:
+${
+  ruleSet.financialRequirements
+    ? `- Financial: Minimum balance ${ruleSet.financialRequirements.minimumBalance || 'N/A'} ${ruleSet.financialRequirements.currency || 'USD'}, ${ruleSet.financialRequirements.bankStatementMonths || 'N/A'} months of statements required`
+    : ''
+}
+${
+  ruleSet.additionalRequirements?.travelInsurance
+    ? `- Travel Insurance: ${ruleSet.additionalRequirements.travelInsurance.required ? 'Required' : 'Optional'}, Minimum coverage ${ruleSet.additionalRequirements.travelInsurance.minimumCoverage || 'N/A'} ${ruleSet.additionalRequirements.travelInsurance.currency || ''}`
+    : ''
+}
+${
+  ruleSet.processingInfo
+    ? `- Processing: ${ruleSet.processingInfo.appointmentRequired ? 'Appointment required' : 'No appointment'}, ${ruleSet.processingInfo.interviewRequired ? 'Interview required' : 'No interview'}, ${ruleSet.processingInfo.biometricsRequired ? 'Biometrics required' : 'No biometrics'}`
+    : ''
+}
 
-Canada (Tourist, Student):
-- DLI/LOA for students
-- Strong ties requirement
-- Sufficient funds for tuition + living expenses
+CRITICAL: When validating documents, compare against these official rules. If a document violates an explicit rule from OFFICIAL_RULES, mark it as NEED_FIX or REJECTED accordingly.`
+    : 'OFFICIAL_RULES: Not available. Use general embassy practice knowledge.'
+}
 
-Australia (Tourist, Student):
-- COE for students
-- OSHC insurance required
-- GTE statement may be required
+================================================================================
+COUNTRY VISA PLAYBOOK (Phase 5)
+================================================================================
 
-Japan:
-- Detailed itinerary
-- Certificate of Eligibility if applicable
-- Sponsor proof if sponsored
+${
+  playbook
+    ? `COUNTRY_VISA_PLAYBOOK: Typical patterns for ${playbook.countryCode} ${playbook.visaCategory} visas.
 
-Korea:
-- D-2/D-4 visa types
-- Clear study plans
-- Financial proof required
+Typical refusal reasons:
+${playbook.typicalRefusalReasonsEn.map((r) => `- ${r}`).join('\n')}
 
-UAE:
-- Hotel booking confirmation
-- Sponsor letter if invited
-- Proof of financial means
+Key officer focus areas:
+${playbook.keyOfficerFocusEn.map((f) => `- ${f}`).join('\n')}
+
+Uzbek context hints:
+${playbook.uzbekContextHintsEn.map((h) => `- ${h}`).join('\n')}
+
+Document-specific hints:
+${
+  playbook.documentHints.length > 0
+    ? playbook.documentHints.map((h) => `- ${h.documentType}: ${h.officerFocusHintEn}`).join('\n')
+    : 'No specific hints available.'
+}
+
+Use these patterns to understand what embassy officers typically look for and what common issues arise.`
+    : 'COUNTRY_VISA_PLAYBOOK: Not available. Use general embassy practice knowledge.'
+}
+
+================================================================================
+RISK DRIVERS (Phase 5)
+================================================================================
+
+You will receive explicit RISK_DRIVERS in APPLICANT_CONTEXT (e.g., ["low_funds", "weak_ties", "limited_travel_history"]).
+
+Use risk drivers to guide validation strictness:
+- If "low_funds" or "borderline_funds" is present and this is a financial document:
+  * Be STRICT on balance requirements
+  * Compare amounts against requiredFundsUSD
+  * If balance is insufficient, mark as NEED_FIX or REJECTED
+- If "weak_ties" is present and this is a ties document (property, employment, family):
+  * This document is CRITICAL for the application
+  * Be strict on completeness and authenticity
+  * Emphasize importance in notes.uz
+- If "limited_travel_history" is present and this is a travel document:
+  * Explain how this document helps mitigate risk
+  * Be clear about completeness requirements
+
+Explicitly mention which risk drivers this document addresses in your notes.
 
 ================================================================================
 FINAL INSTRUCTIONS
 ================================================================================
 
+- OFFICIAL_RULES are AUTHORITATIVE - never ignore them when validating
+- Use COUNTRY_VISA_PLAYBOOK to understand typical officer focus and common issues
+- Use RISK_DRIVERS to guide strictness and explain document importance
 - Use expert fields from APPLICANT_CONTEXT to guide your strictness:
   * Low financial sufficiency → be strict on financial docs
   * Weak ties → emphasize importance of ties docs
   * Limited travel history → explain how travel docs help
 - If dataCompletenessScore is low, be cautious and prefer NEED_FIX over REJECTED
 - Write notes.uz as the primary explanation (clear, simple Uzbek)
+- Reference Uzbek context naturally (Uzbek banks, kadastr, employment letters)
 - Return ONLY valid JSON, no markdown, no extra text
 
 Return ONLY valid JSON matching the schema above.`;
@@ -741,12 +882,13 @@ Return ONLY valid JSON matching the schema, no other text.`;
   }
 
   /**
-   * Build compact user prompt (EXPERT OFFICER VERSION - Phase 4)
+   * Build compact user prompt (EXPERT OFFICER VERSION - Phase 5)
    *
-   * Phase 4 Upgrade:
-   * - Structured APPLICANT_CONTEXT with expert fields grouped
-   * - Explicit "EXPERT DECISION REQUIRED" section
-   * - Clear instructions on using expert fields for validation
+   * Phase 5 Upgrade:
+   * - Includes OFFICIAL_RULES summary
+   * - Includes COUNTRY_VISA_PLAYBOOK summary
+   * - Explicitly includes RISK_DRIVERS
+   * - Clear instructions on using embassy rules as ground truth
    */
   private static buildUserPromptCompact(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -759,7 +901,13 @@ Return ONLY valid JSON matching the schema, no other text.`;
       amounts?: Array<{ value: number; currency: string }>;
       bankName?: string;
       accountHolder?: string;
-    }
+    },
+    ruleSet?: VisaRuleSetData,
+    playbook?: CountryVisaPlaybook,
+    countryCode?: string,
+    countryName?: string,
+    schengen?: boolean,
+    visaCategory?: VisaCategory
   ): string {
     // Limit document text to 8000 chars (reasonable for GPT)
     const truncatedText =
@@ -807,6 +955,8 @@ APPLICANT_CONTEXT
       const applicantContext = {
         visaType: canonicalContext.applicantProfile.visaType,
         countryCode:
+          countryCode ||
+          canonicalContext.countryContext?.countryCode ||
           (canonicalContext.applicantProfile as any).countryCode ||
           canonicalContext.applicantProfile.targetCountry,
         duration: canonicalContext.applicantProfile.duration,

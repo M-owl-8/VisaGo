@@ -456,7 +456,11 @@ export class DocumentChecklistService {
               existingDocumentsMap
             );
             aiGenerated = true;
-            generationMode = 'rules';
+            // Phase 1: Detect generation mode from engine response metadata or infer from item count
+            // If engine returned base-rules fallback, it will have generationMode in metadata
+            // For now, we infer: if rules mode succeeded, it's 'rules' or 'rules_base_fallback'
+            // The engine logs will indicate which one was used
+            generationMode = 'rules'; // Default to 'rules' for successful rules mode
 
             // Log structured checklist generation
             logChecklistGeneration({

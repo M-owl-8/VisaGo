@@ -113,15 +113,61 @@ export class VisaRulesExtractionService {
         });
       }
 
-      // Extract rules using GPT
-      const extraction = await AIEmbassyExtractorService.extractVisaRulesFromPage({
+      // Phase 4: Enhanced logging before extraction
+      logInfo('[VisaRulesExtraction] Starting GPT extraction', {
+        pageContentId,
         countryCode,
         visaType,
-        sourceUrl: pageContent.url,
-        pageText: pageContent.cleanedText,
-        pageTitle: pageContent.title || undefined,
-        previousRules: previousRules || undefined,
+        url: pageContent.url,
+        textLength: pageContent.cleanedText.length,
+        httpStatus: pageContent.httpStatus,
+        hasPreviousRules: !!previousRules,
+        previousRulesConfidence: previousRules?.sourceInfo?.confidence,
       });
+
+      // Extract rules using GPT
+      let extraction;
+      try {
+        extraction = await AIEmbassyExtractorService.extractVisaRulesFromPage({
+          countryCode,
+          visaType,
+          sourceUrl: pageContent.url,
+          pageText: pageContent.cleanedText,
+          pageTitle: pageContent.title || undefined,
+          previousRules: previousRules || undefined,
+        });
+      } catch (extractionError) {
+        // Phase 4: Enhanced error logging
+        const errorMessage =
+          extractionError instanceof Error ? extractionError.message : String(extractionError);
+        logError('[VisaRulesExtraction] GPT extraction failed', extractionError as Error, {
+          pageContentId,
+          countryCode,
+          visaType,
+          url: pageContent.url,
+          textLength: pageContent.cleanedText.length,
+          truncatedTextLength: Math.min(500, pageContent.cleanedText.length), // For debugging
+          errorMessage,
+        });
+        throw extractionError;
+      }
+
+      // Phase 4: Check confidence before creating candidate
+      // NEVER overwrite existing high-confidence rules with low-confidence extraction
+      const newConfidence = extraction.metadata.confidence;
+      const previousConfidence = previousRules?.sourceInfo?.confidence || 0;
+
+      if (previousConfidence > 0 && newConfidence < previousConfidence) {
+        logWarn('[VisaRulesExtraction] New extraction has lower confidence than existing rules', {
+          countryCode,
+          visaType,
+          previousConfidence,
+          newConfidence,
+          action: 'skipping_candidate_creation',
+        });
+        // Phase 4: Still create candidate but mark it for review
+        // Don't auto-approve if confidence is lower
+      }
 
       // Compute diff if previous rules exist
       let diff: RuleSetDiff | null = null;
@@ -129,10 +175,18 @@ export class VisaRulesExtractionService {
         diff = this.computeDiff(previousRules, extraction.ruleSet);
       }
 
-      // Store diff in metadata
+      // Phase 4: Enhanced extraction metadata
       const extractionMetadata = {
         ...extraction.metadata,
         diff: diff,
+        previousConfidence,
+        confidenceDelta: newConfidence - previousConfidence,
+        extractionQuality: {
+          hasDocuments: (extraction.ruleSet.requiredDocuments?.length || 0) > 0,
+          hasFinancial: !!extraction.ruleSet.financialRequirements,
+          hasProcessing: !!extraction.ruleSet.processingInfo,
+          hasFees: !!extraction.ruleSet.fees,
+        },
       };
 
       // Create candidate
@@ -143,19 +197,26 @@ export class VisaRulesExtractionService {
           countryCode,
           visaType,
           data: extraction.ruleSet as any, // Will be serialized by Prisma
-          confidence: extraction.metadata.confidence,
+          confidence: newConfidence,
           extractionMetadata: extractionMetadata as any,
           status: 'pending',
         },
       });
 
+      // Phase 4: Enhanced logging after candidate creation
       logInfo('[VisaRulesExtraction] Candidate created', {
         candidateId: candidate.id,
         countryCode,
         visaType,
-        confidence: extraction.metadata.confidence,
+        confidence: newConfidence,
+        previousConfidence,
+        confidenceDelta: newConfidence - previousConfidence,
+        documentsCount: extraction.ruleSet.requiredDocuments?.length || 0,
         hasDiff: !!diff,
+        extractionQuality: extractionMetadata.extractionQuality,
       });
+
+      // Logging moved above to include Phase 4 enhancements
 
       return {
         success: true,

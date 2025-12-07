@@ -11,6 +11,17 @@ import { getAIConfig } from '../config/ai-models';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 import { CanonicalAIUserContext } from '../types/ai-context';
 import { z } from 'zod';
+import {
+  getCountryVisaPlaybook,
+  type VisaCategory,
+  type CountryVisaPlaybook,
+} from '../config/country-visa-playbooks';
+import {
+  normalizeCountryCode,
+  getCountryNameFromCode,
+  buildCanonicalCountryContext,
+  assertCountryConsistency,
+} from '../config/country-registry';
 
 const prisma = new PrismaClient();
 
@@ -60,12 +71,17 @@ export class VisaChecklistExplanationService {
     countryCode: string,
     visaType: string
   ): { systemPrompt: string; userPrompt: string } {
-    const systemPrompt = this.buildSystemPrompt();
+    // Phase 8: Use canonical country from countryContext
+    const normalizedCountryCode = canonicalContext.countryContext?.countryCode || countryCode;
+    const countryName = canonicalContext.countryContext?.countryName || 'Unknown';
+    const schengen = canonicalContext.countryContext?.schengen || false;
+    const systemPrompt = this.buildSystemPrompt(normalizedCountryCode, countryName, schengen);
     const userPrompt = this.buildUserPrompt(
       canonicalContext,
       documentType,
       documentRule,
-      countryCode,
+      normalizedCountryCode,
+      countryName,
       visaType
     );
     return { systemPrompt, userPrompt };
@@ -114,23 +130,48 @@ export class VisaChecklistExplanationService {
         applicationId
       );
 
+      // Phase 8: Normalize country code using CountryRegistry
+      const normalizedCountryCode =
+        normalizeCountryCode(application.country.code) || application.country.code.toUpperCase();
+      const countryContext = buildCanonicalCountryContext(normalizedCountryCode);
+      const countryName = countryContext?.countryName || application.country.name;
+
+      // Assert consistency
+      const consistency = assertCountryConsistency(
+        normalizedCountryCode,
+        application.country.code,
+        canonicalContext.application.country,
+        canonicalContext.countryContext?.countryCode
+      );
+      if (!consistency.consistent) {
+        logWarn('[VisaChecklistExplanation] Country consistency check failed', {
+          mismatches: consistency.mismatches,
+          normalizedCountryCode,
+          originalCountryCode: application.country.code,
+        });
+      }
+
       // Get rule set to find document definition
-      const countryCode = application.country.code.toUpperCase();
       const visaTypeName = application.visaType.name.toLowerCase();
-      const ruleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaTypeName);
+      const ruleSet = await VisaRulesService.getActiveRuleSet(normalizedCountryCode, visaTypeName);
 
       // Find document definition in rule set
       const documentRule = ruleSet?.requiredDocuments?.find(
         (doc) => doc.documentType === documentType
       );
 
-      // Build prompts
-      const systemPrompt = this.buildSystemPrompt();
+      // Build prompts (Phase 8: Pass canonical country context)
+      const systemPrompt = this.buildSystemPrompt(
+        normalizedCountryCode,
+        countryName,
+        countryContext?.schengen || false
+      );
       const userPrompt = this.buildUserPrompt(
         canonicalContext,
         documentType,
         documentRule,
-        application.country.name,
+        normalizedCountryCode,
+        countryName,
         application.visaType.name
       );
 
@@ -235,8 +276,18 @@ export class VisaChecklistExplanationService {
    * - Connects to financialSufficiency, tiesStrength, travelHistory, risk
    * - Provides practical Uzbek-focused tips
    */
-  private static buildSystemPrompt(): string {
-    return `You are an EXPERT VISA DOCUMENT CONSULTANT. You explain to Uzbek applicants why specific documents are needed for their visa application, and how these documents help their case.
+  private static buildSystemPrompt(
+    countryCode?: string,
+    countryName?: string,
+    schengen?: boolean
+  ): string {
+    // Phase 8: Use canonical country in prompt
+    const countrySection =
+      countryCode && countryName
+        ? `\n\nIMPORTANT COUNTRY CONTEXT:\n- The ONLY valid country for this task is ${countryName} (${countryCode})\n- You MUST NOT refer to any other country\n- If embassy rules for other countries appear in your memory, ignore them${schengen ? '\n- This is a Schengen country. You may reference "Schengen" as a group, but always specify ' + countryName + ' as the primary country' : ''}\n`
+        : '';
+
+    return `You are an EXPERT VISA DOCUMENT CONSULTANT. You explain to Uzbek applicants why specific documents are needed for their visa application, and how these documents help their case.${countrySection}
 
 ================================================================================
 YOUR ROLE
@@ -251,8 +302,12 @@ You will receive:
   * ties: tiesStrengthScore, tiesStrengthLabel, hasPropertyInUzbekistan, hasFamilyInUzbekistan, hasChildren, isEmployed, employmentDurationMonths
   * travelHistory: travelHistoryScore, travelHistoryLabel, previousVisaRejections, hasOverstayHistory
   * riskScore.level
+  * riskDrivers: explicit list of risk factors (e.g., ["low_funds", "weak_ties", "limited_travel_history"])
   * meta.dataCompletenessScore
 - documentRule (from VisaRuleSet if available)
+- OFFICIAL_RULES_SUMMARY (from VisaRuleSet if available) - Phase 3
+- COUNTRY_VISA_PLAYBOOK (typical patterns for this country+visaType) - Phase 3
+- PlaybookDocumentHint (for this specific documentType) - Phase 3
 
 ================================================================================
 YOUR TASK
@@ -277,16 +332,24 @@ YOUR TASK
      * Confirmed accommodation bookings
      * Travel insurance meeting minimum coverage (e.g., €30,000 for Schengen)
 
-3. Connect to applicant risk:
+3. Connect to applicant risk and risk drivers:
+   - Look at RISK_DRIVERS and explicitly mention which risk driver(s) this document addresses
+   - Examples:
+     * "Because you have limited travel history and no property in Uzbekistan, this document helps show that you will return home." (addresses limited_travel_history, weak_ties, no_property)
+     * "Since your funds are a bit low for the length of your trip, this extra financial evidence is critical." (addresses low_funds or borderline_funds)
+     * "Because your ties strength is weak, property documents help prove you will return." (addresses weak_ties)
    - If financialSufficiencyLabel is 'low' or 'borderline' and this is a bank statement:
      * Explain how it addresses financial concerns
      * Emphasize importance of showing sufficient balance and stable history
+     * Reference "low_funds" or "borderline_funds" risk driver
    - If tiesStrengthLabel is 'weak' and this is property/employment/family doc:
      * Explain how it strengthens ties
      * Emphasize importance of proving return intent
+     * Reference "weak_ties", "no_property", or "no_employment" risk driver
    - If travelHistoryScore is low and this is itinerary/accommodation:
      * Explain how it helps mitigate risk for first-time travelers
      * Emphasize clarity and completeness
+     * Reference "limited_travel_history" risk driver
 
 ================================================================================
 OUTPUT REQUIREMENTS
@@ -310,9 +373,13 @@ WHY REQUIREMENTS:
   * Purpose of document
   * Embassy perspective (what officers look for)
   * Applicant-specific relevance (Uzbek context)
+  * How it addresses specific riskDrivers (e.g., "Because you have low_funds and weak_ties, this bank statement is critical to demonstrate financial stability and ties to Uzbekistan.")
 - Reference expert metrics when relevant:
   * "Because your financial sufficiency is borderline, this bank statement is critical..."
   * "Because your ties score is weak, property documents help prove you will return..."
+- Reference embassy rules when available (Phase 3):
+  * "According to official rules from [country] embassy..."
+  * "Officers for [country] commonly refuse applications when this document is missing or weak."
 - Uzbek (Uz): Simple, clear language with common terminology
 - Russian (Ru): Formal but simple
 - English (En): Neutral, embassy-style
@@ -353,7 +420,10 @@ FINAL INSTRUCTIONS
     documentType: string,
     documentRule: any,
     countryName: string,
-    visaTypeName: string
+    visaTypeName: string,
+    ruleSet?: any,
+    playbook?: any,
+    playbookDocumentHint?: any
   ): string {
     const profile = context.applicantProfile;
     const riskScore = context.riskScore;
@@ -383,9 +453,11 @@ ${
 APPLICATION CONTEXT
 ================================================================================
 
-- Country: ${countryName}
+- Country Code: ${countryCode || (context.application as any)?.countryCode || profile.targetCountry || 'Unknown'}
+- Country Name: ${countryName}
 - Visa Type: ${visaTypeName}
-- Country Code: ${(context.application as any)?.countryCode || profile.targetCountry || 'Unknown'}
+
+CRITICAL: You must ALWAYS refer to the exact country name "${countryName}" (${countryCode}) when writing explanations. NEVER mention any other country (e.g., do not mention "UK" or "United Kingdom" if the country is "Spain", do not mention "Spain" if the country is "United Kingdom"). Use the exact country name provided above.
 
 ================================================================================
 APPLICANT PROFILE
@@ -438,6 +510,18 @@ RISK LEVEL:
 - Risk Level: ${riskScore.level}
 - Probability: ${riskScore.probabilityPercent}%
 
+================================================================================
+RISK DRIVERS (Phase 2: Explicit risk factors)
+================================================================================
+
+${JSON.stringify((context as any).riskDrivers || [], null, 2)}
+
+Use these risk drivers to explain WHY this document is needed:
+- If "low_funds" or "borderline_funds" is in riskDrivers and this is a financial document → explain how it addresses financial concerns
+- If "weak_ties", "no_property", or "no_employment" is in riskDrivers and this is a ties document → explain how it strengthens ties
+- If "limited_travel_history" is in riskDrivers and this is a travel document → explain how it helps demonstrate genuine travel purpose
+- Explicitly mention the risk driver(s) in your explanation (e.g., "Because you have limited travel history (limited_travel_history risk driver)...")
+
 DATA COMPLETENESS:
 ${
   context.meta
@@ -452,9 +536,77 @@ ${
     : '- Embassy rules: Not available'
 }
 
+${
+  ruleSet
+    ? `\n================================================================================
+OFFICIAL_RULES_SUMMARY (Phase 3)
 ================================================================================
 
-Provide expert explanation connecting this document to the applicant's risk profile and provide practical Uzbek-focused tips.`;
+Source: ${ruleSet.sourceInfo?.extractedFrom || 'Unknown'}
+Last updated: ${ruleSet.sourceInfo?.extractedAt || 'Unknown'}
+Confidence: ${ruleSet.sourceInfo?.confidence ? (ruleSet.sourceInfo.confidence * 100).toFixed(0) + '%' : 'Unknown'}
+
+REQUIRED DOCUMENTS (relevant to ${documentType}):
+${
+  ruleSet.requiredDocuments
+    .filter((doc: any) => doc.documentType === documentType)
+    .map(
+      (doc: any) =>
+        `- ${doc.documentType} (${doc.category}): ${doc.description || 'No description'}${doc.validityRequirements ? ` | Validity: ${doc.validityRequirements}` : ''}${doc.formatRequirements ? ` | Format: ${doc.formatRequirements}` : ''}`
+    )
+    .join('\n') || '- No specific rule found for this document type'
+}
+
+${
+  (ruleSet.financialRequirements && documentType.includes('bank')) ||
+  documentType.includes('financial')
+    ? `FINANCIAL REQUIREMENTS:
+- Minimum Balance: ${ruleSet.financialRequirements.minimumBalance || 'Not specified'} ${ruleSet.financialRequirements.currency || 'USD'}
+- Bank Statement Months: ${ruleSet.financialRequirements.bankStatementMonths || 'Not specified'}`
+    : ''
+}`
+    : ''
+}
+
+${
+  playbook
+    ? `\n================================================================================
+COUNTRY_VISA_PLAYBOOK (Typical Patterns - Phase 3)
+================================================================================
+
+TYPICAL REFUSAL REASONS:
+${playbook.typicalRefusalReasonsEn.map((reason: string) => `- ${reason}`).join('\n')}
+
+KEY OFFICER FOCUS:
+${playbook.keyOfficerFocusEn.map((focus: string) => `- ${focus}`).join('\n')}
+
+UZBEK CONTEXT HINTS:
+${playbook.uzbekContextHintsEn.map((hint: string) => `- ${hint}`).join('\n')}`
+    : ''
+}
+
+${
+  playbookDocumentHint
+    ? `\n================================================================================
+PLAYBOOK_DOCUMENT_HINT (Phase 3)
+================================================================================
+
+Document Type: ${playbookDocumentHint.documentType}
+Importance: ${playbookDocumentHint.importance}
+Typical For: ${playbookDocumentHint.typicalFor.join(', ')}
+
+OFFICER FOCUS HINT:
+${playbookDocumentHint.officerFocusHintEn}
+
+Use this hint to explain what embassy officers typically look for in this document.`
+    : ''
+}
+
+================================================================================
+
+Provide expert explanation connecting this document to the applicant's risk profile and provide practical Uzbek-focused tips.
+${ruleSet ? 'Reference official embassy rules when available.' : ''}
+${playbook ? 'Reference country-specific patterns from the playbook.' : ''}`;
 
     return prompt;
   }

@@ -7,10 +7,17 @@
 import { PrismaClient } from '@prisma/client';
 import { AIOpenAIService } from './ai-openai.service';
 import { getAIConfig } from '../config/ai-models';
-import { buildAIUserContext } from './ai-context.service';
+import { buildAIUserContext, buildCanonicalAIUserContext } from './ai-context.service';
 import { VisaRulesService } from './visa-rules.service';
 import { VisaDocCheckerService } from './visa-doc-checker.service';
 import { DocumentClassifierService } from './document-classifier.service';
+import { getCountryVisaPlaybook, type VisaCategory } from '../config/country-visa-playbooks';
+import {
+  normalizeCountryCode,
+  getCountryNameFromCode,
+  buildCanonicalCountryContext,
+  assertCountryConsistency,
+} from '../config/country-registry';
 import { logError, logInfo, logWarn } from '../middleware/logger';
 import type { DocumentValidationResultAI } from '../types/ai-responses';
 import {
@@ -56,10 +63,26 @@ export async function validateDocumentWithAI(params: {
   try {
     const { document, checklistItem, application, countryName, visaTypeName } = params;
 
+    // Phase 8: Normalize country code using CountryRegistry
+    const normalizedCountryCode =
+      normalizeCountryCode(application.country.code) || application.country.code.toUpperCase();
+    const countryContext = buildCanonicalCountryContext(normalizedCountryCode);
+    const canonicalCountryName = countryContext?.countryName || countryName;
+
+    // Assert consistency
+    const consistency = assertCountryConsistency(normalizedCountryCode, application.country.code);
+    if (!consistency.consistent) {
+      logWarn('[DocumentValidation] Country consistency check failed', {
+        mismatches: consistency.mismatches,
+        normalizedCountryCode,
+        originalCountryCode: application.country.code,
+      });
+    }
+
     // Try to use new VisaDocCheckerService if VisaRuleSet is available
     try {
       const ruleSet = await VisaRulesService.getActiveRuleSet(
-        application.country.code.toUpperCase(),
+        normalizedCountryCode,
         visaTypeName.toLowerCase()
       );
 
@@ -202,14 +225,25 @@ export async function validateDocumentWithAI(params: {
       throw new Error('OpenAI service not initialized');
     }
 
-    // Load VisaRuleSet and ApplicantProfile for enhanced validation
+    // Phase 5: Load comprehensive context (VisaRuleSet, CountryPlaybook, CanonicalAIUserContext, extracted text)
     let visaRuleSetData: any = null;
-    let applicantProfileData: any = null;
+    let countryPlaybookData: any = null;
+    let canonicalAIUserContextData: any = null;
+    let extractedText = '';
+
+    // Derive visaCategory from visaType
+    const visaCategory: VisaCategory =
+      visaTypeName.toLowerCase().includes('student') ||
+      visaTypeName.toLowerCase().includes('study') ||
+      visaTypeName.toLowerCase() === 'f-1' ||
+      visaTypeName.toLowerCase() === 'j-1'
+        ? 'student'
+        : 'tourist';
 
     try {
-      // Load approved VisaRuleSet
+      // Load approved VisaRuleSet (Phase 8: Use normalized country code)
       const ruleSet = await VisaRulesService.getActiveRuleSet(
-        application.country.code.toUpperCase(),
+        normalizedCountryCode,
         visaTypeName.toLowerCase()
       );
       if (ruleSet) {
@@ -230,63 +264,103 @@ export async function validateDocumentWithAI(params: {
     }
 
     try {
-      // Load ApplicantProfile from User.bio (questionnaire data is stored there)
-      const app = await prisma.visaApplication.findUnique({
-        where: { id: application.id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              bio: true,
-            },
-          },
-        },
-      });
-      if (app && app.user?.bio) {
-        const { buildApplicantProfileFromQuestionnaire } = await import('./ai-context.service');
-        let questionnaireData: any = null;
-        try {
-          questionnaireData = JSON.parse(app.user.bio);
-        } catch (e) {
-          // If parsing fails, skip ApplicantProfile
-          logWarn('[OpenAI][DocValidation] Failed to parse user bio as JSON (non-blocking)', {
-            documentType: document.documentType,
-            applicationId: application.id,
-          });
-        }
-        if (questionnaireData) {
-          applicantProfileData = buildApplicantProfileFromQuestionnaire(questionnaireData, {
-            country: { code: application.country.code },
-            visaType: { name: application.visaType.name },
-          });
-          logInfo('[OpenAI][DocValidation] Loaded ApplicantProfile for validation', {
-            documentType: document.documentType,
-            applicationId: application.id,
-          });
-        }
+      // Load CountryVisaPlaybook (Phase 8: Use normalized country code)
+      const playbook = getCountryVisaPlaybook(normalizedCountryCode, visaCategory);
+      if (playbook) {
+        countryPlaybookData = playbook;
+        logInfo('[OpenAI][DocValidation] Loaded CountryVisaPlaybook for validation', {
+          documentType: document.documentType,
+          applicationId: application.id,
+          countryCode: application.country.code,
+          visaCategory,
+        });
       }
-    } catch (profileError) {
-      logWarn('[OpenAI][DocValidation] Failed to load ApplicantProfile (non-blocking)', {
+    } catch (playbookError) {
+      logWarn('[OpenAI][DocValidation] Failed to load CountryVisaPlaybook (non-blocking)', {
         documentType: document.documentType,
         applicationId: application.id,
-        error: profileError instanceof Error ? profileError.message : String(profileError),
+        error: playbookError instanceof Error ? playbookError.message : String(playbookError),
       });
     }
 
-    logInfo('[OpenAI][DocValidation] Validating document with unified GPT-4', {
+    try {
+      // Build CanonicalAIUserContext (includes riskDrivers and expert fields)
+      const app = await prisma.visaApplication.findUnique({
+        where: { id: application.id },
+        include: {
+          user: true,
+        },
+      });
+      if (app) {
+        const aiUserContext = await buildAIUserContext(app.userId, application.id);
+        canonicalAIUserContextData = await buildCanonicalAIUserContext(aiUserContext);
+        logInfo('[OpenAI][DocValidation] Loaded CanonicalAIUserContext for validation', {
+          documentType: document.documentType,
+          applicationId: application.id,
+          hasRiskDrivers: !!canonicalAIUserContextData?.riskDrivers?.length,
+        });
+      }
+    } catch (contextError) {
+      logWarn('[OpenAI][DocValidation] Failed to load CanonicalAIUserContext (non-blocking)', {
+        documentType: document.documentType,
+        applicationId: application.id,
+        error: contextError instanceof Error ? contextError.message : String(contextError),
+      });
+    }
+
+    try {
+      // Extract document text (OCR) if document ID is available
+      if (document.id) {
+        const docRecord = await prisma.userDocument.findUnique({
+          where: { id: document.id },
+        });
+        if (docRecord) {
+          const text = await DocumentClassifierService.extractTextForDocument({
+            id: docRecord.id,
+            fileName: docRecord.fileName,
+            fileUrl: docRecord.fileUrl,
+            mimeType: undefined,
+          });
+          if (text) {
+            extractedText = text;
+            logInfo('[OpenAI][DocValidation] Extracted document text', {
+              documentType: document.documentType,
+              applicationId: application.id,
+              textLength: extractedText.length,
+            });
+          }
+        }
+      }
+    } catch (ocrError) {
+      logWarn('[OpenAI][DocValidation] Failed to extract document text (non-blocking)', {
+        documentType: document.documentType,
+        applicationId: application.id,
+        error: ocrError instanceof Error ? ocrError.message : String(ocrError),
+      });
+    }
+
+    logInfo('[OpenAI][DocValidation] Validating document with unified GPT-4 (Phase 5)', {
       model: AIOpenAIService.MODEL,
       documentType: document.documentType,
-      country: countryName,
+      country: canonicalCountryName,
+      countryCode: normalizedCountryCode,
+      countryCodeCanonical: normalizedCountryCode,
+      countryNameCanonical: canonicalCountryName,
+      countryConsistencyStatus: consistency.consistent ? 'consistent' : 'mismatch_detected',
       visaType: visaTypeName,
+      visaCategory,
       applicationId: application.id,
       hasRuleSet: !!visaRuleSetData,
-      hasApplicantProfile: !!applicantProfileData,
+      hasCountryPlaybook: !!countryPlaybookData,
+      hasCanonicalContext: !!canonicalAIUserContextData,
+      hasExtractedText: extractedText.length > 0,
+      riskDrivers: canonicalAIUserContextData?.riskDrivers || [],
     });
 
     const startTime = Date.now();
     const openaiClient = AIOpenAIService.getOpenAIClient();
 
-    // Build user prompt using centralized function (now with VisaRuleSet and ApplicantProfile)
+    // Phase 5: Build user prompt with comprehensive context
     const userPrompt = buildDocumentValidationUserPrompt({
       document: {
         documentType: document.documentType,
@@ -294,21 +368,29 @@ export async function validateDocumentWithAI(params: {
         fileUrl: document.fileUrl,
         uploadedAt: document.uploadedAt,
         expiryDate: document.expiryDate || undefined,
+        extractedText: extractedText || undefined, // Phase 5: Include extracted text
       },
       checklistItem: checklistItem
         ? {
             documentType: checklistItem.documentType || document.documentType,
             name: checklistItem.name,
+            nameUz: checklistItem.nameUz,
+            nameRu: checklistItem.nameUz, // Fallback if nameRu not available
             description: checklistItem.description,
+            descriptionUz: checklistItem.descriptionUz,
             whereToObtain: checklistItem.whereToObtain,
+            required: checklistItem.required,
           }
         : undefined,
       application: {
         country: countryName,
+        countryCode: application.country.code, // Phase 5
         visaType: visaTypeName,
+        visaCategory, // Phase 5
       },
-      visaRuleSet: visaRuleSetData || undefined,
-      applicantProfile: applicantProfileData || undefined,
+      visaRuleSet: visaRuleSetData || undefined, // Phase 5: Official rules
+      countryPlaybook: countryPlaybookData || undefined, // Phase 5: Country playbook
+      canonicalAIUserContext: canonicalAIUserContextData || undefined, // Phase 5: Full canonical context with riskDrivers
     });
 
     let validationResult: DocumentValidationResultAI;

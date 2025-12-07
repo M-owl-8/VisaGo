@@ -158,12 +158,14 @@ export class AIEmbassyExtractorService {
     try {
       const { countryCode, visaType, sourceUrl, pageText, pageTitle, previousRules } = params;
 
+      // Phase 4: Enhanced logging
       logInfo('[AIEmbassyExtractor] Starting extraction', {
         countryCode,
         visaType,
         sourceUrl,
         pageTextLength: pageText.length,
         hasPreviousRules: !!previousRules,
+        pageTitle: pageTitle || 'N/A',
       });
 
       // Build system prompt
@@ -241,14 +243,17 @@ export class AIEmbassyExtractorService {
       const validationResult = VisaRuleSetDataSchema.safeParse(parsed);
 
       if (!validationResult.success) {
+        // Phase 4: Enhanced error logging
         logError(
           '[AIEmbassyExtractor] Schema validation failed',
           new Error('Invalid rule set structure'),
           {
             countryCode,
             visaType,
+            sourceUrl,
             errors: validationResult.error.errors,
             parsedKeys: Object.keys(parsed),
+            truncatedTextLength: Math.min(500, pageText.length), // For debugging
           }
         );
 
@@ -257,9 +262,11 @@ export class AIEmbassyExtractorService {
         const fixedValidation = VisaRuleSetDataSchema.safeParse(fixed);
 
         if (!fixedValidation.success) {
-          throw new Error(
-            `Schema validation failed: ${validationResult.error.errors.map((e) => e.message).join(', ')}`
-          );
+          // Phase 4: Enhanced error message
+          const errorDetails = validationResult.error.errors
+            .map((e) => `${e.path.join('.')}: ${e.message}`)
+            .join('; ');
+          throw new Error(`Schema validation failed after fix attempts: ${errorDetails}`);
         }
 
         parsed = fixedValidation.data;
@@ -267,11 +274,34 @@ export class AIEmbassyExtractorService {
         parsed = validationResult.data;
       }
 
-      // Add source info
+      // Phase 4: Enhanced confidence calculation and source info
+      const confidence = this.calculateConfidence(parsed, pageText);
+
+      // Phase 4: Check if page has explicit documents section
+      const hasExplicitDocumentsSection = this.hasExplicitDocumentsSection(pageText);
+
+      // Phase 4: If page has documents section but no documents extracted, this is a problem
+      if (
+        hasExplicitDocumentsSection &&
+        (!parsed.requiredDocuments || parsed.requiredDocuments.length === 0)
+      ) {
+        logWarn('[AIEmbassyExtractor] Page has documents section but no documents extracted', {
+          countryCode,
+          visaType,
+          sourceUrl,
+          confidence,
+        });
+        // Reduce confidence
+        confidence = Math.max(0.0, confidence - 0.2);
+      }
+
+      // Add source info (confidence may have been adjusted above)
       parsed.sourceInfo = {
         extractedFrom: sourceUrl,
         extractedAt: new Date().toISOString(),
-        confidence: this.calculateConfidence(parsed, pageText),
+        confidence, // Use potentially adjusted confidence
+        // Phase 4: Add metadata about extraction quality
+        hasExplicitDocumentsSection,
       };
 
       const ruleSet = parsed as VisaRuleSetData;
@@ -672,14 +702,24 @@ Return ONLY valid JSON matching the VisaRuleSetData schema, no markdown, no expl
   }
 
   /**
-   * Calculate confidence score based on extracted data quality
+   * Calculate confidence score based on extracted data quality (Phase 4: Enhanced)
    */
   private static calculateConfidence(ruleSet: VisaRuleSetData, pageText: string): number {
     let confidence = 0.5; // Base confidence
 
+    // Phase 4: Check if page has explicit documents section
+    const hasExplicitDocumentsSection = this.hasExplicitDocumentsSection(pageText);
+
     // Increase confidence if we have required documents
     if (ruleSet.requiredDocuments && ruleSet.requiredDocuments.length > 0) {
       confidence += 0.2;
+      // Phase 4: Extra boost if documents section was found
+      if (hasExplicitDocumentsSection) {
+        confidence += 0.1;
+      }
+    } else if (hasExplicitDocumentsSection) {
+      // Phase 4: Reduce confidence if documents section exists but no documents extracted
+      confidence -= 0.2;
     }
 
     // Increase confidence if we have financial requirements
@@ -692,11 +732,47 @@ Return ONLY valid JSON matching the VisaRuleSetData schema, no markdown, no expl
       confidence += 0.1;
     }
 
+    // Phase 4: Increase confidence if we have fees
+    if (ruleSet.fees) {
+      confidence += 0.05;
+    }
+
     // Increase confidence if page text is substantial
     if (pageText.length > 1000) {
       confidence += 0.1;
     }
 
-    return Math.min(confidence, 1.0);
+    // Phase 4: Check for visa-related keywords in page text
+    const visaKeywords = [
+      'required documents',
+      'visa application',
+      'financial requirements',
+      'supporting documents',
+    ];
+    const keywordMatches = visaKeywords.filter((keyword) =>
+      pageText.toLowerCase().includes(keyword)
+    );
+    if (keywordMatches.length >= 2) {
+      confidence += 0.05;
+    }
+
+    return Math.max(0.0, Math.min(confidence, 1.0));
+  }
+
+  /**
+   * Phase 4: Check if page has explicit documents section
+   */
+  private static hasExplicitDocumentsSection(pageText: string): boolean {
+    const documentSectionKeywords = [
+      'required documents',
+      'documents to submit',
+      'supporting documents',
+      'application documents',
+      'checklist',
+      'document checklist',
+    ];
+
+    const textLower = pageText.toLowerCase();
+    return documentSectionKeywords.some((keyword) => textLower.includes(keyword));
   }
 }
