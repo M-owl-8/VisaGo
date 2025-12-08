@@ -40,7 +40,7 @@ export function ChatInput({
   };
 
   return (
-    <form onSubmit={onSubmit} className="border-t border-white/10 p-3 sm:p-4">
+    <form onSubmit={onSubmit} className="w-full">
       <div className="flex gap-2 sm:gap-3">
         <textarea
           ref={textareaRef}

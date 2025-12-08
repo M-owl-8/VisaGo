@@ -12,7 +12,6 @@ import { ChatMessageList } from '@/components/chat/ChatMessageList';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { QuickActions } from '@/components/chat/QuickActions';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import ErrorBanner from '@/components/ErrorBanner';
 
 export default function ChatPage() {
@@ -105,13 +104,17 @@ export default function ChatPage() {
     : undefined;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col px-3 py-4 text-white sm:px-4 sm:py-6 lg:px-8">
-      <ChatHeader applicationContext={applicationContext} />
+    <div className="fixed inset-0 top-16 sm:top-20 flex flex-col overflow-hidden bg-background">
+      {/* Header Section - Fixed at top */}
+      <div className="shrink-0 border-b border-white/10 bg-background/90 backdrop-blur-sm px-3 pt-4 text-white sm:px-4 sm:pt-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <ChatHeader applicationContext={applicationContext} />
+        </div>
+      </div>
 
-      {/* Chat Container */}
-      <Card className="glass-panel flex flex-1 flex-col overflow-hidden border border-white/10 bg-white/[0.03] shadow-[0_25px_55px_rgba(1,7,17,0.65)]" style={{ height: 'calc(100vh - 200px)', minHeight: '500px' }}>
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
+      {/* Messages Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-8">
+        <div className="mx-auto max-w-5xl py-4">
           {isLoading && messages.length === 0 ? (
             <div className="space-y-4">
               <div className="h-20 animate-pulse rounded-xl bg-white/5" />
@@ -119,7 +122,7 @@ export default function ChatPage() {
               <div className="h-20 animate-pulse rounded-xl bg-white/5" />
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex h-full min-h-[300px] flex-col items-center justify-center px-4 text-center sm:min-h-[400px]">
+            <div className="flex min-h-[300px] flex-col items-center justify-center px-4 text-center sm:min-h-[400px]">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 sm:mb-6 sm:h-20 sm:w-20">
                 <Sparkles size={24} className="text-primary sm:size-8" />
               </div>
@@ -140,10 +143,12 @@ export default function ChatPage() {
             <ChatMessageList messages={messages} isLoading={false} isSending={isLoading} />
           )}
         </div>
+      </div>
 
-        {/* Error Banner */}
-        {chatError && (
-          <div className="border-t border-white/10 bg-rose-500/10 p-4">
+      {/* Error Banner - Above input */}
+      {chatError && (
+        <div className="shrink-0 border-t border-white/10 bg-rose-500/10 px-3 py-3 sm:px-4 lg:px-8">
+          <div className="mx-auto max-w-5xl">
             <div className="flex items-center justify-between">
               <p className="text-sm text-rose-100">{chatError}</p>
               {lastFailedMessage && (
@@ -159,16 +164,20 @@ export default function ChatPage() {
               )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Input Area */}
-        <ChatInput
-          value={input}
-          onChange={setInput}
-          onSubmit={handleSubmit}
-          disabled={isLoading}
-        />
-      </Card>
+      {/* Input Area - Fixed at bottom */}
+      <div className="shrink-0 border-t border-white/5 bg-background/90 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            disabled={isLoading}
+          />
+        </div>
+      </div>
     </div>
   );
 }
