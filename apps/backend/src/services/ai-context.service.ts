@@ -1227,10 +1227,11 @@ export async function buildAIUserContext(
     };
     const applicationStatus = statusMap[application.status.toLowerCase()] || 'draft';
 
-    // Get country code (prefer from summary, fallback to application)
-    if (questionnaireSummary && questionnaireSummary.targetCountry) {
-      countryCode = questionnaireSummary.targetCountry;
-    }
+    // Phase 8: Always use normalized country code from application (single source of truth)
+    // Don't use questionnaireSummary.targetCountry as it may be inconsistent
+    // The application.country.code is the canonical source
+    countryCode =
+      normalizeCountryCode(application.country.code) || application.country.code.toUpperCase();
 
     // Map documents
     const uploadedDocuments = application.documents.map((doc) => ({

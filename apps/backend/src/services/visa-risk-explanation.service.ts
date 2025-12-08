@@ -354,39 +354,101 @@ export class VisaRiskExplanationService {
         .filter(([code]) => code !== normalizedCountryCode)
         .flatMap(([, names]) => names);
 
-      // Check summaries for incorrect country mentions
-      const checkText = (text: string, fieldName: string) => {
-        if (!text) return;
+      // Helper function to fix country name leakage in text
+      const fixCountryLeakage = (text: string): string => {
+        if (!text) return text;
+        let fixedText = text;
         const textLower = text.toLowerCase();
+
         for (const incorrectName of incorrectNames) {
           if (textLower.includes(incorrectName.toLowerCase())) {
-            countryMismatches.push(
-              `${fieldName} mentions "${incorrectName}" but country is ${countryName}`
-            );
-            // Replace incorrect country name with correct one
-            const regex = new RegExp(incorrectName, 'gi');
-            explanation = {
-              ...explanation,
-              [fieldName]: text.replace(regex, countryName),
-            };
+            // Replace incorrect country name with correct one (case-insensitive, whole word or phrase)
+            const escapedName = incorrectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\b${escapedName}\\b`, 'gi');
+            fixedText = fixedText.replace(regex, countryName);
+
+            // Also replace common variations
+            if (
+              incorrectName.toLowerCase() === 'uk' ||
+              incorrectName.toLowerCase() === 'united kingdom'
+            ) {
+              fixedText = fixedText.replace(/\bUK\b/gi, countryName);
+              fixedText = fixedText.replace(/\bUnited Kingdom\b/gi, countryName);
+              fixedText = fixedText.replace(/\bGreat Britain\b/gi, countryName);
+              fixedText = fixedText.replace(/\bBritain\b/gi, countryName);
+            }
+            if (
+              incorrectName.toLowerCase() === 'us' ||
+              incorrectName.toLowerCase() === 'united states' ||
+              incorrectName.toLowerCase() === 'usa'
+            ) {
+              fixedText = fixedText.replace(/\bUS\b/gi, countryName);
+              fixedText = fixedText.replace(/\bUSA\b/gi, countryName);
+              fixedText = fixedText.replace(/\bUnited States\b/gi, countryName);
+              fixedText = fixedText.replace(/\bUnited States of America\b/gi, countryName);
+            }
           }
         }
+
+        return fixedText;
       };
 
-      checkText(explanation.summaryEn, 'summaryEn');
-      checkText(explanation.summaryUz, 'summaryUz');
-      checkText(explanation.summaryRu, 'summaryRu');
+      // Check and fix summaries
+      const originalSummaryEn = explanation.summaryEn;
+      const originalSummaryUz = explanation.summaryUz;
+      const originalSummaryRu = explanation.summaryRu;
 
-      // Check recommendations
+      explanation.summaryEn = fixCountryLeakage(explanation.summaryEn);
+      explanation.summaryUz = fixCountryLeakage(explanation.summaryUz);
+      explanation.summaryRu = fixCountryLeakage(explanation.summaryRu);
+
+      // Log mismatches for summaries
+      if (explanation.summaryEn !== originalSummaryEn) {
+        countryMismatches.push('summaryEn mentions incorrect country but was corrected');
+      }
+      if (explanation.summaryUz !== originalSummaryUz) {
+        countryMismatches.push('summaryUz mentions incorrect country but was corrected');
+      }
+      if (explanation.summaryRu !== originalSummaryRu) {
+        countryMismatches.push('summaryRu mentions incorrect country but was corrected');
+      }
+
+      // Check and fix recommendations
       if (explanation.recommendations) {
-        explanation.recommendations = explanation.recommendations.map((rec: any) => {
-          let fixedRec = { ...rec };
-          checkText(rec.titleEn, 'recommendations[].titleEn');
-          checkText(rec.titleUz, 'recommendations[].titleUz');
-          checkText(rec.titleRu, 'recommendations[].titleRu');
-          checkText(rec.detailsEn, 'recommendations[].detailsEn');
-          checkText(rec.detailsUz, 'recommendations[].detailsUz');
-          checkText(rec.detailsRu, 'recommendations[].detailsRu');
+        explanation.recommendations = explanation.recommendations.map((rec: any, index: number) => {
+          const fixedRec = { ...rec };
+          let wasFixed = false;
+
+          // Fix each field
+          const originalTitleEn = fixedRec.titleEn;
+          const originalTitleUz = fixedRec.titleUz;
+          const originalTitleRu = fixedRec.titleRu;
+          const originalDetailsEn = fixedRec.detailsEn;
+          const originalDetailsUz = fixedRec.detailsUz;
+          const originalDetailsRu = fixedRec.detailsRu;
+
+          fixedRec.titleEn = fixCountryLeakage(fixedRec.titleEn || '');
+          fixedRec.titleUz = fixCountryLeakage(fixedRec.titleUz || '');
+          fixedRec.titleRu = fixCountryLeakage(fixedRec.titleRu || '');
+          fixedRec.detailsEn = fixCountryLeakage(fixedRec.detailsEn || '');
+          fixedRec.detailsUz = fixCountryLeakage(fixedRec.detailsUz || '');
+          fixedRec.detailsRu = fixCountryLeakage(fixedRec.detailsRu || '');
+
+          // Log if any field was fixed
+          if (
+            fixedRec.titleEn !== originalTitleEn ||
+            fixedRec.titleUz !== originalTitleUz ||
+            fixedRec.titleRu !== originalTitleRu ||
+            fixedRec.detailsEn !== originalDetailsEn ||
+            fixedRec.detailsUz !== originalDetailsUz ||
+            fixedRec.detailsRu !== originalDetailsRu
+          ) {
+            wasFixed = true;
+            countryMismatches.push(
+              `recommendations[${index}] mentions incorrect country but was corrected`
+            );
+          }
+
           return fixedRec;
         });
       }
