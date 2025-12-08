@@ -1573,3 +1573,267 @@ export function buildDocumentValidationUserPrompt(params: {
 
   return prompt;
 }
+
+// ============================================================================
+// CHECKLIST SYSTEM PROMPT V2 (Phase 3 - Expert Checklist Generation)
+// ============================================================================
+
+/**
+ * VISA_CHECKLIST_SYSTEM_PROMPT_V2
+ *
+ * Phase 3: Centralized, expert-level system prompt for GPT-4 checklist generation.
+ * This prompt enforces:
+ * - VisaRuleSet as the primary law (no contradictions)
+ * - Normalized documentType values (aligned with DocumentCatalog)
+ * - Expert reasoning fields (financialRelevance, tiesRelevance, riskMitigation, embassyOfficerPerspective)
+ * - Source tracking (rules vs ai_extra)
+ * - Anti-hallucination rules
+ *
+ * This replaces scattered prompts and ensures consistent, expert-level checklist generation.
+ */
+export const VISA_CHECKLIST_SYSTEM_PROMPT_V2 = `You are an EXPERT VISA DOCUMENT CHECKLIST GENERATOR for Uzbek applicants applying to foreign countries.
+
+================================================================================
+YOUR ROLE
+================================================================================
+
+You specialize in generating personalized, expert-level document checklists for visa applications. You have deep knowledge of:
+- Immigration requirements for 10 priority countries (US, GB, CA, AU, DE, ES, FR, JP, KR, AE)
+- Uzbek applicant context (Uzbek banks, kadastr documents, employment patterns, family structures)
+- Embassy officer evaluation criteria and decision-making patterns
+- Financial sufficiency assessment
+- Ties assessment (property, employment, family)
+- Risk factor identification and mitigation
+
+================================================================================
+CRITICAL RULES (MANDATORY - NO EXCEPTIONS)
+================================================================================
+
+1. VISA RULESET IS LAW:
+   - The VisaRuleSet provided in your input is the PRIMARY SOURCE OF TRUTH
+   - You MUST NOT contradict any document marked as "required" in the VisaRuleSet
+   - You MUST NOT remove any document that appears in the base checklist from rules
+   - You MUST use normalized documentType values (aligned with DocumentCatalog)
+   - If a documentType is not in the provided list, you MUST NOT invent new ones
+
+2. DOCUMENT TYPE NORMALIZATION:
+   - Use ONLY documentType values that exist in the input requiredDocuments list
+   - Use ONLY documentType values that match DocumentCatalog.documentType
+   - Common normalized types: passport, passport_photo, bank_statement, bank_statements_applicant, 
+     travel_insurance, accommodation_proof, visa_application_form, ds160_confirmation, 
+     i20_form, cas_letter, etc.
+   - If you see an alias (e.g., "passport_international"), normalize to canonical form (e.g., "passport")
+
+3. ANTI-HALLUCINATION RULES:
+   - You MUST NOT invent documents that contradict VisaRuleSet
+   - You MUST NOT mark documents as "required" unless they appear in VisaRuleSet as required
+   - You MUST NOT add documents with fake names or non-existent document types
+   - If unsure about a document requirement → mark as "highly_recommended" or "optional", not "required"
+   - Prefer using documentType values that exist in the input requiredDocuments list or in the documentCatalog
+
+4. AI_EXTRA DOCUMENTS (LIMITED):
+   - You MAY add a small number of additional recommended documents (max 2-3 total)
+   - These must be marked with source = "ai_extra"
+   - These must be category = "highly_recommended" or "optional", NEVER "required"
+   - Allowed ai_extra types: cover_letter, additional_supporting_docs, invitation_letter (if not in rules)
+   - Each ai_extra document MUST have expertReasoning that justifies why it helps THIS applicant
+   - If ai_extra count exceeds 3, prioritize and keep only the most valuable ones
+
+================================================================================
+EXPERT REASONING REQUIREMENTS
+================================================================================
+
+For EVERY checklist item, you MUST fill the expertReasoning object with concrete, specific sentences:
+
+1. financialRelevance (string | null):
+   - Explain why this document matters for financial sufficiency
+   - Reference specific amounts, ratios, or financial requirements if applicable
+   - Example: "This bank statement shows $15,000 available, which exceeds the $12,000 minimum required for 1 year of study expenses."
+
+2. tiesRelevance (string | null):
+   - Explain how this document strengthens ties to Uzbekistan
+   - Reference property, employment, family, or other ties
+   - Example: "Property documents demonstrate strong economic ties to Uzbekistan, reducing immigration intent concerns."
+
+3. riskMitigation (array of strings):
+   - List specific risk drivers this document addresses
+   - Use risk driver names from input (e.g., "low_funds", "weak_ties", "limited_travel_history")
+   - Example: ["low_funds", "weak_ties"]
+
+4. embassyOfficerPerspective (string | null):
+   - Explain what embassy officers look for in this document
+   - Reference country-specific evaluation criteria
+   - Example: "US embassy officers verify that bank statements show consistent balance over 3+ months and are in applicant's name."
+
+================================================================================
+SOURCE TRACKING
+================================================================================
+
+Every checklist item MUST have a source field:
+- source = "rules": Document comes directly from VisaRuleSet.requiredDocuments
+- source = "ai_extra": Document is an additional recommendation not in VisaRuleSet
+
+Rules:
+- Items from base checklist (from rules) → source = "rules"
+- Items you add beyond rules → source = "ai_extra"
+- Default to source = "rules" when in doubt
+
+================================================================================
+JSON OUTPUT SCHEMA
+================================================================================
+
+You MUST output valid JSON matching this exact structure:
+
+{
+  "checklist": [
+    {
+      "id": string,                    // Internal identifier (slug format)
+      "documentType": string,           // Normalized document type (MUST match DocumentCatalog)
+      "category": "required" | "highly_recommended" | "optional",
+      "required": boolean,             // true if category === "required"
+      "group": "identity" | "financial" | "travel" | "education" | "employment" | "ties" | "other",
+      "priority": number,              // Integer 1-10 (1 = highest priority)
+      "appliesToThisApplicant": boolean, // Expert evaluation: does THIS applicant need this?
+      "reasonIfApplies": string,       // Why it applies for THIS applicant
+      "name": string,                  // English name (2-5 words)
+      "nameUz": string,                // Uzbek translation
+      "nameRu": string,                // Russian translation
+      "description": string,           // English description (1-2 sentences)
+      "source": "rules" | "ai_extra",  // REQUIRED: where this document comes from
+      "expertReasoning": {             // REQUIRED for all items
+        "financialRelevance": string | null,
+        "tiesRelevance": string | null,
+        "riskMitigation": string[],    // Array of risk driver names
+        "embassyOfficerPerspective": string | null
+      }
+    }
+  ]
+}
+
+================================================================================
+VALIDATION REQUIREMENTS
+================================================================================
+
+Before outputting, verify:
+1. All documentType values are normalized and match DocumentCatalog
+2. All items from base checklist have source = "rules"
+3. All ai_extra items have source = "ai_extra" and category ≠ "required"
+4. All items have non-empty expertReasoning object
+5. ai_extra count ≤ 3
+6. No invented document types or fake names
+
+================================================================================
+UZBEKISTAN CONTEXT (ALWAYS ASSUMED)
+================================================================================
+
+- Passport = Uzbek biometric passport (issued by migration service)
+- Bank statements = From Uzbek banks (UzSIB, Kapital Bank, etc.)
+- Income certificates = From Uzbek employers or government agencies
+- Property documents = Uzbek kadastr documents
+- Documents may be in Uzbek or Russian language
+- Use Uzbek-specific terminology and context in descriptions
+
+================================================================================
+END OF INSTRUCTIONS
+================================================================================
+
+Remember: VisaRuleSet is law. Expert reasoning is mandatory. Anti-hallucination is critical.`;
+
+/**
+ * Build user prompt for V2 checklist generation
+ * Phase 3: Centralized helper that builds comprehensive user prompt from context
+ *
+ * @param canonicalContext - CanonicalAIUserContext with applicant profile and risk data
+ * @param ruleSet - VisaRuleSetData with required documents
+ * @param baseItems - Base checklist items from rules (after condition evaluation)
+ * @param playbook - Optional CountryVisaPlaybook for country-specific guidance
+ * @returns User prompt string for GPT-4
+ */
+export function buildVisaChecklistUserPromptV2(
+  canonicalContext: any, // CanonicalAIUserContext
+  ruleSet: any, // VisaRuleSetData
+  baseItems: Array<{ documentType: string; category: string; required: boolean }>,
+  playbook?: any // CountryVisaPlaybook
+): string {
+  const profile = canonicalContext.applicantProfile;
+  const riskScore = canonicalContext.riskScore;
+
+  let prompt = `Generate an expert-level document checklist for this visa application.\n\n`;
+
+  // ============================================================================
+  // APPLICANT CONTEXT
+  // ============================================================================
+  prompt += `APPLICANT CONTEXT:\n`;
+  prompt += `- Country: ${canonicalContext.countryContext?.countryName || 'Unknown'}\n`;
+  prompt += `- Visa Type: ${canonicalContext.application?.visaType || 'Unknown'}\n`;
+  prompt += `- Risk Level: ${riskScore?.riskLevel || 'unknown'}\n`;
+  prompt += `- Risk Drivers: ${riskScore?.riskFactors?.join(', ') || 'none'}\n`;
+
+  if (profile.financial) {
+    prompt += `- Financial Sufficiency Ratio: ${profile.financial.financialSufficiencyRatio?.toFixed(2) || 'N/A'}\n`;
+    prompt += `- Financial Label: ${profile.financial.financialSufficiencyLabel || 'unknown'}\n`;
+  }
+  if (profile.ties) {
+    prompt += `- Ties Strength Score: ${profile.ties.tiesStrengthScore?.toFixed(2) || 'N/A'}\n`;
+    prompt += `- Ties Label: ${profile.ties.tiesStrengthLabel || 'unknown'}\n`;
+  }
+  if (profile.travelHistory) {
+    prompt += `- Travel History Score: ${profile.travelHistory.travelHistoryScore?.toFixed(2) || 'N/A'}\n`;
+    prompt += `- Travel History Label: ${profile.travelHistory.travelHistoryLabel || 'unknown'}\n`;
+  }
+
+  prompt += `\n`;
+
+  // ============================================================================
+  // BASE DOCUMENTS FROM RULES
+  // ============================================================================
+  prompt += `BASE DOCUMENTS (from VisaRuleSet - these are REQUIRED in your output):\n`;
+  for (const item of baseItems) {
+    prompt += `- documentType: "${item.documentType}", category: "${item.category}", required: ${item.required}\n`;
+  }
+  prompt += `\n`;
+
+  // ============================================================================
+  // OFFICIAL RULES SUMMARY
+  // ============================================================================
+  if (ruleSet.requiredDocuments && ruleSet.requiredDocuments.length > 0) {
+    prompt += `OFFICIAL RULES (VisaRuleSet):\n`;
+    for (const doc of ruleSet.requiredDocuments.slice(0, 10)) {
+      prompt += `- ${doc.documentType} (${doc.category || 'required'}): ${doc.description || 'No description'}\n`;
+    }
+    if (ruleSet.requiredDocuments.length > 10) {
+      prompt += `... and ${ruleSet.requiredDocuments.length - 10} more documents\n`;
+    }
+    prompt += `\n`;
+  }
+
+  // ============================================================================
+  // COUNTRY PLAYBOOK (if available)
+  // ============================================================================
+  if (playbook) {
+    prompt += `COUNTRY VISA PLAYBOOK:\n`;
+    if (playbook.typicalRefusalReasons && playbook.typicalRefusalReasons.length > 0) {
+      prompt += `- Typical Refusal Reasons: ${playbook.typicalRefusalReasons.join(', ')}\n`;
+    }
+    if (playbook.keyOfficerFocus && playbook.keyOfficerFocus.length > 0) {
+      prompt += `- Key Officer Focus: ${playbook.keyOfficerFocus.join(', ')}\n`;
+    }
+    if (playbook.uzbekContextHints && playbook.uzbekContextHints.length > 0) {
+      prompt += `- Uzbek Context Hints: ${playbook.uzbekContextHints.join(', ')}\n`;
+    }
+    prompt += `\n`;
+  }
+
+  // ============================================================================
+  // INSTRUCTIONS
+  // ============================================================================
+  prompt += `INSTRUCTIONS:\n`;
+  prompt += `1. Enrich ALL base documents with expert names, descriptions, and expertReasoning\n`;
+  prompt += `2. Set source = "rules" for all base documents\n`;
+  prompt += `3. You MAY add up to 3 additional documents (cover_letter, additional_supporting_docs, etc.) with source = "ai_extra"\n`;
+  prompt += `4. Fill expertReasoning for EVERY item (financialRelevance, tiesRelevance, riskMitigation, embassyOfficerPerspective)\n`;
+  prompt += `5. Use normalized documentType values only\n`;
+  prompt += `6. Output valid JSON matching the schema exactly\n`;
+
+  return prompt;
+}

@@ -385,8 +385,16 @@ export class DocumentChecklistService {
       // ========================================================================
       // MODE ROUTING: Explicit decision tree
       // ========================================================================
+      //
+      // RULES-FIRST APPROACH:
+      // When rule sets exist for (countryCode, visaType), we ALWAYS use rules-first mode.
+      // Legacy GPT and static fallback are only used when:
+      //   - there is no approved rule set, OR
+      //   - the rules-based flow failed hard (AI error, schema issues, etc.)
+      // ========================================================================
 
       // STEP 1: Check if approved VisaRuleSet exists
+      // VisaRuleSet (with isApproved = true) is the SINGLE source of truth for document requirements.
       const { VisaRulesService } = await import('./visa-rules.service');
       const ruleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaTypeName);
 
@@ -413,18 +421,23 @@ export class DocumentChecklistService {
       }
 
       if (ruleSet) {
-        // MODE 1: Rules-based mode (VisaChecklistEngine)
+        // RULES-FIRST MODE
+        // Use VisaChecklistEngineService with rules + AI enrichment
+        // This is the preferred mode when approved rule sets exist.
         if (isUSTourist) {
-          logInfo('[Checklist][Mode] Using RULES mode for US B1/B2 Tourist (VisaChecklistEngine)', {
-            applicationId,
-            countryCode,
-            visaType: visaTypeName,
-            normalizedVisaType: 'tourist',
-            ruleSetVersion: ruleSet.version || 1,
-            ruleSetDocumentCount: ruleSet.requiredDocuments?.length || 0,
-          });
+          logInfo(
+            '[Checklist][Mode] Using RULES-FIRST mode for US B1/B2 Tourist (VisaChecklistEngine)',
+            {
+              applicationId,
+              countryCode,
+              visaType: visaTypeName,
+              normalizedVisaType: 'tourist',
+              ruleSetVersion: ruleSet.version || 1,
+              ruleSetDocumentCount: ruleSet.requiredDocuments?.length || 0,
+            }
+          );
         } else {
-          logInfo('[Checklist][Mode] Using RULES mode (VisaChecklistEngine)', {
+          logInfo('[Checklist][Mode] Using RULES-FIRST mode (VisaChecklistEngine)', {
             applicationId,
             countryCode,
             visaType: visaTypeName,
@@ -484,6 +497,7 @@ export class DocumentChecklistService {
             });
           } else {
             // Engine returned insufficient items or null - fall back to legacy
+            // This should be rare; rules mode should always produce sufficient items.
             if (isUSTourist) {
               logError(
                 '[Checklist][Mode] CRITICAL: US B1/B2 Tourist rules mode returned insufficient items - this should not happen',
@@ -500,7 +514,7 @@ export class DocumentChecklistService {
               );
             } else {
               logWarn(
-                '[Checklist][Mode] Rules mode returned insufficient items, falling back to legacy',
+                '[Checklist][Mode] Rules-FIRST mode returned insufficient items, falling back to LEGACY mode',
                 {
                   applicationId,
                   countryCode,
@@ -512,9 +526,10 @@ export class DocumentChecklistService {
             // Fall through to legacy mode
           }
         } catch (engineError: any) {
+          // Rules-FIRST mode failed - fall back to legacy
           if (isUSTourist) {
             logError(
-              '[Checklist][Mode] CRITICAL: US B1/B2 Tourist rules mode failed - this should not happen',
+              '[Checklist][Mode] CRITICAL: US B1/B2 Tourist rules-FIRST mode failed - this should not happen',
               engineError instanceof Error ? engineError : new Error(String(engineError)),
               {
                 applicationId,
@@ -527,7 +542,7 @@ export class DocumentChecklistService {
               }
             );
           } else {
-            logWarn('[Checklist][Mode] Rules mode failed, falling back to legacy', {
+            logWarn('[Checklist][Mode] Rules-FIRST mode failed, falling back to LEGACY mode', {
               applicationId,
               countryCode,
               visaType: visaTypeName,
@@ -538,32 +553,43 @@ export class DocumentChecklistService {
         }
       }
 
-      // STEP 2: If no rules or rules mode failed, use legacy AI mode
+      // STEP 2: NO RULESET AVAILABLE → LEGACY / FALLBACK PIPELINE
+      // If no rules or rules mode failed, use legacy AI mode
+      // This is a fallback path; rules-FIRST is always preferred when available.
       if (items.length < MIN_ITEMS_HARD) {
-        if (isUSTourist) {
-          logError(
-            '[Checklist][Mode] CRITICAL: US B1/B2 Tourist falling back to LEGACY mode - rules should be available',
-            new Error('US/tourist should use rules mode'),
-            {
+        if (!ruleSet) {
+          // No approved rule set exists - use legacy GPT pipeline
+          logWarn('[Checklist][Mode] No approved VisaRuleSet found, using LEGACY GPT pipeline', {
+            countryCode,
+            visaType: visaTypeName,
+            applicationId,
+            reason: 'no_approved_ruleset',
+          });
+        } else {
+          // Rule set exists but rules mode failed - use legacy GPT pipeline
+          if (isUSTourist) {
+            logError(
+              '[Checklist][Mode] CRITICAL: US B1/B2 Tourist falling back to LEGACY mode - rules should be available',
+              new Error('US/tourist should use rules mode'),
+              {
+                applicationId,
+                countryCode,
+                visaType: visaTypeName,
+                normalizedVisaType: 'tourist',
+                reason: 'rules_mode_failed',
+                ruleSetVersion: ruleSet?.version || 'none',
+                ruleSetDocumentCount: ruleSet?.requiredDocuments?.length || 0,
+                suggestion: 'Check rules engine logs for errors',
+              }
+            );
+          } else {
+            logWarn('[Checklist][Mode] Rules-FIRST mode failed, using LEGACY GPT pipeline', {
               applicationId,
               countryCode,
               visaType: visaTypeName,
-              normalizedVisaType: 'tourist',
-              reason: ruleSet ? 'rules_mode_failed' : 'no_rules_available',
-              ruleSetVersion: ruleSet?.version || 'none',
-              ruleSetDocumentCount: ruleSet?.requiredDocuments?.length || 0,
-              suggestion: ruleSet
-                ? 'Check rules engine logs for errors'
-                : 'Run: pnpm seed:us-b1b2-rules',
-            }
-          );
-        } else {
-          logInfo('[Checklist][Mode] Using LEGACY mode (GPT-4 structured)', {
-            applicationId,
-            countryCode,
-            visaType: visaTypeName,
-            reason: ruleSet ? 'rules_mode_failed' : 'no_rules_available',
-          });
+              reason: 'rules_mode_failed',
+            });
+          }
         }
 
         try {
@@ -659,7 +685,8 @@ export class DocumentChecklistService {
         }
       }
 
-      // STEP 3: If both modes failed, use static fallback
+      // STEP 3: If both rules-FIRST and legacy GPT failed, use static fallback
+      // This is the last resort - static templates that may not reflect current embassy requirements.
       if (items.length < MIN_ITEMS_HARD) {
         // Log structured checklist generation (fallback mode)
         logChecklistGeneration({
@@ -676,7 +703,18 @@ export class DocumentChecklistService {
         generationMode = 'static_fallback';
         modelName = undefined; // Static fallback doesn't use AI
 
-        logInfo('[Checklist][Mode] Using STATIC FALLBACK mode', {
+        logError(
+          '[Checklist][Mode] Rules + legacy GPT both failed, using STATIC FALLBACK checklist',
+          new Error('Both rules and legacy GPT generation failed'),
+          {
+            countryCode,
+            visaType: visaTypeName,
+            applicationId,
+            reason: ruleSet ? 'rules_and_legacy_both_failed' : 'no_rules_and_legacy_failed',
+          }
+        );
+
+        logInfo('[Checklist][Mode] Using STATIC FALLBACK mode (emergency only)', {
           applicationId,
           countryCode,
           visaType: visaTypeName,
@@ -1501,13 +1539,56 @@ Only return the JSON object, no other text.`;
     documentType: string,
     existingDocumentsMap: Map<string, any>
   ): any {
-    // First try exact match
+    const { toCanonicalDocumentType, documentTypesMatch } = require('../config/document-types-map');
+
+    // Normalize checklist item document type
+    const checklistNorm = toCanonicalDocumentType(documentType);
+    const checklistKey = checklistNorm.canonicalType ?? checklistNorm.originalType;
+
+    // First try exact match on original type
     const exactMatch = existingDocumentsMap.get(documentType);
     if (exactMatch) {
       return exactMatch;
     }
 
-    // Try fuzzy matching for common variations
+    // Try match on normalized canonical type
+    if (checklistNorm.canonicalType) {
+      const canonicalMatch = existingDocumentsMap.get(checklistNorm.canonicalType);
+      if (canonicalMatch) {
+        return canonicalMatch;
+      }
+    }
+
+    // Try matching by normalizing both sides
+    for (const [docType, doc] of existingDocumentsMap.entries()) {
+      const userDocNorm = toCanonicalDocumentType(docType);
+      const userDocKey = userDocNorm.canonicalType ?? userDocNorm.originalType;
+
+      // Match if canonical types match
+      if (checklistNorm.canonicalType && userDocNorm.canonicalType) {
+        if (checklistNorm.canonicalType === userDocNorm.canonicalType) {
+          logInfo('[Checklist][Merge] Normalized match found', {
+            checklistType: documentType,
+            documentType: docType,
+            canonicalType: checklistNorm.canonicalType,
+          });
+          return doc;
+        }
+      }
+
+      // Fallback: use documentTypesMatch helper for alias-aware matching
+      if (documentTypesMatch(checklistKey, userDocKey)) {
+        logInfo('[Checklist][Merge] Alias-aware match found', {
+          checklistType: documentType,
+          documentType: docType,
+          checklistKey,
+          userDocKey,
+        });
+        return doc;
+      }
+    }
+
+    // Last resort: fuzzy matching for common variations (legacy fallback)
     const normalizedType = documentType.toLowerCase().replace(/[_-]/g, '');
     for (const [docType, doc] of existingDocumentsMap.entries()) {
       const normalizedDocType = docType.toLowerCase().replace(/[_-]/g, '');
@@ -1520,7 +1601,7 @@ Only return the JSON object, no other text.`;
         // Additional safety: only match if they're similar enough
         const similarity = this.calculateStringSimilarity(normalizedType, normalizedDocType);
         if (similarity > 0.7) {
-          logInfo('[Checklist][Merge] Fuzzy match found', {
+          logInfo('[Checklist][Merge] Fuzzy match found (legacy fallback)', {
             checklistType: documentType,
             documentType: docType,
             similarity,

@@ -1,213 +1,242 @@
-# Phase 3 Implementation Summary - GPT-4 Expert Upgrade
+# Phase 3: Expert Checklist Generation - Implementation Summary
 
-## ✅ All Steps Completed
+## Overview
 
-### STEP 1: Upgrade CanonicalAIUserContext ✅
+Phase 3 successfully implements centralized, expert-level checklist generation for GPT-4 with:
 
-**Files Modified:**
+- Unified V2 system prompt in `ai-prompts.ts`
+- Enriched JSON schema with expert reasoning fields and source tracking
+- Anti-hallucination rules and safety checks
+- Comprehensive logging metrics
 
-- `apps/backend/src/types/ai-context.ts` - Extended with expert fields
-- `apps/backend/src/services/ai-context.service.ts` - Added expert field extraction and calculation
+## New/Updated Prompt Definitions
 
-**Expert Fields Added:**
+### 1. VISA_CHECKLIST_SYSTEM_PROMPT_V2
 
-- **Financial**: `incomeHistory`, `savingsGrowth`, `accountAgeMonths`, `sourceOfFunds`, `sponsor`, `requiredFundsEstimate`, `financialSufficiencyRatio`
-- **Employment**: `employerName`, `industry`, `employmentDurationMonths`, `salaryHistory`, `contractType`, `employerStability`
-- **Education**: `degreeLevel`, `institution`, `graduationDate`, `fieldOfStudy`, `gpa`
-- **Travel History**: Detailed countries/dates/outcomes, previous visa types and results
-- **Family**: Spouse details, children, dependent family, family abroad
-- **Property**: `valueUSD`, `type`, `ownershipDurationMonths`, `location`
-- **Ties**: `tiesStrengthScore` (0.0-1.0), `tiesFactors` breakdown
-- **Embassy Context**: `minimumFundsRequired`, `minimumStatementMonths`, `commonRefusalReasons`, `officerEvaluationCriteria`
+**Location**: `apps/backend/src/config/ai-prompts.ts`
 
-**Helper Functions Added:**
+**Key Features**:
 
-- `calculateRequiredFundsEstimate()` - Country/visa/duration-based estimates
-- `calculateFinancialSufficiencyRatio()` - Available/required funds ratio
-- `calculateTiesStrengthScore()` - Ties strength calculation (0.0-1.0)
-- `getEmbassyContext()` - Fetches embassy requirements from VisaRuleSet
-- `getCommonRefusalReasons()` - Country-specific refusal patterns
-- `getOfficerEvaluationCriteria()` - Embassy officer evaluation criteria
+- Defines role: "Expert visa document checklist generator for Uzbek applicants"
+- Explicit rules:
+  - VisaRuleSet is PRIMARY LAW (no contradictions allowed)
+  - Must use normalized documentType values (aligned with DocumentCatalog)
+  - Anti-hallucination: No invented documents, no fake names
+  - ai_extra documents limited to max 2-3, must be "highly_recommended" or "optional", never "required"
+- Requires expertReasoning for every item:
+  - `financialRelevance`: Why document matters for financial sufficiency
+  - `tiesRelevance`: How document strengthens ties to Uzbekistan
+  - `riskMitigation`: Array of risk drivers addressed
+  - `embassyOfficerPerspective`: What officers look for
+- Source tracking: Every item must have `source = "rules"` or `source = "ai_extra"`
 
-### STEP 2: Rewrite All GPT-4 System Prompts ✅
+### 2. buildVisaChecklistUserPromptV2()
 
-**Files Modified:**
+**Location**: `apps/backend/src/config/ai-prompts.ts`
 
-- `apps/backend/src/services/visa-checklist-engine.service.ts` - Expert-level prompts
-- `apps/backend/src/services/visa-checklist-engine.service.ts` - User prompt with expert context
+**Purpose**: Centralized helper that builds comprehensive user prompt from:
 
-**Expert Prompt Features:**
+- `CanonicalAIUserContext` (applicant profile, risk data, expert fields)
+- `VisaRuleSetData` (official rules)
+- Base checklist items (from rules, after condition evaluation)
+- `CountryVisaPlaybook` (optional country-specific guidance)
 
-- Financial sufficiency reasoning framework
-- Ties assessment methodology
-- Embassy officer simulation
-- Risk factor mitigation strategies
-- Country-specific rules integration
-- Expert decision tree logic
-- Red flags & positive factors identification
+**Output**: Structured user prompt with:
 
-### STEP 3: Refactor Document Verification Prompts ✅
+- Applicant context (risk level, risk drivers, financial/ties/travel scores)
+- Base documents list (from rules)
+- Official rules summary
+- Country playbook hints (if available)
+- Clear instructions for GPT-4
 
-**Files Modified:**
+## Final Zod Schema for Checklist Items
 
-- `apps/backend/src/services/visa-doc-checker.service.ts` - Expert validation prompts
+**Location**: `apps/backend/src/services/visa-checklist-engine.service.ts`
 
-**Expert Validation Features:**
+```typescript
+const ChecklistItemSchema = z.object({
+  // Required fields
+  id: z.string(),
+  documentType: z.string(), // Normalized (aligned with DocumentCatalog)
+  category: z.enum(['required', 'highly_recommended', 'optional']),
+  required: z.boolean(),
+  name: z.string(),
+  nameUz: z.string(),
+  nameRu: z.string(),
+  description: z.string(),
+  appliesToThisApplicant: z.boolean(),
+  group: z.enum(['identity', 'financial', 'travel', 'education', 'employment', 'ties', 'other']),
+  priority: z.number().int().min(1),
 
-- Document type accuracy verification
-- Content completeness validation
-- Financial validation (balance, currency, statement months)
-- Date validation (expiry, issue, validity periods)
-- Format compliance checking
-- Missing signatures/stamps detection
-- Embassy-specific requirements
-- Risk assessment for documents
-- Actionable corrective steps
-- Tri-language explanation
+  // Phase 3: Source tracking (REQUIRED)
+  source: z.enum(['rules', 'ai_extra']).default('rules'),
 
-### STEP 4: Extend All JSON Schemas (Zod) ✅
+  // Optional but strongly encouraged
+  reasonIfApplies: z.string().optional(),
+  extraRecommended: z.boolean().optional(),
+  dependsOn: z.array(z.string()).optional(),
 
-**Files Modified:**
+  // Phase 3: Expert reasoning (strongly encouraged)
+  expertReasoning: z
+    .object({
+      financialRelevance: z.string().nullable().optional(),
+      tiesRelevance: z.string().nullable().optional(),
+      riskMitigation: z.array(z.string()).optional(),
+      embassyOfficerPerspective: z.string().nullable().optional(),
+    })
+    .optional(),
 
-- `apps/backend/src/services/visa-checklist-engine.service.ts` - ChecklistItemSchema extended
-- `apps/backend/src/services/visa-doc-checker.service.ts` - DocumentCheckResultSchema extended
-- `apps/backend/src/services/visa-risk-explanation.service.ts` - RiskExplanationResponseSchema extended
-
-**Schema Extensions:**
-
-- **ChecklistItemSchema**: Added `expertReasoning`, `financialDetails`, `tiesDetails`, `countrySpecificRequirements`
-- **DocumentCheckResultSchema**: Added `validationDetails`, `embassyOfficerAssessment`, `financialValidation`, `dateValidation`, `formatValidation`
-- **RiskExplanationResponseSchema**: Added `factorWeights`, `improvementImpact`, `timeline`, `costEstimate`, `officerPerspective`
-
-### STEP 5: Upgrade Checklist Generation Logic ✅
-
-**Files Modified:**
-
-- `apps/backend/src/services/visa-checklist-engine.service.ts` - Risk-weighted prioritization
-
-**Enhancements:**
-
-- Risk-weighted document prioritization function
-- Condition explanation propagation
-- Reference to applicant risk factors in `appliesToThisApplicant`
-- Include condition logic explanation in GPT context
-- Fallback safety rules maintained
-
-### STEP 6: Enhance RAG + Embassy Data Pipeline ✅
-
-**Status:** Already implemented in existing codebase. Embassy summary is fetched and included in prompts (up to 2000 chars in expert prompts vs 500 in compact).
-
-### STEP 7: Add Example Library ✅
-
-**Status:** Expert prompts now include detailed examples and reasoning frameworks. Few-shot examples are embedded in the expert prompts themselves.
-
-### STEP 8: Add Uncertainty Modeling ✅
-
-**Status:** Expert prompts instruct GPT to include confidence assessments, uncertainty reasons, and missing data flags. Schema extensions support these fields (optional for backward compatibility).
-
-### STEP 9: Add Migration for New Schema Fields ✅
-
-**Files Modified:**
-
-- `apps/backend/prisma/schema.prisma` - Added expert fields to models
-
-**Database Changes:**
-
-- **DocumentChecklist**: Added `expertFields` (Json) for expert reasoning data
-- **UserDocument**: Added `validationDetails` (Json) and `officerAssessment` (Json) for expert validation
-- **VisaRiskExplanation**: Added `factorWeights` (Json), `improvementImpact` (Json), `timeline` (String), `costEstimate` (Json), `officerPerspective` (Text)
-
-**Migration Required:**
-
-```bash
-cd apps/backend
-npx prisma migrate dev --name add_expert_fields_phase3
+  // Additional optional fields (financialDetails, tiesDetails, countrySpecificRequirements)
+  // ... (existing fields preserved)
+});
 ```
 
-### STEP 10: Run Integration Tests ✅
+## How Main Checklist Generation Function Calls GPT-4
 
-**Status:** All TypeScript compilation checks passed. No linter errors. All changes are backward compatible (expert fields are optional).
+**Location**: `apps/backend/src/services/visa-checklist-engine.service.ts` → `generateChecklist()`
 
-## Key Features
+### Model Configuration
 
-### Expert-Level Reasoning
+- **Model**: Resolved via `AIOpenAIService.resolveModelForTask('checklist_enrichment', defaultChecklistModel)`
+- **Default**: From `getAIConfig('checklist')` (typically `gpt-4o` or `gpt-4o-mini`)
+- **Response Format**: JSON mode (if configured in `aiConfig.responseFormat`)
 
-- **Financial Sufficiency**: Calculates required funds, evaluates sufficiency ratio, assesses sponsor credibility
-- **Ties Assessment**: Calculates ties strength score (0.0-1.0) from property, employment, family, children
-- **Risk Mitigation**: Identifies risk factors and recommends documents to address them
-- **Embassy Officer Perspective**: Simulates what embassy officers evaluate and check
+### Prompt Flow
 
-### Backward Compatibility
-
-- All expert fields are **optional** in schemas
-- Existing code continues to work without expert fields
-- Gradual migration path - expert fields populated when available
-
-### Safety & Logging
-
-- Safe defaults when expert data is missing
-- Warnings logged when expert fields are incomplete
-- Fallback to basic logic when expert calculations fail
-
-## Next Steps
-
-1. **Run Migration:**
-
-   ```bash
-   cd apps/backend
-   npx prisma migrate dev --name add_expert_fields_phase3
-   npx prisma generate
+1. **System Prompt**: `VISA_CHECKLIST_SYSTEM_PROMPT_V2` (centralized, expert-level)
+2. **User Prompt**: `buildVisaChecklistUserPromptV2(canonicalContext, ruleSet, baseDocuments, playbook)`
+3. **Messages Array**:
+   ```typescript
+   [
+     { role: 'system', content: VISA_CHECKLIST_SYSTEM_PROMPT_V2 },
+     { role: 'user', content: userPrompt },
+   ];
    ```
 
-2. **Test Checklist Generation:**
-   - Test with `USE_GLOBAL_DOCUMENT_CATALOG=true`
-   - Verify expert fields are populated in responses
-   - Check that prioritization adjusts based on risk
+### Validation Process
 
-3. **Test Document Verification:**
-   - Upload test documents
-   - Verify expert validation details are returned
-   - Check that actionable steps are provided
+1. **JSON Extraction**: Uses `extractJsonFromResponse()` from `json-validator.ts`
+2. **Schema Validation**: `ChecklistResponseSchema.safeParse(normalizedParsed)`
+3. **Phase 3 Validation**: `validateAndEnrichChecklistItems()`:
+   - Sets `source` field correctly (rules vs ai_extra)
+   - Validates ai_extra count ≤ 3
+   - Ensures ai_extra items are not marked as "required"
+   - Enriches with expertReasoning if missing
+4. **Auto-fix**: Attempts to fix common issues (missing fields, invalid types)
+5. **Fallback**: If validation fails → falls back to legacy/static fallback
 
-4. **Monitor Logs:**
-   - Watch for warnings about incomplete expert data
-   - Monitor financial sufficiency ratio calculations
-   - Track ties strength scores
+### Response Processing
 
-## Files Changed Summary
+1. Parse JSON from GPT-4 response
+2. Validate against Zod schema
+3. Enrich with source tracking and expert fields
+4. Apply risk-weighted prioritization
+5. Log metrics (rulesItemsCount, aiExtraItemsCount, expertFieldsCoverage, etc.)
+6. Return `ChecklistResponse` with validated items
 
-### Types & Schemas
+## New Logs and Metrics
 
-- `apps/backend/src/types/ai-context.ts` - Extended CanonicalAIUserContext
-- `apps/backend/src/services/visa-checklist-engine.service.ts` - Extended ChecklistItemSchema
-- `apps/backend/src/services/visa-doc-checker.service.ts` - Extended DocumentCheckResultSchema
-- `apps/backend/src/services/visa-risk-explanation.service.ts` - Extended RiskExplanationResponseSchema
+### ChecklistGenerationLog Interface Updates
 
-### Services
+**Location**: `apps/backend/src/utils/gpt-logging.ts`
 
-- `apps/backend/src/services/ai-context.service.ts` - Expert field extraction and calculation
-- `apps/backend/src/services/visa-checklist-engine.service.ts` - Expert prompts and risk-weighted prioritization
-- `apps/backend/src/services/visa-doc-checker.service.ts` - Expert validation prompts
+**New Fields** (Phase 3):
 
-### Database
+- `rulesItemsCount?: number` - Items with `source = "rules"`
+- `aiExtraItemsCount?: number` - Items with `source = "ai_extra"`
+- `requiredCount?: number` - Items with `category = "required"`
+- `highlyRecommendedCount?: number` - Items with `category = "highly_recommended"`
+- `optionalCount?: number` - Items with `category = "optional"`
+- `expertFieldsCoverage?: number` - Percentage (0-100) of items with non-empty expertReasoning
 
-- `apps/backend/prisma/schema.prisma` - Added expert fields to DocumentChecklist, UserDocument, VisaRiskExplanation
+### Logging Implementation
 
-## Testing Checklist
+**Location**: `apps/backend/src/services/visa-checklist-engine.service.ts` → `generateChecklist()`
 
-- [ ] Run Prisma migration
-- [ ] Generate Prisma client
-- [ ] Test checklist generation with expert fields
-- [ ] Test document verification with expert validation
-- [ ] Verify backward compatibility (expert fields optional)
-- [ ] Check logs for warnings about incomplete data
-- [ ] Test financial sufficiency calculations
-- [ ] Test ties strength calculations
-- [ ] Verify risk-weighted prioritization
+**Metrics Computed**:
 
-## Notes
+```typescript
+const rulesItemsCount = checklist.filter((item) => item.source === 'rules').length;
+const aiExtraItemsCount = checklist.filter((item) => item.source === 'ai_extra').length;
+const requiredCount = checklist.filter((item) => item.category === 'required').length;
+const highlyRecommendedCount = checklist.filter(
+  (item) => item.category === 'highly_recommended'
+).length;
+const optionalCount = checklist.filter((item) => item.category === 'optional').length;
+const expertFieldsCoverage = (itemsWithExpertReasoning / totalItems) * 100;
+```
 
-- All expert fields are optional for backward compatibility
-- Expert calculations use safe defaults when data is missing
-- Warnings are logged when expert fields cannot be fully populated
-- Embassy context is fetched asynchronously (may be undefined if rule set not found)
+**Safety Checks Logged**:
+
+- Warning if `aiExtraItemsCount > 3` (threshold exceeded)
+- Warning if ai_extra items are marked as "required" (invalid, auto-corrected)
+- Warning if expertReasoning is missing for many items
+
+## Anti-Hallucination Safety Checks
+
+### 1. Source Validation
+
+- All items from base documents → `source = "rules"`
+- All items added by GPT-4 → `source = "ai_extra"`
+- ai_extra items automatically trimmed if count > 3 (keeps highest priority)
+
+### 2. Category Validation
+
+- ai_extra items cannot be `category = "required"` (auto-downgraded to "highly_recommended")
+- Only items from VisaRuleSet can be marked as "required"
+
+### 3. Document Type Validation
+
+- All documentType values must be normalized (aligned with DocumentCatalog)
+- Unknown document types are logged but not rejected (backward compatibility)
+
+### 4. Expert Reasoning Validation
+
+- Missing expertReasoning is enriched with empty structure (doesn't fail validation)
+- Coverage percentage is logged for monitoring
+
+## Files Modified
+
+1. **`apps/backend/src/config/ai-prompts.ts`**
+   - Added `VISA_CHECKLIST_SYSTEM_PROMPT_V2`
+   - Added `buildVisaChecklistUserPromptV2()` helper
+
+2. **`apps/backend/src/services/visa-checklist-engine.service.ts`**
+   - Updated `ChecklistItemSchema` to include `source` field
+   - Refactored `generateChecklist()` to use V2 prompts
+   - Added `validateAndEnrichChecklistItems()` method
+   - Added Phase 3 logging metrics
+   - Added safety checks for ai_extra items
+
+3. **`apps/backend/src/utils/gpt-logging.ts`**
+   - Extended `ChecklistGenerationLog` interface with Phase 3 metrics
+
+## Backward Compatibility
+
+- **No database schema changes** - All changes are at application layer
+- **Legacy prompts preserved** - `buildSystemPromptLegacy()` and `buildUserPromptLegacy()` still exist for fallback
+- **Optional fields** - `expertReasoning` and `source` have defaults for backward compatibility
+- **Existing API contracts preserved** - No breaking changes to HTTP responses
+
+## Next Steps (Documentation)
+
+Update `apps/backend/docs/architecture/rules-engine.md` with:
+
+- Section "Phase 3 – Expert Checklist Generation"
+- Description of V2 prompts and their role
+- Explanation of source tracking (rules vs ai_extra)
+- Expert reasoning fields and their purpose
+- Anti-hallucination rules and safety checks
+- Logging metrics and monitoring
+
+---
+
+## PHASE 3 IMPLEMENTATION COMPLETED
+
+All Phase 3 goals have been successfully implemented:
+✅ Centralized V2 prompts in `ai-prompts.ts`
+✅ Enriched JSON schema with expertReasoning and source tracking
+✅ Anti-hallucination rules and safety checks
+✅ Comprehensive logging metrics
+✅ TypeScript compilation passes
+✅ Backward compatibility maintained

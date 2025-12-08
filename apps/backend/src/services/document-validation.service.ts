@@ -24,6 +24,7 @@ import {
   DOCUMENT_VALIDATION_SYSTEM_PROMPT,
   buildDocumentValidationUserPrompt,
 } from '../config/ai-prompts';
+import { toCanonicalDocumentType, logUnknownDocumentType } from '../config/document-types-map';
 
 const prisma = new PrismaClient();
 
@@ -63,6 +64,17 @@ export async function validateDocumentWithAI(params: {
   try {
     const { document, checklistItem, application, countryName, visaTypeName } = params;
 
+    // Normalize document type
+    const norm = toCanonicalDocumentType(document.documentType);
+    if (!norm.canonicalType) {
+      logUnknownDocumentType(document.documentType, {
+        source: 'doc-validation',
+        documentId: document.id,
+        applicationId: application.id,
+      });
+    }
+    const effectiveDocumentType = norm.canonicalType ?? document.documentType;
+
     // Phase 8: Normalize country code using CountryRegistry
     const normalizedCountryCode =
       normalizeCountryCode(application.country.code) || application.country.code.toUpperCase();
@@ -88,11 +100,16 @@ export async function validateDocumentWithAI(params: {
 
       if (ruleSet) {
         // Find matching required document from rule set
-        const matchingRule = ruleSet.requiredDocuments?.find(
-          (reqDoc: any) =>
-            reqDoc.documentType?.toLowerCase() === document.documentType.toLowerCase() ||
-            reqDoc.name?.toLowerCase().includes(document.documentType.toLowerCase())
-        );
+        // Normalize both sides for matching
+        const { documentTypesMatch } = require('../config/document-types-map');
+        const matchingRule = ruleSet.requiredDocuments?.find((reqDoc: any) => {
+          // Try exact match first
+          if (documentTypesMatch(reqDoc.documentType, effectiveDocumentType)) {
+            return true;
+          }
+          // Fallback: name-based matching
+          return reqDoc.name?.toLowerCase().includes(effectiveDocumentType.toLowerCase());
+        });
 
         if (matchingRule) {
           logInfo('[DocValidation] Using VisaDocCheckerService', {
@@ -363,7 +380,7 @@ export async function validateDocumentWithAI(params: {
     // Phase 5: Build user prompt with comprehensive context
     const userPrompt = buildDocumentValidationUserPrompt({
       document: {
-        documentType: document.documentType,
+        documentType: effectiveDocumentType,
         fileName: document.fileName,
         fileUrl: document.fileUrl,
         uploadedAt: document.uploadedAt,
@@ -403,7 +420,8 @@ export async function validateDocumentWithAI(params: {
         task: 'docVerification',
         applicationId: application.id,
         model: aiConfig.model,
-        documentType: document.documentType,
+        documentType: effectiveDocumentType,
+        originalDocumentType: document.documentType,
         countryCode: application.country.code,
         visaType: application.visaType.name,
         temperature: aiConfig.temperature,
@@ -432,7 +450,8 @@ export async function validateDocumentWithAI(params: {
         task: 'docVerification',
         applicationId: application.id,
         model: aiConfig.model,
-        documentType: document.documentType,
+        documentType: effectiveDocumentType,
+        originalDocumentType: document.documentType,
         tokensUsed: totalTokens,
         responseTimeMs: responseTime,
       });

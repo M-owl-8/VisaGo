@@ -97,6 +97,8 @@ model VisaType {
   validity       String // Duration of visa validity
   fee            Float // In USD
   requirements   String // JSON with requirement details
+  /// @deprecated Legacy field. Do not use as a primary rules source.
+  /// VisaRuleSet is the canonical source for document requirements.
   documentTypes  String // JSON array of required document types
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

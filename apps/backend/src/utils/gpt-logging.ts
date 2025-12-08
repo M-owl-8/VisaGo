@@ -36,6 +36,13 @@ export interface ChecklistGenerationLog {
   countryCodeCanonical?: string;
   countryNameCanonical?: string;
   countryConsistencyStatus?: 'consistent' | 'corrected' | 'mismatch_detected';
+  // Phase 3: Source tracking and expert fields metrics
+  rulesItemsCount?: number; // Items with source = "rules"
+  aiExtraItemsCount?: number; // Items with source = "ai_extra"
+  requiredCount?: number; // Items with category = "required"
+  highlyRecommendedCount?: number; // Items with category = "highly_recommended"
+  optionalCount?: number; // Items with category = "optional"
+  expertFieldsCoverage?: number; // Percentage of items with non-empty expertReasoning (0-100)
 }
 
 export interface DocumentVerificationLog {

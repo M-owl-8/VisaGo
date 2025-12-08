@@ -1,6 +1,20 @@
 /**
+ * STATIC FALLBACK CHECKLISTS
+ *
+ * WARNING:
+ * These are emergency-only checklists used when:
+ * - there is no approved VisaRuleSet for (country, visaType), OR
+ * - both rules-based and legacy GPT-based generation have failed.
+ *
+ * They MUST NOT be used as a primary or canonical source of truth
+ * for document requirements.
+ *
+ * Canonical source: VisaRuleSet (+ VisaRuleReference + DocumentCatalog).
+ *
+ * ========================================================================
  * Emergency Fallback Checklists
  * Categorized fallback sets for each country/visa type combination
+ * ========================================================================
  */
 
 export interface FallbackChecklistItem {

@@ -10,6 +10,7 @@ import { CanonicalAIUserContext } from '../types/ai-context';
 import { buildCanonicalAIUserContext } from './ai-context.service';
 import { getEnvConfig } from '../config/env';
 import { PrismaClient } from '@prisma/client';
+import { toCanonicalDocumentType, logUnknownDocumentType } from '../config/document-types-map';
 
 const prisma = new PrismaClient();
 
@@ -111,8 +112,21 @@ async function buildBaseChecklistFromCatalogReferences(
             `Condition evaluation failed for ${catalogDoc.documentType}: ${ref.condition}`
           );
           const effectiveCategory = ref.categoryOverride || catalogDoc.defaultCategory;
+
+          // Normalize document type
+          const norm = toCanonicalDocumentType(catalogDoc.documentType);
+          if (!norm.canonicalType) {
+            logUnknownDocumentType(catalogDoc.documentType, {
+              source: 'VisaRuleReference.DocumentCatalog (condition failed)',
+              countryCode,
+              visaType,
+              ruleSetId,
+            });
+          }
+          const documentType = norm.canonicalType ?? catalogDoc.documentType;
+
           checklist.push({
-            documentType: catalogDoc.documentType,
+            documentType,
             category: effectiveCategory as 'required' | 'highly_recommended' | 'optional',
             required: effectiveCategory === 'required',
           });
@@ -125,8 +139,20 @@ async function buildBaseChecklistFromCatalogReferences(
       const effectiveCategory = ref.categoryOverride || catalogDoc.defaultCategory;
       const required = effectiveCategory === 'required';
 
+      // Normalize document type
+      const norm = toCanonicalDocumentType(catalogDoc.documentType);
+      if (!norm.canonicalType) {
+        logUnknownDocumentType(catalogDoc.documentType, {
+          source: 'VisaRuleReference.DocumentCatalog',
+          countryCode,
+          visaType,
+          ruleSetId,
+        });
+      }
+      const documentType = norm.canonicalType ?? catalogDoc.documentType;
+
       checklist.push({
-        documentType: catalogDoc.documentType,
+        documentType,
         category: effectiveCategory as 'required' | 'highly_recommended' | 'optional',
         required,
       });
@@ -228,8 +254,18 @@ async function buildBaseChecklistFromEmbeddedDocuments(
           conditionWarnings.push(
             `Condition evaluation failed for ${doc.documentType}: ${doc.condition}`
           );
+
+          // Normalize document type
+          const norm = toCanonicalDocumentType(doc.documentType);
+          if (!norm.canonicalType) {
+            logUnknownDocumentType(doc.documentType, {
+              source: 'VisaRuleSet.requiredDocuments (condition failed)',
+            });
+          }
+          const documentType = norm.canonicalType ?? doc.documentType;
+
           checklist.push({
-            documentType: doc.documentType,
+            documentType,
             category: 'highly_recommended', // Downgrade to highly_recommended
             required: false,
           });
@@ -242,8 +278,17 @@ async function buildBaseChecklistFromEmbeddedDocuments(
       // Map category to required boolean
       const required = doc.category === 'required';
 
+      // Normalize document type
+      const norm = toCanonicalDocumentType(doc.documentType);
+      if (!norm.canonicalType) {
+        logUnknownDocumentType(doc.documentType, {
+          source: 'VisaRuleSet.requiredDocuments',
+        });
+      }
+      const documentType = norm.canonicalType ?? doc.documentType;
+
       checklist.push({
-        documentType: doc.documentType,
+        documentType,
         category: doc.category,
         required,
       });

@@ -26,14 +26,18 @@ import {
   getCountryNameFromCode,
   assertCountryConsistency,
 } from '../config/country-registry';
+import {
+  VISA_CHECKLIST_SYSTEM_PROMPT_V2,
+  buildVisaChecklistUserPromptV2,
+} from '../config/ai-prompts';
 
 /**
  * Checklist Item Schema (using Zod for validation)
- * Phase 3: Extended with expert fields
+ * Phase 3: Extended with expert fields and source tracking
  */
 const ChecklistItemSchema = z.object({
   id: z.string(),
-  documentType: z.string(),
+  documentType: z.string(), // Normalized document type (aligned with DocumentCatalog)
   category: z.enum(['required', 'highly_recommended', 'optional']),
   required: z.boolean(),
   name: z.string(),
@@ -42,17 +46,19 @@ const ChecklistItemSchema = z.object({
   description: z.string(),
   appliesToThisApplicant: z.boolean(),
   reasonIfApplies: z.string().optional(),
-  extraRecommended: z.boolean(),
+  extraRecommended: z.boolean().optional(),
   group: z.enum(['identity', 'financial', 'travel', 'education', 'employment', 'ties', 'other']),
   priority: z.number().int().min(1),
   dependsOn: z.array(z.string()).optional(),
-  // Phase 3: Expert fields (optional for backward compatibility)
+  // Phase 3: Source tracking (REQUIRED)
+  source: z.enum(['rules', 'ai_extra']).default('rules'),
+  // Phase 3: Expert fields (strongly encouraged, but optional for backward compatibility)
   expertReasoning: z
     .object({
-      financialRelevance: z.string().optional(), // Why this document matters for financial sufficiency
-      tiesRelevance: z.string().optional(), // How this document strengthens ties
+      financialRelevance: z.string().nullable().optional(), // Why this document matters for financial sufficiency
+      tiesRelevance: z.string().nullable().optional(), // How this document strengthens ties
       riskMitigation: z.array(z.string()).optional(), // Risk factors this document addresses
-      embassyOfficerPerspective: z.string().optional(), // What officers look for
+      embassyOfficerPerspective: z.string().nullable().optional(), // What officers look for
     })
     .optional(),
   financialDetails: z
@@ -274,23 +280,16 @@ export class VisaChecklistEngineService {
         });
       }
 
-      // Step 4: Build compact system prompt
-      const useCompactPrompts = process.env.USE_COMPACT_CHECKLIST_PROMPTS !== 'false'; // Default: true
-      const systemPrompt = useCompactPrompts
-        ? this.buildSystemPrompt(
-            countryCode,
-            visaType,
-            ruleSet,
-            embassySummary,
-            playbook || undefined
-          )
-        : this.buildSystemPromptLegacy(countryCode, visaType, ruleSet, playbook || undefined);
+      // Step 4: Build canonical context for V2 prompts
+      const canonicalContext = await buildCanonicalAIUserContext(aiUserContext);
 
-      // Step 5: Build compact user prompt with base documents
-      const userPrompt = await this.buildUserPrompt(
-        aiUserContext,
+      // Step 5: Use Phase 3 V2 prompts (centralized, expert-level)
+      const systemPrompt = VISA_CHECKLIST_SYSTEM_PROMPT_V2;
+      const userPrompt = buildVisaChecklistUserPromptV2(
+        canonicalContext,
+        ruleSet,
         baseDocuments,
-        previousChecklist
+        playbook || undefined
       );
 
       // Step 4: Resolve model from registry (with fallback)
@@ -521,6 +520,7 @@ export class VisaChecklistEngineService {
                 extraRecommended: false,
                 group: 'other',
                 priority: filtered.length + 1,
+                source: 'rules' as const, // Phase 3: Missing items are from rules
               });
             }
           }
@@ -612,9 +612,15 @@ export class VisaChecklistEngineService {
         jsonValidationPassed = true;
       }
 
+      // Phase 3: Validate and enrich checklist items
+      const validatedChecklist = this.validateAndEnrichChecklistItems(
+        validationResult.success ? validationResult.data.checklist : parsed.checklist,
+        baseDocuments
+      );
+
       // Phase 3: Apply risk-weighted prioritization
       const canonical = await buildCanonicalAIUserContext(aiUserContext);
-      parsed.checklist = this.applyRiskWeightedPrioritization(parsed.checklist, canonical);
+      parsed.checklist = this.applyRiskWeightedPrioritization(validatedChecklist, canonical);
 
       // Get condition warnings from base documents (reuse already computed baseDocuments)
       const conditionWarnings: string[] = [];
@@ -631,7 +637,40 @@ export class VisaChecklistEngineService {
       const riskDrivers = (canonical as any)?.riskDrivers || [];
       const riskLevel = canonical?.riskScore?.level || 'medium';
 
-      // Log structured checklist generation
+      // Phase 3: Compute logging metrics
+      const rulesItemsCount = parsed.checklist.filter(
+        (item: ChecklistItem) => item.source === 'rules'
+      ).length;
+      const aiExtraItemsCount = parsed.checklist.filter(
+        (item: ChecklistItem) => item.source === 'ai_extra'
+      ).length;
+      const requiredCount = parsed.checklist.filter(
+        (item: ChecklistItem) => item.category === 'required'
+      ).length;
+      const highlyRecommendedCount = parsed.checklist.filter(
+        (item: ChecklistItem) => item.category === 'highly_recommended'
+      ).length;
+      const optionalCount = parsed.checklist.filter(
+        (item: ChecklistItem) => item.category === 'optional'
+      ).length;
+
+      // Calculate expert fields coverage
+      const itemsWithExpertReasoning = parsed.checklist.filter((item: ChecklistItem) => {
+        const er = item.expertReasoning;
+        return (
+          er &&
+          (er.financialRelevance ||
+            er.tiesRelevance ||
+            (er.riskMitigation && er.riskMitigation.length > 0) ||
+            er.embassyOfficerPerspective)
+        );
+      }).length;
+      const expertFieldsCoverage =
+        parsed.checklist.length > 0
+          ? (itemsWithExpertReasoning / parsed.checklist.length) * 100
+          : 0;
+
+      // Log structured checklist generation with Phase 3 metrics
       logChecklistGeneration({
         applicationId,
         country: contextCountryName,
@@ -654,7 +693,23 @@ export class VisaChecklistEngineService {
         rulesConfidence: ruleSet?.sourceInfo?.confidence ?? null,
         playbookCountryCode: playbook?.countryCode,
         playbookVisaCategory: playbook?.visaCategory,
+        // Phase 3: Source tracking and expert fields metrics
+        rulesItemsCount,
+        aiExtraItemsCount,
+        requiredCount,
+        highlyRecommendedCount,
+        optionalCount,
+        expertFieldsCoverage: Math.round(expertFieldsCoverage * 100) / 100, // Round to 2 decimals
       });
+
+      // Phase 3: Log warning if ai_extra count is high (already handled in validateAndEnrichChecklistItems, but log for visibility)
+      if (aiExtraItemsCount > 3) {
+        logWarn('[VisaChecklistEngine][Phase3] High ai_extra count detected', {
+          aiExtraItemsCount,
+          countryCode,
+          visaType,
+        });
+      }
 
       logInfo('[VisaChecklistEngine] Checklist generated successfully', {
         countryCode,
@@ -901,6 +956,7 @@ export class VisaChecklistEngineService {
         group,
         priority,
         dependsOn: [],
+        source: 'rules' as const, // Phase 3: Base documents are from rules
       };
     });
 
@@ -1796,6 +1852,89 @@ Return ONLY valid JSON matching the schema, no other text.`;
    * Apply risk-weighted prioritization to checklist items (Phase 3)
    * Adjusts priority based on risk factors, financial sufficiency, and ties strength
    */
+  /**
+   * Phase 3: Validate and enrich checklist items with source tracking and expert fields
+   * - Ensures source field is set correctly (rules vs ai_extra)
+   * - Validates ai_extra items don't exceed threshold
+   * - Ensures expertReasoning is populated
+   * - Returns enriched checklist with metrics
+   */
+  private static validateAndEnrichChecklistItems(
+    checklist: ChecklistItem[],
+    baseDocuments: Array<{ documentType: string; category: string; required: boolean }>
+  ): ChecklistItem[] {
+    const baseDocTypes = new Set(baseDocuments.map((doc) => doc.documentType));
+    const MAX_AI_EXTRA_ITEMS = 3;
+
+    // Enrich items with source field and validate
+    const enriched = checklist.map((item) => {
+      // Set source based on whether document is in base documents
+      const isFromRules = baseDocTypes.has(item.documentType);
+      const source = item.source || (isFromRules ? 'rules' : 'ai_extra');
+
+      // Ensure expertReasoning exists (even if empty)
+      const expertReasoning = item.expertReasoning || {
+        financialRelevance: null,
+        tiesRelevance: null,
+        riskMitigation: [],
+        embassyOfficerPerspective: null,
+      };
+
+      return {
+        ...item,
+        source: source as 'rules' | 'ai_extra',
+        expertReasoning,
+      };
+    });
+
+    // Count ai_extra items
+    const aiExtraItems = enriched.filter((item) => item.source === 'ai_extra');
+    const aiExtraCount = aiExtraItems.length;
+
+    // Safety check: warn if too many ai_extra items
+    if (aiExtraCount > MAX_AI_EXTRA_ITEMS) {
+      logWarn('[VisaChecklistEngine][Phase3] Too many ai_extra items detected', {
+        aiExtraCount,
+        maxAllowed: MAX_AI_EXTRA_ITEMS,
+        aiExtraTypes: aiExtraItems.map((item) => item.documentType),
+      });
+
+      // Trim to top N by priority (keep highest priority ai_extra items)
+      const sortedAiExtra = aiExtraItems.sort((a, b) => b.priority - a.priority);
+      const keptAiExtra = sortedAiExtra.slice(0, MAX_AI_EXTRA_ITEMS);
+      const removedAiExtra = sortedAiExtra.slice(MAX_AI_EXTRA_ITEMS);
+
+      logWarn('[VisaChecklistEngine][Phase3] Trimmed ai_extra items', {
+        kept: keptAiExtra.map((item) => item.documentType),
+        removed: removedAiExtra.map((item) => item.documentType),
+      });
+
+      // Remove trimmed items from enriched list
+      const keptAiExtraTypes = new Set(keptAiExtra.map((item) => item.documentType));
+      return enriched.filter(
+        (item) => item.source !== 'ai_extra' || keptAiExtraTypes.has(item.documentType)
+      );
+    }
+
+    // Validate ai_extra items are not marked as required
+    const invalidAiExtra = enriched.filter(
+      (item) => item.source === 'ai_extra' && item.category === 'required'
+    );
+    if (invalidAiExtra.length > 0) {
+      logWarn('[VisaChecklistEngine][Phase3] ai_extra items marked as required (invalid)', {
+        invalidItems: invalidAiExtra.map((item) => item.documentType),
+      });
+
+      // Downgrade to highly_recommended
+      for (const item of invalidAiExtra) {
+        item.category = 'highly_recommended';
+        item.required = false;
+      }
+    }
+
+    return enriched;
+  }
+
   private static applyRiskWeightedPrioritization(
     checklist: ChecklistItem[],
     canonical: CanonicalAIUserContext

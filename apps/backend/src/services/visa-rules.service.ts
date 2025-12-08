@@ -1,13 +1,81 @@
 /**
  * Visa Rules Service
  * Manages structured visa rule sets extracted from embassy sources
+ *
+ * IMPORTANT:
+ * For supported countries & visa types, VisaRuleSet (with isApproved = true)
+ * is the SINGLE source of truth for document requirements.
+ *
+ * Other sources like VisaType.documentTypes and static fallback checklists
+ * are considered legacy or emergency fallbacks and MUST NOT be used
+ * as primary rules in new code.
  */
 
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
 import { normalizeVisaTypeForRules, wasAliasApplied } from '../utils/visa-type-aliases';
+import { normalizeCountryCode } from '../config/country-registry';
 
 const prisma = new PrismaClient();
+
+/**
+ * Internal helper: Rule set selection result
+ */
+interface RuleSetSelectionResult {
+  ruleSet: any | null; // Prisma VisaRuleSet type
+  normalizedCountryCode: string;
+  normalizedVisaType: string;
+}
+
+/**
+ * Internal helper: Find approved rule set with normalization
+ * Centralizes the logic for normalizing country/visa codes and querying for approved rule sets.
+ *
+ * @param countryCodeRaw - Raw country code (may be non-canonical)
+ * @param visaTypeRaw - Raw visa type (may be alias)
+ * @returns Rule set (or null) with normalized codes
+ */
+async function findApprovedRuleSet(
+  countryCodeRaw: string,
+  visaTypeRaw: string
+): Promise<RuleSetSelectionResult> {
+  // 1) Normalize country code using CountryRegistry
+  const normalizedCountryCode =
+    normalizeCountryCode(countryCodeRaw) || countryCodeRaw.toUpperCase();
+
+  // 2) Normalize visa type using alias mapping (e.g., "b1/b2 visitor" -> "tourist" for US)
+  const normalizedVisaType = normalizeVisaTypeForRules(normalizedCountryCode, visaTypeRaw);
+
+  // Log if alias mapping was applied
+  if (wasAliasApplied(normalizedCountryCode, visaTypeRaw, normalizedVisaType)) {
+    logInfo(
+      `[VisaRules] Using alias mapping: ${visaTypeRaw} → ${normalizedVisaType} for ${normalizedCountryCode}`,
+      {
+        countryCode: normalizedCountryCode,
+        originalVisaType: visaTypeRaw,
+        normalizedVisaType,
+      }
+    );
+  }
+
+  // 3) Query Prisma for VisaRuleSet with isApproved = true, ordered by version desc
+  const ruleSet = await prisma.visaRuleSet.findFirst({
+    where: {
+      countryCode: normalizedCountryCode,
+      visaType: normalizedVisaType,
+      isApproved: true,
+    },
+    orderBy: {
+      version: 'desc',
+    },
+  });
+
+  return {
+    ruleSet,
+    normalizedCountryCode,
+    normalizedVisaType,
+  };
+}
 
 /**
  * Visa Rule Set Data Structure
@@ -95,41 +163,22 @@ export class VisaRulesService {
   /**
    * Get the latest approved rule set for a country/visa type
    * Applies visa type alias mapping to reuse existing rulesets for equivalent visa types
+   *
+   * Uses centralized findApprovedRuleSet() helper for normalization and query logic.
    */
   static async getActiveRuleSet(
     countryCode: string,
     visaType: string
   ): Promise<VisaRuleSetData | null> {
     try {
-      // Normalize visa type using alias mapping (e.g., "b1/b2 visitor" -> "tourist" for US)
-      const normalizedVisaType = normalizeVisaTypeForRules(countryCode, visaType);
-
-      // Log if alias mapping was applied
-      if (wasAliasApplied(countryCode, visaType, normalizedVisaType)) {
-        logInfo(
-          `[VisaRules] Using alias mapping: ${visaType} → ${normalizedVisaType} for ${countryCode}`,
-          {
-            countryCode,
-            originalVisaType: visaType,
-            normalizedVisaType,
-          }
-        );
-      }
-
-      const ruleSet = await prisma.visaRuleSet.findFirst({
-        where: {
-          countryCode: countryCode.toUpperCase(),
-          visaType: normalizedVisaType,
-          isApproved: true,
-        },
-        orderBy: {
-          version: 'desc',
-        },
-      });
+      const { ruleSet, normalizedCountryCode, normalizedVisaType } = await findApprovedRuleSet(
+        countryCode,
+        visaType
+      );
 
       if (!ruleSet) {
         logWarn('[VisaRules] No approved rule set found', {
-          countryCode,
+          countryCode: normalizedCountryCode,
           visaType,
           normalizedVisaType,
         });
@@ -150,6 +199,8 @@ export class VisaRulesService {
 
   /**
    * Get the full approved rule set with document references (for catalog mode)
+   *
+   * Uses centralized findApprovedRuleSet() helper for normalization and query logic.
    */
   static async getActiveRuleSetWithReferences(
     countryCode: string,
@@ -162,11 +213,15 @@ export class VisaRulesService {
     documentReferences: any[];
   } | null> {
     try {
-      const normalizedVisaType = normalizeVisaTypeForRules(countryCode, visaType);
+      const { normalizedCountryCode, normalizedVisaType } = await findApprovedRuleSet(
+        countryCode,
+        visaType
+      );
 
+      // Query with document references included
       const ruleSet = await prisma.visaRuleSet.findFirst({
         where: {
-          countryCode: countryCode.toUpperCase(),
+          countryCode: normalizedCountryCode,
           visaType: normalizedVisaType,
           isApproved: true,
         },
@@ -262,6 +317,30 @@ export class VisaRulesService {
     try {
       const { countryCode, visaType, data, sourceId, sourceSummary, extractionMetadata } = params;
 
+      // Normalize document types in requiredDocuments before saving
+      const {
+        toCanonicalDocumentType,
+        logUnknownDocumentType,
+      } = require('../config/document-types-map');
+      const normalizedData: VisaRuleSetData = {
+        ...data,
+        requiredDocuments:
+          data.requiredDocuments?.map((doc) => {
+            const norm = toCanonicalDocumentType(doc.documentType);
+            if (!norm.canonicalType) {
+              logUnknownDocumentType(doc.documentType, {
+                source: 'rules-extraction',
+                countryCode,
+                visaType,
+              });
+            }
+            return {
+              ...doc,
+              documentType: norm.canonicalType ?? doc.documentType,
+            };
+          }) || [],
+      };
+
       // Get the latest version number
       const latest = await prisma.visaRuleSet.findFirst({
         where: {
@@ -275,8 +354,8 @@ export class VisaRulesService {
 
       const nextVersion = latest ? latest.version + 1 : 1;
 
-      // Serialize data for database (handle both Json and String types)
-      const dataSerialized = JSON.stringify(data);
+      // Serialize normalized data for database (handle both Json and String types)
+      const dataSerialized = JSON.stringify(normalizedData);
       const metadataSerialized = extractionMetadata ? JSON.stringify(extractionMetadata) : null;
 
       // Create new rule set (unapproved by default)
@@ -295,12 +374,13 @@ export class VisaRulesService {
         },
       });
 
-      // Create version history entry
+      // Create version history entry (use normalized data)
+      const versionDataSerialized = JSON.stringify(normalizedData);
       await prisma.visaRuleVersion.create({
         data: {
           ruleSetId: ruleSet.id,
           version: nextVersion,
-          data: dataSerialized as any,
+          data: versionDataSerialized as any,
           changeLog: `AI extraction - version ${nextVersion}`,
         },
       });

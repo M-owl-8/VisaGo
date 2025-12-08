@@ -170,14 +170,33 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       });
     }
 
+    // Normalize document type before storing
+    const {
+      toCanonicalDocumentType,
+      logUnknownDocumentType,
+    } = require('../config/document-types-map');
+    const rawDocumentType = documentType.trim();
+    const norm = toCanonicalDocumentType(rawDocumentType);
+
+    if (!norm.canonicalType) {
+      logUnknownDocumentType(rawDocumentType, {
+        source: 'document-upload',
+        userId,
+        applicationId,
+      });
+    }
+
+    // Use canonical type if available, otherwise fall back to original (backward compatible)
+    const storedDocumentType = norm.canonicalType ?? rawDocumentType;
+
     // Create document record in database first
-    // Use documentType directly from request body (must be the value sent by frontend)
+    // Store normalized document type when possible, but keep original for backward compatibility
     const document = await prisma.userDocument.create({
       data: {
         userId,
         applicationId,
         documentName: req.file.originalname,
-        documentType: documentType.trim(), // Use the value sent by frontend, trimmed
+        documentType: storedDocumentType,
         fileUrl: uploadResult.fileUrl,
         fileName: uploadResult.fileName,
         fileSize: uploadResult.fileSize,

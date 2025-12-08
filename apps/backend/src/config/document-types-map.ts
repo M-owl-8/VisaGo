@@ -13,6 +13,8 @@
 
 /**
  * Canonical document types used throughout the system
+ * These align with DocumentCatalog.documentType values and are the single source of truth
+ * for document type normalization.
  */
 export type CanonicalDocumentType =
   | 'passport'
@@ -68,7 +70,10 @@ export type CanonicalDocumentType =
   | 'host_letter'
   | 'tax_returns'
   | 'business_registration'
-  | 'leave_letter';
+  | 'leave_letter'
+  | 'ds160_confirmation'
+  | 'visa_fee_receipt'
+  | 'appointment_confirmation';
 
 /**
  * Document type mapping with canonical type and aliases
@@ -268,6 +273,40 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'other_documents',
     ],
   },
+  {
+    canonical: 'ds160_confirmation',
+    aliases: [
+      'ds160_confirmation',
+      'ds160',
+      'ds-160',
+      'ds_160',
+      'ds160_form',
+      'ds_160_confirmation',
+    ],
+  },
+  {
+    canonical: 'visa_fee_receipt',
+    aliases: ['visa_fee_receipt', 'visa_fee', 'fee_receipt', 'visa_payment_receipt'],
+  },
+  {
+    canonical: 'appointment_confirmation',
+    aliases: [
+      'appointment_confirmation',
+      'appointment',
+      'interview_appointment',
+      'visa_appointment',
+    ],
+  },
+  {
+    canonical: 'visa_application_form',
+    aliases: [
+      'visa_application_form',
+      'visa_form',
+      'visa_application',
+      'application_form',
+      'visa_application_form_completed',
+    ],
+  },
 ];
 
 /**
@@ -329,4 +368,91 @@ export function documentTypesMatch(type1: string, type2: string): boolean {
 export function getDocumentTypeAliases(canonical: CanonicalDocumentType): string[] {
   const mapping = DOCUMENT_TYPE_MAPPINGS.find((m) => m.canonical === canonical);
   return mapping ? [canonical, ...mapping.aliases] : [canonical];
+}
+
+/**
+ * Normalized document type result
+ * Provides both the canonical type and metadata about the normalization process
+ */
+export type NormalizedDocumentTypeResult = {
+  canonicalType: CanonicalDocumentType | null;
+  originalType: string;
+  wasNormalized: boolean;
+};
+
+/**
+ * Normalize any raw documentType (from API, DB, rules, etc.)
+ * into a CanonicalDocumentType if possible.
+ *
+ * - Handles aliases and legacy strings.
+ * - Returns { canonicalType, originalType, wasNormalized }.
+ * - If canonicalType is null, caller can decide how to proceed.
+ *
+ * @param raw - Raw document type string (may be an alias or legacy value)
+ * @returns NormalizedDocumentTypeResult with canonical type and normalization metadata
+ */
+export function toCanonicalDocumentType(raw: string): NormalizedDocumentTypeResult {
+  if (!raw || typeof raw !== 'string') {
+    return {
+      canonicalType: null,
+      originalType: raw || '',
+      wasNormalized: false,
+    };
+  }
+
+  // 1) Trim, lowercase, replace spaces/hyphens/underscores consistently
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_') // Replace spaces with underscores
+    .replace(/-/g, '_'); // Replace hyphens with underscores
+
+  // 2) First check if it's already a canonical type
+  for (const mapping of DOCUMENT_TYPE_MAPPINGS) {
+    if (mapping.canonical === normalized) {
+      return {
+        canonicalType: mapping.canonical,
+        originalType: raw,
+        wasNormalized: false, // Already canonical
+      };
+    }
+  }
+
+  // 3) Check aliases
+  for (const mapping of DOCUMENT_TYPE_MAPPINGS) {
+    // Normalize aliases for comparison
+    const aliasMatch = mapping.aliases.some((alias) => {
+      const normalizedAlias = alias.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+      return normalizedAlias === normalized;
+    });
+
+    if (aliasMatch) {
+      return {
+        canonicalType: mapping.canonical,
+        originalType: raw,
+        wasNormalized: true,
+      };
+    }
+  }
+
+  // 4) If no match, return null (caller can handle this)
+  return {
+    canonicalType: null,
+    originalType: raw,
+    wasNormalized: false,
+  };
+}
+
+/**
+ * Log unknown document type for debugging and monitoring
+ *
+ * @param raw - Raw document type that could not be normalized
+ * @param context - Optional context metadata (source, countryCode, visaType, etc.)
+ */
+export function logUnknownDocumentType(raw: string, context?: Record<string, any>): void {
+  const { logWarn } = require('../middleware/logger');
+  logWarn('[DocumentType] Unknown documentType, could not normalize', {
+    raw,
+    ...context,
+  });
 }

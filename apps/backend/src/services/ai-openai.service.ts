@@ -2503,6 +2503,13 @@ You MUST:
    * @param aiUserContext - AI user context with questionnaire data
    * @returns Checklist response with items array
    */
+  /**
+   * Legacy checklist generator used only when the rules-first engine is not available
+   * or fails. New features should prefer VisaChecklistEngineService with VisaRuleSet.
+   *
+   * @deprecated This is a fallback mode. Use VisaChecklistEngineService with approved
+   * VisaRuleSet as the primary checklist generation method.
+   */
   static async generateChecklistLegacy(
     application: { country: { code: string; name: string }; visaType: { name: string } },
     aiUserContext: any

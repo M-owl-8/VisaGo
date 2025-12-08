@@ -166,8 +166,24 @@ export class VisaDocCheckerService {
     visaType?: 'tourist' | 'student'
   ): Promise<DocumentCheckResult> {
     try {
+      // Normalize document type
+      const {
+        toCanonicalDocumentType,
+        logUnknownDocumentType,
+      } = require('../config/document-types-map');
+      const norm = toCanonicalDocumentType(requiredDocumentRule.documentType);
+      if (!norm.canonicalType) {
+        logUnknownDocumentType(requiredDocumentRule.documentType, {
+          source: 'visa-doc-checker',
+          countryCode,
+          visaType,
+        });
+      }
+      const effectiveDocumentType = norm.canonicalType ?? requiredDocumentRule.documentType;
+
       logInfo('[VisaDocChecker] Checking document', {
-        documentType: requiredDocumentRule.documentType,
+        documentType: effectiveDocumentType,
+        originalDocumentType: requiredDocumentRule.documentType,
         textLength: userDocumentText.length,
         hasMetadata: !!metadata,
         countryCode,
