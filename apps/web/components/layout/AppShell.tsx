@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, X, LogOut, Languages, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Menu, X, LogOut, ChevronDown, MessageCircle } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
@@ -84,10 +84,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
             </Link>
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70 shadow-inner sm:flex sm:px-4">
-              <ShieldCheck size={14} className="text-primary" />
-              <span>{t('applications.status')}</span>
-            </div>
           </div>
 
           <div className="hidden items-center gap-1 md:flex">
@@ -113,12 +109,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold tracking-wide shadow-inner shadow-black/20 transition hover:bg-white/15 md:flex md:px-3">
-              <Languages size={14} className="text-white sm:size-4" />
+            <div className="relative hidden md:flex">
               <select
                 value={currentLang}
                 onChange={(e) => changeLanguage(e.target.value)}
-                className="bg-transparent text-xs font-semibold uppercase tracking-[0.2em] text-white focus:outline-none [&>option]:bg-[#0E1A2C] [&>option]:text-white [&>option]:text-white"
+                className="appearance-none rounded-full border border-white/20 bg-white/10 px-3 py-1.5 pr-8 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-inner shadow-black/20 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-primary/50 [&>option]:bg-[#0E1A2C] [&>option]:text-white"
                 style={{ color: 'white' }}
               >
                 <option value="en" className="bg-[#0E1A2C] text-white">
@@ -131,6 +126,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   UZ
                 </option>
               </select>
+              <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/70" />
             </div>
 
             <div className="hidden items-center gap-2 md:flex md:gap-3">

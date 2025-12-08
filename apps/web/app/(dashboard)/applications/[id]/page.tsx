@@ -188,8 +188,8 @@ export default function ApplicationDetailPage() {
             </Link>
             <Link href={`/chat?applicationId=${applicationId}`} className="w-full sm:w-auto">
               <Button
-                variant="secondary"
-                className="w-full rounded-xl border border-white/10 bg-transparent px-3 py-2 text-xs text-white hover:bg-white/10 sm:px-4 sm:text-sm"
+                variant="ghost"
+                className="w-full rounded-xl border border-white/10 !bg-transparent px-3 py-2 text-xs !text-white hover:!bg-white/10 sm:px-4 sm:text-sm"
               >
                 <MessageCircle size={14} className="sm:size-4" />
                 <span className="ml-1.5 sm:ml-2">{t('applications.chatAboutApplication', 'Chat')}</span>
@@ -302,8 +302,8 @@ export default function ApplicationDetailPage() {
             <div className="space-y-2">
               <Link href={`/applications/${applicationId}/documents`}>
                 <Button
-                  variant="secondary"
-                  className="w-full justify-start border border-white/10 bg-transparent text-white hover:bg-white/10"
+                  variant="ghost"
+                  className="w-full justify-start border border-white/10 !bg-transparent !text-white hover:!bg-white/10"
                 >
                   <Upload size={16} />
                   <span className="ml-2">{t('applications.uploadDocuments', 'Upload Documents')}</span>
@@ -311,8 +311,8 @@ export default function ApplicationDetailPage() {
               </Link>
               <Link href={`/chat?applicationId=${applicationId}`}>
                 <Button
-                  variant="secondary"
-                  className="w-full justify-start border border-white/10 bg-transparent text-white hover:bg-white/10"
+                  variant="ghost"
+                  className="w-full justify-start border border-white/10 !bg-transparent !text-white hover:!bg-white/10"
                 >
                   <MessageCircle size={16} />
                   <span className="ml-2">{t('applications.chatAboutApplication', 'Chat with AI')}</span>
