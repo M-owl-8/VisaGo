@@ -19,7 +19,7 @@ export type ConditionResult = true | false | 'unknown';
  * - || (OR)
  * - Parentheses for grouping
  *
- * Supported field paths:
+ * Supported field paths (flat variables - no nested paths):
  * - sponsorType
  * - currentStatus
  * - isStudent
@@ -33,7 +33,8 @@ export type ConditionResult = true | false | 'unknown';
  * - hasUniversityInvitation
  * - hasOtherInvitation
  * - visaType
- * - riskScore.level
+ * - maritalStatus (flat - from applicantProfile.maritalStatus)
+ * - riskLevel (flat - from riskScore.level)
  *
  * Examples:
  * - "sponsorType === 'self'"
@@ -75,7 +76,7 @@ function getFieldValue(
   const profile = context.applicantProfile;
   const riskScore = context.riskScore;
 
-  // Direct profile fields
+  // Direct profile fields (flat variables - no nested paths)
   switch (fieldPath) {
     case 'sponsorType':
       return profile.sponsorType;
@@ -103,8 +104,14 @@ function getFieldValue(
       return profile.hasOtherInvitation;
     case 'visaType':
       return profile.visaType;
+    case 'maritalStatus':
+      return profile.maritalStatus;
+    // Flat riskLevel (from riskScore.level)
+    case 'riskLevel':
+      return riskScore?.level;
+    // Legacy support for nested path (for backward compatibility)
     case 'riskScore.level':
-      return riskScore.level;
+      return riskScore?.level;
     default:
       return undefined;
   }

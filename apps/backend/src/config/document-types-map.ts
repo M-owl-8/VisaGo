@@ -347,9 +347,120 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'visa application form',
       'Visa Application Form', // Common GPT output
       'schengen visa application form',
+      'schengen_visa_form', // ES tourist specific
       'schengen application form',
       'Schengen Visa Application Form', // Common GPT output
     ],
+  },
+  {
+    canonical: 'passport_photo',
+    aliases: [
+      'passport_photo',
+      'photo_passport', // ES tourist specific
+      'passport_photos',
+      'photo',
+      'photos',
+    ],
+  },
+  {
+    canonical: 'sponsor_bank_statements',
+    aliases: [
+      'sponsor_bank_statements',
+      'bank_statements_sponsor', // ES tourist specific
+      'sponsor_bank_statement',
+      'sponsor_financial_documents',
+      'sponsor_financial_evidence',
+    ],
+  },
+  {
+    canonical: 'sponsor_documents',
+    aliases: [
+      'sponsor_documents',
+      'sponsor_affidavit', // ES tourist specific
+      'sponsor_letter',
+      'sponsor_employment_letter', // ES tourist specific
+    ],
+  },
+  {
+    canonical: 'business_registration',
+    aliases: [
+      'business_registration',
+      'business_license',
+      'company_registration',
+      'business_document',
+      'business_bank_statements', // ES tourist specific
+    ],
+  },
+  {
+    canonical: 'study_enrollment',
+    aliases: [
+      'study_enrollment',
+      'student_enrollment_letter', // ES tourist specific
+      'enrollment_letter',
+      'student_enrollment',
+    ],
+  },
+  {
+    canonical: 'academic_transcripts',
+    aliases: [
+      'academic_transcripts',
+      'transcripts',
+      'academic_records',
+      'grade_transcripts',
+      'student_transcript', // ES tourist specific
+    ],
+  },
+  {
+    canonical: 'invitation_letter',
+    aliases: [
+      'invitation_letter',
+      'invitation',
+      'sponsor_letter',
+      'host_letter',
+      'host_passport_copy', // ES tourist specific
+      'host_registration_document', // ES tourist specific
+    ],
+  },
+  {
+    canonical: 'previous_visas',
+    aliases: [
+      'previous_visas',
+      'previous_visa',
+      'visa_history',
+      'travel_history',
+      'travel_history_evidence', // ES tourist specific
+    ],
+  },
+  {
+    canonical: 'cover_letter',
+    aliases: [
+      'cover_letter',
+      'personal_statement',
+      'motivation_letter',
+      'explanation_letter',
+      'refusal_explanation', // ES tourist specific
+    ],
+  },
+  {
+    canonical: 'proof_of_funds',
+    aliases: [
+      'proof_of_funds',
+      'financial_guarantee',
+      'funds_proof',
+      'financial_proof',
+      'proof of financial means',
+      'Proof of Financial Means', // Common GPT output
+      'proof of funds',
+      'Proof of Funds', // Common GPT output
+      'bank statements / income proof',
+      'Bank Statements / Income Proof', // Common GPT output
+      'financial means',
+      'additional_financial_docs', // ES tourist specific
+    ],
+  },
+  {
+    canonical: 'marriage_certificate',
+    aliases: ['marriage_certificate', 'marriage_cert', 'wedding_certificate'],
   },
 ];
 

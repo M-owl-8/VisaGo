@@ -497,30 +497,64 @@ export class VisaChecklistEngineService {
             extra,
           });
 
-          // Fix: remove extras, add missing with defaults
+          // Fix: remove extras, add missing using ruleset content
           const fixedChecklist = [...validationResult.data.checklist];
 
-          // Remove extras
+          // Remove extras (documents not in base ruleset)
           const filtered = fixedChecklist.filter((item) => baseDocTypes.has(item.documentType));
 
-          // Add missing
+          // Build a Map of base documents for quick lookup
+          const baseDocMap = new Map<string, BaseChecklistItem>();
+          for (const doc of baseDocuments) {
+            baseDocMap.set(doc.documentType, doc);
+          }
+
+          // Build a Map of ruleSet document definitions for metadata
+          const ruleSetDocMap = new Map<string, any>();
+          if (ruleSet?.requiredDocuments) {
+            for (const doc of ruleSet.requiredDocuments) {
+              ruleSetDocMap.set(doc.documentType, doc);
+            }
+          }
+
+          // Add missing documents using ruleset content (not generic placeholders)
           for (const docType of missing) {
-            const baseDoc = baseDocuments.find((d) => d.documentType === docType);
+            const baseDoc = baseDocMap.get(docType);
+            const ruleSetDoc = ruleSetDocMap.get(docType);
+
             if (baseDoc) {
+              // Use ruleset description if available, otherwise use document type
+              const description =
+                ruleSetDoc?.description ||
+                (ruleSetDoc?.validityRequirements && ruleSetDoc?.formatRequirements
+                  ? `${ruleSetDoc.validityRequirements}. ${ruleSetDoc.formatRequirements}`
+                  : ruleSetDoc?.validityRequirements ||
+                    ruleSetDoc?.formatRequirements ||
+                    `Required document: ${baseDoc.documentType}`);
+
+              // Get document translation for names
+              const { getDocumentTranslation } = await import('../data/document-translations');
+              const translation = getDocumentTranslation(baseDoc.documentType);
+
               filtered.push({
                 id: `DOC_${filtered.length + 1}`,
                 documentType: baseDoc.documentType,
                 category: baseDoc.category as 'required' | 'highly_recommended' | 'optional',
                 required: baseDoc.required,
-                name: baseDoc.documentType,
-                nameUz: baseDoc.documentType,
-                nameRu: baseDoc.documentType,
-                description: `Required document: ${baseDoc.documentType}`,
+                name: translation?.nameEn || baseDoc.documentType,
+                nameUz: translation?.nameUz || baseDoc.documentType,
+                nameRu: translation?.nameRu || baseDoc.documentType,
+                description: description,
                 appliesToThisApplicant: true,
+                reasonIfApplies:
+                  ruleSetDoc?.description ||
+                  (baseDoc.category === 'required'
+                    ? 'Required by embassy rules'
+                    : 'Recommended for this visa application'),
                 extraRecommended: false,
-                group: 'other',
-                priority: filtered.length + 1,
-                source: 'rules' as const, // Phase 3: Missing items are from rules
+                group: this.inferDocumentGroup(baseDoc.documentType),
+                priority: filtered.length + 1, // Will be normalized later based on category
+                source: 'rules' as const,
               });
             }
           }
@@ -618,7 +652,26 @@ export class VisaChecklistEngineService {
         baseDocuments
       );
 
-      // Phase 3: Apply risk-weighted prioritization
+      // Normalize priorities according to category (before risk-weighted prioritization)
+      for (const item of validatedChecklist) {
+        switch (item.category) {
+          case 'required':
+            item.priority = 1; // High priority for required documents
+            break;
+          case 'highly_recommended':
+            if (!item.priority || item.priority > 5) {
+              item.priority = 3; // Medium priority
+            }
+            break;
+          case 'optional':
+            if (!item.priority || item.priority <= 3) {
+              item.priority = 5; // Low priority
+            }
+            break;
+        }
+      }
+
+      // Phase 3: Apply risk-weighted prioritization (may adjust priorities further)
       const canonical = await buildCanonicalAIUserContext(aiUserContext);
       parsed.checklist = this.applyRiskWeightedPrioritization(validatedChecklist, canonical);
 

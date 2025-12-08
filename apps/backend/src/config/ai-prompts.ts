@@ -1615,6 +1615,15 @@ CRITICAL RULES (MANDATORY - NO EXCEPTIONS)
    - You MUST NOT remove any document that appears in the base checklist from rules
    - You MUST use normalized documentType values (aligned with DocumentCatalog)
    - If a documentType is not in the provided list, you MUST NOT invent new ones
+   - CRITICAL: You are given a list of base checklist items via baseDocuments
+   - Each base item has a stable documentType that MUST be preserved exactly
+   - You MUST return a JSON object with a checklist array
+   - The checklist array MUST contain exactly the same set of documentType values as in the input base documents
+   - You MUST NOT drop any documentType from the base documents
+   - You MUST NOT rename any documentType (e.g., "passport_international" must stay "passport_international", not become "passport")
+   - You MUST NOT invent or add new documentTypes beyond what's in base documents (except limited ai_extra items)
+   - You are ONLY allowed to enrich text fields: name, nameUz, nameRu, description, reasonIfApplies, expertReasoning, etc.
+   - You are allowed to suggest priorities, but these will be normalized afterward based on category
 
 2. DOCUMENT TYPE NORMALIZATION:
    - Use ONLY documentType values that exist in the input requiredDocuments list
