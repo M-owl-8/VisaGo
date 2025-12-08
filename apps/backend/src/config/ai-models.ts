@@ -120,7 +120,7 @@ export const AI_CONFIG: Record<string, AIModelConfig> = {
   riskExplanation: {
     model: AI_MODELS.RISK_EXPLANATION,
     temperature: 0.3, // Low for deterministic explanations
-    maxTokens: 1500, // Enough for summary + recommendations
+    maxTokens: 1200, // Optimized: summary + recommendations (reduced from 1500 for performance)
     timeout: 30000, // 30 seconds
     responseFormat: { type: 'json_object' },
   },

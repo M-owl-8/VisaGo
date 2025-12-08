@@ -90,7 +90,15 @@ export interface DocumentTypeMapping {
 export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
   {
     canonical: 'passport',
-    aliases: ['passport', 'passport_international', 'international_passport'],
+    aliases: [
+      'passport',
+      'passport_international',
+      'international_passport',
+      'international passport',
+      'valid passport',
+      'International Passport', // Common GPT output
+      'Passport', // Capitalized
+    ],
   },
   {
     canonical: 'passport_photo',
@@ -138,6 +146,10 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'employer_letter',
       'job_letter',
       'salary_certificate',
+      'employment letter',
+      'Employment Letter', // Common GPT output
+      'employment verification letter',
+      'Employment Verification Letter', // Common GPT output
     ],
   },
   {
@@ -146,7 +158,17 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
   },
   {
     canonical: 'travel_insurance',
-    aliases: ['travel_insurance', 'insurance', 'health_insurance', 'medical_insurance'],
+    aliases: [
+      'travel_insurance',
+      'insurance',
+      'health_insurance',
+      'medical_insurance',
+      'travel insurance',
+      'Travel Insurance', // Common GPT output
+      'medical / travel insurance',
+      'medical travel insurance',
+      'Medical / Travel Insurance', // Common GPT output
+    ],
   },
   {
     canonical: 'flight_booking',
@@ -160,6 +182,11 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'accommodation_booking',
       'hotel_reservation',
       'lodging_proof',
+      'proof of accommodation',
+      'Proof of Accommodation', // Common GPT output
+      'hotel booking',
+      'airbnb booking',
+      'Hotel Booking', // Common GPT output
     ],
   },
   {
@@ -229,7 +256,19 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
   },
   {
     canonical: 'proof_of_funds',
-    aliases: ['proof_of_funds', 'financial_guarantee', 'funds_proof', 'financial_proof'],
+    aliases: [
+      'proof_of_funds',
+      'financial_guarantee',
+      'funds_proof',
+      'financial_proof',
+      'proof of financial means',
+      'Proof of Financial Means', // Common GPT output
+      'proof of funds',
+      'Proof of Funds', // Common GPT output
+      'bank statements / income proof',
+      'Bank Statements / Income Proof', // Common GPT output
+      'financial means',
+    ],
   },
   {
     canonical: 'tax_returns',
@@ -305,6 +344,11 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'visa_application',
       'application_form',
       'visa_application_form_completed',
+      'visa application form',
+      'Visa Application Form', // Common GPT output
+      'schengen visa application form',
+      'schengen application form',
+      'Schengen Visa Application Form', // Common GPT output
     ],
   },
 ];

@@ -32,6 +32,163 @@ const VISA_TYPE_RULE_ALIASES: VisaTypeAliasMap = {
     'b1/b2 tourist': 'tourist',
     'b1/b2 travel': 'tourist',
   },
+  // Schengen countries: ES, DE, FR, IT, AT, BE, CH, CZ, DK, EE, FI, GR, HU, IS, LV, LI, LT, LU, MT, NL, NO, PL, PT, SE, SK, SI
+  ES: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  DE: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  FR: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  IT: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  AT: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  BE: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  CH: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  CZ: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  DK: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  EE: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  FI: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  GR: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  HU: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  IS: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  LV: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  LI: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  LT: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  LU: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  MT: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  NL: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  NO: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  PL: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  PT: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  SE: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  SK: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
+  SI: {
+    'schengen tourist visa': 'tourist',
+    'schengen tourist': 'tourist',
+    'schengen visa': 'tourist',
+    'tourist visa': 'tourist',
+  },
 };
 
 /**
@@ -53,20 +210,25 @@ export function normalizeVisaTypeForRules(countryCode: string, visaType: string)
   const normalizedCountryCode = countryCode.toUpperCase();
   let normalizedVisaType = visaType.toLowerCase().trim();
 
-  // Remove common suffixes like "visa" if present
-  normalizedVisaType = normalizedVisaType.replace(/\s+visa\s*$/i, '').trim();
-
   // Normalize B1/B2 variations (handle slash, space, dash variations)
   normalizedVisaType = normalizedVisaType.replace(/\s*[\/\-]\s*/g, '/'); // Normalize separators to slash
   normalizedVisaType = normalizedVisaType.replace(/\s+/g, ' '); // Normalize multiple spaces to single space
 
   const countryAliases = VISA_TYPE_RULE_ALIASES[normalizedCountryCode];
 
+  // FIRST: Check aliases with original string (including "visa" suffix if present)
   if (countryAliases && countryAliases[normalizedVisaType]) {
     return countryAliases[normalizedVisaType];
   }
 
-  return normalizedVisaType;
+  // SECOND: Remove common suffixes like "visa" and check again
+  const withoutVisa = normalizedVisaType.replace(/\s+visa\s*$/i, '').trim();
+  if (withoutVisa !== normalizedVisaType && countryAliases && countryAliases[withoutVisa]) {
+    return countryAliases[withoutVisa];
+  }
+
+  // THIRD: Return normalized version without "visa" suffix
+  return withoutVisa;
 }
 
 /**

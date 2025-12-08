@@ -373,13 +373,19 @@ export class DocumentChecklistService {
       const userContext = await buildAIUserContext(userId, applicationId);
 
       const countryCode = application.country.code.toUpperCase();
-      const visaTypeName = application.visaType.name.toLowerCase();
+      const originalVisaTypeName = application.visaType.name.toLowerCase();
+
+      // Normalize visa type using alias mapping (e.g., "Schengen Tourist Visa" -> "tourist")
+      const { normalizeVisaTypeForRules } = await import('../utils/visa-type-aliases');
+      const normalizedVisaType = normalizeVisaTypeForRules(countryCode, originalVisaTypeName);
 
       logInfo('[Checklist][Mode] Starting checklist generation', {
         applicationId,
         country: application.country.name,
         countryCode,
         visaType: application.visaType.name,
+        originalVisaType: originalVisaTypeName,
+        normalizedVisaType,
       });
 
       // ========================================================================
@@ -395,16 +401,17 @@ export class DocumentChecklistService {
 
       // STEP 1: Check if approved VisaRuleSet exists
       // VisaRuleSet (with isApproved = true) is the SINGLE source of truth for document requirements.
+      // Use normalized visa type for rules lookup
       const { VisaRulesService } = await import('./visa-rules.service');
-      const ruleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaTypeName);
+      const ruleSet = await VisaRulesService.getActiveRuleSet(countryCode, normalizedVisaType);
 
       // Special check for US/tourist - ensure rules are found
       const isUSTourist =
         countryCode === 'US' &&
-        (visaTypeName.toLowerCase().includes('tourist') ||
-          visaTypeName.toLowerCase().includes('b1') ||
-          visaTypeName.toLowerCase().includes('b2') ||
-          visaTypeName.toLowerCase().includes('visitor'));
+        (normalizedVisaType === 'tourist' ||
+          originalVisaTypeName.toLowerCase().includes('b1') ||
+          originalVisaTypeName.toLowerCase().includes('b2') ||
+          originalVisaTypeName.toLowerCase().includes('visitor'));
 
       if (isUSTourist && !ruleSet) {
         logError(
@@ -413,8 +420,8 @@ export class DocumentChecklistService {
           {
             applicationId,
             countryCode,
-            visaType: visaTypeName,
-            normalizedVisaType: 'tourist',
+            visaType: originalVisaTypeName,
+            normalizedVisaType,
             suggestion: 'Run: pnpm seed:us-b1b2-rules',
           }
         );
@@ -430,8 +437,8 @@ export class DocumentChecklistService {
             {
               applicationId,
               countryCode,
-              visaType: visaTypeName,
-              normalizedVisaType: 'tourist',
+              visaType: originalVisaTypeName,
+              normalizedVisaType,
               ruleSetVersion: ruleSet.version || 1,
               ruleSetDocumentCount: ruleSet.requiredDocuments?.length || 0,
             }
@@ -440,7 +447,8 @@ export class DocumentChecklistService {
           logInfo('[Checklist][Mode] Using RULES-FIRST mode (VisaChecklistEngine)', {
             applicationId,
             countryCode,
-            visaType: visaTypeName,
+            visaType: originalVisaTypeName,
+            normalizedVisaType,
             ruleSetVersion: ruleSet.version || 1,
           });
         }
@@ -480,7 +488,7 @@ export class DocumentChecklistService {
               applicationId,
               country: application.country.name,
               countryCode,
-              visaType: visaTypeName,
+              visaType: normalizedVisaType,
               mode: 'rules',
               jsonValidationPassed: true, // Rules mode handles validation internally
               jsonValidationRetries: 0,
@@ -490,7 +498,8 @@ export class DocumentChecklistService {
             logInfo('[Checklist][Mode] Rules mode succeeded', {
               applicationId,
               countryCode,
-              visaType: visaTypeName,
+              visaType: originalVisaTypeName,
+              normalizedVisaType,
               generationMode,
               model: modelName,
               itemCount: items.length,
@@ -505,8 +514,8 @@ export class DocumentChecklistService {
                 {
                   applicationId,
                   countryCode,
-                  visaType: visaTypeName,
-                  normalizedVisaType: 'tourist',
+                  visaType: originalVisaTypeName,
+                  normalizedVisaType,
                   itemCount: engineResponse?.checklist?.length || 0,
                   ruleSetVersion: ruleSet?.version || 'unknown',
                   ruleSetDocumentCount: ruleSet?.requiredDocuments?.length || 0,
@@ -518,7 +527,8 @@ export class DocumentChecklistService {
                 {
                   applicationId,
                   countryCode,
-                  visaType: visaTypeName,
+                  visaType: originalVisaTypeName,
+                  normalizedVisaType,
                   itemCount: engineResponse?.checklist?.length || 0,
                 }
               );
@@ -534,8 +544,8 @@ export class DocumentChecklistService {
               {
                 applicationId,
                 countryCode,
-                visaType: visaTypeName,
-                normalizedVisaType: 'tourist',
+                visaType: originalVisaTypeName,
+                normalizedVisaType,
                 error: engineError?.message || String(engineError),
                 ruleSetVersion: ruleSet?.version || 'unknown',
                 ruleSetDocumentCount: ruleSet?.requiredDocuments?.length || 0,
@@ -545,7 +555,8 @@ export class DocumentChecklistService {
             logWarn('[Checklist][Mode] Rules-FIRST mode failed, falling back to LEGACY mode', {
               applicationId,
               countryCode,
-              visaType: visaTypeName,
+              visaType: originalVisaTypeName,
+              normalizedVisaType,
               error: engineError?.message || String(engineError),
             });
           }
@@ -557,14 +568,39 @@ export class DocumentChecklistService {
       // If no rules or rules mode failed, use legacy AI mode
       // This is a fallback path; rules-FIRST is always preferred when available.
       if (items.length < MIN_ITEMS_HARD) {
+        // Check if static fallback exists for this country+visaType combination
+        const { getFallbackChecklist } = await import('../data/fallback-checklists');
+        const visaTypeSlug: 'student' | 'tourist' =
+          normalizedVisaType.includes('student') || normalizedVisaType.includes('study')
+            ? 'student'
+            : 'tourist';
+        const staticFallbackExists = getFallbackChecklist(countryCode, visaTypeSlug).length > 0;
+
         if (!ruleSet) {
-          // No approved rule set exists - use legacy GPT pipeline
-          logWarn('[Checklist][Mode] No approved VisaRuleSet found, using LEGACY GPT pipeline', {
-            countryCode,
-            visaType: visaTypeName,
-            applicationId,
-            reason: 'no_approved_ruleset',
-          });
+          // No approved rule set exists
+          if (staticFallbackExists) {
+            // Prefer static fallback over legacy GPT when available
+            logInfo(
+              '[Checklist][Mode] No approved VisaRuleSet found, using STATIC fallback (preferred over legacy)',
+              {
+                countryCode,
+                visaType: originalVisaTypeName,
+                normalizedVisaType,
+                applicationId,
+                reason: 'no_approved_ruleset_static_available',
+              }
+            );
+            // Skip legacy, go directly to static fallback below
+          } else {
+            // No static fallback, use legacy GPT pipeline
+            logWarn('[Checklist][Mode] No approved VisaRuleSet found, using LEGACY GPT pipeline', {
+              countryCode,
+              visaType: originalVisaTypeName,
+              normalizedVisaType,
+              applicationId,
+              reason: 'no_approved_ruleset_no_static',
+            });
+          }
         } else {
           // Rule set exists but rules mode failed - use legacy GPT pipeline
           if (isUSTourist) {
@@ -574,7 +610,7 @@ export class DocumentChecklistService {
               {
                 applicationId,
                 countryCode,
-                visaType: visaTypeName,
+                visaType: originalVisaTypeName,
                 normalizedVisaType: 'tourist',
                 reason: 'rules_mode_failed',
                 ruleSetVersion: ruleSet?.version || 'none',
@@ -586,102 +622,150 @@ export class DocumentChecklistService {
             logWarn('[Checklist][Mode] Rules-FIRST mode failed, using LEGACY GPT pipeline', {
               applicationId,
               countryCode,
-              visaType: visaTypeName,
+              visaType: originalVisaTypeName,
+              normalizedVisaType,
               reason: 'rules_mode_failed',
             });
           }
         }
 
-        try {
-          const { AIOpenAIService } = await import('./ai-openai.service');
-          const { getAIConfig } = await import('../config/ai-models');
+        // Only try legacy if static fallback doesn't exist or we have a ruleSet that failed
+        if (!staticFallbackExists || ruleSet) {
+          try {
+            const { AIOpenAIService } = await import('./ai-openai.service');
+            const { getAIConfig } = await import('../config/ai-models');
 
-          // Get model name for logging (legacy mode uses checklistLegacy config)
-          const aiConfig = getAIConfig('checklistLegacy');
-          modelName = aiConfig.model;
+            // Get model name for logging (legacy mode uses checklistLegacy config)
+            const aiConfig = getAIConfig('checklistLegacy');
+            modelName = aiConfig.model;
 
-          const legacyResponse = await AIOpenAIService.generateChecklistLegacy(
-            application,
-            userContext
-          );
-
-          if (
-            legacyResponse &&
-            legacyResponse.checklist &&
-            legacyResponse.checklist.length >= MIN_ITEMS_HARD
-          ) {
-            items = this.convertLegacyChecklistToItems(
-              legacyResponse.checklist,
-              existingDocumentsMap
+            const legacyResponse = await AIOpenAIService.generateChecklistLegacy(
+              application,
+              userContext
             );
-            aiGenerated = true;
-            generationMode = 'legacy_gpt';
 
-            // Log structured checklist generation (legacy mode)
-            logChecklistGeneration({
-              applicationId,
-              country: application.country.name,
-              countryCode,
-              visaType: visaTypeName,
-              mode: 'legacy',
-              jsonValidationPassed: true, // Legacy mode handles validation internally
-              jsonValidationRetries: 0,
-              itemCount: items.length,
-            });
-
-            logInfo('[Checklist][Mode] Legacy mode succeeded', {
-              applicationId,
-              countryCode,
-              visaType: visaTypeName,
-              generationMode,
-              model: modelName,
-              itemCount: items.length,
-            });
-
-            // SAFETY NET: If rules were available but failed, and legacy produced < IDEAL_MIN_ITEMS,
-            // mark for static fallback to ensure quality
             if (
-              ruleSet &&
-              ruleSet.requiredDocuments &&
-              ruleSet.requiredDocuments.length >= IDEAL_MIN_ITEMS
+              legacyResponse &&
+              legacyResponse.checklist &&
+              legacyResponse.checklist.length >= MIN_ITEMS_HARD
             ) {
-              const ruleSetDocumentCount = ruleSet.requiredDocuments.length;
-              if (items.length < IDEAL_MIN_ITEMS) {
-                logWarn(
-                  '[Checklist][Mode] SAFETY NET: Rules were available but legacy produced insufficient items, will fallback to static',
+              items = this.convertLegacyChecklistToItems(
+                legacyResponse.checklist,
+                existingDocumentsMap
+              );
+              aiGenerated = true;
+              generationMode = 'legacy_gpt';
+
+              // Log structured checklist generation (legacy mode)
+              logChecklistGeneration({
+                applicationId,
+                country: application.country.name,
+                countryCode,
+                visaType: normalizedVisaType,
+                mode: 'legacy',
+                jsonValidationPassed: true, // Legacy mode handles validation internally
+                jsonValidationRetries: 0,
+                itemCount: items.length,
+              });
+
+              logInfo('[Checklist][Mode] Legacy mode succeeded', {
+                applicationId,
+                countryCode,
+                visaType: originalVisaTypeName,
+                normalizedVisaType,
+                generationMode,
+                model: modelName,
+                itemCount: items.length,
+              });
+
+              // QUALITY CHECK: If legacy produced < IDEAL_MIN_ITEMS and static fallback exists,
+              // prefer static fallback for better quality
+              if (items.length < IDEAL_MIN_ITEMS && staticFallbackExists) {
+                logInfo(
+                  '[Checklist][Mode] Legacy produced insufficient items (< ideal), using static fallback for better quality',
                   {
                     applicationId,
                     countryCode,
-                    visaType: visaTypeName,
-                    ruleSetDocumentCount,
+                    visaType: originalVisaTypeName,
+                    normalizedVisaType,
                     legacyItemCount: items.length,
                     idealMinItems: IDEAL_MIN_ITEMS,
-                    decisionChain:
-                      'rules_available -> rules_failed -> legacy_insufficient -> static_fallback',
+                    decision: 'prefer_static_over_weak_legacy',
                   }
                 );
-                // Clear items to trigger static fallback below
-                items = [];
+                // Use static fallback immediately instead of clearing items
+                const { buildFallbackChecklistFromStaticConfig } = await import(
+                  '../utils/fallback-checklist-helper'
+                );
+                items = buildFallbackChecklistFromStaticConfig(
+                  countryCode,
+                  normalizedVisaType,
+                  Array.from(existingDocumentsMap.values()).map((doc: any) => ({
+                    type: doc.type,
+                    status: doc.status,
+                    id: doc.id,
+                    fileUrl: doc.fileUrl,
+                    fileName: doc.fileName,
+                    fileSize: doc.fileSize,
+                    uploadedAt: doc.uploadedAt,
+                    verificationNotes: doc.verificationNotes,
+                    verifiedByAI: doc.verifiedByAI,
+                    aiConfidence: doc.aiConfidence,
+                    aiNotesUz: doc.aiNotesUz,
+                    aiNotesRu: doc.aiNotesRu,
+                    aiNotesEn: doc.aiNotesEn,
+                  }))
+                );
+                aiGenerated = false;
                 aiFallbackUsed = true;
+                generationMode = 'static_fallback';
+                modelName = undefined;
+              } else if (
+                ruleSet &&
+                ruleSet.requiredDocuments &&
+                ruleSet.requiredDocuments.length >= IDEAL_MIN_ITEMS
+              ) {
+                // SAFETY NET: If rules were available but failed, and legacy produced < IDEAL_MIN_ITEMS,
+                // mark for static fallback to ensure quality
+                const ruleSetDocumentCount = ruleSet.requiredDocuments.length;
+                if (items.length < IDEAL_MIN_ITEMS) {
+                  logWarn(
+                    '[Checklist][Mode] SAFETY NET: Rules were available but legacy produced insufficient items, will fallback to static',
+                    {
+                      applicationId,
+                      countryCode,
+                      visaType: originalVisaTypeName,
+                      normalizedVisaType,
+                      ruleSetDocumentCount,
+                      legacyItemCount: items.length,
+                      idealMinItems: IDEAL_MIN_ITEMS,
+                      decisionChain:
+                        'rules_available -> rules_failed -> legacy_insufficient -> static_fallback',
+                    }
+                  );
+                  // Clear items to trigger static fallback below
+                  items = [];
+                  aiFallbackUsed = true;
+                }
               }
+            } else {
+              logWarn(
+                '[Checklist][Mode] Legacy mode returned insufficient items, using static fallback',
+                {
+                  applicationId,
+                  itemCount: legacyResponse?.checklist?.length || 0,
+                }
+              );
+              aiFallbackUsed = true;
             }
-          } else {
-            logWarn(
-              '[Checklist][Mode] Legacy mode returned insufficient items, using static fallback',
-              {
-                applicationId,
-                itemCount: legacyResponse?.checklist?.length || 0,
-              }
-            );
+          } catch (legacyError: any) {
+            logWarn('[Checklist][Mode] Legacy mode failed, using static fallback', {
+              applicationId,
+              error: legacyError?.message || String(legacyError),
+            });
             aiFallbackUsed = true;
+            aiErrorOccurred = true;
           }
-        } catch (legacyError: any) {
-          logWarn('[Checklist][Mode] Legacy mode failed, using static fallback', {
-            applicationId,
-            error: legacyError?.message || String(legacyError),
-          });
-          aiFallbackUsed = true;
-          aiErrorOccurred = true;
         }
       }
 
@@ -693,7 +777,7 @@ export class DocumentChecklistService {
           applicationId,
           country: application.country.name,
           countryCode,
-          visaType: visaTypeName,
+          visaType: normalizedVisaType,
           mode: 'fallback',
           jsonValidationPassed: true, // Fallback doesn't use GPT
           jsonValidationRetries: 0,
@@ -708,16 +792,18 @@ export class DocumentChecklistService {
           new Error('Both rules and legacy GPT generation failed'),
           {
             countryCode,
-            visaType: visaTypeName,
+            visaType: originalVisaTypeName,
+            normalizedVisaType,
             applicationId,
             reason: ruleSet ? 'rules_and_legacy_both_failed' : 'no_rules_and_legacy_failed',
           }
         );
 
-        logInfo('[Checklist][Mode] Using STATIC FALLBACK mode (emergency only)', {
+        logInfo('[Checklist][Mode] Using STATIC FALLBACK mode', {
           applicationId,
           countryCode,
-          visaType: visaTypeName,
+          visaType: originalVisaTypeName,
+          normalizedVisaType,
           generationMode,
         });
 
@@ -726,7 +812,7 @@ export class DocumentChecklistService {
         );
         items = buildFallbackChecklistFromStaticConfig(
           countryCode,
-          visaTypeName,
+          normalizedVisaType,
           Array.from(existingDocumentsMap.values()).map((doc: any) => ({
             type: doc.type,
             status: doc.status,
@@ -750,7 +836,7 @@ export class DocumentChecklistService {
           applicationId,
           country: application.country.name,
           countryCode,
-          visaType: visaTypeName,
+          visaType: normalizedVisaType,
           mode: 'fallback',
           jsonValidationPassed: true,
           jsonValidationRetries: 0,
@@ -760,7 +846,8 @@ export class DocumentChecklistService {
         logInfo('[Checklist][Mode] Static fallback generated', {
           applicationId,
           countryCode,
-          visaType: visaTypeName,
+          visaType: originalVisaTypeName,
+          normalizedVisaType,
           generationMode,
           itemCount: items.length,
         });
@@ -843,7 +930,8 @@ export class DocumentChecklistService {
       logInfo('[Checklist][Async] Checklist generated and stored', {
         applicationId,
         countryCode,
-        visaType: visaTypeName,
+        visaType: originalVisaTypeName,
+        normalizedVisaType,
         generationMode,
         model: modelName,
         itemCount: sanitizedItems.length,
@@ -1484,9 +1572,16 @@ Only return the JSON object, no other text.`;
     }>,
     existingDocumentsMap: Map<string, any>
   ): ChecklistItem[] {
+    const { toCanonicalDocumentType } = require('../config/document-types-map');
+
     return legacyItems.map((aiItem, index) => {
-      const docType =
-        aiItem.document || aiItem.name?.toLowerCase().replace(/\s+/g, '_') || `document_${index}`;
+      // Normalize document type using document type mapping (handles aliases like "International Passport" -> "passport")
+      // Try document field first, then name field (both may contain the document type)
+      const rawDocType = aiItem.document || aiItem.name || `document_${index}`;
+      // toCanonicalDocumentType handles normalization (lowercase, spaces to underscores, etc.)
+      const normalized = toCanonicalDocumentType(rawDocType);
+      const docType = normalized.canonicalType || normalized.originalType || rawDocType;
+
       const existingDoc = existingDocumentsMap.get(docType);
 
       const item = {
@@ -1537,11 +1632,12 @@ Only return the JSON object, no other text.`;
    */
   private static findMatchingDocument(
     documentType: string,
-    existingDocumentsMap: Map<string, any>
+    existingDocumentsMap: Map<string, any>,
+    itemName?: string // Added itemName for better matching
   ): any {
     const { toCanonicalDocumentType, documentTypesMatch } = require('../config/document-types-map');
 
-    // Normalize checklist item document type
+    // Normalize checklist item document type (handles aliases like "International Passport" -> "passport")
     const checklistNorm = toCanonicalDocumentType(documentType);
     const checklistKey = checklistNorm.canonicalType ?? checklistNorm.originalType;
 
@@ -1588,8 +1684,69 @@ Only return the JSON object, no other text.`;
       }
     }
 
+    // NEW: Try matching by item name if provided (handles "International Passport" -> "passport")
+    if (itemName) {
+      const itemNameNorm = toCanonicalDocumentType(itemName);
+      const itemNameKey = itemNameNorm.canonicalType ?? itemNameNorm.originalType;
+      if (itemNameNorm.canonicalType) {
+        const canonicalNameMatch = existingDocumentsMap.get(itemNameNorm.canonicalType);
+        if (canonicalNameMatch) {
+          logInfo('[Checklist][Merge] Canonical name match found', {
+            checklistType: documentType,
+            itemName: itemName,
+            documentType: canonicalNameMatch.type,
+            canonicalType: itemNameNorm.canonicalType,
+          });
+          return canonicalNameMatch;
+        }
+      }
+      // Fallback: use documentTypesMatch helper for alias-aware matching with item name
+      for (const [docType, doc] of existingDocumentsMap.entries()) {
+        const userDocNorm = toCanonicalDocumentType(docType);
+        const userDocKey = userDocNorm.canonicalType ?? userDocNorm.originalType;
+        if (documentTypesMatch(itemNameKey, userDocKey)) {
+          logInfo('[Checklist][Merge] Alias-aware name match found', {
+            checklistType: documentType,
+            itemName: itemName,
+            documentType: docType,
+            itemNameKey,
+            userDocKey,
+          });
+          return doc;
+        }
+      }
+    }
+
+    // Enhanced fuzzy matching: also check normalized document type against item name variations
+    // This handles cases where GPT outputs "International Passport" but we need to match "passport"
+    const normalizedType = documentType.toLowerCase().replace(/[_-]/g, '').trim();
+    for (const [docType, doc] of existingDocumentsMap.entries()) {
+      const userDocNorm = toCanonicalDocumentType(docType);
+      const userDocCanonical = userDocNorm.canonicalType ?? userDocNorm.originalType;
+      const normalizedDocType = userDocCanonical.toLowerCase().replace(/[_-]/g, '').trim();
+
+      // Check if normalized types match (handles "international_passport" -> "passport")
+      if (
+        normalizedType === normalizedDocType ||
+        normalizedType.includes(normalizedDocType) ||
+        normalizedDocType.includes(normalizedType)
+      ) {
+        // Additional safety: only match if they're similar enough
+        const similarity = this.calculateStringSimilarity(normalizedType, normalizedDocType);
+        if (similarity > 0.6) {
+          // Lowered threshold to catch more matches
+          logInfo('[Checklist][Merge] Enhanced fuzzy match found', {
+            checklistType: documentType,
+            documentType: docType,
+            canonicalType: userDocCanonical,
+            similarity,
+          });
+          return doc;
+        }
+      }
+    }
+
     // Last resort: fuzzy matching for common variations (legacy fallback)
-    const normalizedType = documentType.toLowerCase().replace(/[_-]/g, '');
     for (const [docType, doc] of existingDocumentsMap.entries()) {
       const normalizedDocType = docType.toLowerCase().replace(/[_-]/g, '');
 
@@ -1663,8 +1820,8 @@ Only return the JSON object, no other text.`;
     const unmatchedItems: string[] = [];
 
     const mergedItems = items.map((item) => {
-      // Try exact match first, then fuzzy match
-      const doc = this.findMatchingDocument(item.documentType, existingDocumentsMap);
+      // Try exact match first, then fuzzy match (pass item.name for better matching)
+      const doc = this.findMatchingDocument(item.documentType, existingDocumentsMap, item.name);
       if (doc) {
         merged++;
         return {

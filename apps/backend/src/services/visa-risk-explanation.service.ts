@@ -482,7 +482,7 @@ export class VisaRiskExplanationService {
         ? `\n\nIMPORTANT COUNTRY CONTEXT:\n- The ONLY valid country for this task is ${countryName} (${countryCode})\n- You MUST NOT refer to any other country\n- If embassy rules for other countries appear in your memory, ignore them${schengen ? '\n- This is a Schengen country. You may reference "Schengen" as a group, but always specify ' + countryName + ' as the primary country' : ''}\n`
         : '';
 
-    return `You are an EXPERT VISA CONSULTANT with 10+ years of experience helping applicants from Uzbekistan apply to embassies of the US, UK, Schengen (Germany/Spain/France), Canada, Australia, Japan, Korea, and UAE.${countrySection}
+    return `You are an EXPERT VISA CONSULTANT with 10+ years of experience helping applicants from Uzbekistan apply to embassies worldwide.${countrySection}
 
 ================================================================================
 YOUR ROLE
@@ -585,7 +585,7 @@ SUMMARY REQUIREMENTS:
 - CRITICAL: Only say "you are currently unemployed" if currentStatus is actually 'unemployed'. If currentStatus is 'employed' or 'student', say that instead.
 - If employment status is 'unknown' or missing, say "employment information is incomplete" rather than assuming unemployed.
 - If data is incomplete, mention that it's an estimate
-- CRITICAL: You must refer to the exact country name provided in the user prompt. NEVER mention any other destination country (e.g., do not mention "US" or "UK" if the country is "Australia"). Always use the exact country name provided.
+- CRITICAL: You must refer ONLY to the exact country name provided in the user prompt. NEVER mention any other destination country. Always use the exact country name provided (e.g., if the country is "${countryName || 'the target country'}", do not mention "US", "UK", "United Kingdom", "United States", or any other country).
 - Uzbek (Uz): Simple, clear language with common terminology (bank hisoboti, ish joyidan ma'lumotnoma, kadastr hujjati)
 - Russian (Ru): Formal but simple
 - English (En): Neutral, embassy-style
@@ -678,7 +678,7 @@ CRITICAL COUNTRY IDENTITY (Phase 8):
 - The ONLY valid country for this task is ${canonicalCountryName} (${canonicalCountryCode})
 - You MUST NOT refer to any other country
 - If embassy rules for other countries appear in your memory, ignore them
-- NEVER mention any other country (e.g., do not mention "UK" or "United Kingdom" if the country is "${canonicalCountryName}", do not mention "Spain" if the country is "${canonicalCountryName}")
+- NEVER mention any other country. Only refer to "${canonicalCountryName}" (${canonicalCountryCode})
 - Use the exact country name "${canonicalCountryName}" in all summaries and recommendations
 - Duration: ${profile.duration || 'Unknown'}
 
