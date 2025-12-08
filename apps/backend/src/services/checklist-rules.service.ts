@@ -322,10 +322,18 @@ async function buildBaseChecklistFromEmbeddedDocuments(
     }
 
     // Log with rule set info for ES/tourist specifically
-    const countryCode = options?.countryCode || 'UNKNOWN';
-    const visaType = options?.visaType || 'UNKNOWN';
+    // Extract countryCode and visaType from userContext if available
+    const countryCode =
+      userContext?.application?.country?.toUpperCase() ||
+      userContext?.questionnaireSummary?.targetCountry?.toUpperCase() ||
+      'UNKNOWN';
+    const visaType =
+      userContext?.application?.visaType?.toLowerCase() ||
+      userContext?.questionnaireSummary?.visaType?.toLowerCase() ||
+      'UNKNOWN';
     const isESTourist =
-      countryCode === 'ES' && (visaType === 'tourist' || visaType === 'schengen tourist');
+      countryCode === 'ES' &&
+      (visaType === 'tourist' || visaType === 'schengen tourist' || visaType.includes('tourist'));
 
     if (isESTourist) {
       logInfo('[ChecklistRules] Base checklist built from VisaRuleSet (ES/tourist)', {
