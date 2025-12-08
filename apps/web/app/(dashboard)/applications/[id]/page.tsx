@@ -3,7 +3,7 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
-import { ArrowLeft, Upload, MessageCircle, CheckCircle2, Clock, XCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageCircle, CheckCircle2, Clock, XCircle, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplication } from '@/lib/hooks/useApplication';
 import ErrorBanner from '@/components/ErrorBanner';
@@ -180,12 +180,6 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Link href={`/applications/${applicationId}/documents`} className="w-full sm:w-auto">
-              <Button className="w-full rounded-xl bg-gradient-to-r from-primary to-primary-dark px-3 py-2 text-xs shadow-[0_15px_35px_rgba(62,166,255,0.35)] sm:px-4 sm:text-sm">
-                <Upload size={14} className="sm:size-4" />
-                <span className="ml-1.5 sm:ml-2">{t('applications.uploadDocuments', 'Upload Documents')}</span>
-              </Button>
-            </Link>
             <Link href={`/chat?applicationId=${applicationId}`} className="w-full sm:w-auto">
               <Button
                 variant="ghost"
@@ -293,33 +287,6 @@ export default function ApplicationDetailPage() {
         <div className="space-y-6">
           {/* Checklist Summary */}
           <ChecklistSummary items={checklistItems} />
-
-          {/* Quick Actions */}
-          <Card className="glass-panel border border-white/10 bg-white/[0.03] p-6">
-            <h3 className="mb-4 text-lg font-semibold text-white">
-              {t('applications.quickActions', 'Quick Actions')}
-            </h3>
-            <div className="space-y-2">
-              <Link href={`/applications/${applicationId}/documents`}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start border border-white/10 !bg-transparent !text-white hover:!bg-white/10"
-                >
-                  <Upload size={16} />
-                  <span className="ml-2">{t('applications.uploadDocuments', 'Upload Documents')}</span>
-                </Button>
-              </Link>
-              <Link href={`/chat?applicationId=${applicationId}`}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start border border-white/10 !bg-transparent !text-white hover:!bg-white/10"
-                >
-                  <MessageCircle size={16} />
-                  <span className="ml-2">{t('applications.chatAboutApplication', 'Chat with AI')}</span>
-                </Button>
-              </Link>
-            </div>
-          </Card>
         </div>
       </div>
     </div>
