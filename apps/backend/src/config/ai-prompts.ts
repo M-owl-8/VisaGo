@@ -1617,7 +1617,9 @@ CRITICAL RULES (MANDATORY - NO EXCEPTIONS)
    - If a documentType is not in the provided list, you MUST NOT invent new ones
    - CRITICAL: You are given a list of base checklist items via baseDocuments
    - Each base item has a stable documentType that MUST be preserved exactly
-   - You MUST return a JSON object with a checklist array
+   - You MUST return a JSON object with EXACTLY this structure: { "checklist": [...] }
+   - The top-level MUST be an object with a "checklist" key containing an array
+   - NEVER return a bare array or a single checklist item object
    - The checklist array MUST contain exactly the same set of documentType values as in the input base documents
    - You MUST NOT drop any documentType from the base documents
    - You MUST NOT rename any documentType (e.g., "passport_international" must stay "passport_international", not become "passport")
@@ -1842,7 +1844,10 @@ export function buildVisaChecklistUserPromptV2(
   prompt += `3. You MAY add up to 3 additional documents (cover_letter, additional_supporting_docs, etc.) with source = "ai_extra"\n`;
   prompt += `4. Fill expertReasoning for EVERY item (financialRelevance, tiesRelevance, riskMitigation, embassyOfficerPerspective)\n`;
   prompt += `5. Use normalized documentType values only\n`;
-  prompt += `6. Output valid JSON matching the schema exactly\n`;
+  prompt += `6. Output valid JSON with EXACTLY this structure: { "checklist": [...] }\n`;
+  prompt += `   - The top-level MUST be an object with a "checklist" key\n`;
+  prompt += `   - The "checklist" value MUST be an array of checklist items\n`;
+  prompt += `   - NEVER return a bare array or a single checklist item object\n`;
 
   return prompt;
 }

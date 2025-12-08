@@ -67,6 +67,8 @@ export type CanonicalDocumentType =
   | 'additional_supporting_docs'
   | 'invitation_letter'
   | 'sponsor_letter'
+  | 'host_passport_copy'
+  | 'host_registration_document'
   | 'host_letter'
   | 'tax_returns'
   | 'business_registration'
@@ -412,13 +414,19 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
   },
   {
     canonical: 'invitation_letter',
+    aliases: ['invitation_letter', 'invitation', 'sponsor_letter', 'host_letter'],
+  },
+  {
+    canonical: 'host_passport_copy',
+    aliases: ['host_passport_copy', 'host_passport', 'inviter_passport_copy'],
+  },
+  {
+    canonical: 'host_registration_document',
     aliases: [
-      'invitation_letter',
-      'invitation',
-      'sponsor_letter',
-      'host_letter',
-      'host_passport_copy', // ES tourist specific
-      'host_registration_document', // ES tourist specific
+      'host_registration_document',
+      'host_registration',
+      'inviter_registration',
+      'host_residence_document',
     ],
   },
   {

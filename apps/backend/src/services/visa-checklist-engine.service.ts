@@ -434,25 +434,45 @@ export class VisaChecklistEngineService {
             documentsLength: (parsed as any).documents.length,
           });
         } else {
-          // Try to find any array-valued property
-          for (const key of parsedKeys) {
-            const value = (parsed as any)[key];
-            if (Array.isArray(value) && value.length > 0) {
-              // Check if first item looks like a checklist item (has documentType or similar)
-              const firstItem = value[0];
-              if (
-                firstItem &&
-                typeof firstItem === 'object' &&
-                (firstItem.documentType || firstItem.document || firstItem.id || firstItem.name)
-              ) {
-                normalizedParsed = { checklist: value };
-                logWarn('[VisaChecklistEngine][Adapter] Mapped array property to checklist', {
-                  countryCode,
-                  visaType,
-                  sourceKey: key,
-                  arrayLength: value.length,
-                });
-                break;
+          // Check if top-level is a single checklist item object (has documentType, category, etc.)
+          const looksLikeChecklistItem =
+            parsed &&
+            typeof parsed === 'object' &&
+            !Array.isArray(parsed) &&
+            ((parsed as any).documentType ||
+              (parsed as any).document ||
+              ((parsed as any).category && (parsed as any).name));
+
+          if (looksLikeChecklistItem) {
+            // Wrap single item as array
+            normalizedParsed = { checklist: [parsed] };
+            logWarn('[VisaChecklistEngine][Adapter] Wrapped single checklist item object', {
+              countryCode,
+              visaType,
+              hasDocumentType: !!(parsed as any).documentType,
+              hasCategory: !!(parsed as any).category,
+            });
+          } else {
+            // Try to find any array-valued property
+            for (const key of parsedKeys) {
+              const value = (parsed as any)[key];
+              if (Array.isArray(value) && value.length > 0) {
+                // Check if first item looks like a checklist item (has documentType or similar)
+                const firstItem = value[0];
+                if (
+                  firstItem &&
+                  typeof firstItem === 'object' &&
+                  (firstItem.documentType || firstItem.document || firstItem.id || firstItem.name)
+                ) {
+                  normalizedParsed = { checklist: value };
+                  logWarn('[VisaChecklistEngine][Adapter] Mapped array property to checklist', {
+                    countryCode,
+                    visaType,
+                    sourceKey: key,
+                    arrayLength: value.length,
+                  });
+                  break;
+                }
               }
             }
           }

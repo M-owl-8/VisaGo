@@ -1334,9 +1334,18 @@ export async function buildCanonicalAIUserContext(
   }
 
   // Extract sponsorType (default: 'self')
+  // Check multiple sources: questionnaire v2 finance.payer, sponsorType, financialInfo, travelInfo
   let sponsorType: 'self' | 'parent' | 'relative' | 'company' | 'other' = 'self';
   if (summary?.sponsorType) {
     sponsorType = summary.sponsorType;
+  } else if ((summary as any)?.finance?.payer) {
+    // v2 format: questionnaire.finance.payer
+    const payer = (summary as any).finance.payer;
+    if (payer === 'self') sponsorType = 'self';
+    else if (payer === 'parent') sponsorType = 'parent';
+    else if (payer === 'relative' || payer === 'sibling') sponsorType = 'relative';
+    else if (payer === 'company') sponsorType = 'company';
+    else sponsorType = 'other';
   } else if (summary?.financialInfo?.sponsorDetails?.relationship) {
     const rel = summary.financialInfo.sponsorDetails.relationship;
     sponsorType =
@@ -1348,6 +1357,7 @@ export async function buildCanonicalAIUserContext(
   }
 
   // Extract currentStatus (default: 'unknown')
+  // Check multiple sources: questionnaire v2 status.currentStatus, currentStatus, employment.currentStatus
   let currentStatus:
     | 'student'
     | 'employed'
@@ -1355,7 +1365,31 @@ export async function buildCanonicalAIUserContext(
     | 'unemployed'
     | 'retired'
     | 'unknown' = 'unknown';
-  if (summary?.employment?.currentStatus) {
+  if ((summary as any)?.status?.currentStatus) {
+    // v2 format: questionnaire.status.currentStatus
+    const status = (summary as any).status.currentStatus;
+    if (
+      status === 'student' ||
+      status === 'employed' ||
+      status === 'self_employed' ||
+      status === 'unemployed' ||
+      status === 'retired'
+    ) {
+      currentStatus = status;
+    }
+  } else if ((summary as any)?.currentStatus) {
+    // v2 format: questionnaire.currentStatus (flat)
+    const status = (summary as any).currentStatus;
+    if (
+      status === 'student' ||
+      status === 'employed' ||
+      status === 'self_employed' ||
+      status === 'unemployed' ||
+      status === 'retired'
+    ) {
+      currentStatus = status;
+    }
+  } else if (summary?.employment?.currentStatus) {
     const empStatus = summary.employment.currentStatus;
     // Handle all possible status values, including 'retired' if it exists
     if (
@@ -1424,15 +1458,18 @@ export async function buildCanonicalAIUserContext(
     summary?.hasFamilyInUzbekistan ?? summary?.ties?.familyTies ?? false;
 
   // Extract maritalStatus (default: 'unknown')
+  // Check multiple sources: questionnaire v2 personal.maritalStatus, maritalStatus (flat)
   const maritalStatus: 'single' | 'married' | 'divorced' | 'widowed' | 'unknown' =
-    summary?.maritalStatus ?? 'unknown';
+    summary?.maritalStatus ?? (summary as any)?.personal?.maritalStatus ?? 'unknown';
 
   // Extract hasChildren (default: false)
   const hasChildren = (summary?.hasChildren && summary.hasChildren !== 'no') ?? false;
 
   // Extract invitations
+  // Check multiple sources: questionnaire v2 invitation.hasInvitation, hasOtherInvitation (flat)
   const hasUniversityInvitation = summary?.hasUniversityInvitation ?? false;
-  const hasOtherInvitation = summary?.hasOtherInvitation ?? false;
+  const hasOtherInvitation =
+    summary?.hasOtherInvitation ?? (summary as any)?.invitation?.hasInvitation ?? false;
 
   // ============================================
   // PHASE 3: EXPERT FIELDS EXTRACTION
@@ -1769,6 +1806,11 @@ export async function buildCanonicalAIUserContext(
 
   // Phase 2: Log derived metrics (non-sensitive) + debug info for employment/ties + risk drivers
   const applicationId = currentContext.application.applicationId;
+  const countryCode = currentContext.application.country;
+  const visaType = currentContext.application.visaType;
+  const isESTourist =
+    countryCode === 'ES' && (visaType === 'tourist' || visaType.includes('tourist'));
+
   logInfo('[AI Context] Canonical context built with expert fields', {
     applicationId,
     employmentStatus: currentStatus,
@@ -1786,6 +1828,51 @@ export async function buildCanonicalAIUserContext(
     travelHistoryLabel: travelHistory.travelHistoryLabel ?? null,
     riskDrivers, // Phase 2: Log risk drivers
   });
+
+  // Additional debug logging for ES/tourist to verify condition fields
+  if (isESTourist) {
+    logInfo('[AI Context][ES Tourist] Condition evaluation fields', {
+      applicationId,
+      sponsorType,
+      currentStatus,
+      maritalStatus,
+      hasPropertyInUzbekistan,
+      hasFamilyInUzbekistan,
+      hasInternationalTravel,
+      previousVisaRejections,
+      hasOtherInvitation,
+      riskLevel: riskScore.level,
+      // Log source of each field for debugging
+      sponsorTypeSource: summary?.sponsorType
+        ? 'summary.sponsorType'
+        : (summary as any)?.finance?.payer
+          ? 'questionnaire.finance.payer'
+          : summary?.financialInfo?.sponsorDetails?.relationship
+            ? 'summary.financialInfo.sponsorDetails.relationship'
+            : summary?.travelInfo?.funding
+              ? 'summary.travelInfo.funding'
+              : 'default(self)',
+      currentStatusSource: (summary as any)?.status?.currentStatus
+        ? 'questionnaire.status.currentStatus'
+        : (summary as any)?.currentStatus
+          ? 'questionnaire.currentStatus'
+          : summary?.employment?.currentStatus
+            ? 'summary.employment.currentStatus'
+            : summary?.education?.isStudent
+              ? 'summary.education.isStudent'
+              : 'default(unknown)',
+      maritalStatusSource: summary?.maritalStatus
+        ? 'summary.maritalStatus'
+        : (summary as any)?.personal?.maritalStatus
+          ? 'questionnaire.personal.maritalStatus'
+          : 'default(unknown)',
+      hasOtherInvitationSource: summary?.hasOtherInvitation
+        ? 'summary.hasOtherInvitation'
+        : (summary as any)?.invitation?.hasInvitation
+          ? 'questionnaire.invitation.hasInvitation'
+          : 'default(false)',
+    });
+  }
 
   return {
     userProfile: {

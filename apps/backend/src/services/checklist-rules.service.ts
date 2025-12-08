@@ -321,13 +321,33 @@ async function buildBaseChecklistFromEmbeddedDocuments(
       }
     }
 
-    logInfo('[ChecklistRules] Base checklist built from embedded documents', {
-      totalItems: checklist.length,
-      requiredCount: checklist.filter((item) => item.required).length,
-      highlyRecommendedCount: checklist.filter((item) => item.category === 'highly_recommended')
-        .length,
-      optionalCount: checklist.filter((item) => item.category === 'optional').length,
-    });
+    // Log with rule set info for ES/tourist specifically
+    const countryCode = options?.countryCode || 'UNKNOWN';
+    const visaType = options?.visaType || 'UNKNOWN';
+    const isESTourist =
+      countryCode === 'ES' && (visaType === 'tourist' || visaType === 'schengen tourist');
+
+    if (isESTourist) {
+      logInfo('[ChecklistRules] Base checklist built from VisaRuleSet (ES/tourist)', {
+        totalItems: checklist.length,
+        requiredCount: checklist.filter((item) => item.required).length,
+        highlyRecommendedCount: checklist.filter((item) => item.category === 'highly_recommended')
+          .length,
+        optionalCount: checklist.filter((item) => item.category === 'optional').length,
+        ruleSetVersion: ruleSet.version || 1,
+        ruleSetDocumentCount: ruleSet.requiredDocuments?.length || 0,
+        countryCode,
+        visaType,
+      });
+    } else {
+      logInfo('[ChecklistRules] Base checklist built from embedded documents', {
+        totalItems: checklist.length,
+        requiredCount: checklist.filter((item) => item.required).length,
+        highlyRecommendedCount: checklist.filter((item) => item.category === 'highly_recommended')
+          .length,
+        optionalCount: checklist.filter((item) => item.category === 'optional').length,
+      });
+    }
 
     return checklist;
   } catch (error) {
