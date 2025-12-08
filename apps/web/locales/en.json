@@ -272,7 +272,7 @@
     "commonMistakes": "Common mistakes",
     "summary": {
       "title": "Checklist Summary",
-      "totalRequired": "Total Required",
+      "total": "Total",
       "uploaded": "Uploaded",
       "verified": "Verified",
       "completion": "Completion"
@@ -308,7 +308,7 @@
     "refresh": "Refresh",
     "overallProgress": "Overall Progress",
     "documentStats": "Document Status",
-    "totalRequired": "Total Required",
+    "total": "Total",
     "uploaded": "Uploaded",
     "verified": "Verified",
     "completion": "Completion",

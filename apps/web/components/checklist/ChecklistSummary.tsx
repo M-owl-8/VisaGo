@@ -27,17 +27,19 @@ export function ChecklistSummary({ items, className }: ChecklistSummaryProps) {
   // Calculate stats
   const requiredItems = items.filter((item) => item.category === 'required');
   const totalRequired = requiredItems.length;
+  const totalItems = items.length; // Total count of all items (required + highly_recommended + optional)
   // Uploaded = items with status !== 'missing'
   const uploadedCount = items.filter((item) => item.status !== 'missing').length;
   // Verified = items with status === 'verified'
   const verifiedCount = items.filter((item) => item.status === 'verified').length;
+  // Completion percentage is still based on required items only
   const completionPercentage =
     totalRequired > 0 ? Math.round((verifiedCount / totalRequired) * 100) : 0;
 
   const stats = [
     {
-      label: t('checklist.summary.totalRequired', 'Total Required'),
-      value: totalRequired,
+      label: t('checklist.summary.total', 'Total'),
+      value: totalItems,
       icon: FileText,
       color: 'text-white',
     },
