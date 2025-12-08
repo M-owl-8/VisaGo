@@ -7,7 +7,6 @@ import { Sparkles, RefreshCcw } from 'lucide-react';
 import { useChatStore } from '@/lib/stores/chat';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplication } from '@/lib/hooks/useApplication';
-import { ChatHeader } from '@/components/chat/ChatHeader';
 import { ChatMessageList } from '@/components/chat/ChatMessageList';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { QuickActions } from '@/components/chat/QuickActions';
@@ -47,6 +46,15 @@ export default function ChatPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, applicationId]); // loadChatHistory and setCurrentApplication are stable Zustand functions
+
+  // Prepare application context for QuickActions
+  const applicationContext = application
+    ? {
+        country: application.country,
+        visaType: application.visaType,
+        status: application.status,
+      }
+    : undefined;
 
   // Redirect if not signed in
   if (!isSignedIn) {
@@ -94,24 +102,8 @@ export default function ChatPage() {
     }
   };
 
-  // Prepare application context for header
-  const applicationContext = application
-    ? {
-        country: application.country,
-        visaType: application.visaType,
-        status: application.status,
-      }
-    : undefined;
-
   return (
     <div className="fixed inset-0 top-16 sm:top-20 flex flex-col overflow-hidden bg-background">
-      {/* Header Section - Fixed at top */}
-      <div className="shrink-0 border-b border-white/10 bg-background/90 backdrop-blur-sm px-3 pt-4 text-white sm:px-4 sm:pt-6 lg:px-8">
-        <div className="mx-auto max-w-5xl">
-          <ChatHeader applicationContext={applicationContext} />
-        </div>
-      </div>
-
       {/* Messages Area - Scrollable */}
       <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-8">
         <div className="mx-auto max-w-5xl py-4">

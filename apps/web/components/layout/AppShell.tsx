@@ -228,7 +228,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="relative z-10 px-3 pb-16 pt-3 sm:px-4 sm:pt-4 lg:px-8">{children}</main>
 
-      <footer className="relative z-10 border-t border-white/10 px-4 pb-8 pt-6 text-white/60 sm:px-6 lg:px-8">
+      {pathname !== '/chat' && (
+        <footer className="relative z-10 border-t border-white/10 px-4 pb-8 pt-6 text-white/60 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             © {new Date().getFullYear()} Ketdik. {t('common.allRightsReserved')}
@@ -251,6 +252,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+      )}
     </div>
   );
 }
