@@ -410,11 +410,13 @@ export interface CanonicalAIUserContext {
 export type RiskDriver =
   | 'low_funds'
   | 'borderline_funds'
+  | 'funds_unknown'
   | 'weak_ties'
   | 'no_property'
   | 'no_employment'
   | 'limited_travel_history'
   | 'previous_visa_refusals'
+  | 'previous_overstay'
   | 'is_minor'
   | 'short_preparation_time'
   | 'self_employed_without_proof'
