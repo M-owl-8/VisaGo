@@ -204,3 +204,26 @@ export const webhookLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Admin API rate limiter: 300 requests per minute per IP
+ * More lenient than strictLimiter to allow admin panel usage
+ * Admin users need to make multiple requests when loading dashboard
+ */
+export const adminLimiter = rateLimit({
+  store: getStore(),
+  windowMs: 60 * 1000, // 1 minute
+  max: 300, // Limit each IP to 300 requests per minute (allows ~5 requests per second)
+  message: 'Too many admin requests. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: {
+        status: 429,
+        message: 'Too many admin requests. Please try again later.',
+      },
+    });
+  },
+});

@@ -10,6 +10,7 @@ import {
   registerLimiter,
   strictLimiter,
   webhookLimiter,
+  adminLimiter,
 } from './middleware/rate-limit';
 import { csrfProtection } from './middleware/csrf';
 import { preventSQLInjection, preventXSS } from './middleware/input-validation';
@@ -276,7 +277,8 @@ app.use('/api/doc-check', docCheckRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/notifications', notificationsRoutes);
-app.use('/api/admin', strictLimiter); // Sensitive operations
+// Admin routes with more lenient rate limiting (admin panel needs multiple requests)
+app.use('/api/admin', adminLimiter);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/legal', legalRoutes);
