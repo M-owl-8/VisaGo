@@ -57,14 +57,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase();
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-background text-white">
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-background text-white">
       <div className="pointer-events-none absolute inset-0 z-0 opacity-70">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(62,166,255,0.15),transparent_60%),radial-gradient(circle_at_80%_0%,rgba(13,25,56,0.7),transparent_40%)]" />
         <div className="blur-[180px] opacity-40 absolute right-[-10%] top-[-5%] h-72 w-72 rounded-full bg-primary animate-blob" />
         <div className="blur-[200px] opacity-30 absolute left-[-5%] bottom-[-10%] h-72 w-72 rounded-full bg-primary-dark animate-blob" />
       </div>
 
-      <nav className="sticky top-0 z-40 px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
+      <nav className="sticky top-0 z-40 shrink-0 px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
         <div className="glass-panel relative flex items-center justify-between border border-white/10 bg-midnight/80 px-3 py-3 text-white sm:px-4 sm:py-4 md:px-6">
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/applications" className="flex items-center gap-2 sm:gap-3">
@@ -187,17 +187,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <p className="text-sm font-semibold text-white">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
                     {initials || 'U'}
                   </div>
                   <Button
-                    variant="secondary"
-                    className="flex-1 border border-white/10 text-white"
+                    variant="ghost"
+                    className="flex-1 min-w-0 border border-white/20 !bg-transparent text-white hover:bg-white/10 hover:border-white/40 transition"
                     onClick={handleLogout}
                   >
-                    <LogOut size={16} />
-                    <span className="ml-2">{t('profile.logout')}</span>
+                    <LogOut size={16} className="shrink-0" />
+                    <span className="ml-2 truncate">{t('profile.logout')}</span>
                   </Button>
                 </div>
 
@@ -226,10 +226,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </nav>
 
-      <main className="relative z-10 px-3 pb-16 pt-3 sm:px-4 sm:pt-4 lg:px-8">{children}</main>
+      <main className="relative z-10 flex-1 px-3 pb-8 pt-3 sm:px-4 sm:pt-4 lg:px-8">{children}</main>
 
       {pathname !== '/chat' && (
-        <footer className="relative z-10 border-t border-white/10 px-4 pb-8 pt-6 text-white/60 sm:px-6 lg:px-8">
+        <footer className="relative z-10 shrink-0 border-t border-white/10 px-4 pb-6 pt-6 text-white/60 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             © {new Date().getFullYear()} Ketdik. {t('common.allRightsReserved')}
