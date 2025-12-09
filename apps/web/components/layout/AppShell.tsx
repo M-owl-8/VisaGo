@@ -11,6 +11,14 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
 
+function normalizeRole(role: string | undefined | null): 'user' | 'admin' | 'super_admin' {
+  if (!role) return 'user';
+  const lower = role.toLowerCase().trim();
+  if (lower === 'super_admin' || lower === 'superadmin') return 'super_admin';
+  if (lower === 'admin') return 'admin';
+  return 'user';
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -19,8 +27,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [currentLang, setCurrentLang] = useState('en');
   const [isNavOpen, setIsNavOpen] = useState(false);
 
-  // Check if user is admin
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  // Check if user is admin (using normalizeRole for consistency)
+  const userRole = normalizeRole(user?.role);
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
   useEffect(() => {
     if (i18n) {
