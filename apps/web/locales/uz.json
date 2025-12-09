@@ -17,7 +17,16 @@
     "close": "Yopish",
     "submit": "Yuborish",
     "search": "Qidirish",
-    "allRightsReserved": "Barcha huquqlar himoyalangan."
+    "allRightsReserved": "Barcha huquqlar himoyalangan.",
+    "unknown": "Noma'lum",
+    "user": "Foydalanuvchi",
+    "privacy": "Maxfiylik",
+    "terms": "Shartlar",
+    "languageNames": {
+      "en": "Inglizcha",
+      "ru": "Ruscha",
+      "uz": "O'zbekcha"
+    }
   },
   "auth": {
     "title": "Ketdik",

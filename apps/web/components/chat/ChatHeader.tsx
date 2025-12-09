@@ -42,8 +42,8 @@ export function ChatHeader({ applicationContext }: ChatHeaderProps) {
             className="border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary sm:px-3 sm:py-1.5 sm:text-xs"
           >
             <span className="truncate">
-              {applicationContext.country?.name || 'Unknown'} •{' '}
-              {applicationContext.visaType?.name || 'Unknown'} •{' '}
+              {applicationContext.country?.name || t('common.unknown', 'Unknown')} •{' '}
+              {applicationContext.visaType?.name || t('common.unknown', 'Unknown')} •{' '}
               {applicationContext.status}
             </span>
           </Badge>

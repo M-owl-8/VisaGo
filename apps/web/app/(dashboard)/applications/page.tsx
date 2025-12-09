@@ -34,7 +34,7 @@ export default function ApplicationsPage() {
 
   const documentsReady = useMemo(() => {
     if (!totalApplications) return { uploaded: 0, required: 0 };
-    const requiredPerApplication = 8;
+    const requiredPerApplication = 20; // Total documents per application (required + highly_recommended + optional)
     const totalRequired = totalApplications * requiredPerApplication;
     const uploaded = userApplications.reduce((sum, app) => {
       const progress = (app.progressPercentage || 0) / 100;
@@ -47,7 +47,7 @@ export default function ApplicationsPage() {
     return userApplications
       .map((app) => ({
         id: app.id,
-        description: `${app.country?.name ?? 'Unknown'} — ${
+        description: `${app.country?.name ?? t('common.unknown', 'Unknown')} — ${
           app.visaType?.name ?? t('applications.title')
         }`,
         timestamp: app.submissionDate ?? app.updatedAt ?? new Date().toISOString(),

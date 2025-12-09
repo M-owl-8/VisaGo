@@ -117,13 +117,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 style={{ color: 'white' }}
               >
                 <option value="en" className="bg-[#0E1A2C] text-white">
-                  EN
+                  {t('common.languageNames.en', 'EN')}
                 </option>
                 <option value="ru" className="bg-[#0E1A2C] text-white">
-                  RU
+                  {t('common.languageNames.ru', 'RU')}
                 </option>
                 <option value="uz" className="bg-[#0E1A2C] text-white">
-                  UZ
+                  {t('common.languageNames.uz', 'UZ')}
                 </option>
               </select>
               <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/70" />
@@ -211,13 +211,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   style={{ color: 'white' }}
                 >
                   <option value="en" className="bg-[#0E1A2C] text-white">
-                    English
+                    {t('common.languageNames.en', 'English')}
                   </option>
                   <option value="ru" className="bg-[#0E1A2C] text-white">
-                    Русский
+                    {t('common.languageNames.ru', 'Русский')}
                   </option>
                   <option value="uz" className="bg-[#0E1A2C] text-white">
-                    O&apos;zbekcha
+                    {t('common.languageNames.uz', "O'zbekcha")}
                   </option>
                 </select>
               </div>
@@ -236,10 +236,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <Link href="/privacy" className="transition hover:text-white">
-              Privacy
+              {t('common.privacy', 'Privacy')}
             </Link>
             <Link href="/terms" className="transition hover:text-white">
-              Terms
+              {t('common.terms', 'Terms')}
             </Link>
             <button
               type="button"

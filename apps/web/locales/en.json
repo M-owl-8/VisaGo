@@ -17,7 +17,16 @@
     "close": "Close",
     "submit": "Submit",
     "search": "Search",
-    "allRightsReserved": "All rights reserved."
+    "allRightsReserved": "All rights reserved.",
+    "unknown": "Unknown",
+    "user": "User",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "languageNames": {
+      "en": "English",
+      "ru": "Русский",
+      "uz": "O'zbekcha"
+    }
   },
   "auth": {
     "title": "Ketdik",

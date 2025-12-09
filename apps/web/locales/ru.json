@@ -17,7 +17,16 @@
     "close": "Закрыть",
     "submit": "Отправить",
     "search": "Поиск",
-    "allRightsReserved": "Все права защищены."
+    "allRightsReserved": "Все права защищены.",
+    "unknown": "Неизвестно",
+    "user": "Пользователь",
+    "privacy": "Конфиденциальность",
+    "terms": "Условия",
+    "languageNames": {
+      "en": "English",
+      "ru": "Русский",
+      "uz": "O'zbekcha"
+    }
   },
   "auth": {
     "title": "Ketdik",

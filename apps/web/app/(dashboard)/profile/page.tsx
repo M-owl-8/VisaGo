@@ -38,7 +38,7 @@ export default function ProfilePage() {
   }
 
   // Get user's display name (first name only, no surname)
-  const displayName = user.firstName || user.email?.split('@')[0] || 'User';
+  const displayName = user.firstName || user.email?.split('@')[0] || t('common.user', 'User');
   
   // Get user initials for avatar
   const initials = displayName
