@@ -19,6 +19,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [currentLang, setCurrentLang] = useState('en');
   const [isNavOpen, setIsNavOpen] = useState(false);
 
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
   useEffect(() => {
     if (i18n) {
       setCurrentLang(i18n.language);
@@ -26,14 +29,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [i18n]);
 
   const navLinks = useMemo(
-    () => [
-      { href: '/applications', label: t('applications.title') },
-      { href: '/questionnaire', label: t('applications.startNewApplication') },
-      { href: '/chat', label: t('chat.aiAssistant') },
-      { href: '/profile', label: t('profile.profile') },
-      { href: '/support', label: t('helpSupport.title') },
-    ],
-    [t]
+    () => {
+      const links = [
+        { href: '/applications', label: t('applications.title') },
+        { href: '/questionnaire', label: t('applications.startNewApplication') },
+        { href: '/chat', label: t('chat.aiAssistant') },
+        { href: '/profile', label: t('profile.profile') },
+        { href: '/support', label: t('helpSupport.title') },
+      ];
+      
+      // Add admin link if user is admin
+      if (isAdmin) {
+        links.push({ href: '/admin/dashboard', label: 'Admin Panel' });
+      }
+      
+      return links;
+    },
+    [t, isAdmin]
   );
 
   const handleLogout = async () => {
