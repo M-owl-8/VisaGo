@@ -224,7 +224,160 @@ export const documentTranslations: Record<string, DocumentTranslation> = {
     descriptionUz: "Kompaniya ro'yxatdan o'tish hujjatlari va biznes litsenziyasi",
     descriptionRu: 'Документы регистрации компании и бизнес-лицензия',
   },
+  proof_of_funds: {
+    type: 'proof_of_funds',
+    nameEn: 'Proof of Funds',
+    nameUz: "Mablag' Isboti",
+    nameRu: 'Подтверждение Средств',
+    descriptionEn: 'Bank statements or financial documents proving sufficient funds for the trip',
+    descriptionUz:
+      "Sayohat uchun yetarli mablag'ni isbotlovchi bank hisoblari yoki moliyaviy hujjatlar",
+    descriptionRu:
+      'Банковские выписки или финансовые документы, подтверждающие достаточные средства для поездки',
+  },
+  property_documents: {
+    type: 'property_documents',
+    nameEn: 'Property Documents',
+    nameUz: 'Mulk Hujjatlari',
+    nameRu: 'Документы на Недвижимость',
+    descriptionEn:
+      'Documents proving property ownership in home country (deed, registration, etc.)',
+    descriptionUz:
+      "Vatandagi mulk egaligini isbotlovchi hujjatlar (guvohnoma, ro'yxatdan o'tish va boshqalar)",
+    descriptionRu:
+      'Документы, подтверждающие право собственности на недвижимость в стране проживания (свидетельство, регистрация и т.д.)',
+  },
+  family_ties_documents: {
+    type: 'family_ties_documents',
+    nameEn: 'Family Ties Documents',
+    nameUz: "Oila Bog'liqlik Hujjatlari",
+    nameRu: 'Документы о Семейных Связях',
+    descriptionEn:
+      'Documents showing family relationships and ties to home country (marriage certificate, birth certificates of children, etc.)',
+    descriptionUz:
+      "Oila munosabatlari va vatanga bog'liqlikni ko'rsatuvchi hujjatlar (nikoh guvohnomasi, farzandlarning tug'ilganlik guvohnomalari va boshqalar)",
+    descriptionRu:
+      'Документы, показывающие семейные отношения и связи со страной проживания (свидетельство о браке, свидетельства о рождении детей и т.д.)',
+  },
+  family_ties_proof: {
+    type: 'family_ties_proof',
+    nameEn: 'Family Ties Proof',
+    nameUz: "Oila Bog'liqlik Isboti",
+    nameRu: 'Подтверждение Семейных Связей',
+    descriptionEn: 'Documents proving family ties to home country',
+    descriptionUz: "Vatanga oilaviy bog'liqlikni isbotlovchi hujjatlar",
+    descriptionRu: 'Документы, подтверждающие семейные связи со страной проживания',
+  },
+  travel_insurance: {
+    type: 'travel_insurance',
+    nameEn: 'Travel Insurance',
+    nameUz: "Sayohat Sug'urtasi",
+    nameRu: 'Страховка для Путешествия',
+    descriptionEn:
+      'Travel health insurance covering entire Schengen stay with minimum €30,000 coverage',
+    descriptionUz:
+      "Butun Shengen qolish muddatini qamrab oladigan, kamida €30,000 sug'urta qoplamasi bo'lgan sayohat sog'liqni saqlash sug'urtasi",
+    descriptionRu:
+      'Медицинская страховка для путешествия, покрывающая весь период пребывания в Шенгене с минимальным покрытием €30,000',
+  },
+  visa_fee_receipt: {
+    type: 'visa_fee_receipt',
+    nameEn: 'Visa Fee Receipt',
+    nameUz: "Viza To'lovi Kvitansiyasi",
+    nameRu: 'Квитанция об Оплате Визы',
+    descriptionEn: 'Proof of payment for Schengen visa application fee (€80 for adults)',
+    descriptionUz: "Shengen viza ariza to'lovi uchun to'lov isboti (kattalar uchun €80)",
+    descriptionRu: 'Подтверждение оплаты сбора за заявление на шенгенскую визу (€80 для взрослых)',
+  },
+  accommodation_proof: {
+    type: 'accommodation_proof',
+    nameEn: 'Accommodation Proof',
+    nameUz: 'Turar Joy Isboti',
+    nameRu: 'Подтверждение Проживания',
+    descriptionEn:
+      'Hotel bookings, Airbnb reservations, or host accommodation confirmation for entire stay in Spain and Schengen area',
+    descriptionUz:
+      'Ispaniya va Shengen hududida butun qolish muddati uchun mehmonxona bronlari, Airbnb bronlari yoki mehmonxona tasdiqlanishi',
+    descriptionRu:
+      'Бронирование отелей, бронирование Airbnb или подтверждение размещения у принимающей стороны на весь период пребывания в Испании и Шенгенской зоне',
+  },
+  invitation_letter: {
+    type: 'invitation_letter',
+    nameEn: 'Invitation Letter',
+    nameUz: 'Taklifnoma',
+    nameRu: 'Пригласительное Письмо',
+    descriptionEn:
+      'Letter from Spanish host inviting applicant, including purpose of visit and accommodation details',
+    descriptionUz:
+      "Arizachi taklif qiluvchi ispaniyalik mezbon xati, tashrif maqsadi va turar joy tafsilotlarini o'z ichiga oladi",
+    descriptionRu:
+      'Письмо от испанского принимающего лица с приглашением заявителя, включая цель визита и детали размещения',
+  },
+  host_registration_document: {
+    type: 'host_registration_document',
+    nameEn: 'Host Registration Document',
+    nameUz: "Mezbon Ro'yxatdan O'tish Hujjati",
+    nameRu: 'Документ о Регистрации Принимающей Стороны',
+    descriptionEn:
+      'Proof of host registration/address in Spain (e.g., padrón/empadronamiento or rental contract)',
+    descriptionUz:
+      "Ispaniyada mezbon ro'yxatdan o'tish/manzil isboti (masalan, padrón/empadronamiento yoki ijara shartnomasi)",
+    descriptionRu:
+      'Подтверждение регистрации/адреса принимающей стороны в Испании (например, padrón/empadronamiento или договор аренды)',
+  },
+  previous_visas: {
+    type: 'previous_visas',
+    nameEn: 'Previous Visas',
+    nameUz: 'Oldingi Vizalar',
+    nameRu: 'Предыдущие Визы',
+    descriptionEn: 'Copies of previous Schengen or other visas',
+    descriptionUz: 'Oldingi Shengen yoki boshqa vizalarning nusxalari',
+    descriptionRu: 'Копии предыдущих шенгенских или других виз',
+  },
+  cover_letter: {
+    type: 'cover_letter',
+    nameEn: 'Cover Letter',
+    nameUz: 'Xat',
+    nameRu: 'Сопроводительное Письмо',
+    descriptionEn:
+      'Personal cover letter explaining purpose of visit, itinerary, and ties to home country, addressed to the Spanish consulate/embassy',
+    descriptionUz:
+      "Tashrif maqsadi, marshrut va vatanga bog'liqlikni tushuntiruvchi shaxsiy xat, Ispaniya konsulxona/elchixonasiga yuborilgan",
+    descriptionRu:
+      'Личное сопроводительное письмо с объяснением цели визита, маршрута и связей со страной проживания, адресованное консульству/посольству Испании',
+  },
+  flight_booking: {
+    type: 'flight_booking',
+    nameEn: 'Flight Booking',
+    nameUz: 'Parvoz Broni',
+    nameRu: 'Бронирование Рейса',
+    descriptionEn: 'Flight reservation or booking confirmation',
+    descriptionUz: 'Parvoz broni yoki bron tasdiqlanishi',
+    descriptionRu: 'Бронирование или подтверждение бронирования рейса',
+  },
+  employment_certificate: {
+    type: 'employment_certificate',
+    nameEn: 'Employment Certificate',
+    nameUz: "Ish Joyidan Ma'lumotnoma",
+    nameRu: 'Справка с Места Работы',
+    descriptionEn:
+      'Letter from current employer confirming employment, position, salary, and leave approval',
+    descriptionUz:
+      "Joriy ish beruvchidan ish, lavozim, maosh va ta'til tasdiqlanishini tasdiqlovchi xat",
+    descriptionRu:
+      'Письмо от текущего работодателя, подтверждающее трудоустройство, должность, зарплату и одобрение отпуска',
+  },
 };
+
+/**
+ * Format snake_case or kebab-case to Title Case
+ */
+function formatDocumentName(name: string): string {
+  return name
+    .split(/[_-]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
 
 /**
  * Get document translation by type
@@ -247,12 +400,13 @@ export function getDocumentTranslation(documentType: string): DocumentTranslatio
     return documentTranslations[partialMatch];
   }
 
-  // Default fallback
+  // Default fallback with formatted name
+  const formattedName = formatDocumentName(documentType);
   return {
     type: documentType,
-    nameEn: documentType,
-    nameUz: documentType,
-    nameRu: documentType,
+    nameEn: formattedName,
+    nameUz: formattedName,
+    nameRu: formattedName,
     descriptionEn: 'Required document for visa application',
     descriptionUz: 'Viza arizasi uchun kerakli hujjat',
     descriptionRu: 'Необходимый документ для визовой заявки',

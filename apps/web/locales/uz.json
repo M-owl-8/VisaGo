@@ -318,6 +318,34 @@
     "selectRequiredFields": "Iltimos, barcha majburiy maydonlarni to'ldiring",
     "step1Description": "Yo'nalish davlatini va viza turini tanlang"
   },
+  "documents": {
+    "title": "Hujjat Yuklash",
+    "selectDocument": "Hujjatni tanlang (PDF, JPG, PNG - Maksimal 20MB)",
+    "uploadSuccess": "Hujjat muvaffaqiyatli yuklandi",
+    "uploadFailed": "Yuklash muvaffaqiyatsiz",
+    "fileTooLarge": "Fayl hajmi 20MB dan kichik bo'lishi kerak",
+    "statusVerified": "Tasdiqlangan",
+    "statusPending": "Kutilmoqda",
+    "statusRejected": "Rad etilgan",
+    "statusNotUploaded": "Yuklanmagan",
+    "categoryRequired": "Majburiy",
+    "categoryHighlyRecommended": "Tavsiya etiladi",
+    "categoryOptional": "Ixtiyoriy",
+    "viewDocument": "Ko'rish",
+    "uploadDocument": "Yuklash",
+    "whereToObtain": "Qayerdan olish mumkin"
+  },
+  "checklist": {
+    "whereToObtain": "Qayerdan olish mumkin",
+    "commonMistakes": "Keng tarqalgan xatolar",
+    "summary": {
+      "title": "Ro'yxat Xulosasi",
+      "total": "Jami",
+      "uploaded": "Yuklangan",
+      "verified": "Tasdiqlangan",
+      "completion": "Bajarilish"
+    }
+  },
   "landing": {
     "badge": "AI YORDAMCHI VIZA UCHUN",
     "heroTitle": "Talabalar va sayohatchilar uchun AI viza hamkori",

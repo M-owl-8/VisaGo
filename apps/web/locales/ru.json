@@ -318,6 +318,34 @@
     "selectRequiredFields": "Пожалуйста, заполните все обязательные поля",
     "step1Description": "Выберите страну назначения и тип визы"
   },
+  "documents": {
+    "title": "Загрузить Документ",
+    "selectDocument": "Выберите документ (PDF, JPG, PNG - Макс. 20MB)",
+    "uploadSuccess": "Документ успешно загружен",
+    "uploadFailed": "Загрузка не удалась",
+    "fileTooLarge": "Размер файла должен быть менее 20MB",
+    "statusVerified": "Проверено",
+    "statusPending": "В ожидании",
+    "statusRejected": "Отклонено",
+    "statusNotUploaded": "Не загружено",
+    "categoryRequired": "Обязательно",
+    "categoryHighlyRecommended": "Настоятельно рекомендуется",
+    "categoryOptional": "Необязательно",
+    "viewDocument": "Просмотр",
+    "uploadDocument": "Загрузить",
+    "whereToObtain": "Где получить"
+  },
+  "checklist": {
+    "whereToObtain": "Где получить",
+    "commonMistakes": "Распространенные ошибки",
+    "summary": {
+      "title": "Сводка Списка",
+      "total": "Всего",
+      "uploaded": "Загружено",
+      "verified": "Проверено",
+      "completion": "Выполнение"
+    }
+  },
   "landing": {
     "badge": "AI-ПОМОЩНИК ПО ВИЗАМ",
     "heroTitle": "AI-помощник по визам для студентов и путешественников",

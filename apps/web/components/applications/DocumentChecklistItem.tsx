@@ -54,8 +54,29 @@ export function DocumentChecklistItem({
   
   const documentType = item.documentType || item.document || '';
 
-  // Get localized text
-  const name = language === 'uz' ? item.nameUz || item.name : language === 'ru' ? item.nameRu || item.name : item.name;
+  // Helper to format snake_case to Title Case
+  const formatDocumentName = (name: string): string => {
+    if (!name) return '';
+    // If already formatted (contains spaces and capitals), return as is
+    if (name.includes(' ') && /[A-Z]/.test(name)) return name;
+    // Format snake_case or kebab-case
+    return name
+      .split(/[_-]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Get localized text with fallback formatting
+  const getLocalizedName = () => {
+    if (language === 'uz') {
+      return item.nameUz || item.name || formatDocumentName(documentType);
+    }
+    if (language === 'ru') {
+      return item.nameRu || item.name || formatDocumentName(documentType);
+    }
+    return item.name || formatDocumentName(documentType);
+  };
+  const name = getLocalizedName();
   const description = language === 'uz' 
     ? item.descriptionUz || item.description 
     : language === 'ru' 
