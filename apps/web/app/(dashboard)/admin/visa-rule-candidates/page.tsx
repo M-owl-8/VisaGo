@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -38,11 +38,7 @@ export default function VisaRuleCandidatesPage() {
   const [visaTypeFilter, setVisaTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  useEffect(() => {
-    fetchCandidates();
-  }, [countryFilter, visaTypeFilter, statusFilter]);
-
-  const fetchCandidates = async () => {
+  const fetchCandidates = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
@@ -68,7 +64,11 @@ export default function VisaRuleCandidatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [countryFilter, visaTypeFilter, statusFilter]);
+
+  useEffect(() => {
+    fetchCandidates();
+  }, [fetchCandidates]);
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {

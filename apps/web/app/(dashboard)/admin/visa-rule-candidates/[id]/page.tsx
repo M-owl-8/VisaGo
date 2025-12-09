@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -44,11 +44,7 @@ export default function CandidateDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    fetchCandidate();
-  }, [id]);
-
-  const fetchCandidate = async () => {
+  const fetchCandidate = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
@@ -69,7 +65,11 @@ export default function CandidateDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchCandidate();
+  }, [fetchCandidate]);
 
   const handleApprove = async () => {
     if (!confirm('Are you sure you want to approve this candidate? This will create a new approved rule set.')) {

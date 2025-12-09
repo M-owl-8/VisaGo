@@ -15,11 +15,12 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
 }
 
 const navItems: NavItem[] = [

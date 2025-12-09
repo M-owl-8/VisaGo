@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -28,11 +28,7 @@ export default function VisaRulesListPage() {
   const [countryFilter, setCountryFilter] = useState('');
   const [visaTypeFilter, setVisaTypeFilter] = useState('');
 
-  useEffect(() => {
-    fetchRuleSets();
-  }, [countryFilter, visaTypeFilter]);
-
-  const fetchRuleSets = async () => {
+  const fetchRuleSets = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
@@ -58,7 +54,11 @@ export default function VisaRulesListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [countryFilter, visaTypeFilter]);
+
+  useEffect(() => {
+    fetchRuleSets();
+  }, [fetchRuleSets]);
 
   if (loading) {
     return (

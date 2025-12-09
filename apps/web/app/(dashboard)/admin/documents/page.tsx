@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { adminApi, DocumentVerificationQueue } from '@/lib/api/admin';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -15,11 +15,7 @@ export default function AdminDocumentsPage() {
   const [pageSize] = useState(20);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadDocuments();
-  }, [page]);
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -31,7 +27,11 @@ export default function AdminDocumentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   const handleVerify = async (documentId: string, status: 'verified' | 'rejected') => {
     try {

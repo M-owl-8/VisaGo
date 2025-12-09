@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -47,11 +47,7 @@ export default function VisaRuleSetEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    fetchRuleSet();
-  }, [id]);
-
-  const fetchRuleSet = async () => {
+  const fetchRuleSet = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
@@ -72,7 +68,11 @@ export default function VisaRuleSetEditPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchRuleSet();
+  }, [fetchRuleSet]);
 
   const handleConditionChange = (index: number, condition: string) => {
     if (!ruleSet) return;

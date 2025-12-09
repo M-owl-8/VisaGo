@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { adminApi, AIInteraction } from '@/lib/api/admin';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -21,11 +21,7 @@ export default function AdminAIInteractionsPage() {
     dateTo: '',
   });
 
-  useEffect(() => {
-    loadInteractions();
-  }, [page, filters]);
-
-  const loadInteractions = async () => {
+  const loadInteractions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -45,7 +41,11 @@ export default function AdminAIInteractionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, filters]);
+
+  useEffect(() => {
+    loadInteractions();
+  }, [loadInteractions]);
 
   const totalPages = Math.ceil(total / pageSize);
 

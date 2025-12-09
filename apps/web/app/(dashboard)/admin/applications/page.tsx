@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { adminApi, ApplicationData } from '@/lib/api/admin';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -14,11 +14,7 @@ export default function AdminApplicationsPage() {
   const [page, setPage] = useState(0);
   const [pageSize] = useState(20);
 
-  useEffect(() => {
-    loadApplications();
-  }, [page]);
-
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -30,7 +26,11 @@ export default function AdminApplicationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize]);
+
+  useEffect(() => {
+    loadApplications();
+  }, [loadApplications]);
 
   const totalPages = Math.ceil(total / pageSize);
 
