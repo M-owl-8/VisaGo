@@ -21,6 +21,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkAdminAccess = async () => {
       // Wait for auth store to initialize
       if (isLoading) {
@@ -29,32 +31,81 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       // If no user, redirect to login
       if (!user) {
-        router.push('/login');
+        if (isMounted) {
+          router.push('/login');
+        }
         return;
       }
 
-      // Fetch latest user profile to ensure role is up to date
-      try {
-        await fetchUserProfile();
-      } catch (error) {
-        console.error('Failed to fetch user profile:', error);
-      }
-
-      // Check role after profile fetch
+      // Check role from current user first (fast path)
       const currentUser = useAuthStore.getState().user;
       const role = normalizeRole(currentUser?.role);
 
-      if (role !== 'admin' && role !== 'super_admin') {
-        // Not an admin, redirect to dashboard
-        router.push('/applications');
+      // If already admin, allow access immediately
+      if (role === 'admin' || role === 'super_admin') {
+        if (isMounted) {
+          setIsChecking(false);
+        }
         return;
       }
 
-      setIsChecking(false);
+      // If not admin, try fetching latest profile to ensure role is up to date
+      // Use a timeout to prevent infinite waiting
+      const timeoutId = setTimeout(() => {
+        if (isMounted) {
+          // Timeout: check current role and proceed if admin, otherwise redirect
+          const finalUser = useAuthStore.getState().user;
+          const finalRole = normalizeRole(finalUser?.role);
+          if (finalRole === 'admin' || finalRole === 'super_admin') {
+            setIsChecking(false);
+          } else {
+            router.push('/applications');
+          }
+        }
+      }, 5000); // 5 second timeout
+
+      try {
+        await fetchUserProfile();
+        clearTimeout(timeoutId);
+        
+        if (!isMounted) return;
+
+        // Re-check role after profile fetch
+        const updatedUser = useAuthStore.getState().user;
+        const updatedRole = normalizeRole(updatedUser?.role);
+
+        if (updatedRole !== 'admin' && updatedRole !== 'super_admin') {
+          // Still not an admin, redirect to dashboard
+          router.push('/applications');
+          return;
+        }
+
+        setIsChecking(false);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error('Failed to fetch user profile:', error);
+        
+        if (!isMounted) return;
+
+        // On error, check current role and proceed if admin
+        const errorUser = useAuthStore.getState().user;
+        const errorRole = normalizeRole(errorUser?.role);
+        if (errorRole === 'admin' || errorRole === 'super_admin') {
+          setIsChecking(false);
+        } else {
+          // Not admin and fetch failed, redirect
+          router.push('/applications');
+        }
+      }
     };
 
     checkAdminAccess();
-  }, [user, isLoading, router, fetchUserProfile]);
+
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isLoading]);
 
   const handleLogout = async () => {
     await logout();
