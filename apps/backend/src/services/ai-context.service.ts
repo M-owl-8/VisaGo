@@ -552,17 +552,23 @@ function computeRiskDrivers(context: {
 }): RiskDriver[] {
   const drivers: RiskDriver[] = [];
 
-  // Financial risk drivers
+  // Financial risk drivers (v2 thresholds)
   if (context.financialSufficiencyRatio !== null) {
-    if (context.financialSufficiencyRatio < 0.8) {
+    if (context.financialSufficiencyRatio < 0.5) {
       drivers.push('low_funds');
-    } else if (context.financialSufficiencyRatio < 1.1) {
+    } else if (context.financialSufficiencyRatio < 0.8) {
+      drivers.push('low_funds');
+    } else if (context.financialSufficiencyRatio < 1.0) {
       drivers.push('borderline_funds');
     }
+  } else if (context.availableFundsUSD === null || context.availableFundsUSD <= 0) {
+    drivers.push('funds_unknown');
   }
 
-  // Ties risk drivers
-  if (context.tiesStrengthScore !== null && context.tiesStrengthScore < 0.5) {
+  // Ties risk drivers (v2 thresholds)
+  if (context.tiesStrengthScore !== null && context.tiesStrengthScore <= 0.3) {
+    drivers.push('weak_ties');
+  } else if (context.tiesStrengthLabel === 'weak') {
     drivers.push('weak_ties');
   }
   if (!context.hasPropertyInUzbekistan) {
@@ -577,12 +583,10 @@ function computeRiskDrivers(context: {
     drivers.push('no_employment');
   }
 
-  // Travel history risk drivers
-  if (
-    !context.hasInternationalTravel ||
-    context.travelHistoryLabel === 'none' ||
-    context.travelHistoryLabel === 'limited'
-  ) {
+  // Travel history risk drivers (v2)
+  if (context.travelHistoryLabel === 'none' || context.travelHistoryLabel === 'limited') {
+    drivers.push('limited_travel_history');
+  } else if (!context.hasInternationalTravel) {
     drivers.push('limited_travel_history');
   }
 
@@ -597,7 +601,7 @@ function computeRiskDrivers(context: {
     drivers.push('previous_visa_refusals');
   }
   if (context.hasOverstayHistory) {
-    drivers.push('previous_visa_refusals'); // Overstay is also a refusal risk
+    drivers.push('previous_overstay');
   }
 
   // Minor risk driver
@@ -643,14 +647,14 @@ function computeRiskDrivers(context: {
 }
 
 /**
- * Compute risk level from risk score (Phase 2)
+ * Compute risk level from risk score (Risk Engine v2)
  * Centralized mapping to ensure consistency across all services
  */
 export function computeRiskLevel(riskScore: number): 'low' | 'medium' | 'high' {
-  if (riskScore < 40) {
+  if (riskScore <= 35) {
     return 'low';
   }
-  if (riskScore < 70) {
+  if (riskScore <= 65) {
     return 'medium';
   }
   return 'high';
@@ -831,126 +835,204 @@ function getOfficerEvaluationCriteria(countryCode: string, visaType: string): st
  * @param summary - VisaQuestionnaireSummary
  * @returns VisaProbabilityResult with score, level, and factors
  */
-export function calculateVisaProbability(summary: VisaQuestionnaireSummary): VisaProbabilityResult {
-  let score = 70; // Start with a baseline score
+/**
+ * Calculate visa probability using Risk Engine v2
+ * Deterministic scoring with baseline 50, additive adjustments
+ */
+export function calculateVisaProbability(
+  summary: VisaQuestionnaireSummary,
+  expertFields?: {
+    financialSufficiencyRatio: number | null;
+    financialSufficiencyLabel: 'low' | 'borderline' | 'sufficient' | 'strong' | null;
+    requiredFundsUSD: number | null;
+    availableFundsUSD: number | null;
+    tiesStrengthScore: number | null;
+    tiesStrengthLabel: 'weak' | 'medium' | 'strong' | null;
+    travelHistoryLabel: 'none' | 'limited' | 'good' | 'strong' | null;
+    employmentDurationMonths: number | null;
+    monthlyIncomeUSD: number | null;
+  }
+): VisaProbabilityResult {
+  let score = 50; // Neutral baseline (v2)
   const riskFactors: string[] = [];
   const positiveFactors: string[] = [];
+  const riskDrivers: string[] = [];
 
-  // Money - Bank Balance
-  // Only penalize if balance is explicitly low, not if it's just missing/unknown
-  if (summary.bankBalanceUSD !== undefined && summary.bankBalanceUSD !== null) {
-    if (summary.visaType === 'tourist' && summary.bankBalanceUSD < 2000) {
-      score -= 10;
-      riskFactors.push('Bank balance is relatively low for a tourist trip.');
+  // Helper to add driver
+  const addDriver = (driver: string) => {
+    if (!riskDrivers.includes(driver)) {
+      riskDrivers.push(driver);
     }
-    if (summary.visaType === 'student' && summary.bankBalanceUSD < 10000) {
-      score -= 15;
-      riskFactors.push('Savings may be low compared to common student visa expectations.');
+  };
+
+  // Extract expert fields or compute them if not provided
+  const financialRatio = expertFields?.financialSufficiencyRatio ?? null;
+  const financialLabel = expertFields?.financialSufficiencyLabel ?? null;
+  const requiredFundsUSD = expertFields?.requiredFundsUSD ?? null;
+  const availableFundsUSD = expertFields?.availableFundsUSD ?? null;
+  const tiesStrengthScore = expertFields?.tiesStrengthScore ?? null;
+  const tiesStrengthLabel = expertFields?.tiesStrengthLabel ?? null;
+  const travelHistoryLabel = expertFields?.travelHistoryLabel ?? null;
+  const employmentDurationMonths = expertFields?.employmentDurationMonths ?? null;
+  const monthlyIncomeUSD = expertFields?.monthlyIncomeUSD ?? summary.monthlyIncomeUSD ?? null;
+
+  // A) Financial sufficiency
+  if (requiredFundsUSD === null || requiredFundsUSD === 0) {
+    // Treat as neutral (ratio = 1)
+    // No adjustment
+  } else if (!availableFundsUSD || availableFundsUSD <= 0) {
+    score += 5; // Small risk bump for unknown funds
+    addDriver('funds_unknown');
+  } else {
+    const ratio = financialRatio ?? availableFundsUSD / requiredFundsUSD;
+    if (ratio < 0.5) {
+      score += 25;
+      addDriver('low_funds');
+    } else if (ratio < 0.8) {
+      score += 15;
+      addDriver('low_funds');
+    } else if (ratio < 1.0) {
+      score += 8;
+      addDriver('borderline_funds');
+    } else if (ratio < 1.3) {
+      // Adequate, neutral
+    } else if (ratio < 2.5) {
+      score -= 5; // Good buffer
+    } else {
+      score -= 8; // Very strong buffer
     }
-  }
-  // If bank balance is missing/unknown, don't penalize - it's just incomplete data
 
-  // Rejections / overstays
-  if (summary.previousVisaRejections) {
-    score -= 15;
-    riskFactors.push('Previous visa rejection increases the level of scrutiny.');
-  }
-  if (summary.previousOverstay) {
-    score -= 25;
-    riskFactors.push('Previous overstay strongly reduces chances of approval.');
-  }
-
-  // Ties to Uzbekistan (strong positive factors)
-  let tiesStrength = 0;
-  if (summary.hasPropertyInUzbekistan) {
-    score += 5;
-    tiesStrength += 1;
-    positiveFactors.push('Property in Uzbekistan strengthens your ties to home country.');
-  }
-  if (summary.hasFamilyInUzbekistan) {
-    score += 5;
-    tiesStrength += 1;
-    positiveFactors.push('Close family in Uzbekistan is a strong tie to home country.');
-  }
-  // Check employment status - if employed, that's also a tie
-  const isEmployed =
-    summary.employment?.isEmployed ||
-    summary.employment?.currentStatus === 'employed' ||
-    summary.employment?.currentStatus === 'self_employed';
-  if (isEmployed) {
-    score += 3;
-    tiesStrength += 0.5;
-    positiveFactors.push('Employment demonstrates ties to home country.');
-  }
-  // Check if has children
-  if (summary.hasChildren && summary.hasChildren !== 'no') {
-    score += 3;
-    tiesStrength += 0.5;
-    positiveFactors.push('Children in Uzbekistan strengthen ties to home country.');
-  }
-
-  // IMPROVED RISK LOGIC: If ties are strong and finances are just unknown (not bad),
-  // don't mark as high risk
-  const hasStrongTies = tiesStrength >= 1.5; // Property + family, or property + employment, etc.
-  const financesAreUnknown =
-    summary.bankBalanceUSD === undefined || summary.bankBalanceUSD === null;
-  const financesAreBad =
-    summary.bankBalanceUSD !== undefined &&
-    summary.bankBalanceUSD !== null &&
-    ((summary.visaType === 'tourist' && summary.bankBalanceUSD < 2000) ||
-      (summary.visaType === 'student' && summary.bankBalanceUSD < 10000));
-
-  // If ties are strong, finances are unknown (not bad), and no serious negatives,
-  // cap the risk at medium instead of high
-  if (
-    hasStrongTies &&
-    financesAreUnknown &&
-    !financesAreBad &&
-    !summary.previousVisaRejections &&
-    !summary.previousOverstay
-  ) {
-    // Ensure score is at least 50 (medium risk threshold)
-    if (score < 50) {
-      score = 50;
-      // Remove any "low balance" risk factors that might have been added incorrectly
-      const balanceRiskIndex = riskFactors.findIndex(
-        (f) => f.includes('balance') || f.includes('Savings')
-      );
-      if (balanceRiskIndex >= 0) {
-        riskFactors.splice(balanceRiskIndex, 1);
+    // Suspicious "too much money vs income"
+    if (monthlyIncomeUSD && monthlyIncomeUSD > 0) {
+      const monthsOfIncome = availableFundsUSD / monthlyIncomeUSD;
+      if (monthsOfIncome > 24) {
+        addDriver('big_funds_vs_low_income');
+        score += 5; // Slight risk bump
       }
     }
   }
 
-  // Clamp score to valid range
-  if (score < 10) score = 10;
-  if (score > 90) score = 90;
-
-  // Determine level (improved logic)
-  let level: 'low' | 'medium' | 'high';
-  if (score < 40) {
-    level = 'low';
-  } else if (score < 70) {
-    level = 'medium';
-  } else {
-    level = 'high';
-  }
-
-  // Override: If ties are strong and finances are unknown (not bad), cap at medium
-  if (
-    hasStrongTies &&
-    financesAreUnknown &&
-    !financesAreBad &&
-    !summary.previousVisaRejections &&
-    !summary.previousOverstay &&
-    level === 'high'
-  ) {
-    level = 'medium';
-    // Adjust score to match medium range
-    if (score >= 70) {
-      score = 69; // Just below high threshold
+  // B) Ties to home country
+  if (tiesStrengthScore !== null) {
+    if (tiesStrengthScore <= 0.3) {
+      score += 15;
+      addDriver('weak_ties');
+    } else if (tiesStrengthScore <= 0.6) {
+      // Medium ties, neutral
+    } else {
+      score -= 10; // Strong ties reduce risk
+    }
+  } else if (tiesStrengthLabel) {
+    switch (tiesStrengthLabel) {
+      case 'weak':
+        score += 15;
+        addDriver('weak_ties');
+        break;
+      case 'medium':
+        // Neutral
+        break;
+      case 'strong':
+        score -= 10;
+        break;
     }
   }
+
+  // C) Employment status
+  const isEmployed =
+    summary.employment?.isEmployed ||
+    summary.employment?.currentStatus === 'employed' ||
+    summary.employment?.currentStatus === 'self_employed';
+  const currentStatus = summary.employment?.currentStatus ?? 'unknown';
+
+  if (!isEmployed && currentStatus !== 'student') {
+    score += 8;
+    addDriver('no_employment');
+  } else {
+    // Bonus for stable employment
+    if (employmentDurationMonths !== null) {
+      if (employmentDurationMonths >= 12) {
+        score -= 5;
+      } else if (employmentDurationMonths >= 6) {
+        score -= 3;
+      }
+    }
+  }
+
+  // D) Travel history
+  if (travelHistoryLabel) {
+    switch (travelHistoryLabel) {
+      case 'none':
+        score += 15;
+        addDriver('limited_travel_history');
+        break;
+      case 'limited':
+        score += 7;
+        addDriver('limited_travel_history');
+        break;
+      case 'good':
+      case 'strong':
+        score -= 5;
+        break;
+    }
+  } else if (!summary.hasInternationalTravel) {
+    // Fallback if label not available
+    score += 15;
+    addDriver('limited_travel_history');
+  }
+
+  // E) Previous refusals / overstay
+  const previousVisaRejections =
+    typeof summary.previousVisaRejections === 'number'
+      ? summary.previousVisaRejections
+      : summary.previousVisaRejections
+        ? 1
+        : 0;
+  if (previousVisaRejections > 0) {
+    score += 20;
+    addDriver('previous_visa_refusals');
+  }
+
+  if (summary.previousOverstay) {
+    score += 30;
+    addDriver('previous_overstay');
+  }
+
+  // F) Sponsor type
+  const sponsorType = summary.sponsorType ?? 'unknown';
+  if (sponsorType !== 'self' && sponsorType !== 'unknown') {
+    score += 5;
+    addDriver('sponsor_based_finance');
+  }
+
+  // G) Age
+  const age =
+    (summary.age ?? summary.personalInfo?.dateOfBirth)
+      ? new Date().getFullYear() - new Date(summary.personalInfo!.dateOfBirth!).getFullYear()
+      : null;
+  if (age !== null && age < 18) {
+    score += 10;
+    addDriver('is_minor');
+  }
+
+  // H) Clamp to [0, 100]
+  score = Math.max(0, Math.min(100, score));
+
+  // "Strong profile cannot be high risk" override
+  const hasStrongTies = tiesStrengthLabel === 'strong';
+  const financesStrongEnough = financialRatio !== null && financialRatio >= 1.3;
+  const noSeriousNegatives = previousVisaRejections === 0 && !summary.previousOverstay;
+
+  if (hasStrongTies && financesStrongEnough && noSeriousNegatives) {
+    // Cap at medium-risk band
+    if (score > 65) score = 65;
+    if (score < 40) score = 40; // Also avoid showing "low" when we know nothing
+  }
+
+  // Determine risk level using centralized function (will be updated with new thresholds)
+  const level = computeRiskLevel(score);
+
+  // Convert risk drivers to risk factors for backward compatibility
+  riskFactors.push(...riskDrivers);
 
   return { score, level, riskFactors, positiveFactors };
 }
@@ -1273,9 +1355,12 @@ export async function buildAIUserContext(
 
     // Calculate and attach risk score if questionnaire summary exists
     if (questionnaireSummary) {
+      // Legacy function call - expert fields not available here, will use defaults
       const probability = calculateVisaProbability(questionnaireSummary);
+      const approvalProbability = 100 - probability.score;
+      const probabilityPercent = Math.max(5, Math.min(95, approvalProbability));
       context.riskScore = {
-        probabilityPercent: probability.score,
+        probabilityPercent,
         level: probability.level,
         riskFactors: probability.riskFactors,
         positiveFactors: probability.positiveFactors,
@@ -1743,20 +1828,37 @@ export async function buildCanonicalAIUserContext(
   // Always calculate risk score (even if questionnaire is missing)
   let riskScore: CanonicalAIUserContext['riskScore'];
   if (summary) {
-    const probability = calculateVisaProbability(summary);
+    // Pass expert fields to calculateVisaProbability v2
+    const probability = calculateVisaProbability(summary, {
+      financialSufficiencyRatio: financial.financialSufficiencyRatio ?? null,
+      financialSufficiencyLabel: financial.financialSufficiencyLabel ?? null,
+      requiredFundsUSD: financial.requiredFundsUSD ?? null,
+      availableFundsUSD: financial.availableFundsUSD ?? null,
+      tiesStrengthScore: ties.tiesStrengthScore ?? null,
+      tiesStrengthLabel: ties.tiesStrengthLabel ?? null,
+      travelHistoryLabel: travelHistory.travelHistoryLabel ?? null,
+      employmentDurationMonths: employment?.employmentDurationMonths ?? null,
+      monthlyIncomeUSD: monthlyIncomeUSD,
+    });
     // Phase 2: Use centralized computeRiskLevel for consistency
     const canonicalRiskLevel = computeRiskLevel(probability.score);
+    // v2: probabilityPercent = 100 - score (clamped to 5-95)
+    const approvalProbability = 100 - probability.score;
+    const probabilityPercent = Math.max(5, Math.min(95, approvalProbability));
     riskScore = {
-      probabilityPercent: probability.score,
+      probabilityPercent,
       level: canonicalRiskLevel, // Use centralized function
       riskFactors: probability.riskFactors,
       positiveFactors: probability.positiveFactors,
     };
   } else {
     // Default risk score for missing questionnaire
+    const defaultScore = 50; // v2 baseline
+    const approvalProbability = 100 - defaultScore;
+    const probabilityPercent = Math.max(5, Math.min(95, approvalProbability));
     riskScore = {
-      probabilityPercent: 70,
-      level: computeRiskLevel(70), // Use centralized function
+      probabilityPercent,
+      level: computeRiskLevel(defaultScore), // Use centralized function
       riskFactors: ['Questionnaire data incomplete - using default risk assessment'],
       positiveFactors: [],
     };
