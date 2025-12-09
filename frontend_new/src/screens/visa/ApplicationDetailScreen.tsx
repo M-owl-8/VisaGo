@@ -99,7 +99,8 @@ export default function ApplicationDetailScreen({
     } else {
       navigation.goBack();
     }
-  }, [applicationId, loadApplicationData, navigation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId]);
 
   // HIGH PRIORITY FIX: Debounce checklist refresh to prevent expensive AI calls on every focus
   // Only refresh if more than 30 seconds have passed since last load, or if forced
@@ -164,7 +165,20 @@ export default function ApplicationDetailScreen({
         ]);
 
         if (appResponse.success && appResponse.data) {
-          setApplication(appResponse.data);
+          // Ensure application data has required fields with defaults
+          const appData = {
+            ...appResponse.data,
+            status: appResponse.data.status || 'draft',
+            createdAt: appResponse.data.createdAt || new Date().toISOString(),
+          };
+          setApplication(appData);
+        } else {
+          // If application fetch fails, set error state
+          console.error(
+            '[Application] Failed to load application:',
+            appResponse.error,
+          );
+          setApplication(null);
         }
 
         if (checklistResponse.success && checklistResponse.data) {
@@ -584,16 +598,22 @@ export default function ApplicationDetailScreen({
               <Icon name="calendar-outline" size={16} color="#94A3B8" />
               <Text style={styles.metaText}>
                 {t('visa.applicationDetail.createdOn')}:{' '}
-                {new Date(application.createdAt).toLocaleDateString()}
+                {application.createdAt
+                  ? new Date(application.createdAt).toLocaleDateString()
+                  : 'N/A'}
               </Text>
             </View>
             <View
               style={[
                 styles.statusBadge,
-                {backgroundColor: getStatusBgColor(application.status)},
+                {
+                  backgroundColor: getStatusBgColor(
+                    application.status || 'draft',
+                  ),
+                },
               ]}>
               <Text style={styles.statusText}>
-                {getStatusLabel(application.status)}
+                {getStatusLabel(application.status || 'draft')}
               </Text>
             </View>
           </View>
