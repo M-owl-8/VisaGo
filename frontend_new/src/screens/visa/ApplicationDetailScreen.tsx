@@ -21,6 +21,9 @@ import {useFocusEffect} from '@react-navigation/native';
 import {apiClient} from '../../services/api';
 import {getTranslatedCountryName} from '../../data/countryTranslations';
 import {getTranslatedVisaTypeName} from '../../utils/visaTypeTranslations';
+import {RiskExplanationPanel} from '../../components/risk/RiskExplanationPanel';
+import {DocumentExplanationModal} from '../../components/checklist/DocumentExplanationModal';
+import {ChecklistSummary} from '../../components/checklist/ChecklistSummary';
 
 interface ApplicationDetailProps {
   route: any;
@@ -80,6 +83,9 @@ export default function ApplicationDetailScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [showSlowChecklistMessage, setShowSlowChecklistMessage] =
     useState(false);
+  const [explanationModalVisible, setExplanationModalVisible] = useState(false);
+  const [selectedDocumentItem, setSelectedDocumentItem] =
+    useState<DocumentChecklistItem | null>(null);
   const isFetchingRef = useRef(false);
   const hasLoadedOnceRef = useRef(false);
   const slowMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -622,6 +628,19 @@ export default function ApplicationDetailScreen({
           </View>
         )}
 
+        {/* Risk Explanation Panel - Show when checklist is ready */}
+        {checklistItems.length > 0 && !isProcessing && (
+          <RiskExplanationPanel
+            applicationId={applicationId}
+            language={language}
+          />
+        )}
+
+        {/* Checklist Summary - Show when checklist is ready */}
+        {checklistItems.length > 0 && !isProcessing && (
+          <ChecklistSummary items={checklistItems} />
+        )}
+
         {/* AI Generated Document List Header */}
         <View style={styles.aiGeneratedHeader}>
           <Icon name="sparkles" size={20} color="#8B5CF6" />
@@ -769,6 +788,26 @@ export default function ApplicationDetailScreen({
                             <Text style={styles.documentDescription}>
                               {getLocalizedText(item, 'description')}
                             </Text>
+                            {/* Why? Button */}
+                            {(item.whereToObtain ||
+                              item.commonMistakes ||
+                              item.description) && (
+                              <TouchableOpacity
+                                style={styles.whyButton}
+                                onPress={() => {
+                                  setSelectedDocumentItem(item);
+                                  setExplanationModalVisible(true);
+                                }}>
+                                <Icon
+                                  name="help-circle-outline"
+                                  size={16}
+                                  color="#4A9EFF"
+                                />
+                                <Text style={styles.whyButtonText}>
+                                  {t('applications.why', 'Why?')}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
                             {/* AI Verification Notes */}
                             {item.verificationNotes && (
                               <Text style={styles.verificationNotesText}>
@@ -854,6 +893,17 @@ export default function ApplicationDetailScreen({
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Document Explanation Modal */}
+      <DocumentExplanationModal
+        visible={explanationModalVisible}
+        onClose={() => {
+          setExplanationModalVisible(false);
+          setSelectedDocumentItem(null);
+        }}
+        item={selectedDocumentItem}
+        language={language}
+      />
     </View>
   );
 
@@ -1207,6 +1257,17 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     lineHeight: 16,
     marginTop: 4,
+  },
+  whyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  whyButtonText: {
+    fontSize: 12,
+    color: '#4A9EFF',
+    fontWeight: '500',
   },
   verificationNotesText: {
     fontSize: 12,

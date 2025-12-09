@@ -197,7 +197,29 @@
     "submitted": "Отправлено",
     "underReview": "На рассмотрении",
     "approved": "Одобрено",
-    "rejected": "Отклонено"
+    "rejected": "Отклонено",
+    "visaRisk": "Риск визы",
+    "riskLow": "Низкий риск",
+    "riskMedium": "Средний риск",
+    "riskHigh": "Высокий риск",
+    "recommendations": "Рекомендации",
+    "unableToLoadRiskAnalysis": "Не удалось загрузить анализ риска",
+    "why": "Зачем?",
+    "whyDoINeedThis": "Зачем нужен этот документ?",
+    "whyThisDocument": "Зачем этот документ?",
+    "tips": "Советы",
+    "whereToObtain": "Где получить",
+    "commonMistakes": "Общие ошибки",
+    "unableToLoadExplanation": "Не удалось загрузить объяснение. Пожалуйста, попробуйте еще раз."
+  },
+  "checklist": {
+    "summary": {
+      "title": "Сводка Списка",
+      "total": "Всего",
+      "uploaded": "Загружено",
+      "verified": "Проверено",
+      "completion": "Завершение"
+    }
   },
   "profile": {
     "profile": "Профиль",

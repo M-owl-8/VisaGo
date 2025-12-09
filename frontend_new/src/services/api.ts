@@ -1306,6 +1306,13 @@ class ApiClient {
     return response.data;
   }
 
+  async getRiskExplanation(applicationId: string): Promise<ApiResponse> {
+    const response = await this.api.get(
+      `/applications/${applicationId}/risk-explanation`,
+    );
+    return response.data;
+  }
+
   async getRequiredDocuments(applicationId: string): Promise<ApiResponse> {
     const response = await this.api.get(
       `/documents/application/${applicationId}/required`,

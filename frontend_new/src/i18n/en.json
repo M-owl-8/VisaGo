@@ -95,7 +95,29 @@
     "submitted": "Submitted",
     "underReview": "Under Review",
     "approved": "Approved",
-    "rejected": "Rejected"
+    "rejected": "Rejected",
+    "visaRisk": "Visa Risk",
+    "riskLow": "Low Risk",
+    "riskMedium": "Medium Risk",
+    "riskHigh": "High Risk",
+    "recommendations": "Recommendations",
+    "unableToLoadRiskAnalysis": "Unable to load risk analysis",
+    "why": "Why?",
+    "whyDoINeedThis": "Why do I need this document?",
+    "whyThisDocument": "Why this document?",
+    "tips": "Tips",
+    "whereToObtain": "Where to obtain",
+    "commonMistakes": "Common mistakes",
+    "unableToLoadExplanation": "Unable to load explanation. Please try again."
+  },
+  "checklist": {
+    "summary": {
+      "title": "Checklist Summary",
+      "total": "Total",
+      "uploaded": "Uploaded",
+      "verified": "Verified",
+      "completion": "Completion"
+    }
   },
   "visa": {
     "visaSelection": "Visa Selection",

@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
 import AdminService from '../services/admin.service';
 import AnalyticsService from '../services/analytics.service';
+import AdminLogService from '../services/admin-log.service';
 import { VisaRulesService } from '../services/visa-rules.service';
 import { EmbassySourceService } from '../services/embassy-source.service';
 import { EmbassySyncJobService } from '../services/embassy-sync-job.service';
@@ -1323,6 +1324,103 @@ router.get(
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to get version info',
+      });
+    }
+  }
+);
+
+// ============================================================================
+// ADMIN LOG ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/admin/activity-logs
+ * Get activity logs with pagination and filters
+ */
+router.get(
+  '/activity-logs',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const filters = {
+        page: req.query.page ? parseInt(req.query.page as string) : undefined,
+        pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined,
+        userId: req.query.userId as string | undefined,
+        action: req.query.action as string | undefined,
+        dateFrom: req.query.dateFrom as string | undefined,
+        dateTo: req.query.dateTo as string | undefined,
+      };
+
+      const result = await AdminLogService.getActivityLogs(filters);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[AdminRoute] Error fetching activity logs:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch activity logs',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/admin-logs
+ * Get admin action logs with pagination and filters
+ */
+router.get('/admin-logs', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const filters = {
+      page: req.query.page ? parseInt(req.query.page as string) : undefined,
+      pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined,
+      entityType: req.query.entityType as string | undefined,
+      action: req.query.action as string | undefined,
+      performedBy: req.query.performedBy as string | undefined,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+    };
+
+    const result = await AdminLogService.getAdminLogs(filters);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[AdminRoute] Error fetching admin logs:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch admin logs',
+    });
+  }
+});
+
+/**
+ * GET /api/admin/ai-interactions
+ * Get AI interaction logs with pagination and filters
+ */
+router.get(
+  '/ai-interactions',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const filters = {
+        page: req.query.page ? parseInt(req.query.page as string) : undefined,
+        pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined,
+        taskType: req.query.taskType as string | undefined,
+        model: req.query.model as string | undefined,
+        userId: req.query.userId as string | undefined,
+        applicationId: req.query.applicationId as string | undefined,
+        countryCode: req.query.countryCode as string | undefined,
+        dateFrom: req.query.dateFrom as string | undefined,
+        dateTo: req.query.dateTo as string | undefined,
+        success: req.query.success !== undefined ? req.query.success === 'true' : undefined,
+      };
+
+      const result = await AdminLogService.getAIInteractions(filters);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[AdminRoute] Error fetching AI interactions:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch AI interactions',
       });
     }
   }

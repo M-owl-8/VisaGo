@@ -372,6 +372,36 @@ model AIUsageMetrics {
   @@index([date])
 }
 
+// AI Interaction logging model
+// Tracks all AI/GPT API calls for audit and training purposes
+// Migration: npx prisma migrate dev --name add_ai_interaction_model
+model AIInteraction {
+  id              String   @id @default(cuid())
+  taskType        String   // "checklist", "risk", "doc_check", "chat", "doc_explanation", "rules_extraction"
+  model           String   // "gpt-4o", "gpt-4o-mini", "deepseek", etc.
+  promptVersion   String?
+  source          String?
+  requestPayload  String   @db.Text // JSON stringified request
+  responsePayload String?  @db.Text // JSON stringified response
+  success         Boolean
+  errorMessage    String?  @db.Text
+  countryCode     String?
+  visaType        String?
+  ruleSetId       String?
+  applicationId   String?
+  userId          String?
+  modelVersionId  String?
+  latencyMs       Int?
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([createdAt])
+  @@index([taskType])
+  @@index([model])
+  @@index([success])
+}
+
 model AnalyticsEvent {
   id        String   @id @default(cuid())
   userId    String? // null for anonymous events

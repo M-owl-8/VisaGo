@@ -210,7 +210,29 @@
     "submitted": "Yuborilgan",
     "underReview": "Ko'rib chiqilmoqda",
     "approved": "Tasdiqlangan",
-    "rejected": "Rad etilgan"
+    "rejected": "Rad etilgan",
+    "visaRisk": "Viza xavfi",
+    "riskLow": "Past xavf",
+    "riskMedium": "O'rtacha xavf",
+    "riskHigh": "Yuqori xavf",
+    "recommendations": "Tavsiyalar",
+    "unableToLoadRiskAnalysis": "Xavf tahlilini yuklab bo'lmadi",
+    "why": "Nima uchun?",
+    "whyDoINeedThis": "Nima uchun bu hujjat kerak?",
+    "whyThisDocument": "Nima uchun bu hujjat?",
+    "tips": "Maslahatlar",
+    "whereToObtain": "Qayerdan olish mumkin",
+    "commonMistakes": "Umumiy xatolar",
+    "unableToLoadExplanation": "Tushuntirmani yuklab bo'lmadi. Iltimos, qayta urinib ko'ring."
+  },
+  "checklist": {
+    "summary": {
+      "title": "Ro'yxat Xulosa",
+      "total": "Jami",
+      "uploaded": "Yuklangan",
+      "verified": "Tasdiqlangan",
+      "completion": "Tugallanish"
+    }
   },
   "profile": {
     "profile": "Profil",

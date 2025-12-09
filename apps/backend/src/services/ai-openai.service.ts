@@ -114,28 +114,73 @@ export class AIOpenAIService {
       applicationId?: string | null;
       userId?: string | null;
     };
+    latencyMs?: number;
   }): Promise<void> {
     try {
       if (!AIOpenAIService.prisma) {
         AIOpenAIService.prisma = new PrismaClient();
       }
 
-      await (AIOpenAIService.prisma as any).aIInteraction.create({
+      // Safely stringify payloads, truncating if too large
+      const MAX_PAYLOAD_LENGTH = 50000; // ~50KB per field
+      const stringifyPayload = (payload: any): string => {
+        try {
+          const str = JSON.stringify(payload);
+          return str.length > MAX_PAYLOAD_LENGTH
+            ? str.substring(0, MAX_PAYLOAD_LENGTH) + '... [truncated]'
+            : str;
+        } catch (e) {
+          return String(payload).substring(0, MAX_PAYLOAD_LENGTH);
+        }
+      };
+
+      // Redact sensitive data from payloads
+      const redactSensitive = (obj: any): any => {
+        if (!obj || typeof obj !== 'object') return obj;
+        const redacted = { ...obj };
+        // Check for sensitive field patterns (not actual secrets, just field names to redact)
+        const isSensitiveField = (fieldName: string): boolean => {
+          const lower = fieldName.toLowerCase();
+          return (
+            lower.includes('password') ||
+            lower.includes('token') ||
+            lower.includes('secret') ||
+            lower.includes('authorization') ||
+            (lower.includes('api') && lower.includes('key'))
+          );
+        };
+        for (const key in redacted) {
+          if (isSensitiveField(key)) {
+            redacted[key] = '[REDACTED]';
+          } else if (typeof redacted[key] === 'object') {
+            redacted[key] = redactSensitive(redacted[key]);
+          }
+        }
+        return redacted;
+      };
+
+      const safeRequestPayload = stringifyPayload(redactSensitive(params.requestPayload));
+      const safeResponsePayload = params.responsePayload
+        ? stringifyPayload(redactSensitive(params.responsePayload))
+        : null;
+
+      await AIOpenAIService.prisma.aIInteraction.create({
         data: {
           taskType: params.taskType,
           model: params.model,
           promptVersion: params.promptVersion || null,
-          requestPayload: params.requestPayload as any,
-          responsePayload: params.responsePayload as any,
+          source: params.source || null,
+          requestPayload: safeRequestPayload,
+          responsePayload: safeResponsePayload,
           success: params.success,
           errorMessage: params.errorMessage || null,
-          source: params.source,
           countryCode: params.contextMeta?.countryCode || null,
           visaType: params.contextMeta?.visaType || null,
           ruleSetId: params.contextMeta?.ruleSetId || null,
           applicationId: params.contextMeta?.applicationId || null,
           userId: params.contextMeta?.userId || null,
           modelVersionId: params.modelVersionId || null,
+          latencyMs: params.latencyMs || null,
         },
       });
     } catch (error) {
