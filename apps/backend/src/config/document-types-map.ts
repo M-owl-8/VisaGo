@@ -427,6 +427,10 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'host_registration',
       'inviter_registration',
       'host_residence_document',
+      'host_status_proof',
+      'host_status',
+      'host_citizenship_proof',
+      'host_immigration_status',
     ],
   },
   {

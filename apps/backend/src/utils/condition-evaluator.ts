@@ -28,10 +28,13 @@ export type ConditionResult = true | false | 'unknown';
  * - previousVisaRejections
  * - previousOverstay
  * - hasPropertyInUzbekistan
+ * - hasPropertyInHomeCountry (alias for hasPropertyInUzbekistan)
  * - hasFamilyInUzbekistan
+ * - hasFamilyInHomeCountry (alias for hasFamilyInUzbekistan)
  * - hasChildren
  * - hasUniversityInvitation
  * - hasOtherInvitation
+ * - hasHostInCanada (alias for hasOtherInvitation for tourist visas)
  * - visaType
  * - maritalStatus (flat - from applicantProfile.maritalStatus)
  * - riskLevel (flat - from riskScore.level)
@@ -94,13 +97,22 @@ function getFieldValue(
       return profile.previousOverstay;
     case 'hasPropertyInUzbekistan':
       return profile.hasPropertyInUzbekistan;
+    case 'hasPropertyInHomeCountry':
+      // Alias for hasPropertyInUzbekistan (used in VisaRuleSet conditions)
+      return profile.hasPropertyInUzbekistan;
     case 'hasFamilyInUzbekistan':
+      return profile.hasFamilyInUzbekistan;
+    case 'hasFamilyInHomeCountry':
+      // Alias for hasFamilyInUzbekistan (used in VisaRuleSet conditions)
       return profile.hasFamilyInUzbekistan;
     case 'hasChildren':
       return profile.hasChildren;
     case 'hasUniversityInvitation':
       return profile.hasUniversityInvitation;
     case 'hasOtherInvitation':
+      return profile.hasOtherInvitation;
+    case 'hasHostInCanada':
+      // Alias for hasOtherInvitation (used in VisaRuleSet conditions for tourist visas)
       return profile.hasOtherInvitation;
     case 'visaType':
       return profile.visaType;
