@@ -216,7 +216,15 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
   },
   {
     canonical: 'coe_letter',
-    aliases: ['coe_letter', 'coe', 'confirmation_of_enrollment', 'university_acceptance'],
+    aliases: [
+      'coe_letter',
+      'coe',
+      'confirmation_of_enrollment',
+      'university_acceptance',
+      'university_admission_letter',
+      'admission_letter',
+      'acceptance_letter',
+    ],
   },
   {
     canonical: 'i20_form',
@@ -287,7 +295,15 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
   },
   {
     canonical: 'medical_exam',
-    aliases: ['medical_exam', 'medical_examination', 'health_exam', 'medical_check'],
+    aliases: [
+      'medical_exam',
+      'medical_examination',
+      'health_exam',
+      'medical_check',
+      'medical_certificate',
+      'health_certificate',
+      'medical_clearance',
+    ],
   },
   {
     canonical: 'tb_test_certificate',
@@ -312,6 +328,11 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'supporting_documents',
       'additional_docs',
       'other_documents',
+      'spanish_language_certificate',
+      'language_certificate',
+      'dele_certificate',
+      'siele_certificate',
+      'language_proficiency_certificate',
     ],
   },
   {
@@ -352,6 +373,9 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'schengen_visa_form', // ES tourist specific
       'schengen application form',
       'Schengen Visa Application Form', // Common GPT output
+      'national_visa_form', // ES student visa specific (Type D)
+      'national visa form',
+      'type_d_visa_form',
     ],
   },
   {
