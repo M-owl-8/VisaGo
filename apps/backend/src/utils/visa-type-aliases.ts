@@ -32,6 +32,32 @@ const VISA_TYPE_RULE_ALIASES: VisaTypeAliasMap = {
     'b1/b2 tourist': 'tourist',
     'b1/b2 travel': 'tourist',
   },
+  // Canada: Uses "Visitor" as visa type name, but rules stored as "tourist"
+  CA: {
+    visitor: 'tourist',
+    'visitor visa': 'tourist',
+    'visitor visa canada': 'tourist',
+    tourist: 'tourist', // Explicit mapping for consistency
+    'tourist visa': 'tourist',
+  },
+  // Australia: Uses "Visitor" as visa type name, but rules stored as "tourist"
+  AU: {
+    visitor: 'tourist',
+    'visitor visa': 'tourist',
+    'visitor visa australia': 'tourist',
+    tourist: 'tourist', // Explicit mapping for consistency
+    'tourist visa': 'tourist',
+  },
+  // United Kingdom: Uses "Standard Visitor" as visa type name, but rules stored as "tourist"
+  GB: {
+    visitor: 'tourist',
+    'standard visitor': 'tourist',
+    'standard visitor visa': 'tourist',
+    'visitor visa': 'tourist',
+    'uk visitor': 'tourist',
+    tourist: 'tourist', // Explicit mapping for consistency
+    'tourist visa': 'tourist',
+  },
   // Schengen countries: ES, DE, FR, IT, AT, BE, CH, CZ, DK, EE, FI, GR, HU, IS, LV, LI, LT, LU, MT, NL, NO, PL, PT, SE, SK, SI
   ES: {
     'schengen tourist visa': 'tourist',
