@@ -149,11 +149,17 @@ export class DocumentProcessingQueueService {
             // Save validation result
             await saveValidationResultToDocument(document.id, aiResult);
 
+            // Get mapped DB status for logging clarity
+            const { mapAIStatusToDbStatus } = await import('./document-validation.service');
+            const dbStatus = mapAIStatusToDbStatus(aiResult.status);
+
             logInfo('[DocumentProcessingQueue] AI validation completed', {
               documentId,
-              status: aiResult.status,
+              aiStatus: aiResult.status, // AI-level status (verified/rejected/needs_review/uncertain)
+              dbStatus, // Mapped database status (pending/verified/rejected)
               verifiedByAI: aiResult.verifiedByAI,
               confidence: aiResult.confidence,
+              hasProblems: (aiResult.problems ?? []).length > 0,
             });
           } catch (validationError: any) {
             // Log but continue - validation failure shouldn't block other processing

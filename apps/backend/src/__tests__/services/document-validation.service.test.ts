@@ -336,4 +336,188 @@ describe('Document Validation Service', () => {
       });
     });
   });
+
+  describe('VisaDocChecker path - problems array construction', () => {
+    it('should construct problems array when status is NEED_FIX with proper notes', () => {
+      // Simulate the conversion logic from DocumentCheckResult to DocumentValidationResultAI
+      const checkResult: {
+        status: 'APPROVED' | 'NEED_FIX' | 'REJECTED';
+        short_reason: string;
+        notes?: { uz?: string; en?: string; ru?: string };
+        embassy_risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+      } = {
+        status: 'NEED_FIX',
+        short_reason: 'Bank statement missing required months',
+        notes: {
+          uz: "Bank hisoboti yetarli oylarni o'z ichiga olmaydi",
+          en: 'Bank statement does not include required months',
+        },
+        embassy_risk_level: 'MEDIUM',
+      };
+
+      // Simulate the conversion (as done in document-validation.service.ts)
+      const primaryExplanationUz =
+        checkResult.notes?.uz ||
+        checkResult.short_reason ||
+        'Hujjat bilan muammo bor. Iltimos, hujjatni yangilab qayta yuklang.';
+      const primaryExplanationEn =
+        checkResult.notes?.en ||
+        checkResult.short_reason ||
+        'Document has issues. Please upload an updated version.';
+
+      const problems: Array<{
+        code: string;
+        message: string;
+        userMessage: string;
+      }> =
+        checkResult.status === 'APPROVED'
+          ? []
+          : [
+              {
+                code: 'ai_generic_issue',
+                message: checkResult.short_reason || primaryExplanationEn,
+                userMessage: primaryExplanationUz,
+              },
+            ];
+
+      expect(problems.length).toBe(1);
+      expect(problems[0].code).toBe('ai_generic_issue');
+      expect(problems[0].userMessage).toBe("Bank hisoboti yetarli oylarni o'z ichiga olmaydi");
+
+      // Test buildVerificationNotes with this result
+      const result: DocumentValidationResultAI = {
+        status: 'needs_review',
+        confidence: 0.5,
+        verifiedByAI: false,
+        problems,
+        suggestions: [],
+        notes: {
+          uz: primaryExplanationUz,
+          en: primaryExplanationEn,
+        },
+      };
+
+      const notes = buildVerificationNotes(result);
+      expect(notes).toBe("1) Bank hisoboti yetarli oylarni o'z ichiga olmaydi");
+    });
+
+    it('should construct problems array with generic message when status is NEED_FIX but notes are empty', () => {
+      // Simulate violation: GPT returns NEED_FIX but omits notes.uz
+      const checkResult: {
+        status: 'APPROVED' | 'NEED_FIX' | 'REJECTED';
+        short_reason: string;
+        notes?: { uz?: string; en?: string; ru?: string };
+        embassy_risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+      } = {
+        status: 'NEED_FIX',
+        short_reason: '', // Empty short_reason (violation)
+        notes: {
+          uz: '', // Empty notes.uz (violation)
+          en: '',
+        },
+        embassy_risk_level: 'MEDIUM',
+      };
+
+      // Simulate the conversion with fallback logic
+      const primaryExplanationUz =
+        checkResult.notes?.uz ||
+        checkResult.short_reason ||
+        'Hujjat bilan muammo bor. Iltimos, hujjatni yangilab qayta yuklang.';
+      const primaryExplanationEn =
+        checkResult.notes?.en ||
+        checkResult.short_reason ||
+        'Document has issues. Please upload an updated version.';
+
+      const problems: Array<{
+        code: string;
+        message: string;
+        userMessage: string;
+      }> =
+        checkResult.status === 'APPROVED'
+          ? []
+          : [
+              {
+                code: 'ai_generic_issue',
+                message: checkResult.short_reason || primaryExplanationEn,
+                userMessage: primaryExplanationUz,
+              },
+            ];
+
+      expect(problems.length).toBe(1);
+      expect(problems[0].userMessage).toBe(
+        'Hujjat bilan muammo bor. Iltimos, hujjatni yangilab qayta yuklang.'
+      );
+
+      // Test buildVerificationNotes
+      const result: DocumentValidationResultAI = {
+        status: 'needs_review',
+        confidence: 0.5,
+        verifiedByAI: false,
+        problems,
+        suggestions: [],
+        notes: {
+          uz: primaryExplanationUz,
+          en: primaryExplanationEn,
+        },
+      };
+
+      const notes = buildVerificationNotes(result);
+      expect(notes).toBe('1) Hujjat bilan muammo bor. Iltimos, hujjatni yangilab qayta yuklang.');
+    });
+
+    it('should have empty problems array when status is APPROVED', () => {
+      const checkResult: {
+        status: 'APPROVED' | 'NEED_FIX' | 'REJECTED';
+        short_reason: string;
+        notes?: { uz?: string; en?: string; ru?: string };
+        embassy_risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+      } = {
+        status: 'APPROVED',
+        short_reason: 'Document is valid',
+        notes: {
+          uz: "Hujjat to'g'ri",
+          en: 'Document is valid',
+        },
+        embassy_risk_level: 'LOW',
+      };
+
+      const primaryExplanationUz =
+        checkResult.notes?.uz ||
+        checkResult.short_reason ||
+        'Hujjat bilan muammo bor. Iltimos, hujjatni yangilab qayta yuklang.';
+
+      const problems: Array<{
+        code: string;
+        message: string;
+        userMessage: string;
+      }> =
+        checkResult.status === 'APPROVED'
+          ? []
+          : [
+              {
+                code: 'ai_generic_issue',
+                message: checkResult.short_reason || primaryExplanationUz,
+                userMessage: primaryExplanationUz,
+              },
+            ];
+
+      expect(problems.length).toBe(0);
+
+      // Test buildVerificationNotes
+      const result: DocumentValidationResultAI = {
+        status: 'verified',
+        confidence: 0.9,
+        verifiedByAI: true,
+        problems,
+        suggestions: [],
+        notes: {
+          uz: checkResult.notes?.uz || checkResult.short_reason || "Hujjat to'g'ri",
+          en: checkResult.notes?.en || checkResult.short_reason || 'Document is valid',
+        },
+      };
+
+      const notes = buildVerificationNotes(result);
+      expect(notes).toBe('Document is valid');
+    });
+  });
 });

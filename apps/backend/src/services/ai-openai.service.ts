@@ -882,9 +882,9 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
     country: string,
     visaType: string
   ): any {
+    // Extract JSON from response
+    let jsonText = rawContent.trim();
     try {
-      // Extract JSON from response
-      let jsonText = rawContent.trim();
       if (jsonText.includes('```json')) {
         const start = jsonText.indexOf('```json') + 7;
         const end = jsonText.indexOf('```', start);
@@ -911,14 +911,24 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       const parsed = JSON.parse(jsonText);
 
       if (!parsed.checklist || !Array.isArray(parsed.checklist)) {
+        logWarn('[OpenAI][Checklist] Hybrid mode response missing checklist array', {
+          country,
+          visaType,
+          hasChecklist: !!parsed.checklist,
+          checklistType: typeof parsed.checklist,
+        });
         return null;
       }
 
       return parsed;
     } catch (error) {
+      // Log first 300 chars of jsonText for debugging (truncated to avoid log bloat)
+      const jsonTextPreview = jsonText.length > 300 ? jsonText.substring(0, 300) + '...' : jsonText;
       logError('[OpenAI][Checklist] Hybrid mode JSON parse error', error as Error, {
         country,
         visaType,
+        jsonTextPreview,
+        jsonTextLength: jsonText.length,
       });
       return null;
     }

@@ -152,6 +152,63 @@ npm test -- document-validation.service.test.ts
 - **AI validation failures**: Document status remains `'pending'`, `verifiedByAI = false`
 - **Database update failures**: Error logged and re-thrown (queue will retry)
 
+## AIInteraction / latencyMs Migration
+
+The `AIInteraction` table stores logs of all GPT-4 API calls for analytics and debugging. The `latencyMs` column was added in migration `20251209151448_add_ai_interaction_model`.
+
+### Migration Status
+
+To check if migrations have been applied:
+
+```bash
+cd apps/backend
+npx prisma migrate status
+```
+
+### Deploying Migrations
+
+**For Production (Railway):**
+
+Migrations should run automatically via `startup.js` on service start. If they don't, run manually:
+
+```bash
+# From Railway CLI or SSH
+railway run --service backend npx prisma migrate deploy
+```
+
+**For Local Development:**
+
+```bash
+cd apps/backend
+npx prisma migrate deploy
+```
+
+Or use the helper script:
+
+```bash
+npm run deploy:migrations
+```
+
+### Troubleshooting
+
+If you see errors like `"The column 'latencyMs' does not exist in the current database"`:
+
+1. **Check migration status**: `npx prisma migrate status`
+2. **Apply pending migrations**: `npx prisma migrate deploy`
+3. **Verify column exists**:
+   ```sql
+   SELECT column_name FROM information_schema.columns
+   WHERE table_name = 'AIInteraction' AND column_name = 'latencyMs';
+   ```
+
+### AI Interaction Logging
+
+The `AIOpenAIService.recordAIInteraction()` method is **non-fatal**:
+
+- If logging fails (e.g., missing column), it logs a warning but does not throw
+- Document verification continues normally even if AI interaction logging fails
+- This ensures production stability while migrations are being applied
+
 ## Future Improvements
 
 - Real-time status updates via WebSocket

@@ -30,7 +30,7 @@ import {
  * Document Check Result Schema (EXPERT VERSION - Phase 3)
  * Includes tri-language notes, expert validation details, and embassy officer assessment
  */
-const DocumentCheckResultSchema = z.object({
+const DocumentCheckResultSchemaBase = z.object({
   status: z.enum(['APPROVED', 'NEED_FIX', 'REJECTED']),
   short_reason: z.string().max(200), // Enforce max length
   notes: z
@@ -78,6 +78,26 @@ const DocumentCheckResultSchema = z.object({
       originalFormat: z.boolean().optional(), // Original/certified copy format correct?
     })
     .optional(),
+});
+
+// Refinement: For non-APPROVED statuses, require short_reason and notes.uz
+const DocumentCheckResultSchema = DocumentCheckResultSchemaBase.superRefine((value, ctx) => {
+  if (value.status !== 'APPROVED') {
+    if (!value.short_reason || !value.short_reason.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['short_reason'],
+        message: 'short_reason is required for non-approved documents',
+      });
+    }
+    if (!value.notes?.uz || !value.notes.uz.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['notes', 'uz'],
+        message: 'Uzbek note (notes.uz) is required for non-approved documents',
+      });
+    }
+  }
 });
 
 export type DocumentCheckResult = z.infer<typeof DocumentCheckResultSchema>;
@@ -417,10 +437,24 @@ export class VisaDocCheckerService {
             error: `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
           });
 
-          // Fallback: create a conservative result
+          // Fallback: create a conservative result with required fields
+          logError(
+            '[VisaDocChecker] Schema validation failed, using safe fallback',
+            new Error('Schema validation failed'),
+            {
+              errors: validationResult.error.errors.map((e) => ({
+                path: e.path.join('.'),
+                message: e.message,
+              })),
+            }
+          );
           return {
             status: 'NEED_FIX',
             short_reason: 'Document validation could not be completed. Please review manually.',
+            notes: {
+              uz: "Hujjat tekshiruvida xatolik yuz berdi. Iltimos, hujjatni qo'lda tekshiring.",
+              en: 'Document validation could not be completed. Please review manually.',
+            },
             embassy_risk_level: 'MEDIUM',
             technical_notes: `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
           };
@@ -530,10 +564,14 @@ export class VisaDocCheckerService {
         documentType: requiredDocumentRule.documentType,
       });
 
-      // Return conservative fallback
+      // Return conservative fallback with required fields
       return {
         status: 'NEED_FIX',
         short_reason: 'Document check could not be completed. Please review manually.',
+        notes: {
+          uz: "Hujjat tekshiruvida xatolik yuz berdi. Iltimos, hujjatni qo'lda tekshiring.",
+          en: 'Document check could not be completed. Please review manually.',
+        },
         embassy_risk_level: 'MEDIUM',
         technical_notes: error instanceof Error ? error.message : String(error),
       };

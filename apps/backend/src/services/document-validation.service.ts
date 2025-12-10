@@ -19,7 +19,7 @@ import {
   assertCountryConsistency,
 } from '../config/country-registry';
 import { logError, logInfo, logWarn } from '../middleware/logger';
-import type { DocumentValidationResultAI } from '../types/ai-responses';
+import type { DocumentValidationResultAI, ValidationProblemAI } from '../types/ai-responses';
 import {
   DOCUMENT_VALIDATION_SYSTEM_PROMPT,
   buildDocumentValidationUserPrompt,
@@ -189,23 +189,40 @@ export async function validateDocumentWithAI(params: {
                 : 0.2;
 
           // Map tri-language notes if available
-          const notes = checkResult.notes
-            ? {
-                en: checkResult.notes.en || checkResult.short_reason || 'Document checked.',
-                uz: checkResult.notes.uz || checkResult.short_reason || 'Hujjat tekshirildi.',
-                ru: checkResult.notes.ru || checkResult.short_reason || 'Документ проверен.',
-              }
-            : {
-                en: checkResult.short_reason || 'Document checked.',
-                uz: checkResult.short_reason || 'Hujjat tekshirildi.',
-                ru: checkResult.short_reason || 'Документ проверен.',
-              };
+          // Ensure notes.uz and notes.en are always filled with user-friendly explanations
+          const primaryExplanationUz =
+            checkResult.notes?.uz ||
+            checkResult.short_reason ||
+            'Hujjat bilan muammo bor. Iltimos, hujjatni yangilab qayta yuklang.';
+          const primaryExplanationEn =
+            checkResult.notes?.en ||
+            checkResult.short_reason ||
+            'Document has issues. Please upload an updated version.';
+
+          const notes = {
+            uz: primaryExplanationUz,
+            en: primaryExplanationEn,
+            ru: checkResult.notes?.ru || checkResult.short_reason || 'Документ проверен.',
+          };
+
+          // Construct problems array for non-APPROVED statuses
+          // This ensures buildVerificationNotes() generates a clear explanation
+          const problems: ValidationProblemAI[] =
+            checkResult.status === 'APPROVED'
+              ? []
+              : [
+                  {
+                    code: 'ai_generic_issue',
+                    message: checkResult.short_reason || primaryExplanationEn,
+                    userMessage: primaryExplanationUz,
+                  },
+                ];
 
           const result: DocumentValidationResultAI = {
             status,
             confidence,
             verifiedByAI: status === 'verified' && confidence >= 0.7,
-            problems: [], // VisaDocChecker doesn't provide structured problems
+            problems,
             suggestions: [], // VisaDocChecker doesn't provide structured suggestions
             notes,
           };

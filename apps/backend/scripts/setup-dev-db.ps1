@@ -44,3 +44,4 @@ Write-Host "DATABASE_URL is set to: file:./dev.db" -ForegroundColor Cyan
 
 
 
+

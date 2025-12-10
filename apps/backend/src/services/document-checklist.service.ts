@@ -97,6 +97,39 @@ export interface DocumentChecklist {
  */
 export class DocumentChecklistService {
   /**
+   * Build existingDocumentsMap from application.documents
+   * Ensures only the latest document per documentType is kept (sorted by createdAt desc)
+   */
+  private static buildExistingDocumentsMap(documents: any[]): Map<string, any> {
+    // Sort by createdAt desc to ensure latest documents are processed first
+    const sortedDocuments = [...documents].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    const map = new Map<string, any>();
+    for (const doc of sortedDocuments) {
+      // Only add if we haven't seen this documentType yet (keeps the latest)
+      if (!map.has(doc.documentType)) {
+        map.set(doc.documentType, {
+          type: doc.documentType,
+          status: doc.status,
+          id: doc.id,
+          fileUrl: doc.fileUrl,
+          fileName: doc.fileName,
+          fileSize: doc.fileSize,
+          uploadedAt: doc.uploadedAt,
+          verificationNotes: doc.verificationNotes,
+          verifiedByAI: doc.verifiedByAI ?? false,
+          aiConfidence: doc.aiConfidence ?? null,
+          aiNotesUz: doc.aiNotesUz ?? null,
+          aiNotesRu: doc.aiNotesRu ?? null,
+          aiNotesEn: doc.aiNotesEn ?? null,
+        });
+      }
+    }
+    return map;
+  }
+  /**
    * Generate document checklist for an application
    * Now uses persistent DB storage to avoid re-calling OpenAI on every GET
    *
@@ -214,26 +247,7 @@ export class DocumentChecklistService {
               }))
             );
 
-            const existingDocumentsMap = new Map(
-              application.documents.map((doc: any) => [
-                doc.documentType,
-                {
-                  type: doc.documentType,
-                  status: doc.status,
-                  id: doc.id,
-                  fileUrl: doc.fileUrl,
-                  fileName: doc.fileName,
-                  fileSize: doc.fileSize,
-                  uploadedAt: doc.uploadedAt,
-                  verificationNotes: doc.verificationNotes,
-                  verifiedByAI: doc.verifiedByAI ?? false,
-                  aiConfidence: doc.aiConfidence ?? null,
-                  aiNotesUz: doc.aiNotesUz ?? null,
-                  aiNotesRu: doc.aiNotesRu ?? null,
-                  aiNotesEn: doc.aiNotesEn ?? null,
-                },
-              ])
-            );
+            const existingDocumentsMap = this.buildExistingDocumentsMap(application.documents);
 
             const enrichedItems = this.mergeChecklistItemsWithDocuments(
               fallbackItems,
@@ -341,26 +355,7 @@ export class DocumentChecklistService {
       }
 
       // Get existing documents with full data
-      const existingDocumentsMap: Map<string, any> = new Map(
-        application.documents.map((doc: any) => [
-          doc.documentType,
-          {
-            type: doc.documentType,
-            status: doc.status,
-            id: doc.id,
-            fileUrl: doc.fileUrl,
-            fileName: doc.fileName,
-            fileSize: doc.fileSize,
-            uploadedAt: doc.uploadedAt,
-            verificationNotes: doc.verificationNotes,
-            verifiedByAI: doc.verifiedByAI ?? false,
-            aiConfidence: doc.aiConfidence ?? null,
-            aiNotesUz: doc.aiNotesUz ?? null,
-            aiNotesRu: doc.aiNotesRu ?? null,
-            aiNotesEn: doc.aiNotesEn ?? null,
-          },
-        ])
-      );
+      const existingDocumentsMap = this.buildExistingDocumentsMap(application.documents);
 
       let items: ChecklistItem[] = [];
       let aiGenerated = false;
@@ -974,26 +969,7 @@ export class DocumentChecklistService {
         );
 
         // Merge with documents
-        const existingDocumentsMap = new Map(
-          (application.documents || []).map((doc: any) => [
-            doc.documentType,
-            {
-              type: doc.documentType,
-              status: doc.status,
-              id: doc.id,
-              fileUrl: doc.fileUrl,
-              fileName: doc.fileName,
-              fileSize: doc.fileSize,
-              uploadedAt: doc.uploadedAt,
-              verificationNotes: doc.verificationNotes,
-              verifiedByAI: doc.verifiedByAI ?? false,
-              aiConfidence: doc.aiConfidence ?? null,
-              aiNotesUz: doc.aiNotesUz ?? null,
-              aiNotesRu: doc.aiNotesRu ?? null,
-              aiNotesEn: doc.aiNotesEn ?? null,
-            },
-          ])
-        );
+        const existingDocumentsMap = this.buildExistingDocumentsMap(application.documents || []);
 
         const enrichedItems = this.mergeChecklistItemsWithDocuments(
           emergencyItems,
@@ -1900,26 +1876,7 @@ Only return the JSON object, no other text.`;
       }
 
       // Get existing documents with full data
-      const existingDocumentsMap = new Map(
-        application.documents.map((doc: any) => [
-          doc.documentType,
-          {
-            type: doc.documentType,
-            status: doc.status,
-            id: doc.id,
-            fileUrl: doc.fileUrl,
-            fileName: doc.fileName,
-            fileSize: doc.fileSize,
-            uploadedAt: doc.uploadedAt,
-            verificationNotes: doc.verificationNotes,
-            verifiedByAI: doc.verifiedByAI ?? false,
-            aiConfidence: doc.aiConfidence ?? null,
-            aiNotesUz: doc.aiNotesUz ?? null,
-            aiNotesRu: doc.aiNotesRu ?? null,
-            aiNotesEn: doc.aiNotesEn ?? null,
-          },
-        ])
-      );
+      const existingDocumentsMap = this.buildExistingDocumentsMap(application.documents);
 
       // Generate checklist items using same AI-first flow as generateChecklist
       let items: ChecklistItem[] = [];

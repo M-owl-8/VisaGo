@@ -223,7 +223,11 @@ export function DocumentChecklistItem({
       <div className="mt-4 flex items-center gap-2">
         {item.fileUrl ? (
           <Link
-            href={item.fileUrl}
+            href={
+              typeof window !== 'undefined' && item.fileUrl.startsWith('http://localhost')
+                ? item.fileUrl.replace('http://localhost:3000', window.location.origin)
+                : item.fileUrl
+            }
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"

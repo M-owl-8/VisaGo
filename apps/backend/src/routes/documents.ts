@@ -189,20 +189,64 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     // Use canonical type if available, otherwise fall back to original (backward compatible)
     const storedDocumentType = norm.canonicalType ?? rawDocumentType;
 
-    // Create document record in database first
-    // Store normalized document type when possible, but keep original for backward compatibility
-    const document = await prisma.userDocument.create({
-      data: {
-        userId,
+    // Check for existing document with same applicationId and documentType
+    // Update existing record instead of creating duplicates
+    const existingDocument = await prisma.userDocument.findFirst({
+      where: {
         applicationId,
-        documentName: req.file.originalname,
         documentType: storedDocumentType,
-        fileUrl: uploadResult.fileUrl,
-        fileName: uploadResult.fileName,
-        fileSize: uploadResult.fileSize,
-        status: 'pending', // Will be updated after AI validation in background
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
+
+    let document;
+    if (existingDocument) {
+      // Update existing document with new file
+      document = await prisma.userDocument.update({
+        where: { id: existingDocument.id },
+        data: {
+          documentName: req.file.originalname,
+          fileUrl: uploadResult.fileUrl,
+          fileName: uploadResult.fileName,
+          fileSize: uploadResult.fileSize,
+          status: 'pending', // Reset to pending for new validation
+          verifiedByAI: false,
+          aiConfidence: null,
+          aiNotesUz: null,
+          aiNotesEn: null,
+          aiNotesRu: null,
+          verificationNotes: null,
+        },
+      });
+      console.log('[UPLOAD_DEBUG] Updated existing UserDocument', {
+        documentId: document.id,
+        documentType: document.documentType,
+        status: document.status,
+        applicationId: document.applicationId,
+      });
+    } else {
+      // Create new document record
+      document = await prisma.userDocument.create({
+        data: {
+          userId,
+          applicationId,
+          documentName: req.file.originalname,
+          documentType: storedDocumentType,
+          fileUrl: uploadResult.fileUrl,
+          fileName: uploadResult.fileName,
+          fileSize: uploadResult.fileSize,
+          status: 'pending', // Will be updated after AI validation in background
+        },
+      });
+      console.log('[UPLOAD_DEBUG] Created new UserDocument', {
+        documentId: document.id,
+        documentType: document.documentType,
+        status: document.status,
+        applicationId: document.applicationId,
+      });
+    }
 
     // Log document creation for debugging
     console.log('[UPLOAD_DEBUG] Created UserDocument', {

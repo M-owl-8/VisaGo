@@ -36,12 +36,24 @@ export interface UploadResult {
 
 export class LocalStorageService {
   private static baseDir = process.env.LOCAL_STORAGE_PATH || 'uploads';
-  private static serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+  private static serverUrl =
+    process.env.SERVER_URL ||
+    process.env.BACKEND_PUBLIC_URL ||
+    (process.env.NODE_ENV === 'production' ? null : 'http://localhost:3000');
 
   /**
-   * Initialize storage directory
+   * Initialize and validate configuration
+   * Throws error in production if SERVER_URL is not set
    */
   static async initialize(): Promise<void> {
+    // Fail fast in production if base URL is not configured
+    if (process.env.NODE_ENV === 'production' && !this.serverUrl) {
+      throw new Error(
+        'SERVER_URL or BACKEND_PUBLIC_URL must be set in production for LocalStorageService. ' +
+          'This is required to generate correct file URLs.'
+      );
+    }
+
     try {
       await fs.mkdir(this.baseDir, { recursive: true });
       await fs.mkdir(path.join(this.baseDir, 'uploads'), { recursive: true });
@@ -62,6 +74,14 @@ export class LocalStorageService {
     userId: string,
     options: UploadOptions = {}
   ): Promise<UploadResult> {
+    // Ensure serverUrl is set (will throw in production if not configured)
+    if (!this.serverUrl) {
+      throw new Error(
+        'SERVER_URL or BACKEND_PUBLIC_URL must be set for LocalStorageService. ' +
+          'Cannot generate file URLs without a base URL.'
+      );
+    }
+
     await this.initialize();
 
     const {
