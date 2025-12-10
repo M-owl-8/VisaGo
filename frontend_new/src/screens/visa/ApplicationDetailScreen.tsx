@@ -838,12 +838,16 @@ export default function ApplicationDetailScreen({
                                       ? 'Неправильный документ'
                                       : 'Incorrect document'}
                                 </Text>
-                                {(item.verificationNotes || item.aiNotesEn) && (
-                                  <Text style={styles.rejectedExplanationText}>
-                                    {item.verificationNotes || item.aiNotesEn}
-                                  </Text>
-                                )}
-                                {item.aiConfidence !== undefined && (
+                                <Text style={styles.rejectedExplanationText}>
+                                  {item.verificationNotes ||
+                                    item.aiNotesEn ||
+                                    (language === 'uz'
+                                      ? "Iltimos, ushbu hujjatning to'g'rilangan versiyasini yuklang."
+                                      : language === 'ru'
+                                        ? 'Пожалуйста, загрузите исправленную версию этого документа.'
+                                        : 'Please upload a corrected version of this document.')}
+                                </Text>
+                                {typeof item.aiConfidence === 'number' && (
                                   <Text style={styles.aiConfidenceText}>
                                     {language === 'uz'
                                       ? `AI ishonchliligi: ${Math.round(item.aiConfidence * 100)}%`

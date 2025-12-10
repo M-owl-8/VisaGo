@@ -182,12 +182,10 @@ export function DocumentChecklistItem({
               <p className="text-xs font-medium text-red-300 mb-1">
                 {t('documents.incorrectDocument', 'Incorrect document')}
               </p>
-              {(item.verificationNotes || (item as any).aiNotesEn) && (
-                <p className="text-xs text-red-200/90 leading-relaxed">
-                  {item.verificationNotes || (item as any).aiNotesEn}
-                </p>
-              )}
-              {item.aiConfidence !== undefined && (
+              <p className="text-xs text-red-200/90 leading-relaxed">
+                {item.verificationNotes || (item as any).aiNotesEn || t('documents.pleaseUploadCorrected', 'Please upload a corrected version of this document.')}
+              </p>
+              {typeof item.aiConfidence === 'number' && (
                 <p className="text-xs text-red-200/70 mt-1">
                   {t('documents.aiConfidence', 'AI confidence')}: {Math.round(item.aiConfidence * 100)}%
                 </p>

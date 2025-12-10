@@ -625,11 +625,11 @@ export async function validateDocumentWithAI(params: {
  * - rejected → wrong document / needs fix
  * - pending → not yet processed by AI
  *
- * @param aiStatus - Status from DocumentValidationResultAI
+ * @param aiStatus - Status from DocumentValidationResultAI (may be undefined)
  * @returns Database status for UserDocument
  */
-function mapAIStatusToDbStatus(
-  aiStatus: DocumentValidationResultAI['status']
+export function mapAIStatusToDbStatus(
+  aiStatus: DocumentValidationResultAI['status'] | undefined
 ): 'pending' | 'verified' | 'rejected' {
   if (aiStatus === 'verified') {
     return 'verified';
@@ -637,7 +637,7 @@ function mapAIStatusToDbStatus(
   if (aiStatus === 'rejected' || aiStatus === 'needs_review') {
     return 'rejected';
   }
-  // 'uncertain' or any unexpected value → 'pending' (not yet processed)
+  // 'uncertain' or any unexpected / missing value → 'pending' (not yet processed)
   return 'pending';
 }
 
@@ -650,19 +650,22 @@ function mapAIStatusToDbStatus(
  * @param result - DocumentValidationResultAI from GPT-4
  * @returns Human-readable explanation string or null
  */
-function buildVerificationNotes(result: DocumentValidationResultAI): string | null {
-  if (result.problems.length > 0) {
-    // Build numbered list using userMessage (fallback to message)
-    const problemList = result.problems.map((problem, index) => {
-      const message = problem.userMessage || problem.message;
-      return `${index + 1}) ${message}`;
+export function buildVerificationNotes(result: DocumentValidationResultAI): string | null {
+  const problems = result.problems ?? [];
+
+  if (problems.length > 0) {
+    const problemList = problems.map((problem, index) => {
+      const message = problem.userMessage || problem.message || '';
+      return `${index + 1}) ${message}`.trim();
     });
-    return problemList.join(' ');
+
+    const joined = problemList.join(' ');
+    return joined.length > 0 ? joined : null;
   }
 
-  // Fallback to English notes if available
-  if (result.notes?.en) {
-    return result.notes.en;
+  const englishNote = result.notes?.en?.trim();
+  if (englishNote) {
+    return englishNote;
   }
 
   return null;
@@ -680,7 +683,7 @@ export async function saveValidationResultToDocument(
   validationResult: DocumentValidationResultAI
 ): Promise<void> {
   try {
-    // Map AI status to database status
+    // Map AI status to database status (null-safe)
     const documentStatus = mapAIStatusToDbStatus(validationResult.status);
 
     // Determine if AI has made a decision (verified or rejected)
@@ -690,15 +693,19 @@ export async function saveValidationResultToDocument(
     // Build user-facing verification notes
     const verificationNotes = buildVerificationNotes(validationResult);
 
+    // Safely extract notes with null fallbacks
+    const notes = validationResult.notes ?? {};
+
     await prisma.userDocument.update({
       where: { id: documentId },
       data: {
         status: documentStatus,
-        verifiedByAI: aiHasDecided, // true when AI has decided (verified or rejected)
-        aiConfidence: validationResult.confidence,
-        aiNotesUz: validationResult.notes.uz,
-        aiNotesRu: validationResult.notes.ru || null,
-        aiNotesEn: validationResult.notes.en || null,
+        verifiedByAI: aiHasDecided,
+        aiConfidence:
+          typeof validationResult.confidence === 'number' ? validationResult.confidence : null,
+        aiNotesUz: notes.uz ?? null,
+        aiNotesRu: notes.ru ?? null,
+        aiNotesEn: notes.en ?? null,
         verificationNotes: verificationNotes,
       },
     });
@@ -709,7 +716,7 @@ export async function saveValidationResultToDocument(
       aiStatus: validationResult.status,
       verifiedByAI: aiHasDecided,
       confidence: validationResult.confidence,
-      hasProblems: validationResult.problems.length > 0,
+      hasProblems: (validationResult.problems ?? []).length > 0,
     });
   } catch (error) {
     logError(
