@@ -119,7 +119,7 @@ export function DocumentChecklistItem({
           : t('documents.statusVerified', 'Verified');
         break;
       case 'rejected':
-        statusLabel = t('documents.statusRejectedByAI', 'AI found problems ❌');
+        statusLabel = t('documents.statusNeedsFix', 'Needs fix');
         break;
       default:
         statusLabel = t('documents.statusNotUploaded', 'Not uploaded');
@@ -177,9 +177,21 @@ export function DocumentChecklistItem({
             )}
           </div>
           {/* Show AI explanation if document is rejected */}
-          {isRejected && item.verificationNotes && (
+          {isRejected && (
             <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-2">
-              <p className="text-xs text-red-300">{item.verificationNotes}</p>
+              <p className="text-xs font-medium text-red-300 mb-1">
+                {t('documents.incorrectDocument', 'Incorrect document')}
+              </p>
+              {(item.verificationNotes || (item as any).aiNotesEn) && (
+                <p className="text-xs text-red-200/90 leading-relaxed">
+                  {item.verificationNotes || (item as any).aiNotesEn}
+                </p>
+              )}
+              {item.aiConfidence !== undefined && (
+                <p className="text-xs text-red-200/70 mt-1">
+                  {t('documents.aiConfidence', 'AI confidence')}: {Math.round(item.aiConfidence * 100)}%
+                </p>
+              )}
             </div>
           )}
         </div>

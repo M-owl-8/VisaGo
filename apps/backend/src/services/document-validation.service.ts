@@ -618,6 +618,57 @@ export async function validateDocumentWithAI(params: {
 }
 
 /**
+ * Map AI validation status to database status
+ *
+ * From user's perspective:
+ * - verified → correct document
+ * - rejected → wrong document / needs fix
+ * - pending → not yet processed by AI
+ *
+ * @param aiStatus - Status from DocumentValidationResultAI
+ * @returns Database status for UserDocument
+ */
+function mapAIStatusToDbStatus(
+  aiStatus: DocumentValidationResultAI['status']
+): 'pending' | 'verified' | 'rejected' {
+  if (aiStatus === 'verified') {
+    return 'verified';
+  }
+  if (aiStatus === 'rejected' || aiStatus === 'needs_review') {
+    return 'rejected';
+  }
+  // 'uncertain' or any unexpected value → 'pending' (not yet processed)
+  return 'pending';
+}
+
+/**
+ * Build user-facing verification notes from AI validation result
+ *
+ * If problems exist, creates a numbered list using userMessage (fallback to message).
+ * Otherwise, falls back to English notes.
+ *
+ * @param result - DocumentValidationResultAI from GPT-4
+ * @returns Human-readable explanation string or null
+ */
+function buildVerificationNotes(result: DocumentValidationResultAI): string | null {
+  if (result.problems.length > 0) {
+    // Build numbered list using userMessage (fallback to message)
+    const problemList = result.problems.map((problem, index) => {
+      const message = problem.userMessage || problem.message;
+      return `${index + 1}) ${message}`;
+    });
+    return problemList.join(' ');
+  }
+
+  // Fallback to English notes if available
+  if (result.notes?.en) {
+    return result.notes.en;
+  }
+
+  return null;
+}
+
+/**
  * Save validation result to UserDocument
  *
  * @param documentId - UserDocument ID
@@ -629,37 +680,36 @@ export async function saveValidationResultToDocument(
   validationResult: DocumentValidationResultAI
 ): Promise<void> {
   try {
-    // Map DocumentValidationResultAI status to UserDocument status
-    let documentStatus: 'pending' | 'verified' | 'rejected' = 'pending';
-    if (validationResult.status === 'verified') {
-      documentStatus = 'verified';
-    } else if (validationResult.status === 'rejected') {
-      documentStatus = 'rejected';
-    } else {
-      documentStatus = 'pending'; // needs_review or uncertain -> pending
-    }
+    // Map AI status to database status
+    const documentStatus = mapAIStatusToDbStatus(validationResult.status);
+
+    // Determine if AI has made a decision (verified or rejected)
+    // 'pending' means AI hasn't processed yet, so verifiedByAI should be false
+    const aiHasDecided = documentStatus === 'verified' || documentStatus === 'rejected';
+
+    // Build user-facing verification notes
+    const verificationNotes = buildVerificationNotes(validationResult);
 
     await prisma.userDocument.update({
       where: { id: documentId },
       data: {
         status: documentStatus,
-        verifiedByAI: validationResult.verifiedByAI,
+        verifiedByAI: aiHasDecided, // true when AI has decided (verified or rejected)
         aiConfidence: validationResult.confidence,
         aiNotesUz: validationResult.notes.uz,
         aiNotesRu: validationResult.notes.ru || null,
         aiNotesEn: validationResult.notes.en || null,
-        verificationNotes:
-          validationResult.problems.length > 0
-            ? validationResult.problems.map((p) => p.message).join('; ')
-            : null,
+        verificationNotes: verificationNotes,
       },
     });
 
     logInfo('[DocValidation] Saved validation result to UserDocument', {
       documentId,
       status: documentStatus,
-      verifiedByAI: validationResult.verifiedByAI,
+      aiStatus: validationResult.status,
+      verifiedByAI: aiHasDecided,
       confidence: validationResult.confidence,
+      hasProblems: validationResult.problems.length > 0,
     });
   } catch (error) {
     logError(

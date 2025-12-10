@@ -492,7 +492,7 @@ export default function ApplicationDetailScreen({
       rejected: {
         icon: 'close-circle',
         color: '#EF4444',
-        label: t('visa.documentStatus.rejected'),
+        label: t('visa.documentStatus.needsFix', 'Needs fix'),
         bgColor: 'rgba(239, 68, 68, 0.15)',
       },
     };
@@ -828,19 +828,32 @@ export default function ApplicationDetailScreen({
                                 </Text>
                               </TouchableOpacity>
                             )}
-                            {/* AI Verification Notes */}
-                            {item.verificationNotes && (
-                              <Text style={styles.verificationNotesText}>
-                                {item.verificationNotes}
-                              </Text>
-                            )}
-                            {/* Rejected Status with Notes */}
-                            {item.status === 'rejected' &&
-                              item.verificationNotes && (
-                                <Text style={styles.rejectedNotesText}>
-                                  {item.verificationNotes}
+                            {/* Rejected Status with Explanation */}
+                            {item.status === 'rejected' && (
+                              <View style={styles.rejectedExplanationContainer}>
+                                <Text style={styles.rejectedExplanationTitle}>
+                                  {language === 'uz'
+                                    ? "Noto'g'ri hujjat"
+                                    : language === 'ru'
+                                      ? 'Неправильный документ'
+                                      : 'Incorrect document'}
                                 </Text>
-                              )}
+                                {(item.verificationNotes || item.aiNotesEn) && (
+                                  <Text style={styles.rejectedExplanationText}>
+                                    {item.verificationNotes || item.aiNotesEn}
+                                  </Text>
+                                )}
+                                {item.aiConfidence !== undefined && (
+                                  <Text style={styles.aiConfidenceText}>
+                                    {language === 'uz'
+                                      ? `AI ishonchliligi: ${Math.round(item.aiConfidence * 100)}%`
+                                      : language === 'ru'
+                                        ? `Уверенность ИИ: ${Math.round(item.aiConfidence * 100)}%`
+                                        : `AI confidence: ${Math.round(item.aiConfidence * 100)}%`}
+                                  </Text>
+                                )}
+                              </View>
+                            )}
                           </View>
 
                           {/* Upload Button */}
@@ -1301,6 +1314,31 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     marginTop: 4,
     lineHeight: 16,
+  },
+  rejectedExplanationContainer: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  rejectedExplanationTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+    marginBottom: 4,
+  },
+  rejectedExplanationText: {
+    fontSize: 12,
+    color: '#FCA5A5',
+    lineHeight: 18,
+  },
+  aiConfidenceText: {
+    fontSize: 11,
+    color: '#FCA5A5',
+    marginTop: 4,
+    opacity: 0.8,
   },
   uploadButton: {
     width: 48,
