@@ -24,10 +24,10 @@ export declare class ApplicationsService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         };
         checkpoints: {
@@ -50,11 +50,11 @@ export declare class ApplicationsService {
         updatedAt: Date;
         countryId: string;
         visaTypeId: string;
-        notes: string | null;
-        expiryDate: Date | null;
         progressPercentage: number;
+        notes: string | null;
         submissionDate: Date | null;
         approvalDate: Date | null;
+        expiryDate: Date | null;
     }>;
     /**
      * Create new visa application
@@ -81,10 +81,10 @@ export declare class ApplicationsService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         };
         checkpoints: {
@@ -107,11 +107,11 @@ export declare class ApplicationsService {
         updatedAt: Date;
         countryId: string;
         visaTypeId: string;
-        notes: string | null;
-        expiryDate: Date | null;
         progressPercentage: number;
+        notes: string | null;
         submissionDate: Date | null;
         approvalDate: Date | null;
+        expiryDate: Date | null;
     }>;
     /**
      * Update application status
@@ -134,10 +134,10 @@ export declare class ApplicationsService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         };
         checkpoints: {
@@ -160,11 +160,11 @@ export declare class ApplicationsService {
         updatedAt: Date;
         countryId: string;
         visaTypeId: string;
-        notes: string | null;
-        expiryDate: Date | null;
         progressPercentage: number;
+        notes: string | null;
         submissionDate: Date | null;
         approvalDate: Date | null;
+        expiryDate: Date | null;
     }>;
     /**
      * Update application progress based on verified documents

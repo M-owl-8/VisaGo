@@ -80,6 +80,11 @@ const envSchema = z.object({
     .transform((val) => val === 'true')
     .default('false')
     .optional(),
+  ENABLE_ENSEMBLE_VALIDATION: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('false')
+    .optional(), // Phase 7: Multi-model ensemble validation
 
   // Payment Freeze (for free trial periods)
   // Default to enabled for first 3 months free period

@@ -38,8 +38,84 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AIOpenAIService = void 0;
 const openai_1 = __importDefault(require("openai"));
+const ai_models_1 = require("../config/ai-models");
+const client_1 = require("@prisma/client");
 const logger_1 = require("../middleware/logger");
+const registry_service_1 = require("../ai-model-registry/registry.service");
 class AIOpenAIService {
+    /**
+     * Resolve model for task using registry (with fallback to defaults)
+     */
+    static async resolveModelForTask(taskType, defaultModel) {
+        try {
+            // Check env overrides
+            const envOverride = process.env[`${taskType.toUpperCase().replace(/_/g, '_')}_FORCE_MODEL`] ||
+                process.env[`${taskType.split('_')[0].toUpperCase()}_FORCE_MODEL`] ||
+                (taskType === 'checklist_enrichment' ? process.env.CHECKLIST_FORCE_MODEL : undefined) ||
+                (taskType === 'document_check' ? process.env.DOC_CHECK_FORCE_MODEL : undefined) ||
+                (taskType === 'risk_explanation' ? process.env.RISK_FORCE_MODEL : undefined) ||
+                (taskType === 'document_explanation'
+                    ? process.env.DOC_EXPLANATION_FORCE_MODEL
+                    : undefined) ||
+                (taskType === 'rules_extraction' ? process.env.RULES_EXTRACTION_FORCE_MODEL : undefined);
+            const options = {
+                forceModelName: envOverride,
+                allowCandidates: true, // Allow canary models
+            };
+            const routing = await (0, registry_service_1.getActiveModelForTask)(taskType, options);
+            return {
+                modelName: routing.modelName,
+                modelVersionId: routing.modelVersionId,
+            };
+        }
+        catch (error) {
+            // Fallback to default if registry fails
+            (0, logger_1.logWarn)('[AIOpenAI] Failed to resolve model from registry, using default', {
+                error: error instanceof Error ? error.message : String(error),
+                taskType,
+                defaultModel,
+            });
+            return {
+                modelName: defaultModel,
+            };
+        }
+    }
+    /**
+     * Record AI interaction for training data pipeline
+     * Called after GPT-4 API calls to store request/response for export
+     */
+    static async recordAIInteraction(params) {
+        try {
+            if (!AIOpenAIService.prisma) {
+                AIOpenAIService.prisma = new client_1.PrismaClient();
+            }
+            await AIOpenAIService.prisma.aIInteraction.create({
+                data: {
+                    taskType: params.taskType,
+                    model: params.model,
+                    promptVersion: params.promptVersion || null,
+                    requestPayload: params.requestPayload,
+                    responsePayload: params.responsePayload,
+                    success: params.success,
+                    errorMessage: params.errorMessage || null,
+                    source: params.source,
+                    countryCode: params.contextMeta?.countryCode || null,
+                    visaType: params.contextMeta?.visaType || null,
+                    ruleSetId: params.contextMeta?.ruleSetId || null,
+                    applicationId: params.contextMeta?.applicationId || null,
+                    userId: params.contextMeta?.userId || null,
+                    modelVersionId: params.modelVersionId || null,
+                },
+            });
+        }
+        catch (error) {
+            // Don't fail the main request if logging fails
+            (0, logger_1.logWarn)('[AIOpenAI] Failed to record AI interaction', {
+                error: error instanceof Error ? error.message : String(error),
+                taskType: params.taskType,
+            });
+        }
+    }
     /**
      * Get OpenAI client (for internal use)
      */
@@ -181,33 +257,48 @@ class AIOpenAIService {
         }
         const startTime = Date.now();
         try {
+            // Use centralized config for chat
+            const aiConfig = (0, ai_models_1.getAIConfig)('chat');
             const systemMessage = systemPrompt || this.getDefaultSystemPrompt();
             if (!AIOpenAIService.openai) {
                 throw new Error('OpenAI client not initialized');
             }
+            (0, logger_1.logInfo)('[AIOpenAIService] Calling GPT for chat', {
+                task: 'chat',
+                model: aiConfig.model,
+                temperature: aiConfig.temperature,
+                maxTokens: aiConfig.maxTokens,
+            });
             const response = await AIOpenAIService.openai.chat.completions.create({
-                model: this.MODEL,
+                model: aiConfig.model,
                 messages: [{ role: 'system', content: systemMessage }, ...messages],
-                max_tokens: this.MAX_TOKENS,
-                temperature: 0.7,
+                max_tokens: aiConfig.maxTokens,
+                temperature: aiConfig.temperature,
             });
             const responseTime = Date.now() - startTime;
             const inputTokens = response.usage?.prompt_tokens || 0;
             const outputTokens = response.usage?.completion_tokens || 0;
+            const totalTokens = inputTokens + outputTokens;
             const cost = this.calculateCost(inputTokens, outputTokens);
             const aiMessage = response.choices[0]?.message?.content || '';
             if (!aiMessage) {
                 console.error('[AIOpenAIService] Empty response from OpenAI:', {
                     choices: response.choices,
-                    model: this.MODEL,
+                    model: aiConfig.model,
                 });
                 throw new Error('Received empty response from AI service');
             }
+            (0, logger_1.logInfo)('[AIOpenAIService] Chat response received', {
+                task: 'chat',
+                model: aiConfig.model,
+                tokensUsed: totalTokens,
+                responseTimeMs: responseTime,
+            });
             return {
                 message: aiMessage,
-                tokensUsed: inputTokens + outputTokens,
+                tokensUsed: totalTokens,
                 cost,
-                model: this.MODEL,
+                model: aiConfig.model,
                 responseTime,
             };
         }
@@ -215,8 +306,11 @@ class AIOpenAIService {
             const errorType = error?.type || 'unknown';
             const statusCode = error?.status || error?.response?.status;
             const errorMessage = error?.message || String(error);
+            // Get config for logging
+            const aiConfig = (0, ai_models_1.getAIConfig)('chat');
             (0, logger_1.logError)('[OpenAI_API_ERROR] Chat completion failed', error instanceof Error ? error : new Error(errorMessage), {
-                model: this.MODEL,
+                task: 'chat',
+                model: aiConfig.model,
                 errorType,
                 statusCode,
                 errorMessage,
@@ -234,13 +328,15 @@ class AIOpenAIService {
                 if (error.message.includes('API key') ||
                     error.message.includes('401') ||
                     statusCode === 401) {
-                    (0, logger_1.logError)('[OPENAI_CONFIG_ERROR] Invalid API key', error, { model: this.MODEL });
+                    const aiConfig = (0, ai_models_1.getAIConfig)('chat');
+                    (0, logger_1.logError)('[OPENAI_CONFIG_ERROR] Invalid API key', error, { task: 'chat', model: aiConfig.model });
                     throw new Error('AI service configuration error. Please contact support.');
                 }
                 if (error.message.includes('quota') ||
                     error.message.includes('insufficient_quota') ||
                     statusCode === 429) {
-                    (0, logger_1.logError)('[OPENAI_QUOTA_ERROR] Quota exceeded', error, { model: this.MODEL });
+                    const aiConfig = (0, ai_models_1.getAIConfig)('chat');
+                    (0, logger_1.logError)('[OPENAI_QUOTA_ERROR] Quota exceeded', error, { task: 'chat', model: aiConfig.model });
                     throw new Error('AI service quota exceeded. Please try again later.');
                 }
             }
@@ -287,34 +383,55 @@ class AIOpenAIService {
             const systemMessage = `${systemPrompt || this.getDefaultSystemPrompt()}${ragContext}
 
 When answering questions, cite the sources from the knowledge base when relevant.`;
+            // Use centralized config for chat
+            const aiConfig = (0, ai_models_1.getAIConfig)('chat');
             // Call GPT-4
             if (!AIOpenAIService.openai) {
                 throw new Error('OpenAI client not initialized');
             }
+            (0, logger_1.logInfo)('[AIOpenAIService] Calling GPT for RAG chat', {
+                task: 'chat_rag',
+                model: aiConfig.model,
+                userId,
+                applicationId,
+                temperature: aiConfig.temperature,
+                maxTokens: aiConfig.maxTokens,
+                sourcesCount: ragSources.length,
+            });
             const response = await AIOpenAIService.openai.chat.completions.create({
-                model: this.MODEL,
+                model: aiConfig.model,
                 messages: [{ role: 'system', content: systemMessage }, ...messages],
-                max_tokens: this.MAX_TOKENS,
-                temperature: 0.7,
+                max_tokens: aiConfig.maxTokens,
+                temperature: aiConfig.temperature,
             });
             const responseTime = Date.now() - startTime;
             const inputTokens = response.usage?.prompt_tokens || 0;
             const outputTokens = response.usage?.completion_tokens || 0;
+            const totalTokens = inputTokens + outputTokens;
             const cost = this.calculateCost(inputTokens, outputTokens);
             const aiMessage = response.choices[0]?.message?.content || '';
             if (!aiMessage) {
                 console.error('[AIOpenAIService] Empty response from OpenAI (RAG):', {
                     choices: response.choices,
-                    model: this.MODEL,
+                    model: aiConfig.model,
                 });
                 throw new Error('Received empty response from AI service');
             }
+            (0, logger_1.logInfo)('[AIOpenAIService] RAG chat response received', {
+                task: 'chat_rag',
+                model: aiConfig.model,
+                userId,
+                applicationId,
+                tokensUsed: totalTokens,
+                responseTimeMs: responseTime,
+                sourcesCount: ragSources.length,
+            });
             return {
                 message: aiMessage,
                 sources: ragSources,
-                tokensUsed: inputTokens + outputTokens,
+                tokensUsed: totalTokens,
                 cost,
-                model: this.MODEL,
+                model: aiConfig.model,
                 responseTime,
             };
         }
@@ -501,15 +618,18 @@ NO markdown, NO extra text, ONLY valid JSON.`;
      * Build user prompt for hybrid mode
      * Includes base checklist and context
      */
-    static buildHybridUserPrompt(userContext, country, visaType, baseChecklist, visaKb, documentGuidesText) {
-        const summary = userContext.questionnaireSummary;
-        const riskScore = userContext.riskScore;
-        // Extract key info
-        const sponsorType = summary?.sponsorType || 'self';
-        const duration = summary?.duration || summary?.travelInfo?.duration || 'Not specified';
-        const hasTravelHistory = summary?.hasInternationalTravel ?? false;
-        const previousRefusals = summary?.previousVisaRejections ?? false;
-        const bankBalance = summary?.bankBalanceUSD || summary?.financialInfo?.selfFundsUSD;
+    static async buildHybridUserPrompt(userContext, country, visaType, baseChecklist, visaKb, documentGuidesText) {
+        // Convert to canonical format for consistent GPT input
+        const { buildCanonicalAIUserContext } = require('./ai-context.service');
+        const canonical = await buildCanonicalAIUserContext(userContext);
+        const profile = canonical.applicantProfile;
+        const riskScore = canonical.riskScore;
+        // Extract key info from canonical format
+        const sponsorType = profile.sponsorType;
+        const duration = profile.duration === 'unknown' ? 'Not specified' : profile.duration;
+        const hasTravelHistory = profile.hasInternationalTravel;
+        const previousRefusals = profile.previousVisaRejections;
+        const bankBalance = profile.bankBalanceUSD;
         return `Enrich the following document checklist with names, descriptions, and whereToObtain instructions.
 
 Destination Country: ${country}
@@ -519,7 +639,7 @@ Duration: ${duration}
 Travel History: ${hasTravelHistory ? 'Has previous travel' : 'No previous international travel'}
 Previous Refusals: ${previousRefusals ? 'Yes' : 'No'}
 Financial Capacity: ${bankBalance ? `~$${bankBalance}` : 'Not specified'}
-Risk Score: ${riskScore ? `${riskScore.probabilityPercent}% (${riskScore.level})` : 'Not calculated'}
+Risk Score: ${riskScore.probabilityPercent}% (${riskScore.level})
 
 Knowledge Base Context:
 ${visaKb || 'No specific knowledge base available.'}
@@ -889,7 +1009,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                 }
                 else {
                     // Build base checklist from rules
-                    const baseChecklist = buildBaseChecklistFromRules(userContext, ruleSetData);
+                    const baseChecklist = await buildBaseChecklistFromRules(userContext, ruleSetData);
                     if (baseChecklist.length === 0) {
                         (0, logger_1.logWarn)('[OpenAI][Checklist] Base checklist is empty, falling back to legacy mode', {
                             country,
@@ -905,7 +1025,7 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                         // Build hybrid system prompt (GPT only enriches, doesn't decide documents)
                         const hybridSystemPrompt = this.buildHybridSystemPrompt(country, visaType, visaKb);
                         // Build hybrid user prompt with base checklist
-                        const hybridUserPrompt = this.buildHybridUserPrompt(userContext, country, visaType, baseChecklist, visaKb, documentGuidesText);
+                        const hybridUserPrompt = await this.buildHybridUserPrompt(userContext, country, visaType, baseChecklist, visaKb, documentGuidesText);
                         // Call GPT-4 for enrichment only (with retry logic)
                         let response;
                         let attempt = 0;
@@ -2001,8 +2121,172 @@ You MUST:
             const hasChildren = summary?.hasChildren && summary.hasChildren !== 'no';
             const age = summary?.age || aiUserContext.userProfile?.age;
             const riskScore = aiUserContext.riskScore;
-            // Build concise system prompt with structured output schema
-            const systemPrompt = `You are a visa document checklist generator specialized for Uzbek applicants.
+            // Build compact system prompt (COMPACT VERSION)
+            const useCompactPrompts = process.env.USE_COMPACT_CHECKLIST_PROMPTS !== 'false'; // Default: true
+            const systemPrompt = useCompactPrompts
+                ? this.buildLegacySystemPromptCompact(country, visaType, MIN_ITEMS_HARD, IDEAL_MIN_ITEMS)
+                : this.buildLegacySystemPromptLegacy(country, visaType, MIN_ITEMS_HARD, IDEAL_MIN_ITEMS);
+            // Build compact user prompt using CanonicalAIUserContext
+            let userPrompt;
+            if (useCompactPrompts) {
+                const { buildCanonicalAIUserContext } = await Promise.resolve().then(() => __importStar(require('./ai-context.service')));
+                const canonical = await buildCanonicalAIUserContext(aiUserContext);
+                userPrompt = this.buildLegacyUserPromptCompact(canonical, country, countryCode, visaType, visaKb, documentGuidesText, MIN_ITEMS_HARD, IDEAL_MIN_ITEMS);
+            }
+            else {
+                userPrompt = this.buildLegacyUserPromptLegacy(aiUserContext, country, countryCode, visaType, purpose, duration, employmentStatus, sponsorType, bankBalance, monthlyIncome, hasInvitation, travelHistory, previousRefusals, hasProperty, hasFamily, hasChildren, age, riskScore, visaKb, documentGuidesText, MIN_ITEMS_HARD, IDEAL_MIN_ITEMS);
+            }
+            // Call GPT-4 with structured output using centralized config
+            const aiConfig = (0, ai_models_1.getAIConfig)('checklistLegacy');
+            (0, logger_1.logInfo)('[OpenAI][Checklist][Legacy] Calling GPT-4 with centralized config', {
+                task: 'checklistLegacy',
+                model: aiConfig.model,
+                country,
+                visaType,
+                countryCode,
+                temperature: aiConfig.temperature,
+                maxTokens: aiConfig.maxTokens,
+            });
+            const response = await this.callChecklistAPI([
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+            ], {
+                temperature: aiConfig.temperature,
+                max_completion_tokens: aiConfig.maxTokens,
+                response_format: aiConfig.responseFormat || undefined,
+            }, {
+                country,
+                visaType,
+                mode: 'legacy',
+            });
+            const rawContent = response.choices[0]?.message?.content || '{}';
+            const responseTime = Date.now() - startTime;
+            const tokensUsed = response.usage?.total_tokens || 0;
+            (0, logger_1.logInfo)('[OpenAI][Checklist][Legacy] GPT-4 response received', {
+                task: 'checklistLegacy',
+                model: response?.model || aiConfig.model,
+                country,
+                visaType,
+                countryCode,
+                responseLength: rawContent.length,
+                tokensUsed,
+                responseTimeMs: responseTime,
+            });
+            // Parse and validate
+            const { parseAndValidateChecklistResponse } = await Promise.resolve().then(() => __importStar(require('../utils/json-validator')));
+            const parseResult = parseAndValidateChecklistResponse(rawContent, country, visaType, 1);
+            if (!parseResult.validation.isValid) {
+                (0, logger_1.logWarn)('[OpenAI][Checklist][Legacy] Validation failed, will retry or use fallback', {
+                    country,
+                    visaType,
+                    errors: parseResult.validation.errors,
+                });
+                // Return null so caller can use fallback
+                return null;
+            }
+            const parsed = parseResult.parsed;
+            if (!parsed || !parsed.checklist) {
+                throw new Error('Invalid checklist response: missing checklist array');
+            }
+            // Auto-translate missing translations if needed
+            if (parseResult.validation.warnings.some((w) => w.includes('Missing'))) {
+                const { autoTranslateChecklistItems } = await Promise.resolve().then(() => __importStar(require('../utils/translation-helper')));
+                await autoTranslateChecklistItems(parsed.checklist);
+            }
+            (0, logger_1.logInfo)('[OpenAI][Checklist][Legacy] Checklist generated successfully', {
+                task: 'checklistLegacy',
+                model: aiConfig.model,
+                country,
+                visaType,
+                countryCode,
+                itemCount: parsed.checklist.length,
+                tokensUsed,
+                responseTimeMs: responseTime,
+            });
+            return {
+                type: visaType,
+                checklist: parsed.checklist, // Type assertion needed due to legacy format compatibility
+            };
+        }
+        catch (error) {
+            (0, logger_1.logError)('[OpenAI][Checklist][Legacy] Generation failed', error, {
+                country,
+                visaType,
+            });
+            // Return null so caller can use fallback
+            return null;
+        }
+    }
+    /**
+     * Build compact legacy system prompt (COMPACT VERSION)
+     */
+    static buildLegacySystemPromptCompact(country, visaType, minItems, idealItems) {
+        return `Generate visa document checklist for Uzbek applicants.
+
+OUTPUT SCHEMA:
+{
+  "checklist": [
+    {
+      "document": "string",
+      "name": "string",
+      "nameUz": "string",
+      "nameRu": "string",
+      "category": "required" | "highly_recommended" | "optional",
+      "required": boolean,
+      "description": "string",
+      "descriptionUz": "string",
+      "descriptionRu": "string",
+      "priority": "high" | "medium" | "low",
+      "whereToObtain": "string",
+      "whereToObtainUz": "string",
+      "whereToObtainRu": "string"
+    }
+  ]
+}
+
+RULES:
+- Output ${minItems}-${idealItems} items
+- Include all 3 categories
+- Use country-specific terms (I-20/USA, LOA/Canada, CAS/UK)
+- Complete EN/UZ/RU translations
+- whereToObtain: realistic for Uzbekistan
+
+Return ONLY valid JSON.`;
+    }
+    /**
+     * Build compact legacy user prompt using CanonicalAIUserContext (COMPACT VERSION)
+     */
+    static buildLegacyUserPromptCompact(canonical, country, countryCode, visaType, visaKb, documentGuidesText, minItems, idealItems) {
+        const profile = canonical.applicantProfile;
+        const riskScore = canonical.riskScore;
+        const context = {
+            country: `${country} (${countryCode})`,
+            visaType,
+            sponsorType: profile.sponsorType,
+            currentStatus: profile.currentStatus,
+            bankBalanceUSD: profile.bankBalanceUSD,
+            monthlyIncomeUSD: profile.monthlyIncomeUSD,
+            hasInternationalTravel: profile.hasInternationalTravel,
+            previousVisaRejections: profile.previousVisaRejections,
+            hasProperty: profile.hasPropertyInUzbekistan,
+            hasFamily: profile.hasFamilyInUzbekistan,
+            hasChildren: profile.hasChildren,
+            riskLevel: riskScore.level,
+            riskProbability: riskScore.probabilityPercent,
+        };
+        return `APPLICANT_CONTEXT:
+${JSON.stringify(context, null, 2)}
+
+${visaKb ? `KNOWLEDGE_BASE:\n${visaKb.substring(0, 800)}\n` : ''}
+${documentGuidesText ? `DOCUMENT_GUIDES:\n${documentGuidesText.substring(0, 500)}\n` : ''}
+
+Generate ${minItems}-${idealItems} items. Return ONLY valid JSON.`;
+    }
+    /**
+     * OLD LEGACY SYSTEM PROMPT (kept for reference/rollback)
+     */
+    static buildLegacySystemPromptLegacy(country, visaType, minItems, idealItems) {
+        return `You are a visa document checklist generator specialized for Uzbek applicants.
 
 Your task: Generate a personalized document checklist using structured JSON output.
 
@@ -2028,15 +2312,19 @@ OUTPUT SCHEMA (JSON):
 }
 
 RULES:
-- Output at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is ideal)
+- Output at least ${minItems} items (${idealItems}+ is ideal)
 - Include ALL THREE categories: required, highly_recommended, optional
 - Use country-specific terminology (I-20 for USA, LOA for Canada, CAS for UK, etc.)
 - All items must have complete EN, UZ, RU translations
 - whereToObtain must be realistic for Uzbekistan
 
 Return ONLY valid JSON, no markdown, no comments.`;
-            // Build user prompt with explicit questionnaire data
-            const userPrompt = `Generate a personalized visa document checklist.
+    }
+    /**
+     * OLD LEGACY USER PROMPT (kept for reference/rollback)
+     */
+    static buildLegacyUserPromptLegacy(aiUserContext, country, countryCode, visaType, purpose, duration, employmentStatus, sponsorType, bankBalance, monthlyIncome, hasInvitation, travelHistory, previousRefusals, hasProperty, hasFamily, hasChildren, age, riskScore, visaKb, documentGuidesText, minItems, idealItems) {
+        return `Generate a personalized visa document checklist.
 
 APPLICANT INFORMATION:
 - Destination: ${country} (${countryCode})
@@ -2056,68 +2344,7 @@ APPLICANT INFORMATION:
 ${visaKb ? `\nKNOWLEDGE BASE:\n${visaKb.substring(0, 1000)}` : ''}
 ${documentGuidesText ? `\nDOCUMENT GUIDES:\n${documentGuidesText}` : ''}
 
-Generate checklist with at least ${MIN_ITEMS_HARD} items (${IDEAL_MIN_ITEMS}+ is ideal). Return ONLY valid JSON.`;
-            // Call GPT-4 with structured output
-            const response = await this.callChecklistAPI([
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-            ], {
-                temperature: 0.5,
-                max_completion_tokens: 2000,
-                response_format: { type: 'json_object' },
-            }, {
-                country,
-                visaType,
-                mode: 'legacy',
-            });
-            const rawContent = response.choices[0]?.message?.content || '{}';
-            const responseTime = Date.now() - startTime;
-            (0, logger_1.logInfo)('[OpenAI][Checklist][Legacy] GPT-4 response received', {
-                model: response?.model || this.getChecklistModel(),
-                country,
-                visaType,
-                responseLength: rawContent.length,
-                responseTimeMs: responseTime,
-            });
-            // Parse and validate
-            const { parseAndValidateChecklistResponse } = await Promise.resolve().then(() => __importStar(require('../utils/json-validator')));
-            const parseResult = parseAndValidateChecklistResponse(rawContent, country, visaType, 1);
-            if (!parseResult.validation.isValid) {
-                (0, logger_1.logWarn)('[OpenAI][Checklist][Legacy] Validation failed, will retry or use fallback', {
-                    country,
-                    visaType,
-                    errors: parseResult.validation.errors,
-                });
-                // Return null so caller can use fallback
-                return null;
-            }
-            const parsed = parseResult.parsed;
-            if (!parsed || !parsed.checklist) {
-                throw new Error('Invalid checklist response: missing checklist array');
-            }
-            // Auto-translate missing translations if needed
-            if (parseResult.validation.warnings.some((w) => w.includes('Missing'))) {
-                const { autoTranslateChecklistItems } = await Promise.resolve().then(() => __importStar(require('../utils/translation-helper')));
-                await autoTranslateChecklistItems(parsed.checklist);
-            }
-            (0, logger_1.logInfo)('[OpenAI][Checklist][Legacy] Checklist generated successfully', {
-                country,
-                visaType,
-                itemCount: parsed.checklist.length,
-            });
-            return {
-                type: visaType,
-                checklist: parsed.checklist, // Type assertion needed due to legacy format compatibility
-            };
-        }
-        catch (error) {
-            (0, logger_1.logError)('[OpenAI][Checklist][Legacy] Generation failed', error, {
-                country,
-                visaType,
-            });
-            // Return null so caller can use fallback
-            return null;
-        }
+Generate checklist with at least ${minItems} items (${idealItems}+ is ideal). Return ONLY valid JSON.`;
     }
 }
 exports.AIOpenAIService = AIOpenAIService;

@@ -15,10 +15,10 @@ export declare class CountriesService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         }[];
     } & {
@@ -42,10 +42,10 @@ export declare class CountriesService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         }[];
     } & {
@@ -69,10 +69,10 @@ export declare class CountriesService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         }[];
     } & {
@@ -97,10 +97,10 @@ export declare class CountriesService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         }[];
     } & {
@@ -124,10 +124,10 @@ export declare class CountriesService {
             updatedAt: Date;
             name: string;
             countryId: string;
-            fee: number;
             requirements: string;
             processingDays: number;
             validity: string;
+            fee: number;
             documentTypes: string;
         }[];
     } & {
@@ -161,10 +161,10 @@ export declare class CountriesService {
         updatedAt: Date;
         name: string;
         countryId: string;
-        fee: number;
         requirements: string;
         processingDays: number;
         validity: string;
+        fee: number;
         documentTypes: string;
     }>;
     /**
@@ -177,10 +177,10 @@ export declare class CountriesService {
         updatedAt: Date;
         name: string;
         countryId: string;
-        fee: number;
         requirements: string;
         processingDays: number;
         validity: string;
+        fee: number;
         documentTypes: string;
     }[]>;
     /**
@@ -220,10 +220,10 @@ export declare class CountriesService {
         updatedAt: Date;
         name: string;
         countryId: string;
-        fee: number;
         requirements: string;
         processingDays: number;
         validity: string;
+        fee: number;
         documentTypes: string;
     }>;
 }

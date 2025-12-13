@@ -36,6 +36,15 @@ export declare class AIOpenAIService {
     static readonly CHECKLIST_MODEL: string;
     private static readonly MAX_TOKENS;
     /**
+     * Resolve model for task using registry (with fallback to defaults)
+     */
+    private static resolveModelForTask;
+    /**
+     * Record AI interaction for training data pipeline
+     * Called after GPT-4 API calls to store request/response for export
+     */
+    private static recordAIInteraction;
+    /**
      * Get OpenAI client (for internal use)
      */
     static getOpenAIClient(): OpenAI;
@@ -213,6 +222,22 @@ export declare class AIOpenAIService {
         }>;
         type: string;
     }>;
+    /**
+     * Build compact legacy system prompt (COMPACT VERSION)
+     */
+    private static buildLegacySystemPromptCompact;
+    /**
+     * Build compact legacy user prompt using CanonicalAIUserContext (COMPACT VERSION)
+     */
+    private static buildLegacyUserPromptCompact;
+    /**
+     * OLD LEGACY SYSTEM PROMPT (kept for reference/rollback)
+     */
+    private static buildLegacySystemPromptLegacy;
+    /**
+     * OLD LEGACY USER PROMPT (kept for reference/rollback)
+     */
+    private static buildLegacyUserPromptLegacy;
 }
 export default AIOpenAIService;
 //# sourceMappingURL=ai-openai.service.d.ts.map

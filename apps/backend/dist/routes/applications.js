@@ -38,12 +38,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const axios_1 = __importDefault(require("axios"));
+const client_1 = require("@prisma/client");
 const applications_service_1 = require("../services/applications.service");
 const ai_application_service_1 = require("../services/ai-application.service");
 const auth_1 = require("../middleware/auth");
 const ai_context_service_1 = require("../services/ai-context.service");
 const logger_1 = require("../middleware/logger");
 const ai_openai_service_1 = require("../services/ai-openai.service");
+const visa_risk_explanation_service_1 = require("../services/visa-risk-explanation.service");
+const visa_checklist_explanation_service_1 = require("../services/visa-checklist-explanation.service");
+const prisma = new client_1.PrismaClient();
 const router = express_1.default.Router();
 // All routes require authentication
 router.use(auth_1.authenticateToken);
@@ -525,6 +529,221 @@ router.post('/:id/visa-probability', async (req, res, next) => {
             applicationId: req.params.id,
         });
         next(error);
+    }
+});
+/**
+ * GET /api/applications/:id/risk-explanation
+ * Get GPT-generated risk explanation and improvement advice
+ */
+router.get('/:id/risk-explanation', async (req, res, next) => {
+    try {
+        const applicationId = req.params.id;
+        const userId = req.userId;
+        if (!applicationId) {
+            return res.status(400).json({
+                success: false,
+                error: 'APPLICATION_ID_REQUIRED',
+                message: 'Application ID is required',
+            });
+        }
+        (0, logger_1.logInfo)('[RiskExplanation] Requesting risk explanation', {
+            userId,
+            applicationId,
+        });
+        const explanation = await visa_risk_explanation_service_1.VisaRiskExplanationService.generateRiskExplanation(userId, applicationId);
+        res.json({
+            success: true,
+            data: explanation,
+        });
+    }
+    catch (error) {
+        (0, logger_1.logError)('[RiskExplanation] Error generating risk explanation', error, {
+            userId: req.userId,
+            applicationId: req.params.id,
+        });
+        if (error.message === 'Application not found') {
+            return res.status(404).json({
+                success: false,
+                error: 'APPLICATION_NOT_FOUND',
+                message: 'Application not found',
+            });
+        }
+        if (error.message === 'Unauthorized') {
+            return res.status(403).json({
+                success: false,
+                error: 'UNAUTHORIZED',
+                message: 'You do not have access to this application',
+            });
+        }
+        res.status(500).json({
+            success: false,
+            error: 'RISK_EXPLANATION_ERROR',
+            message: error.message || 'Failed to generate risk explanation',
+        });
+    }
+});
+/**
+ * GET /api/applications/:applicationId/checklist/:documentType/explanation
+ * Get GPT-generated explanation for why a specific checklist item is needed
+ */
+router.get('/:applicationId/checklist/:documentType/explanation', async (req, res, next) => {
+    try {
+        const applicationId = req.params.applicationId;
+        const documentType = req.params.documentType;
+        const userId = req.userId;
+        if (!applicationId || !documentType) {
+            return res.status(400).json({
+                success: false,
+                error: 'MISSING_PARAMS',
+                message: 'Application ID and document type are required',
+            });
+        }
+        (0, logger_1.logInfo)('[ChecklistExplanation] Requesting document explanation', {
+            userId,
+            applicationId,
+            documentType,
+        });
+        const explanation = await visa_checklist_explanation_service_1.VisaChecklistExplanationService.getExplanation(userId, applicationId, documentType);
+        res.json({
+            success: true,
+            data: explanation,
+        });
+    }
+    catch (error) {
+        (0, logger_1.logError)('[ChecklistExplanation] Error generating explanation', error, {
+            userId: req.userId,
+            applicationId: req.params.applicationId,
+            documentType: req.params.documentType,
+        });
+        if (error.message === 'Application not found') {
+            return res.status(404).json({
+                success: false,
+                error: 'APPLICATION_NOT_FOUND',
+                message: 'Application not found',
+            });
+        }
+        if (error.message === 'Unauthorized') {
+            return res.status(403).json({
+                success: false,
+                error: 'UNAUTHORIZED',
+                message: 'You do not have access to this application',
+            });
+        }
+        res.status(500).json({
+            success: false,
+            error: 'EXPLANATION_ERROR',
+            message: error.message || 'Failed to generate explanation',
+        });
+    }
+});
+/**
+ * POST /api/applications/:id/checklist-feedback
+ * Submit feedback about checklist quality
+ */
+router.post('/:id/checklist-feedback', async (req, res, next) => {
+    try {
+        const applicationId = req.params.id;
+        const userId = req.userId;
+        if (!applicationId) {
+            return res.status(400).json({
+                success: false,
+                error: 'APPLICATION_ID_REQUIRED',
+                message: 'Application ID is required',
+            });
+        }
+        const { feedbackType, feedbackText } = req.body;
+        if (!feedbackType || !feedbackText) {
+            return res.status(400).json({
+                success: false,
+                error: 'MISSING_FIELDS',
+                message: 'Feedback type and text are required',
+            });
+        }
+        if (!['missing_docs', 'unnecessary_docs', 'other'].includes(feedbackType)) {
+            return res.status(400).json({
+                success: false,
+                error: 'INVALID_FEEDBACK_TYPE',
+                message: 'Feedback type must be: missing_docs, unnecessary_docs, or other',
+            });
+        }
+        // Get application
+        const application = await prisma.visaApplication.findUnique({
+            where: { id: applicationId },
+            include: {
+                country: true,
+                visaType: true,
+            },
+        });
+        if (!application) {
+            return res.status(404).json({
+                success: false,
+                error: 'APPLICATION_NOT_FOUND',
+                message: 'Application not found',
+            });
+        }
+        // Verify ownership
+        if (application.userId !== userId) {
+            return res.status(403).json({
+                success: false,
+                error: 'UNAUTHORIZED',
+                message: 'You do not have access to this application',
+            });
+        }
+        // Get current checklist snapshot
+        const checklist = await prisma.documentChecklist.findUnique({
+            where: { applicationId },
+        });
+        let checklistSnapshot = null;
+        if (checklist?.checklistData) {
+            try {
+                checklistSnapshot =
+                    typeof checklist.checklistData === 'string'
+                        ? JSON.parse(checklist.checklistData)
+                        : checklist.checklistData;
+            }
+            catch (e) {
+                // If parse fails, use raw data
+                checklistSnapshot = { raw: checklist.checklistData };
+            }
+        }
+        // Store feedback
+        const feedback = await prisma.checklistFeedback.create({
+            data: {
+                applicationId,
+                userId,
+                countryCode: application.country.code.toUpperCase(),
+                visaType: application.visaType.name.toLowerCase(),
+                checklistSnapshot: JSON.stringify(checklistSnapshot),
+                feedbackType,
+                feedbackText,
+            },
+        });
+        (0, logger_1.logInfo)('[ChecklistFeedback] Feedback submitted', {
+            feedbackId: feedback.id,
+            applicationId,
+            userId,
+            countryCode: application.country.code,
+            visaType: application.visaType.name,
+            feedbackType,
+        });
+        res.json({
+            success: true,
+            data: {
+                id: feedback.id,
+                message: 'Feedback submitted successfully',
+            },
+        });
+    }
+    catch (error) {
+        (0, logger_1.logError)('[ChecklistFeedback] Error submitting feedback', error, {
+            userId: req.userId,
+            applicationId: req.params.id,
+        });
+        res.status(500).json({
+            success: false,
+            error: 'FEEDBACK_ERROR',
+            message: error.message || 'Failed to submit feedback',
+        });
     }
 });
 exports.default = router;

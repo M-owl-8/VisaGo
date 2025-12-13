@@ -60,9 +60,40 @@ export async function validateDocumentWithAI(params: {
   };
   countryName: string;
   visaTypeName: string; // tourist / student
+  modelOverride?: string; // Optional: override default model
+  useEnsemble?: boolean; // Optional: use ensemble validation (Phase 7)
 }): Promise<DocumentValidationResultAI> {
   try {
-    const { document, checklistItem, application, countryName, visaTypeName } = params;
+    const { document, checklistItem, application, countryName, visaTypeName, useEnsemble } = params;
+
+    // Phase 7: Optional ensemble validation (feature-flagged)
+    if (useEnsemble || process.env.ENABLE_ENSEMBLE_VALIDATION === 'true') {
+      try {
+        const { EnsembleValidationService } = await import('./ensemble-validation.service');
+        const extractedText = document.id
+          ? await prisma.userDocument
+              .findUnique({ where: { id: document.id }, select: { extractedText: true } })
+              .then((d) => d?.extractedText || '')
+          : '';
+        const ensembleResult = await EnsembleValidationService.validateWithEnsemble({
+          documentText: extractedText || document.documentName,
+          documentType: document.documentType,
+          checklistItem,
+          application,
+        });
+        logInfo('[DocValidation] Used ensemble validation', {
+          documentType: document.documentType,
+          applicationId: application.id,
+          consensusScore: (ensembleResult as any).consensusScore || 0,
+        });
+        return ensembleResult;
+      } catch (ensembleError) {
+        logWarn('[DocValidation] Ensemble validation failed, falling back to single model', {
+          error: ensembleError instanceof Error ? ensembleError.message : String(ensembleError),
+        });
+        // Fall through to normal validation
+      }
+    }
 
     // Normalize document type
     const norm = toCanonicalDocumentType(document.documentType);

@@ -63,10 +63,10 @@ export declare class ChatService {
         responseTime: number | null;
         id: string;
         createdAt: Date;
-        sources: string | null;
-        tokensUsed: number;
-        content: string;
         role: string;
+        tokensUsed: number;
+        sources: string | null;
+        content: string;
         sessionId: string;
         feedback: string | null;
     }[]>;
@@ -77,8 +77,8 @@ export declare class ChatService {
         sessions: ({
             messages: {
                 createdAt: Date;
-                content: string;
                 role: string;
+                content: string;
             }[];
         } & {
             title: string;
@@ -105,10 +105,10 @@ export declare class ChatService {
             responseTime: number | null;
             id: string;
             createdAt: Date;
-            sources: string | null;
-            tokensUsed: number;
-            content: string;
             role: string;
+            tokensUsed: number;
+            sources: string | null;
+            content: string;
             feedback: string | null;
         }[];
         title: string;
@@ -140,10 +140,10 @@ export declare class ChatService {
         responseTime: number | null;
         id: string;
         createdAt: Date;
-        sources: string | null;
-        tokensUsed: number;
-        content: string;
         role: string;
+        tokensUsed: number;
+        sources: string | null;
+        content: string;
         sessionId: string;
         feedback: string | null;
     }>;
@@ -189,10 +189,10 @@ export declare class ChatService {
         responseTime: number | null;
         id: string;
         createdAt: Date;
-        sources: string | null;
-        tokensUsed: number;
-        content: string;
         role: string;
+        tokensUsed: number;
+        sources: string | null;
+        content: string;
         sessionId: string;
         feedback: string | null;
     }>;
