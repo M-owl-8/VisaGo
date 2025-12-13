@@ -133,19 +133,27 @@ export class FirebaseStorageService {
       FirebaseStorageService.bucketName = storageBucket;
       FirebaseStorageService.firebaseEnabled = true;
 
-      // Verify bucket is accessible (this will fail if credentials are wrong)
+      // Verify bucket is accessible (this will fail if credentials are wrong or bucket doesn't exist)
       try {
         // Test bucket access by checking if it exists
         const [exists] = await FirebaseStorageService.bucket.exists();
         if (!exists) {
           throw new Error(`Bucket ${storageBucket} does not exist or is not accessible`);
         }
+        
+        // Test actual upload capability by trying to get bucket metadata
+        // This will fail if we don't have proper permissions
+        await FirebaseStorageService.bucket.getMetadata();
+        
         console.log(`✅ Firebase Storage configured (bucket: ${storageBucket})`);
-      } catch (error) {
-        console.error(`❌ Firebase Storage bucket verification failed:`, error);
-        // Don't throw - let individual operations handle errors
-        // This allows the service to be marked as enabled but operations will fail gracefully
-        console.warn(`⚠️  Firebase Storage enabled but bucket verification failed. Operations may fail.`);
+      } catch (error: any) {
+        // If bucket doesn't exist or we can't access it, disable Firebase Storage
+        console.error(`❌ Firebase Storage bucket verification failed:`, error?.message || error);
+        FirebaseStorageService.firebaseEnabled = false;
+        FirebaseStorageService.bucket = null;
+        FirebaseStorageService.instance = null;
+        console.warn(`⚠️  Firebase Storage disabled due to bucket access failure. Will use local storage fallback.`);
+        // Don't throw - this allows the system to fall back to local storage
       }
     } catch (error) {
       FirebaseStorageService.firebaseEnabled = false;
@@ -179,6 +187,12 @@ export class FirebaseStorageService {
     options: UploadOptions = {}
   ): Promise<UploadResult> {
     await this.initialize();
+    
+    // If Firebase is not enabled (e.g., bucket doesn't exist), throw error to trigger fallback
+    if (!this.firebaseEnabled || !this.bucket) {
+      throw new Error('Firebase Storage is not available. Bucket may not exist or is not accessible.');
+    }
+    
     this.ensureEnabled();
 
     const {
@@ -282,15 +296,27 @@ export class FirebaseStorageService {
     const file = FirebaseStorageService.bucket.file(uniqueFileName);
 
     // Upload with explicit metadata
-    await file.save(uploadBuffer, {
-      metadata: {
-        contentType: mimeType,
+    try {
+      await file.save(uploadBuffer, {
         metadata: {
-          userId,
-          uploadedAt: new Date().toISOString(),
+          contentType: mimeType,
+          metadata: {
+            userId,
+            uploadedAt: new Date().toISOString(),
+          },
         },
-      },
-    });
+      });
+    } catch (uploadError: any) {
+      // If bucket doesn't exist (404), disable Firebase and throw error for fallback
+      if (uploadError?.response?.status === 404 || uploadError?.code === 404) {
+        console.error('❌ Firebase Storage bucket not found. Disabling Firebase Storage.');
+        FirebaseStorageService.firebaseEnabled = false;
+        FirebaseStorageService.bucket = null;
+        throw new Error('Firebase Storage bucket does not exist. Please check FIREBASE_STORAGE_BUCKET configuration.');
+      }
+      // Re-throw other errors
+      throw uploadError;
+    }
 
     // Get signed URL (valid for 1 year)
     // Ensure it uses Firebase Admin credentials
