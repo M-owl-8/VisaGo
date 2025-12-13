@@ -164,25 +164,56 @@ export class AIOpenAIService {
         ? stringifyPayload(redactSensitive(params.responsePayload))
         : null;
 
-      await AIOpenAIService.prisma.aIInteraction.create({
-        data: {
-          taskType: params.taskType,
-          model: params.model,
-          promptVersion: params.promptVersion || null,
-          source: params.source || null,
-          requestPayload: safeRequestPayload,
-          responsePayload: safeResponsePayload,
-          success: params.success,
-          errorMessage: params.errorMessage || null,
-          countryCode: params.contextMeta?.countryCode || null,
-          visaType: params.contextMeta?.visaType || null,
-          ruleSetId: params.contextMeta?.ruleSetId || null,
-          applicationId: params.contextMeta?.applicationId || null,
-          userId: params.contextMeta?.userId || null,
-          modelVersionId: params.modelVersionId || null,
-          latencyMs: params.latencyMs || null,
-        },
-      });
+      // Try to create with latencyMs first
+      try {
+        await AIOpenAIService.prisma.aIInteraction.create({
+          data: {
+            taskType: params.taskType,
+            model: params.model,
+            promptVersion: params.promptVersion || null,
+            source: params.source || null,
+            requestPayload: safeRequestPayload,
+            responsePayload: safeResponsePayload,
+            success: params.success,
+            errorMessage: params.errorMessage || null,
+            countryCode: params.contextMeta?.countryCode || null,
+            visaType: params.contextMeta?.visaType || null,
+            ruleSetId: params.contextMeta?.ruleSetId || null,
+            applicationId: params.contextMeta?.applicationId || null,
+            userId: params.contextMeta?.userId || null,
+            modelVersionId: params.modelVersionId || null,
+            latencyMs: params.latencyMs || null,
+          },
+        });
+      } catch (latencyError: any) {
+        // If latencyMs column doesn't exist, try without it
+        if (latencyError?.message?.includes('latencyMs') || latencyError?.message?.includes('does not exist')) {
+          logWarn('[AIOpenAI] latencyMs column not found, creating without it. Run migration to add column.', {
+            taskType: params.taskType,
+          });
+          await AIOpenAIService.prisma.aIInteraction.create({
+            data: {
+              taskType: params.taskType,
+              model: params.model,
+              promptVersion: params.promptVersion || null,
+              source: params.source || null,
+              requestPayload: safeRequestPayload,
+              responsePayload: safeResponsePayload,
+              success: params.success,
+              errorMessage: params.errorMessage || null,
+              countryCode: params.contextMeta?.countryCode || null,
+              visaType: params.contextMeta?.visaType || null,
+              ruleSetId: params.contextMeta?.ruleSetId || null,
+              applicationId: params.contextMeta?.applicationId || null,
+              userId: params.contextMeta?.userId || null,
+              modelVersionId: params.modelVersionId || null,
+              // Omit latencyMs
+            },
+          });
+        } else {
+          throw latencyError; // Re-throw if it's a different error
+        }
+      }
     } catch (error) {
       // Don't fail the main request if logging fails
       logWarn('[AIOpenAI] Failed to record AI interaction', {
@@ -924,11 +955,28 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
     } catch (error) {
       // Log first 300 chars of jsonText for debugging (truncated to avoid log bloat)
       const jsonTextPreview = jsonText.length > 300 ? jsonText.substring(0, 300) + '...' : jsonText;
+      // Also log around the error position if it's a syntax error
+      let errorPosition = -1;
+      if (error instanceof SyntaxError && error.message.includes('position')) {
+        const match = error.message.match(/position (\d+)/);
+        if (match) {
+          errorPosition = parseInt(match[1], 10);
+        }
+      }
+      
+      const contextStart = Math.max(0, errorPosition - 100);
+      const contextEnd = Math.min(jsonText.length, errorPosition + 100);
+      const errorContext = errorPosition >= 0 
+        ? jsonText.substring(contextStart, contextEnd)
+        : null;
+      
       logError('[OpenAI][Checklist] Hybrid mode JSON parse error', error as Error, {
         country,
         visaType,
         jsonTextPreview,
         jsonTextLength: jsonText.length,
+        errorPosition: errorPosition >= 0 ? errorPosition : undefined,
+        errorContext: errorContext ? errorContext.substring(0, 200) : undefined,
       });
       return null;
     }

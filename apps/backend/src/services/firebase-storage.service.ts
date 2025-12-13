@@ -304,7 +304,7 @@ export class FirebaseStorageService {
           [thumbnailUrl] = await thumbnailFile.getSignedUrl({
             version: 'v4',
             action: 'read',
-            expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+            expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days (Firebase max)
           });
         } catch (signedUrlError: any) {
           // If signed URL fails due to credentials, try making file public temporarily
@@ -358,14 +358,14 @@ export class FirebaseStorageService {
       throw uploadError;
     }
 
-    // Get signed URL (valid for 1 year)
+    // Get signed URL (valid for 7 days - Firebase max)
     // Ensure it uses Firebase Admin credentials
     let fileUrl: string;
     try {
       [fileUrl] = await file.getSignedUrl({
         version: 'v4',
         action: 'read',
-        expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days (Firebase max)
       });
     } catch (signedUrlError: any) {
       // If signed URL fails due to credentials, try making file public temporarily
@@ -452,10 +452,12 @@ export class FirebaseStorageService {
     const file = FirebaseStorageService.bucket.file(fileName);
     
     try {
+      // Firebase max expiration is 7 days
+      const maxDays = Math.min(expiresInDays, 7);
       const [url] = await file.getSignedUrl({
         version: 'v4',
         action: 'read',
-        expires: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+        expires: new Date(Date.now() + maxDays * 24 * 60 * 60 * 1000),
       });
       return url;
     } catch (signedUrlError: any) {
