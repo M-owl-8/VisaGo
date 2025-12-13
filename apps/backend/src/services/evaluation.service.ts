@@ -387,6 +387,9 @@ export class EvaluationService {
         currentStatus: profile.currentStatus,
         isStudent: profile.currentStatus === 'student',
         isEmployed: profile.currentStatus === 'employed' || profile.currentStatus === 'self_employed',
+        // University / invitation (required defaults)
+        hasUniversityInvitation: false,
+        hasOtherInvitation: false,
         // Travel history (required)
         hasInternationalTravel: false, // Default for evaluation
         previousVisaRejections: profile.hasPreviousRefusals,
