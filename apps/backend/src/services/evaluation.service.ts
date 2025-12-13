@@ -393,6 +393,7 @@ export class EvaluationService {
       countryContext: {
         countryCode: caseData.input.application.countryCode,
         countryName: caseData.input.application.countryCode,
+        schengen: false, // Default to false, would be determined from country registry
       },
       riskScore: {
         level: caseData.input.riskScore.level,
