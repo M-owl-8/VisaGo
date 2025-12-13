@@ -399,6 +399,8 @@ export class EvaluationService {
         score: caseData.input.riskScore.score,
       },
       riskDrivers: this.calculateRiskDrivers(profile, caseData.input.riskScore),
+      uploadedDocuments: [],
+      appActions: [],
     } as CanonicalAIUserContext;
   }
 
@@ -569,7 +571,7 @@ export class EvaluationService {
       docVerificationRecall: checklistRecall, // Simplified
       docVerificationF1Score: checklistF1Score, // Simplified
       averageLatencyMs: totalCases > 0 ? totalLatency / totalCases : 0,
-      averageTokenUsage: totalTokens / totalCases,
+      averageTokenUsage: 0, // Token usage tracking not implemented yet
       totalTestCases: totalCases,
       passedTestCases: passedCases,
       failedTestCases: failedCases,

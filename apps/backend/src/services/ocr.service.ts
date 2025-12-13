@@ -203,9 +203,10 @@ export class OCRService {
       // For PDFs, try pdf-parse first (faster and more accurate for text-based PDFs)
       if (isPDF) {
         try {
-          const pdfParse = await import('pdf-parse');
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const pdfParse = require('pdf-parse');
           const fileBuffer = await this.readFileBuffer(filePath);
-          const pdfData = await pdfParse.default(fileBuffer);
+          const pdfData = await pdfParse(fileBuffer);
 
           if (pdfData.text && pdfData.text.trim().length > 0) {
             logInfo('[OCR] PDF text extracted using pdf-parse', {
@@ -304,8 +305,9 @@ export class OCRService {
       if (isPDF) {
         // For PDFs, try pdf-parse first (faster for text-based PDFs)
         try {
-          const pdfParse = await import('pdf-parse');
-          const pdfData = await pdfParse.default(fileBuffer);
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const pdfParse = require('pdf-parse');
+          const pdfData = await pdfParse(fileBuffer);
 
           if (pdfData.text && pdfData.text.trim().length > 0) {
             logInfo('[OCR] PDF text extracted using pdf-parse (Google Vision path)', {
@@ -354,7 +356,7 @@ export class OCRService {
             .filter((c: number) => c > 0);
           confidence =
             confidences.length > 0
-              ? confidences.reduce((a, b) => a + b, 0) / confidences.length
+              ? confidences.reduce((a: number, b: number) => a + b, 0) / confidences.length
               : 0.8;
         }
 

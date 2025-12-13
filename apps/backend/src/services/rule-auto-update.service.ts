@@ -43,10 +43,10 @@ export class RuleAutoUpdateService {
         visaType,
       });
 
-      // 1. Get existing rule set
-      const existingRuleSet = await VisaRulesService.getActiveRuleSet(countryCode, visaType);
+      // 1. Get existing rule set (both data and database record)
+      const existingRuleSetData = await VisaRulesService.getActiveRuleSet(countryCode, visaType);
 
-      if (!existingRuleSet) {
+      if (!existingRuleSetData) {
         logWarn('[RuleAutoUpdate] No existing rule set found', {
           countryCode,
           visaType,
@@ -58,6 +58,29 @@ export class RuleAutoUpdateService {
           updated: false,
           changesDetected: false,
           error: 'No existing rule set found',
+        };
+      }
+
+      // Get the database record to get the ID
+      const existingRuleSetRecord = await prisma.visaRuleSet.findFirst({
+        where: {
+          countryCode: countryCode.toUpperCase(),
+          visaType: visaType.toLowerCase(),
+          isApproved: true,
+        },
+        orderBy: {
+          version: 'desc',
+        },
+      });
+
+      if (!existingRuleSetRecord) {
+        return {
+          ruleSetId: '',
+          countryCode,
+          visaType,
+          updated: false,
+          changesDetected: false,
+          error: 'No existing rule set record found',
         };
       }
 
@@ -76,7 +99,7 @@ export class RuleAutoUpdateService {
           visaType,
         });
         return {
-          ruleSetId: existingRuleSet.id,
+          ruleSetId: existingRuleSetRecord.id,
           countryCode,
           visaType,
           updated: false,
@@ -101,7 +124,7 @@ export class RuleAutoUpdateService {
 
       if (embassyContents.length === 0) {
         return {
-          ruleSetId: existingRuleSet.id,
+          ruleSetId: existingRuleSetRecord.id,
           countryCode,
           visaType,
           updated: false,
@@ -111,15 +134,37 @@ export class RuleAutoUpdateService {
       }
 
       // 4. Extract rules from embassy content using AI
-      const extractedRules = await VisaRulesExtractionService.extractRulesFromText(
-        embassyContents.join('\n\n'),
-        countryCode,
-        visaType
-      );
+      // Use the extraction service's processPageContent method or create a new page content entry
+      // For now, we'll use a simplified approach - in production, would use the full extraction pipeline
+      const { AIEmbassyExtractorService } = await import('./ai-embassy-extractor.service');
+      
+      let extractedRules: any = null;
+      try {
+        const extraction = await AIEmbassyExtractorService.extractVisaRulesFromPage({
+          countryCode,
+          visaType,
+          sourceUrl: embassySources[0].url,
+          pageText: embassyContents.join('\n\n'),
+        });
+        extractedRules = extraction.ruleSet;
+      } catch (error) {
+        logError('[RuleAutoUpdate] Failed to extract rules', error as Error, {
+          countryCode,
+          visaType,
+        });
+        return {
+          ruleSetId: existingRuleSetRecord.id,
+          countryCode,
+          visaType,
+          updated: false,
+          changesDetected: false,
+          error: 'Failed to extract rules from embassy content',
+        };
+      }
 
       if (!extractedRules || !extractedRules.requiredDocuments) {
         return {
-          ruleSetId: existingRuleSet.id,
+          ruleSetId: existingRuleSetRecord.id,
           countryCode,
           visaType,
           updated: false,
@@ -130,18 +175,18 @@ export class RuleAutoUpdateService {
 
       // 5. Compare extracted rules with existing rules
       const changes = this.compareRules(
-        existingRuleSet.requiredDocuments || [],
+        existingRuleSetData.requiredDocuments || [],
         extractedRules.requiredDocuments || []
       );
 
-      if (changes.length === 0) {
+      if (!changes || changes.length === 0) {
         logInfo('[RuleAutoUpdate] No changes detected', {
           countryCode,
           visaType,
-          ruleSetId: existingRuleSet.id,
+          ruleSetId: existingRuleSetRecord.id,
         });
         return {
-          ruleSetId: existingRuleSet.id,
+          ruleSetId: existingRuleSetRecord.id,
           countryCode,
           visaType,
           updated: false,
@@ -150,7 +195,7 @@ export class RuleAutoUpdateService {
       }
 
       // 6. Create new version of rule set with updated rules
-      const newVersion = (existingRuleSet.version || 1) + 1;
+      const newVersion = (existingRuleSetRecord.version || 1) + 1;
 
       const updatedRuleSet = await prisma.visaRuleSet.create({
         data: {
@@ -158,11 +203,11 @@ export class RuleAutoUpdateService {
           visaType: visaType.toLowerCase(),
           version: newVersion,
           ruleSetData: {
-            ...existingRuleSet,
+            ...existingRuleSetData,
             requiredDocuments: extractedRules.requiredDocuments,
-            financialRequirements: extractedRules.financialRequirements,
+            financialRequirements: extractedRules.financialRequirements || existingRuleSetData.financialRequirements,
             sourceInfo: {
-              ...existingRuleSet.sourceInfo,
+              ...existingRuleSetData.sourceInfo,
               extractedFrom: 'embassy_auto_update',
               extractedAt: new Date().toISOString(),
               confidence: 0.8, // Auto-extracted rules have lower confidence
@@ -175,7 +220,7 @@ export class RuleAutoUpdateService {
       logInfo('[RuleAutoUpdate] Created new rule set version', {
         countryCode,
         visaType,
-        oldVersion: existingRuleSet.version,
+        oldVersion: existingRuleSetRecord.version,
         newVersion: updatedRuleSet.version,
         changesCount: changes.length,
       });

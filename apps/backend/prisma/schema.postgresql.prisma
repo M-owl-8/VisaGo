@@ -186,12 +186,21 @@ model UserDocument {
   aiNotesUz         String?
   aiNotesRu         String?
   aiNotesEn         String?
+  // Phase 1: OCR fields
+  extractedText     String?   @db.Text // Extracted text from OCR
+  ocrStatus         String?   // pending, processing, complete, failed
+  ocrConfidence     Float?    // OCR confidence score (0-1)
+  ocrLanguage       String?   // Detected language code (uzb, eng, rus, etc.)
+  // Phase 2: Image analysis fields
+  imageAnalysisResult Json?   // JSON with image analysis results (hasSignature, hasStamp, qualityScore, issues)
+  hasSignature      Boolean?  // Whether document has a signature detected
+  hasStamp          Boolean?  // Whether document has a stamp/seal detected
+  imageQualityScore Float?    // Image quality score (0-1)
   // Phase 3: Document classification fields
   // TODO: classification fields were removed from DB; reintroduce carefully with a proper migration if needed.
   // classifiedType        String?   // e.g. "passport", "bank_statement", "employment_letter"
   // classificationSource  String?   // e.g. "ai", "manual"
   // classificationScore   Float?    // confidence score 0-1
-  // extractedText         String?   // extracted/ocr text (for doc-check)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
