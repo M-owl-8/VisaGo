@@ -360,11 +360,8 @@ export class EvaluationService {
       },
       application: {
         applicationId: 'eval-application-id',
-        visaType: caseData.input.application.visaType,
-        country: {
-          code: caseData.input.application.countryCode,
-          name: caseData.input.application.countryCode,
-        },
+        visaType: caseData.input.application.visaType as 'student' | 'tourist',
+        country: caseData.input.application.countryCode, // ISO country code as string
         status: 'draft',
       },
       applicantProfile: {

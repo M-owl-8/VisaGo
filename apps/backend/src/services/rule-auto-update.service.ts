@@ -202,7 +202,7 @@ export class RuleAutoUpdateService {
           countryCode: countryCode.toUpperCase(),
           visaType: visaType.toLowerCase(),
           version: newVersion,
-          ruleSetData: {
+          data: {
             ...existingRuleSetData,
             requiredDocuments: extractedRules.requiredDocuments,
             financialRequirements: extractedRules.financialRequirements || existingRuleSetData.financialRequirements,
