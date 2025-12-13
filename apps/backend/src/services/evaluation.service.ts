@@ -365,26 +365,58 @@ export class EvaluationService {
         status: 'draft',
       },
       applicantProfile: {
-        visaType: caseData.input.application.visaType,
+        // Core identity (required)
+        citizenship: 'UZ',
+        age: 25,
+        // Visa details (required)
+        visaType: caseData.input.application.visaType as 'student' | 'tourist',
         targetCountry: caseData.input.application.countryCode,
+        duration: '3_6_months', // Default for evaluation
+        // Financial (required)
         sponsorType: profile.sponsorType,
+        bankBalanceUSD: profile.bankBalanceUSD,
+        monthlyIncomeUSD: profile.monthlyIncomeUSD,
+        // Financial (expert fields - optional but included)
         financial: {
           requiredFundsUSD: 10000,
           availableFundsUSD: profile.bankBalanceUSD,
           financialSufficiencyRatio: profile.bankBalanceUSD / 10000,
           financialSufficiencyLabel: profile.bankBalanceUSD >= 10000 ? 'sufficient' : 'low',
         },
-        ties: {
-          tiesStrengthScore: profile.hasProperty && profile.hasFamilyTies ? 0.8 : 0.5,
-          tiesStrengthLabel: profile.hasProperty && profile.hasFamilyTies ? 'strong' : 'medium',
-          hasPropertyInUzbekistan: profile.hasProperty,
-          hasFamilyInUzbekistan: profile.hasFamilyTies,
-        },
+        // Employment/Education (required)
+        currentStatus: profile.currentStatus,
+        isStudent: profile.currentStatus === 'student',
+        isEmployed: profile.currentStatus === 'employed' || profile.currentStatus === 'self_employed',
+        // Travel history (required)
+        hasInternationalTravel: false, // Default for evaluation
+        previousVisaRejections: profile.hasPreviousRefusals,
+        previousOverstay: false, // Default for evaluation
+        // Travel history (expert fields - optional)
         travelHistory: {
           travelHistoryScore: profile.hasPreviousRefusals ? 0.3 : 0.7,
           travelHistoryLabel: profile.hasPreviousRefusals ? 'limited' : 'good',
           previousVisaRejections: profile.hasPreviousRefusals ? 1 : 0,
           hasOverstayHistory: false,
+        },
+        // Ties to home country (required)
+        hasPropertyInUzbekistan: profile.hasProperty,
+        hasFamilyInUzbekistan: profile.hasFamilyTies,
+        maritalStatus: 'unknown', // Default for evaluation
+        hasChildren: false, // Default for evaluation
+        // Ties (expert fields - optional)
+        ties: {
+          tiesStrengthScore: profile.hasProperty && profile.hasFamilyTies ? 0.8 : 0.5,
+          tiesStrengthLabel: profile.hasProperty && profile.hasFamilyTies ? 'strong' : 'medium',
+        },
+        // Documents (required)
+        documents: {
+          hasPassport: true,
+          hasBankStatement: true,
+          hasEmploymentOrStudyProof: profile.currentStatus !== 'unemployed',
+          hasTravelInsurance: false,
+          hasInsurance: false,
+          hasFlightBooking: false,
+          hasHotelBookingOrAccommodation: false,
         },
       },
       countryContext: {
