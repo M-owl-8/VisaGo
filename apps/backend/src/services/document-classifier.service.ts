@@ -193,9 +193,10 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
   }
 
   /**
-   * Extract text from a document.
+   * Extract text from a document using OCR service.
    *
-   * For now, this is a placeholder. Real OCR/PDF extraction should be integrated later.
+   * Phase 1: Integrated OCR service with Tesseract.js and Google Vision API support.
+   * Results are cached in the database (extractedText field).
    *
    * @param doc - Document record from Prisma
    * @returns Extracted text or null
@@ -206,20 +207,129 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
     fileUrl: string;
     mimeType?: string;
   }): Promise<string | null> {
-    // TODO: Integrate real OCR/PDF text extraction
-    // For now, return null with a clear TODO comment
+    try {
+      // Check if text already extracted and cached in database
+      const document = await prisma.userDocument.findUnique({
+        where: { id: doc.id },
+        select: {
+          extractedText: true,
+          ocrStatus: true,
+          ocrConfidence: true,
+          ocrLanguage: true,
+        },
+      });
 
-    // Potential integrations:
-    // - PDF.js for PDF text extraction
-    // - Tesseract.js for image OCR
-    // - Cloud OCR services (Google Vision, AWS Textract, etc.)
+      // Return cached text if available and OCR was successful
+      if (document?.extractedText && document.ocrStatus === 'complete') {
+        logInfo('[DocumentClassifier] Using cached extracted text', {
+          documentId: doc.id,
+          textLength: document.extractedText.length,
+          confidence: document.ocrConfidence,
+        });
+        return document.extractedText;
+      }
 
-    logInfo('[DocumentClassifier] Text extraction not yet implemented', {
-      documentId: doc.id,
-      fileName: doc.fileName,
-    });
+      // Skip if OCR already failed (avoid retrying repeatedly)
+      if (document?.ocrStatus === 'failed') {
+        logWarn('[DocumentClassifier] OCR previously failed, skipping retry', {
+          documentId: doc.id,
+        });
+        return null;
+      }
 
-    return null;
+      // Update status to processing
+      await prisma.userDocument
+        .update({
+          where: { id: doc.id },
+          data: {
+            ocrStatus: 'processing',
+          },
+        })
+        .catch((error) => {
+          // Non-fatal if update fails
+          logWarn('[DocumentClassifier] Failed to update OCR status', {
+            documentId: doc.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+
+      // Import OCR service dynamically to avoid initialization issues
+      const { OCRService } = await import('./ocr.service');
+
+      // Extract text using OCR service
+      const ocrResult = await OCRService.extractTextFromUrl(
+        doc.fileUrl,
+        doc.fileName,
+        doc.mimeType,
+        {
+          language: 'uzb+eng+rus', // Support Uzbek, English, and Russian
+        }
+      );
+
+      // Update database with OCR results
+      if (ocrResult.text && ocrResult.text.length > 0) {
+        await prisma.userDocument.update({
+          where: { id: doc.id },
+          data: {
+            extractedText: ocrResult.text,
+            ocrStatus: 'complete',
+            ocrConfidence: ocrResult.confidence,
+            ocrLanguage: ocrResult.language || undefined,
+          },
+        });
+
+        logInfo('[DocumentClassifier] Text extraction completed', {
+          documentId: doc.id,
+          textLength: ocrResult.text.length,
+          confidence: ocrResult.confidence,
+          provider: ocrResult.provider,
+          language: ocrResult.language,
+        });
+
+        return ocrResult.text;
+      } else {
+        // OCR returned empty text - mark as failed
+        await prisma.userDocument
+          .update({
+            where: { id: doc.id },
+            data: {
+              ocrStatus: 'failed',
+              ocrConfidence: ocrResult.confidence,
+            },
+          })
+          .catch(() => {
+            // Non-fatal
+          });
+
+        logWarn('[DocumentClassifier] OCR returned empty text', {
+          documentId: doc.id,
+          provider: ocrResult.provider,
+          confidence: ocrResult.confidence,
+        });
+
+        return null;
+      }
+    } catch (error) {
+      // Update status to failed
+      await prisma.userDocument
+        .update({
+          where: { id: doc.id },
+          data: {
+            ocrStatus: 'failed',
+          },
+        })
+        .catch(() => {
+          // Non-fatal if update fails
+        });
+
+      logError('[DocumentClassifier] Text extraction failed', error as Error, {
+        documentId: doc.id,
+        fileName: doc.fileName,
+        fileUrl: doc.fileUrl,
+      });
+
+      return null;
+    }
   }
 
   /**

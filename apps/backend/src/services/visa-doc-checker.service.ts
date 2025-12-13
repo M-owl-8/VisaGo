@@ -169,6 +169,7 @@ export class VisaDocCheckerService {
    * @param metadata - Optional document metadata
    * @param countryCode - Country code (e.g., 'US', 'GB') for fetching embassy rules and playbooks
    * @param visaType - Visa type ('tourist' | 'student') for fetching embassy rules and playbooks
+   * @param imageAnalysis - Optional image analysis results (Phase 2)
    */
   static async checkDocument(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -183,7 +184,13 @@ export class VisaDocCheckerService {
       accountHolder?: string;
     },
     countryCode?: string,
-    visaType?: 'tourist' | 'student'
+    visaType?: 'tourist' | 'student',
+    imageAnalysis?: {
+      hasSignature?: boolean;
+      hasStamp?: boolean;
+      imageQualityScore?: number;
+      issues?: string[];
+    }
   ): Promise<DocumentCheckResult> {
     try {
       // Normalize document type
@@ -295,6 +302,7 @@ export class VisaDocCheckerService {
         : this.buildSystemPromptLegacy();
 
       // Build compact user prompt (Phase 5: includes embassy rules, playbook, and risk drivers)
+      // Phase 2: Include image analysis results
       const userPrompt = useCompactPrompts
         ? this.buildUserPromptCompact(
             requiredDocumentRule,
@@ -306,13 +314,15 @@ export class VisaDocCheckerService {
             normalizedCountryCodeForRules || countryCodeForRules,
             countryNameForRules || undefined,
             countryContextForRules?.schengen || false,
-            visaCategory
+            visaCategory,
+            imageAnalysis
           )
         : this.buildUserPromptLegacy(
             requiredDocumentRule,
             userDocumentText,
             aiUserContext,
-            metadata
+            metadata,
+            imageAnalysis
           );
 
       const startTime = Date.now();
@@ -949,6 +959,9 @@ Return ONLY valid JSON matching the schema, no other text.`;
    * - Includes COUNTRY_VISA_PLAYBOOK summary
    * - Explicitly includes RISK_DRIVERS
    * - Clear instructions on using embassy rules as ground truth
+   *
+   * Phase 2 Upgrade:
+   * - Includes image analysis results (signatures, stamps, quality)
    */
   private static buildUserPromptCompact(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -967,7 +980,13 @@ Return ONLY valid JSON matching the schema, no other text.`;
     countryCode?: string,
     countryName?: string,
     schengen?: boolean,
-    visaCategory?: VisaCategory
+    visaCategory?: VisaCategory,
+    imageAnalysis?: {
+      hasSignature?: boolean;
+      hasStamp?: boolean;
+      imageQualityScore?: number;
+      issues?: string[];
+    }
   ): string {
     // Limit document text to 8000 chars (reasonable for GPT)
     const truncatedText =
@@ -1089,6 +1108,9 @@ APPLICANT_CONTEXT
    * - Same structured context approach as compact version
    * - Note that some expert fields may be missing
    * - Same "EXPERT DECISION REQUIRED" instructions
+   *
+   * Phase 2 Upgrade:
+   * - Includes image analysis results
    */
   private static buildUserPromptLegacy(
     requiredDocumentRule: VisaRuleSetData['requiredDocuments'][0],
@@ -1101,6 +1123,12 @@ APPLICANT_CONTEXT
       amounts?: Array<{ value: number; currency: string }>;
       bankName?: string;
       accountHolder?: string;
+    },
+    imageAnalysis?: {
+      hasSignature?: boolean;
+      hasStamp?: boolean;
+      imageQualityScore?: number;
+      issues?: string[];
     }
   ): string {
     let prompt = `EXPERT DECISION REQUIRED:
@@ -1133,6 +1161,27 @@ METADATA
 ================================================================================
 
 ${metadata ? JSON.stringify(metadata, null, 2) : 'No metadata provided'}
+
+================================================================================
+IMAGE_ANALYSIS (Phase 2)
+================================================================================
+
+${
+  imageAnalysis
+    ? JSON.stringify(
+        {
+          hasSignature: imageAnalysis.hasSignature,
+          hasStamp: imageAnalysis.hasStamp,
+          imageQualityScore: imageAnalysis.imageQualityScore,
+          issues: imageAnalysis.issues || [],
+        },
+        null,
+        2
+      )
+    : 'No image analysis available'
+}
+
+Note: Use image analysis to check document quality and completeness.
 
 ================================================================================
 APPLICANT_CONTEXT

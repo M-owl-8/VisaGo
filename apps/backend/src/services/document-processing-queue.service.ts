@@ -67,7 +67,54 @@ export class DocumentProcessingQueueService {
           throw new Error(`Document not found: ${documentId}`);
         }
 
-        // Step 2: AI Validation (if not already done)
+        // Step 2: Image Analysis (Phase 2) - Run before AI validation
+        try {
+          const { ImageAnalysisService } = await import('./image-analysis.service');
+
+          // Only analyze if not already analyzed
+          if (!document.imageAnalysisResult) {
+            const imageAnalysisResult = await ImageAnalysisService.analyzeImageFromUrl(
+              document.fileUrl,
+              document.fileName,
+              undefined, // MIME type will be detected from fileName
+              {
+                detectSignatures: true,
+                detectStamps: true,
+                checkQuality: true,
+              }
+            );
+
+            // Save image analysis results to database
+            await prisma.userDocument.update({
+              where: { id: documentId },
+              data: {
+                imageAnalysisResult: imageAnalysisResult as any,
+                hasSignature: imageAnalysisResult.hasSignature,
+                hasStamp: imageAnalysisResult.hasStamp,
+                imageQualityScore: imageAnalysisResult.imageQualityScore,
+              },
+            });
+
+            logInfo('[DocumentProcessingQueue] Image analysis completed', {
+              documentId,
+              hasSignature: imageAnalysisResult.hasSignature,
+              hasStamp: imageAnalysisResult.hasStamp,
+              qualityScore: imageAnalysisResult.imageQualityScore,
+              issuesCount: imageAnalysisResult.issues.length,
+            });
+          }
+        } catch (imageAnalysisError) {
+          // Non-blocking: log but continue with validation
+          logWarn('[DocumentProcessingQueue] Image analysis failed (non-blocking)', {
+            documentId,
+            error:
+              imageAnalysisError instanceof Error
+                ? imageAnalysisError.message
+                : String(imageAnalysisError),
+          });
+        }
+
+        // Step 3: AI Validation (if not already done)
         if (document.status === 'pending' && !document.verifiedByAI) {
           try {
             const { validateDocumentWithAI, saveValidationResultToDocument } = await import(

@@ -119,20 +119,44 @@ export async function validateDocumentWithAI(params: {
 
           // Try to extract OCR text if document ID is available
           let ocrText = '';
+          let imageAnalysis: any = undefined;
           if (document.id) {
             try {
               const docRecord = await prisma.userDocument.findUnique({
                 where: { id: document.id },
+                select: {
+                  extractedText: true,
+                  imageAnalysisResult: true,
+                  hasSignature: true,
+                  hasStamp: true,
+                  imageQualityScore: true,
+                },
               });
               if (docRecord) {
-                const extractedText = await DocumentClassifierService.extractTextForDocument({
-                  id: docRecord.id,
-                  fileName: docRecord.fileName,
-                  fileUrl: docRecord.fileUrl,
-                  mimeType: undefined, // Could be added if available
-                });
-                if (extractedText) {
-                  ocrText = extractedText;
+                // Use cached OCR text if available
+                if (docRecord.extractedText) {
+                  ocrText = docRecord.extractedText;
+                } else {
+                  // Extract text if not cached
+                  const extractedText = await DocumentClassifierService.extractTextForDocument({
+                    id: document.id,
+                    fileName: document.fileName,
+                    fileUrl: document.fileUrl,
+                    mimeType: undefined, // Could be added if available
+                  });
+                  if (extractedText) {
+                    ocrText = extractedText;
+                  }
+                }
+
+                // Get image analysis results (Phase 2)
+                if (docRecord.imageAnalysisResult) {
+                  imageAnalysis = {
+                    hasSignature: docRecord.hasSignature ?? false,
+                    hasStamp: docRecord.hasStamp ?? false,
+                    imageQualityScore: docRecord.imageQualityScore ?? undefined,
+                    issues: (docRecord.imageAnalysisResult as any)?.issues || [],
+                  };
                 }
               }
             } catch (ocrError) {
@@ -157,7 +181,7 @@ export async function validateDocumentWithAI(params: {
             // Continue without user context
           }
 
-          // Use new checker service
+          // Use new checker service (Phase 2: include image analysis)
           const checkResult = await VisaDocCheckerService.checkDocument(
             matchingRule,
             ocrText || document.documentName || '', // Fallback to document name if no OCR
@@ -165,7 +189,10 @@ export async function validateDocumentWithAI(params: {
             {
               fileType: document.fileName.split('.').pop()?.toLowerCase(),
               expiryDate: document.expiryDate?.toISOString(),
-            }
+            },
+            normalizedCountryCode,
+            visaTypeName.toLowerCase() as 'tourist' | 'student',
+            imageAnalysis
           );
 
           // Convert VisaDocChecker result to DocumentValidationResultAI format
@@ -667,16 +694,34 @@ export function mapAIStatusToDbStatus(
  * @param result - DocumentValidationResultAI from GPT-4
  * @returns Human-readable explanation string or null
  */
-export function buildVerificationNotes(result: DocumentValidationResultAI): string | null {
+export function buildVerificationNotes(
+  result: DocumentValidationResultAI,
+  applicationContext?: {
+    riskScore?: { level: string; score: number };
+    riskDrivers?: string[];
+  }
+): string | null {
   const problems = result.problems ?? [];
 
   if (problems.length > 0) {
-    const problemList = problems.map((problem, index) => {
+    // Phase 6: Prioritize problems by severity
+    const prioritizedProblems = prioritizeProblems(problems, applicationContext);
+
+    // Build explanation with priority indicators
+    const problemList = prioritizedProblems.map((problem, index) => {
       const message = problem.userMessage || problem.message || '';
-      return `${index + 1}) ${message}`.trim();
+      const priorityIndicator =
+        problem.priority === 'high' ? '🔴' : problem.priority === 'medium' ? '🟡' : '🟢';
+      return `${priorityIndicator} ${index + 1}) ${message}`.trim();
     });
 
-    const joined = problemList.join(' ');
+    // Add success probability if available
+    const successProbability = calculateSuccessProbability(result, applicationContext);
+    if (successProbability !== null) {
+      problemList.push(`\n💡 Visa approval probability if fixed: ${successProbability}%`);
+    }
+
+    const joined = problemList.join('\n');
     return joined.length > 0 ? joined : null;
   }
 
@@ -686,6 +731,106 @@ export function buildVerificationNotes(result: DocumentValidationResultAI): stri
   }
 
   return null;
+}
+
+/**
+ * Prioritize problems by severity and impact
+ * Phase 6: Enhanced explanation prioritization
+ */
+function prioritizeProblems(
+  problems: ValidationProblemAI[],
+  applicationContext?: {
+    riskScore?: { level: string; score: number };
+    riskDrivers?: string[];
+  }
+): Array<ValidationProblemAI & { priority: 'high' | 'medium' | 'low' }> {
+  // Map problem codes to priority levels
+  const priorityMap: Record<string, 'high' | 'medium' | 'low'> = {
+    EXPIRED_DOCUMENT: 'high',
+    WRONG_DOCUMENT_TYPE: 'high',
+    MISSING_SIGNATURE: 'high',
+    INSUFFICIENT_BALANCE: 'high',
+    INVALID_DATES: 'high',
+    MISSING_INFORMATION: 'medium',
+    WRONG_FORMAT: 'medium',
+    NEEDS_TRANSLATION: 'medium',
+    NEEDS_APOSTILLE: 'medium',
+    INCOMPLETE_DOCUMENT: 'medium',
+    POOR_QUALITY: 'low',
+    UNREADABLE: 'low',
+  };
+
+  const prioritized = problems.map((problem) => {
+    const priority = priorityMap[problem.code] || 'medium';
+
+    // Boost priority if related to high-risk drivers
+    let finalPriority = priority;
+    if (applicationContext?.riskDrivers) {
+      const riskDrivers = applicationContext.riskDrivers;
+      if (
+        (problem.code === 'INSUFFICIENT_BALANCE' && riskDrivers.includes('low_funds')) ||
+        (problem.code === 'MISSING_INFORMATION' && riskDrivers.includes('weak_ties'))
+      ) {
+        finalPriority = 'high';
+      }
+    }
+
+    return {
+      ...problem,
+      priority: finalPriority,
+    };
+  });
+
+  // Sort by priority: high -> medium -> low
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  return prioritized.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+}
+
+/**
+ * Calculate success probability if problems are fixed
+ * Phase 6: Success probability estimation
+ */
+function calculateSuccessProbability(
+  result: DocumentValidationResultAI,
+  applicationContext?: {
+    riskScore?: { level: string; score: number };
+    riskDrivers?: string[];
+  }
+): number | null {
+  if (!applicationContext?.riskScore) {
+    return null;
+  }
+
+  const baseScore = applicationContext.riskScore.score || 50;
+  const problems = result.problems ?? [];
+
+  // Estimate impact of fixing problems
+  let improvement = 0;
+  for (const problem of problems) {
+    // High-priority problems have bigger impact
+    const priorityMap: Record<string, number> = {
+      EXPIRED_DOCUMENT: 15,
+      WRONG_DOCUMENT_TYPE: 20,
+      MISSING_SIGNATURE: 10,
+      INSUFFICIENT_BALANCE: 25,
+      INVALID_DATES: 15,
+      MISSING_INFORMATION: 10,
+      WRONG_FORMAT: 5,
+      NEEDS_TRANSLATION: 5,
+      NEEDS_APOSTILLE: 5,
+      INCOMPLETE_DOCUMENT: 8,
+      POOR_QUALITY: 3,
+      UNREADABLE: 3,
+    };
+
+    improvement += priorityMap[problem.code] || 5;
+  }
+
+  // Cap improvement at 40 points
+  improvement = Math.min(improvement, 40);
+
+  const estimatedScore = Math.min(100, baseScore + improvement);
+  return Math.round(estimatedScore);
 }
 
 /**

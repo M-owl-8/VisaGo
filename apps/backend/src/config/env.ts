@@ -38,6 +38,16 @@ const envSchema = z.object({
   // OpenAI (optional)
   OPENAI_API_KEY: z.string().optional(),
 
+  // OCR Configuration (optional)
+  OCR_PROVIDER: z
+    .enum(['tesseract', 'google_vision', 'aws_textract', 'azure'])
+    .default('tesseract')
+    .optional(),
+  GOOGLE_VISION_API_KEY: z.string().optional(),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(), // Path to service account JSON file
+  AWS_TEXTRACT_REGION: z.string().optional(),
+  AZURE_COMPUTER_VISION_KEY: z.string().optional(),
+
   // Google OAuth (optional)
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
