@@ -99,7 +99,21 @@ export class FirebaseStorageService {
       // Process private key from environment variable (replace escaped newlines)
       const privateKeyEnv = requiredVars.FIREBASE_PRIVATE_KEY!;
       const privateKey = privateKeyEnv.replace(/\\n/g, '\n');
-      const storageBucket = requiredVars.FIREBASE_STORAGE_BUCKET!;
+      let storageBucket = requiredVars.FIREBASE_STORAGE_BUCKET!.trim();
+
+      // Auto-detect correct bucket name format
+      // Firebase uses two formats: project-id.appspot.com or project-id.firebasestorage.app
+      // Try both if the configured one doesn't work
+      const bucketCandidates = [
+        storageBucket, // Try configured bucket first
+        storageBucket.replace('.appspot.com', '.firebasestorage.app'), // Try firebasestorage.app format
+        storageBucket.replace('.firebasestorage.app', '.appspot.com'), // Try appspot.com format
+        `${projectId}.appspot.com`, // Default appspot.com format
+        `${projectId}.firebasestorage.app`, // Default firebasestorage.app format
+      ];
+      
+      // Remove duplicates
+      const uniqueBuckets = [...new Set(bucketCandidates)];
 
       // Initialize Firebase Admin App with explicit credentials
       // Use a named app to avoid conflicts
@@ -118,7 +132,7 @@ export class FirebaseStorageService {
               clientEmail,
               privateKey,
             }),
-            storageBucket,
+            storageBucket: uniqueBuckets[0], // Use first candidate for initialization
           },
           appName
         );
@@ -127,33 +141,59 @@ export class FirebaseStorageService {
       FirebaseStorageService.instance = app;
       
       // Get storage instance from the Firebase Admin app
-      // This ensures all operations use the app's credentials
       const storage = app.storage();
-      FirebaseStorageService.bucket = storage.bucket(storageBucket);
-      FirebaseStorageService.bucketName = storageBucket;
-      FirebaseStorageService.firebaseEnabled = true;
-
-      // Verify bucket is accessible (this will fail if credentials are wrong or bucket doesn't exist)
-      try {
-        // Test bucket access by checking if it exists
-        const [exists] = await FirebaseStorageService.bucket.exists();
-        if (!exists) {
-          throw new Error(`Bucket ${storageBucket} does not exist or is not accessible`);
+      
+      // Try each bucket candidate until one works
+      let bucketFound = false;
+      let lastError: any = null;
+      
+      for (const candidateBucket of uniqueBuckets) {
+        try {
+          const testBucket = storage.bucket(candidateBucket);
+          
+          // Test bucket access by checking if it exists
+          const [exists] = await testBucket.exists();
+          if (!exists) {
+            continue; // Try next candidate
+          }
+          
+          // Test actual upload capability by trying to get bucket metadata
+          await testBucket.getMetadata();
+          
+          // This bucket works!
+          FirebaseStorageService.bucket = testBucket;
+          FirebaseStorageService.bucketName = candidateBucket;
+          FirebaseStorageService.firebaseEnabled = true;
+          bucketFound = true;
+          
+          if (candidateBucket !== storageBucket) {
+            console.warn(`⚠️  Using bucket "${candidateBucket}" instead of configured "${storageBucket}"`);
+            console.warn(`   Update FIREBASE_STORAGE_BUCKET in Railway to: ${candidateBucket}`);
+          }
+          
+          console.log(`✅ Firebase Storage configured (bucket: ${candidateBucket})`);
+          break;
+        } catch (error: any) {
+          lastError = error;
+          // Continue to next candidate
+          continue;
         }
+      }
+      
+      if (!bucketFound) {
+        // None of the bucket candidates worked
+        console.error(`❌ Firebase Storage bucket verification failed for all candidates:`, uniqueBuckets);
+        console.error(`   Last error:`, lastError?.message || lastError);
+        console.error(`   Please verify:`);
+        console.error(`   1. Bucket exists in Firebase Console → Storage`);
+        console.error(`   2. Service account has "Storage Admin" role in Google Cloud Console`);
+        console.error(`   3. FIREBASE_STORAGE_BUCKET is set correctly in Railway`);
+        console.error(`   Expected formats: ${projectId}.appspot.com or ${projectId}.firebasestorage.app`);
         
-        // Test actual upload capability by trying to get bucket metadata
-        // This will fail if we don't have proper permissions
-        await FirebaseStorageService.bucket.getMetadata();
-        
-        console.log(`✅ Firebase Storage configured (bucket: ${storageBucket})`);
-      } catch (error: any) {
-        // If bucket doesn't exist or we can't access it, disable Firebase Storage
-        console.error(`❌ Firebase Storage bucket verification failed:`, error?.message || error);
         FirebaseStorageService.firebaseEnabled = false;
         FirebaseStorageService.bucket = null;
         FirebaseStorageService.instance = null;
-        console.warn(`⚠️  Firebase Storage disabled due to bucket access failure. Will use local storage fallback.`);
-        // Don't throw - this allows the system to fall back to local storage
+        console.warn(`⚠️  Firebase Storage disabled. Will use local storage fallback.`);
       }
     } catch (error) {
       FirebaseStorageService.firebaseEnabled = false;
