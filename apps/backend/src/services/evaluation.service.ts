@@ -430,6 +430,9 @@ export class EvaluationService {
       riskScore: {
         level: caseData.input.riskScore.level,
         score: caseData.input.riskScore.score,
+        probabilityPercent: caseData.input.riskScore.score,
+        riskFactors: [],
+        positiveFactors: [],
       },
       riskDrivers: this.calculateRiskDrivers(profile, caseData.input.riskScore),
       uploadedDocuments: [],
