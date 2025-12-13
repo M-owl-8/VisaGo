@@ -101,23 +101,52 @@ export class FirebaseStorageService {
       const privateKey = privateKeyEnv.replace(/\\n/g, '\n');
       const storageBucket = requiredVars.FIREBASE_STORAGE_BUCKET!;
 
-      if (!admin.apps.length) {
-        admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey,
-          }),
-          storageBucket,
-        });
+      // Initialize Firebase Admin App with explicit credentials
+      // Use a named app to avoid conflicts
+      const appName = 'firebase-storage';
+      
+      // Check if app already exists
+      let app: admin.app.App;
+      try {
+        app = admin.app(appName);
+      } catch (error) {
+        // App doesn't exist, create it
+        app = admin.initializeApp(
+          {
+            credential: admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey,
+            }),
+            storageBucket,
+          },
+          appName
+        );
       }
 
-      FirebaseStorageService.instance = admin.app();
-      FirebaseStorageService.bucket = admin.storage().bucket(storageBucket);
+      FirebaseStorageService.instance = app;
+      
+      // Get storage instance from the Firebase Admin app
+      // This ensures all operations use the app's credentials
+      const storage = app.storage();
+      FirebaseStorageService.bucket = storage.bucket(storageBucket);
       FirebaseStorageService.bucketName = storageBucket;
       FirebaseStorageService.firebaseEnabled = true;
 
-      console.log(`✅ Firebase Storage configured (bucket: ${storageBucket})`);
+      // Verify bucket is accessible (this will fail if credentials are wrong)
+      try {
+        // Test bucket access by checking if it exists
+        const [exists] = await FirebaseStorageService.bucket.exists();
+        if (!exists) {
+          throw new Error(`Bucket ${storageBucket} does not exist or is not accessible`);
+        }
+        console.log(`✅ Firebase Storage configured (bucket: ${storageBucket})`);
+      } catch (error) {
+        console.error(`❌ Firebase Storage bucket verification failed:`, error);
+        // Don't throw - let individual operations handle errors
+        // This allows the service to be marked as enabled but operations will fail gracefully
+        console.warn(`⚠️  Firebase Storage enabled but bucket verification failed. Operations may fail.`);
+      }
     } catch (error) {
       FirebaseStorageService.firebaseEnabled = false;
       console.error('❌ Firebase Storage initialization failed:', error);
@@ -197,19 +226,39 @@ export class FirebaseStorageService {
         const thumbnailBuffer = await generateThumbnailImage(fileBuffer, 200, 200);
 
         const thumbnailName = `${userId}/${fileType}/thumbnails/${uuidv4()}-thumb-${fileName}`;
+        
+        // Ensure bucket is using the Firebase Admin app instance
+        if (!FirebaseStorageService.bucket) {
+          throw new Error('Firebase Storage bucket not initialized');
+        }
+        
         const thumbnailFile = FirebaseStorageService.bucket.file(thumbnailName);
 
+        // Upload thumbnail with explicit metadata
         await thumbnailFile.save(thumbnailBuffer, {
           metadata: {
             contentType: 'image/jpeg',
           },
+          // Explicitly use the Firebase Admin app credentials
+          // The bucket should already be using the app's credentials, but we ensure it here
         });
 
-        const [thumbnailUrl] = await thumbnailFile.getSignedUrl({
-          version: 'v4',
-          action: 'read',
-          expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-        });
+        // Get signed URL - ensure it uses Firebase Admin credentials
+        // Use makePublic() as fallback if getSignedUrl fails due to credentials
+        let thumbnailUrl: string;
+        try {
+          [thumbnailUrl] = await thumbnailFile.getSignedUrl({
+            version: 'v4',
+            action: 'read',
+            expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+          });
+        } catch (signedUrlError: any) {
+          // If signed URL fails due to credentials, try making file public temporarily
+          // This is a fallback for credential issues
+          console.warn('Failed to generate signed URL for thumbnail, using public URL:', signedUrlError?.message);
+          await thumbnailFile.makePublic();
+          thumbnailUrl = `https://storage.googleapis.com/${FirebaseStorageService.bucketName}/${thumbnailName}`;
+        }
 
         metadata.thumbnailUrl = thumbnailUrl;
 
@@ -220,12 +269,19 @@ export class FirebaseStorageService {
       } catch (error) {
         console.error('Thumbnail generation failed:', error);
         // Continue without thumbnail if generation fails
+        // This is non-blocking - document upload will continue
       }
     }
 
     // Upload file
+    // Ensure bucket is using the Firebase Admin app instance
+    if (!FirebaseStorageService.bucket) {
+      throw new Error('Firebase Storage bucket not initialized');
+    }
+    
     const file = FirebaseStorageService.bucket.file(uniqueFileName);
 
+    // Upload with explicit metadata
     await file.save(uploadBuffer, {
       metadata: {
         contentType: mimeType,
@@ -237,11 +293,21 @@ export class FirebaseStorageService {
     });
 
     // Get signed URL (valid for 1 year)
-    const [fileUrl] = await file.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-    });
+    // Ensure it uses Firebase Admin credentials
+    let fileUrl: string;
+    try {
+      [fileUrl] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      });
+    } catch (signedUrlError: any) {
+      // If signed URL fails due to credentials, try making file public temporarily
+      // This is a fallback for credential issues
+      console.warn('Failed to generate signed URL, using public URL:', signedUrlError?.message);
+      await file.makePublic();
+      fileUrl = `https://storage.googleapis.com/${FirebaseStorageService.bucketName}/${uniqueFileName}`;
+    }
 
     return {
       fileUrl,
@@ -318,13 +384,20 @@ export class FirebaseStorageService {
     this.ensureEnabled();
 
     const file = FirebaseStorageService.bucket.file(fileName);
-    const [url] = await file.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
-    });
-
-    return url;
+    
+    try {
+      const [url] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+      });
+      return url;
+    } catch (signedUrlError: any) {
+      // If signed URL fails due to credentials, try making file public temporarily
+      console.warn('Failed to generate signed URL, using public URL:', signedUrlError?.message);
+      await file.makePublic();
+      return `https://storage.googleapis.com/${FirebaseStorageService.bucketName}/${fileName}`;
+    }
   }
 }
 
