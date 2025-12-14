@@ -869,7 +869,8 @@ export default function ApplicationDetailScreen({
                             onPress={() => {
                               if (
                                 item.status === 'missing' ||
-                                item.status === 'rejected'
+                                item.status === 'rejected' ||
+                                item.status === 'pending'
                               ) {
                                 // Use documentType for internal logic, localized name for display
                                 handleUploadDocument(

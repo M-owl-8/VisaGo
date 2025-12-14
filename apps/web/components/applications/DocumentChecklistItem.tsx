@@ -221,7 +221,18 @@ export function DocumentChecklistItem({
 
       {/* Actions */}
       <div className="mt-4 flex items-center gap-2">
-        {item.fileUrl ? (
+        {/* Show Upload button if missing, rejected, or pending (allows re-upload) */}
+        {(status === 'missing' || status === 'rejected' || status === 'pending') && (
+          <Link
+            href={`/applications/${applicationId}/documents?documentType=${encodeURIComponent(item.documentType || 'document')}&name=${encodeURIComponent(name || 'Document')}`}
+            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
+          >
+            <Upload size={14} />
+            {t('documents.uploadDocument', 'Upload')}
+          </Link>
+        )}
+        {/* Show View button if file exists (for all statuses including rejected/pending) */}
+        {item.fileUrl && (
           <Link
             href={
               typeof window !== 'undefined' && item.fileUrl.startsWith('http://localhost')
@@ -234,14 +245,6 @@ export function DocumentChecklistItem({
           >
             <Eye size={14} />
             {t('documents.viewDocument', 'View')}
-          </Link>
-        ) : (
-          <Link
-            href={`/applications/${applicationId}/documents?documentType=${encodeURIComponent(item.documentType || 'document')}&name=${encodeURIComponent(name || 'Document')}`}
-            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
-          >
-            <Upload size={14} />
-            {t('documents.uploadDocument', 'Upload')}
           </Link>
         )}
         {documentType && (
