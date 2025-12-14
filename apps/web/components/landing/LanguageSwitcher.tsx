@@ -54,7 +54,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
           RU
         </option>
         <option value="uz" className="bg-[#0E1A2C] text-white">
-          O'Z
+          UZ
         </option>
       </select>
     </div>
