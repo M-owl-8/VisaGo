@@ -152,11 +152,6 @@ export default function ApplicationsPage() {
           <div className="absolute right-[-10%] top-[-20%] h-60 w-60 rounded-full bg-primary/20 blur-[140px]" />
           <div className="absolute left-[-15%] bottom-[-20%] h-72 w-72 rounded-full bg-[#1D4ED8]/15 blur-[160px]" />
           <div className="relative space-y-4 sm:space-y-6">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-white/70 sm:gap-2 sm:px-4 sm:py-1 sm:text-xs">
-              <Sparkles size={12} className="text-primary sm:size-4" />
-              {t('applications.heroBadge', 'Premium workspace')}
-            </div>
-
             <div>
               <p className="text-xs uppercase tracking-[0.4em] text-white/50 sm:text-sm">
                 {t('applications.heroEyebrow', 'Dashboard')}

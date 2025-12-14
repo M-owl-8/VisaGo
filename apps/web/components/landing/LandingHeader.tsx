@@ -16,12 +16,13 @@ export function LandingHeader() {
         <Link href="/" className="flex items-center gap-2 sm:gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 sm:h-10 sm:w-10">
             <Image
-              src="/images/ketdik-icon.jpg"
+              src="/images/ketdik-icon.jpg?v=2"
               alt="Ketdik"
               width={32}
               height={32}
               className="h-6 w-6 rounded-lg object-cover sm:h-8 sm:w-8"
               priority
+              unoptimized
             />
           </div>
           <span className="font-display text-lg font-semibold text-white sm:text-xl">Ketdik</span>

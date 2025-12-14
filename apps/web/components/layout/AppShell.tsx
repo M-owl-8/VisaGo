@@ -91,11 +91,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/applications" className="flex items-center gap-2 sm:gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:h-12 sm:w-12">
                 <Image
-                  src="/images/ketdik-icon.jpg"
+                  src="/images/ketdik-icon.jpg?v=2"
                   alt="Ketdik icon"
                   width={40}
                   height={40}
                   priority
+                  unoptimized
                   className="h-8 w-8 rounded-2xl object-cover sm:h-10 sm:w-10"
                 />
               </div>
