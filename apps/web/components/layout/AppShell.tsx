@@ -85,8 +85,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="blur-[200px] opacity-30 absolute left-[-5%] bottom-[-10%] h-72 w-72 rounded-full bg-primary-dark animate-blob" />
       </div>
 
-      <nav className="sticky top-0 z-40 shrink-0 px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
-        <div className="glass-panel relative flex items-center justify-between border border-white/10 bg-midnight/80 px-3 py-3 text-white sm:px-4 sm:py-4 md:px-6">
+      <nav className="sticky top-0 z-40 shrink-0 px-3 py-2.5 sm:px-4 sm:py-3 lg:px-8">
+        <div className="glass-panel relative flex items-center justify-between border border-white/10 bg-midnight/80 px-3 py-2.5 text-white sm:px-4 sm:py-3 md:px-6">
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/applications" className="flex items-center gap-2 sm:gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:h-12 sm:w-12">
@@ -168,10 +168,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setIsNavOpen((prev) => !prev)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg transition hover:bg-white/10 md:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-xl transition hover:bg-white/10 active:scale-95 md:hidden"
               aria-label="Toggle navigation"
             >
-              {isNavOpen ? <X size={20} className="sm:size-6" /> : <Menu size={20} className="sm:size-6" />}
+              {isNavOpen ? <X size={22} className="sm:size-6" /> : <Menu size={22} className="sm:size-6" />}
             </button>
           </div>
         </div>
@@ -191,7 +191,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     key={link.href}
                     variant="ghost"
                     className={cn(
-                      'justify-start rounded-2xl text-left',
+                      'justify-start rounded-2xl text-left h-12 text-base font-medium',
                       isActive ? 'bg-primary text-white' : 'text-white/70 hover:bg-white/10'
                     )}
                     onClick={() => {
@@ -214,11 +214,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                   <Button
                     variant="ghost"
-                    className="flex-1 min-w-0 border border-white/20 !bg-transparent text-white hover:bg-white/10 hover:border-white/40 transition"
+                    className="flex-1 min-w-0 h-11 border border-white/20 !bg-transparent text-white hover:bg-white/10 hover:border-white/40 transition active:scale-95"
                     onClick={handleLogout}
                   >
-                    <LogOut size={16} className="shrink-0" />
-                    <span className="ml-2 truncate">{t('profile.logout')}</span>
+                    <LogOut size={18} className="shrink-0" />
+                    <span className="ml-2 truncate font-medium">{t('profile.logout')}</span>
                   </Button>
                 </div>
 

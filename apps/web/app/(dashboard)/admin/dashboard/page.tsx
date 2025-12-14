@@ -185,10 +185,22 @@ export default function AdminDashboardPage() {
               {metrics.revenueByCountry.slice(0, 10).map((country, idx) => (
                 <div key={idx} className="flex items-center justify-between py-2 border-b border-white/10 last:border-0">
                   <div>
-                    <p className="text-white font-medium">{country.country}</p>
-                    <p className="text-sm text-white/60">{country.applicationCount} applications</p>
+                    <p className="text-white font-medium">
+                      {typeof country === 'object' && country !== null 
+                        ? (country.country || country.countryCode || 'Unknown')
+                        : String(country)}
+                    </p>
+                    <p className="text-sm text-white/60">
+                      {typeof country === 'object' && country !== null && typeof country.applicationCount === 'number'
+                        ? `${country.applicationCount} applications`
+                        : ''}
+                    </p>
                   </div>
-                  <p className="text-white font-semibold">${country.revenue.toFixed(2)}</p>
+                  <p className="text-white font-semibold">
+                    {typeof country === 'object' && country !== null && typeof country.revenue === 'number'
+                      ? `$${country.revenue.toFixed(2)}`
+                      : '$0.00'}
+                  </p>
                 </div>
               ))}
             </div>

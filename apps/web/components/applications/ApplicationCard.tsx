@@ -100,19 +100,19 @@ export function ApplicationCard({
       <div className="flex flex-col gap-2 border-t border-white/5 pt-3 sm:flex-row sm:items-center sm:gap-3 sm:pt-4">
         <Link
           href={`/applications/${application.id}`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/10 sm:px-4 sm:text-sm"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 active:scale-95 sm:px-4 sm:py-2"
         >
           <span>{t('applications.viewDetails', 'View details')}</span>
-          <ArrowUpRight size={14} className="sm:size-4" />
+          <ArrowUpRight size={16} className="sm:size-4" />
         </Link>
         {isDraft && (
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-400 transition hover:bg-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:text-sm"
+            className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-400 transition hover:bg-rose-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-2"
             title={t('applications.removeApplication', 'Remove application')}
           >
-            <Trash2 size={14} className="sm:size-4" />
+            <Trash2 size={16} className="sm:size-4" />
             <span className="hidden sm:inline">{t('applications.remove', 'Remove')}</span>
           </button>
         )}

@@ -220,14 +220,14 @@ export function DocumentChecklistItem({
       )}
 
       {/* Actions */}
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {/* Show Upload button if missing, rejected, or pending (allows re-upload) */}
         {(status === 'missing' || status === 'rejected' || status === 'pending') && (
           <Link
             href={`/applications/${applicationId}/documents?documentType=${encodeURIComponent(item.documentType || 'document')}&name=${encodeURIComponent(name || 'Document')}`}
-            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
+            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/20 active:scale-95"
           >
-            <Upload size={14} />
+            <Upload size={16} />
             {t('documents.uploadDocument', 'Upload')}
           </Link>
         )}
@@ -241,19 +241,19 @@ export function DocumentChecklistItem({
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 active:scale-95"
           >
-            <Eye size={14} />
+            <Eye size={16} />
             {t('documents.viewDocument', 'View')}
           </Link>
         )}
         {documentType && (
           <button
             onClick={() => setShowExplanation(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95"
             title={t('applications.whyDoINeedThis', 'Why do I need this document?')}
           >
-            <HelpCircle size={14} />
+            <HelpCircle size={16} />
             <span>{t('applications.why', 'Why?')}</span>
           </button>
         )}
