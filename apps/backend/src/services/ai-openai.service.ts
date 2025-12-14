@@ -187,10 +187,16 @@ export class AIOpenAIService {
         });
       } catch (latencyError: any) {
         // If latencyMs column doesn't exist, try without it
-        if (latencyError?.message?.includes('latencyMs') || latencyError?.message?.includes('does not exist')) {
-          logWarn('[AIOpenAI] latencyMs column not found, creating without it. Run migration to add column.', {
-            taskType: params.taskType,
-          });
+        if (
+          latencyError?.message?.includes('latencyMs') ||
+          latencyError?.message?.includes('does not exist')
+        ) {
+          logWarn(
+            '[AIOpenAI] latencyMs column not found, creating without it. Run migration to add column.',
+            {
+              taskType: params.taskType,
+            }
+          );
           await AIOpenAIService.prisma.aIInteraction.create({
             data: {
               taskType: params.taskType,
@@ -804,6 +810,7 @@ RULES:
 - You MUST NOT remove documents
 - You MUST NOT change category or required status
 - Each documentType must have complete name, description, and whereToObtain in EN, UZ, and RU
+- Be concise to avoid truncation: keep each description and whereToObtain to 1 short sentence per language (aim for <= 160 characters per field)
 - Use correct country-specific terminology:
   * USA student: "Form I-20" (NOT "LOA")
   * Canada student: "Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)" (NOT "I-20")
@@ -953,6 +960,24 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
 
       return parsed;
     } catch (error) {
+      // Best-effort repair for the most common production failure:
+      // truncated JSON due to max token limits (EOF while still inside checklist array/object).
+      const repaired = this.repairLikelyTruncatedJson(jsonText);
+      if (repaired) {
+        try {
+          const parsed = JSON.parse(repaired);
+          if (parsed?.checklist && Array.isArray(parsed.checklist)) {
+            logWarn('[OpenAI][Checklist] Hybrid mode JSON repaired after parse error', {
+              country,
+              visaType,
+            });
+            return parsed;
+          }
+        } catch {
+          // ignore repair parse failures and fall back to error logging below
+        }
+      }
+
       // Log first 300 chars of jsonText for debugging (truncated to avoid log bloat)
       const jsonTextPreview = jsonText.length > 300 ? jsonText.substring(0, 300) + '...' : jsonText;
       // Also log around the error position if it's a syntax error
@@ -963,13 +988,11 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
           errorPosition = parseInt(match[1], 10);
         }
       }
-      
+
       const contextStart = Math.max(0, errorPosition - 100);
       const contextEnd = Math.min(jsonText.length, errorPosition + 100);
-      const errorContext = errorPosition >= 0 
-        ? jsonText.substring(contextStart, contextEnd)
-        : null;
-      
+      const errorContext = errorPosition >= 0 ? jsonText.substring(contextStart, contextEnd) : null;
+
       logError('[OpenAI][Checklist] Hybrid mode JSON parse error', error as Error, {
         country,
         visaType,
@@ -980,6 +1003,74 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
       });
       return null;
     }
+  }
+
+  /**
+   * Best-effort repair for truncated JSON (common when max tokens is hit).
+   * Only applies safe fixes:
+   * - Removes trailing commas before ] or }
+   * - Appends missing closing ] / } (brace counting outside strings)
+   *
+   * Returns repaired JSON text or null if no safe repair can be applied.
+   */
+  private static repairLikelyTruncatedJson(jsonText: string): string | null {
+    const original = jsonText.trim();
+
+    // 1) Remove trailing commas like ",}" or ",]"
+    let candidate = original.replace(/,\s*([}\]])/g, '$1');
+
+    // 2) Append missing closers (only if we are not inside an open string)
+    candidate = this.appendMissingJsonClosers(candidate);
+
+    if (candidate === original) {
+      return null;
+    }
+    return candidate;
+  }
+
+  /**
+   * Append missing closing brackets/braces by counting structure characters outside strings.
+   * If the input ends inside an open string, we do not attempt to repair.
+   */
+  private static appendMissingJsonClosers(input: string): string {
+    let inString = false;
+    let escape = false;
+    let openBraces = 0;
+    let openBrackets = 0;
+
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+
+      if (inString && ch === '\\') {
+        escape = true;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (ch === '{') openBraces++;
+      else if (ch === '}') openBraces = Math.max(0, openBraces - 1);
+      else if (ch === '[') openBrackets++;
+      else if (ch === ']') openBrackets = Math.max(0, openBrackets - 1);
+    }
+
+    // If we're inside a string, we can't safely repair
+    if (inString) return input;
+
+    let output = input;
+    if (openBrackets > 0) output += ']'.repeat(openBrackets);
+    if (openBraces > 0) output += '}'.repeat(openBraces);
+    return output;
   }
 
   /**
@@ -1372,6 +1463,10 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
               documentGuidesText
             );
 
+            // Dynamic token sizing: multilingual enrichment can easily truncate JSON if the cap is too low.
+            // Raise the floor to avoid 2000-token truncation seen in logs; keep a hard cap for cost.
+            const maxCompletionTokens = Math.min(5000, Math.max(3200, baseChecklist.length * 240));
+
             // Call GPT-4 for enrichment only (with retry logic)
             let response;
             let attempt = 0;
@@ -1389,8 +1484,9 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                     { role: 'user', content: hybridUserPrompt },
                   ],
                   {
-                    temperature: 0.5,
-                    max_completion_tokens: 2000,
+                    // Lower temperature improves JSON reliability and reduces verbose drift
+                    temperature: 0.2,
+                    max_completion_tokens: maxCompletionTokens,
                     response_format: { type: 'json_object' },
                   },
                   {

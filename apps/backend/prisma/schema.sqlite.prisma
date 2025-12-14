@@ -11,6 +11,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ============================================================================
+// AI MODEL REGISTRY (A/B testing, canary routing, fine-tunes)
+// ============================================================================
+//
+// NOTE (SQLite compatibility):
+// - Prisma's SQLite connector does not support enums/Json fields in our setup.
+// - We store statuses as String and JSON payloads as String (JSON-encoded).
+
 model User {
   id                String    @id @default(cuid())
   email             String    @unique
@@ -362,6 +370,54 @@ model AIUsageMetrics {
 
   @@unique([userId, date])
   @@index([date])
+}
+
+model AIModelVersion {
+  id              String        @id @default(cuid())
+  taskType         String
+  provider         String
+  baseModel        String
+  modelName        String
+  externalModelId  String?
+  status           String        @default("CANDIDATE")
+  trafficPercent   Int           @default(0)
+  promptVersion    String?
+  dataSnapshot     String?       // JSON-encoded string (SQLite compatibility)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  activatedAt      DateTime?
+
+  fineTuneJobs AIFineTuneJob[]
+
+  @@index([taskType])
+  @@index([status])
+  @@index([taskType, status])
+  @@index([createdAt])
+}
+
+model AIFineTuneJob {
+  id              String           @id @default(cuid())
+  taskType         String
+  provider         String
+  baseModel        String
+  status           String           @default("QUEUED")
+  externalJobId    String?
+  resultModelName  String?
+  trainFilePath    String
+  valFilePath      String?
+  metrics          String?          // JSON-encoded string (SQLite compatibility)
+  errorMessage     String?
+  modelVersionId   String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  completedAt      DateTime?
+
+  modelVersion AIModelVersion? @relation(fields: [modelVersionId], references: [id], onDelete: SetNull)
+
+  @@index([taskType])
+  @@index([status])
+  @@index([modelVersionId])
+  @@index([createdAt])
 }
 
 model AnalyticsEvent {

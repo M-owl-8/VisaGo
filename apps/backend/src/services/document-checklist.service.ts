@@ -1793,6 +1793,7 @@ Only return the JSON object, no other text.`;
   ): ChecklistItem[] {
     const documentsFound = existingDocumentsMap.size;
     let merged = 0;
+    const matchedDocumentIds = new Set<string>();
     const unmatchedItems: string[] = [];
 
     const mergedItems = items.map((item) => {
@@ -1800,6 +1801,9 @@ Only return the JSON object, no other text.`;
       const doc = this.findMatchingDocument(item.documentType, existingDocumentsMap, item.name);
       if (doc) {
         merged++;
+        if (doc.id) {
+          matchedDocumentIds.add(doc.id);
+        }
         return {
           ...item,
           status: doc.status as any,
@@ -1829,7 +1833,7 @@ Only return the JSON object, no other text.`;
         merged,
         totalItems: items.length,
         unmatchedCount: unmatchedItems.length,
-        unmatchedDocuments: documentsFound - merged,
+        unmatchedDocuments: Math.max(0, documentsFound - matchedDocumentIds.size),
         ...(unmatchedItems.length > 0 && { missingDocs }), // Only include if there are missing docs
         ...(unmatchedItems.length > 0 && { unmatchedItems }), // Only include if there are unmatched items
       });

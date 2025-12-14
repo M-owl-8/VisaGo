@@ -4,13 +4,16 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-
-// Type for AIModelStatus enum
-type AIModelStatus = 'ACTIVE' | 'CANDIDATE' | 'DEPRECATED' | 'ARCHIVED';
 import { AITaskType, ModelRoutingDecision, RoutingOptions } from './types';
 import { getAIConfig } from '../config/ai-models';
 
 const prisma = new PrismaClient();
+
+function hasRegistryDelegate(): boolean {
+  // Some environments (or older schema builds) may not have the AIModelVersion delegate.
+  // In that case, we must fall back to default routing without throwing.
+  return Boolean((prisma as any)?.aIModelVersion);
+}
 
 /**
  * Get default model for task from AI config
@@ -49,20 +52,51 @@ export async function getActiveModelForTask(
   }
 
   // 2. Query registry for active/candidate models
-  const models = await (prisma as any).aIModelVersion.findMany({
-    where: {
-      taskType,
-      status: {
-        in: options.allowCandidates !== false ? ['ACTIVE', 'CANDIDATE'] : ['ACTIVE'],
+  let models: Array<{
+    id: string;
+    provider: string;
+    modelName: string;
+    baseModel: string;
+    trafficPercent: number;
+  }> = [];
+
+  try {
+    if (!hasRegistryDelegate()) {
+      // Registry tables/delegate are unavailable (likely migrations not applied or using a lightweight schema).
+      throw new Error('AIModelVersion delegate unavailable');
+    }
+
+    models = await (prisma as any).aIModelVersion.findMany({
+      where: {
+        taskType,
+        status: {
+          in: options.allowCandidates !== false ? ['ACTIVE', 'CANDIDATE'] : ['ACTIVE'],
+        },
+        trafficPercent: {
+          gt: 0,
+        },
       },
-      trafficPercent: {
-        gt: 0,
+      orderBy: {
+        trafficPercent: 'desc',
       },
-    },
-    orderBy: {
-      trafficPercent: 'desc',
-    },
-  });
+      select: {
+        id: true,
+        provider: true,
+        modelName: true,
+        baseModel: true,
+        trafficPercent: true,
+      },
+    });
+  } catch (error) {
+    // If the registry tables don't exist yet (or migrations haven't run),
+    // fall back to default routing (non-fatal).
+    const defaultModel = getDefaultModelForTask(taskType);
+    return {
+      provider: 'openai',
+      modelName: defaultModel,
+      baseModel: defaultModel,
+    };
+  }
 
   if (models.length === 0) {
     // Fallback to default
@@ -122,14 +156,14 @@ export async function registerModelCandidate(params: {
   dataSnapshot?: any;
   notes?: string;
 }): Promise<string> {
-  const model = await (prisma as any).aIModelVersion.create({
+  const model = await prisma.aIModelVersion.create({
     data: {
       taskType: params.taskType,
       provider: params.provider,
       baseModel: params.baseModel,
       modelName: params.modelName,
       externalModelId: params.externalModelId || null,
-      status: 'CANDIDATE' as any,
+      status: 'CANDIDATE',
       trafficPercent: 0,
       promptVersion: params.promptVersion || null,
       dataSnapshot: params.dataSnapshot || null,
@@ -152,7 +186,7 @@ export async function promoteModelToActive(params: {
   const deactivateOthers = params.deactivateOthers ?? true;
 
   // Get the model to promote
-  const model = await (prisma as any).aIModelVersion.findUnique({
+  const model = await prisma.aIModelVersion.findUnique({
     where: { id: params.modelVersionId },
   });
 
@@ -161,10 +195,10 @@ export async function promoteModelToActive(params: {
   }
 
   // Update this model
-  await (prisma as any).aIModelVersion.update({
+  await prisma.aIModelVersion.update({
     where: { id: params.modelVersionId },
     data: {
-      status: 'ACTIVE' as any,
+      status: 'ACTIVE',
       trafficPercent,
       activatedAt: new Date(),
     },
@@ -172,7 +206,7 @@ export async function promoteModelToActive(params: {
 
   // Deactivate others if requested
   if (deactivateOthers) {
-    await (prisma as any).aIModelVersion.updateMany({
+    await prisma.aIModelVersion.updateMany({
       where: {
         taskType: model.taskType,
         id: {
@@ -183,7 +217,7 @@ export async function promoteModelToActive(params: {
         },
       },
       data: {
-        status: 'DEPRECATED' as any,
+        status: 'DEPRECATED',
         trafficPercent: 0,
       },
     });
@@ -201,7 +235,7 @@ export async function updateCanaryTraffic(params: {
     throw new Error('trafficPercent must be between 0 and 100');
   }
 
-  await (prisma as any).aIModelVersion.update({
+  await prisma.aIModelVersion.update({
     where: { id: params.modelVersionId },
     data: {
       trafficPercent: params.trafficPercent,
@@ -213,7 +247,7 @@ export async function updateCanaryTraffic(params: {
  * Get all models for a task
  */
 export async function listModelsForTask(taskType: AITaskType) {
-  return (prisma as any).aIModelVersion.findMany({
+  return prisma.aIModelVersion.findMany({
     where: { taskType },
     orderBy: { createdAt: 'desc' },
   });

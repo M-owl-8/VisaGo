@@ -10,6 +10,25 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ============================================================================
+// AI MODEL REGISTRY (A/B testing, canary routing, fine-tunes)
+// ============================================================================
+
+enum AIModelStatus {
+  ACTIVE
+  CANDIDATE
+  DEPRECATED
+  ARCHIVED
+}
+
+enum AIFineTuneStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 model User {
   id                     String            @id @default(cuid())
   email                  String            @unique
@@ -381,6 +400,55 @@ model AIUsageMetrics {
   @@index([date])
 }
 
+model AIModelVersion {
+  id             String        @id @default(cuid())
+  taskType       String
+  provider       String
+  baseModel      String
+  modelName      String
+  externalModelId String?
+  status         AIModelStatus @default(CANDIDATE)
+  trafficPercent Int           @default(0)
+  promptVersion  String?
+  dataSnapshot   Json?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  activatedAt    DateTime?
+
+  fineTuneJobs AIFineTuneJob[]
+  interactions AIInteraction[]
+
+  @@index([taskType])
+  @@index([status])
+  @@index([taskType, status])
+  @@index([createdAt])
+}
+
+model AIFineTuneJob {
+  id             String           @id @default(cuid())
+  taskType       String
+  provider       String
+  baseModel      String
+  status         AIFineTuneStatus @default(QUEUED)
+  externalJobId  String?
+  resultModelName String?
+  trainFilePath  String
+  valFilePath    String?
+  metrics        Json?
+  errorMessage   String?
+  modelVersionId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  completedAt    DateTime?
+
+  modelVersion AIModelVersion? @relation(fields: [modelVersionId], references: [id], onDelete: SetNull)
+
+  @@index([taskType])
+  @@index([status])
+  @@index([modelVersionId])
+  @@index([createdAt])
+}
+
 // AI Interaction logging model
 // Tracks all AI/GPT API calls for audit and training purposes
 // Migration: npx prisma migrate dev --name add_ai_interaction_model
@@ -403,12 +471,15 @@ model AIInteraction {
   latencyMs       Int?
   createdAt       DateTime @default(now())
 
+  modelVersion AIModelVersion? @relation(fields: [modelVersionId], references: [id], onDelete: SetNull)
+
   @@index([userId])
   @@index([applicationId])
   @@index([createdAt])
   @@index([taskType])
   @@index([model])
   @@index([success])
+  @@index([modelVersionId])
 }
 
 model AnalyticsEvent {
