@@ -802,7 +802,13 @@ RULES:
 - If status === "rejected": problems array must contain at least one problem
 - If status === "needs_review" or "uncertain": problems array may contain problems, verifiedByAI = false
 - notes.uz is REQUIRED (must always be provided)
-- notes.ru and notes.en are optional but recommended
+- notes.ru is optional
+- notes.en is optional EXCEPT for rejected/needs_review (see below)
+- For status === "rejected" OR status === "needs_review":
+  - notes.uz MUST be 1-2 bullet points, each bullet <= 12 words (Uzbek Latin).
+  - notes.en MUST be 1-2 bullet points, each bullet <= 12 words (English).
+  - Output bullets only (each line starts with "- "), no extra text.
+  - Must be user-friendly, non-legal, and always present.
 - confidence must be between 0.0 and 1.0
 
 ================================================================================

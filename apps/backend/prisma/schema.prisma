@@ -1,9 +1,8 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
-// SQLite version for local development
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -14,45 +13,56 @@ generator client {
 // ============================================================================
 // AI MODEL REGISTRY (A/B testing, canary routing, fine-tunes)
 // ============================================================================
-//
-// NOTE (SQLite compatibility):
-// - Prisma's SQLite connector does not support enums/Json fields in our setup.
-// - We store statuses as String and JSON payloads as String (JSON-encoded).
+
+enum AIModelStatus {
+  ACTIVE
+  CANDIDATE
+  DEPRECATED
+  ARCHIVED
+}
+
+enum AIFineTuneStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
 
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  googleId          String?   @unique
-  firstName         String?
-  lastName          String?
-  phone             String?
-  passwordHash      String?
-  avatar            String?
-  language          String    @default("en")
-  timezone          String?
-  currency          String    @default("USD")
-  emailVerified     Boolean   @default(false)
-  bio               String?   // JSON string containing questionnaire data
-  questionnaireCompleted Boolean @default(false)
-  role              String    @default("user")
-  resetToken        String?
-  resetTokenExpiry  DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                     String            @id @default(cuid())
+  email                  String            @unique
+  googleId               String?           @unique
+  firstName              String?
+  lastName               String?
+  phone                  String?
+  passwordHash           String?
+  avatar                 String?
+  language               String            @default("en")
+  timezone               String?
+  currency               String            @default("USD")
+  emailVerified          Boolean           @default(false)
+  bio                    String? // JSON string containing questionnaire data
+  questionnaireCompleted Boolean           @default(false)
+  role                   String            @default("user")
+  resetToken             String?
+  resetTokenExpiry       DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
   // ... rest of the model stays the same
   // Relations
-  visaApplications  VisaApplication[]
-  documents         UserDocument[]
-  payments          Payment[]
-  preferences       UserPreferences?
-  activityLog       ActivityLog[]
-  chatSessions      ChatSession[]
-  chatMessages      ChatMessage[]
-  aiUsageMetrics    AIUsageMetrics[]
-  emailLogs         EmailLog[]
-  deviceTokens      DeviceToken[]
-  notificationLogs  NotificationLog[]
-  applications      Application[]
+  visaApplications       VisaApplication[]
+  documents              UserDocument[]
+  payments               Payment[]
+  preferences            UserPreferences?
+  activityLog            ActivityLog[]
+  chatSessions           ChatSession[]
+  chatMessages           ChatMessage[]
+  aiUsageMetrics         AIUsageMetrics[]
+  emailLogs              EmailLog[]
+  deviceTokens           DeviceToken[]
+  notificationLogs       NotificationLog[]
+  applications           Application[]
 
   @@index([email])
   @@index([googleId])
@@ -60,84 +70,85 @@ model User {
 }
 
 model UserPreferences {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  notificationsEnabled Boolean @default(true)
-  emailNotifications Boolean   @default(true)
-  pushNotifications Boolean    @default(true)
-  paymentConfirmations Boolean @default(true)
-  documentUpdates Boolean      @default(true)
-  visaStatusUpdates Boolean    @default(true)
-  dailyReminders Boolean       @default(true)
-  newsUpdates Boolean          @default(false)
-  twoFactorEnabled  Boolean   @default(false)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  notificationsEnabled Boolean  @default(true)
+  emailNotifications   Boolean  @default(true)
+  pushNotifications    Boolean  @default(true)
+  paymentConfirmations Boolean  @default(true)
+  documentUpdates      Boolean  @default(true)
+  visaStatusUpdates    Boolean  @default(true)
+  dailyReminders       Boolean  @default(true)
+  newsUpdates          Boolean  @default(false)
+  twoFactorEnabled     Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model Country {
-  id                String    @id @default(cuid())
-  name              String    @unique
-  code              String    @unique // ISO 3166-1 alpha-2
-  flagEmoji         String
-  description       String?
-  requirements      String?   // JSON field with detailed requirements
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  name         String   @unique
+  code         String   @unique // ISO 3166-1 alpha-2
+  flagEmoji    String
+  description  String?
+  requirements String? // JSON field with detailed requirements
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  visaTypes         VisaType[]
-  applications      VisaApplication[]
-  userApplications  Application[]
+  visaTypes        VisaType[]
+  applications     VisaApplication[]
+  userApplications Application[]
 
   @@index([code])
   @@index([name])
 }
 
 model VisaType {
-  id                String    @id @default(cuid())
-  countryId         String
-  name              String    // e.g., "Tourist Visa", "Work Visa"
-  description       String?
-  processingDays    Int       // Average processing time
-  validity          String    // Duration of visa validity
-  fee               Float     // In USD
-  requirements      String    // JSON with requirement details
-  documentTypes     String    // JSON array of required document types
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id             String   @id @default(cuid())
+  countryId      String
+  name           String // e.g., "Tourist Visa", "Work Visa"
+  description    String?
+  processingDays Int // Average processing time
+  validity       String // Duration of visa validity
+  fee            Float // In USD
+  requirements   String // JSON with requirement details
+  documentTypes  String // JSON array of required document types
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  country           Country   @relation(fields: [countryId], references: [id], onDelete: Cascade)
-  applications      VisaApplication[]
-  userApplications  Application[]
+  country          Country           @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  applications     VisaApplication[]
+  userApplications Application[]
 
   @@unique([countryId, name])
   @@index([countryId])
 }
 
 model VisaApplication {
-  id                String    @id @default(cuid())
-  userId            String
-  countryId         String
-  visaTypeId        String
-  status            String    @default("draft") // draft, submitted, approved, rejected, expired
-  progressPercentage Int      @default(0)
-  notes             String?
-  submissionDate    DateTime?
-  approvalDate      DateTime?
-  expiryDate        DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String
+  countryId          String
+  visaTypeId         String
+  status             String    @default("draft") // draft, submitted, approved, rejected, expired
+  progressPercentage Int       @default(0)
+  notes              String?
+  submissionDate     DateTime?
+  approvalDate       DateTime?
+  expiryDate         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  country           Country   @relation(fields: [countryId], references: [id])
-  visaType          VisaType  @relation(fields: [visaTypeId], references: [id])
-  documents         UserDocument[]
-  payment           Payment?
-  checkpoints       Checkpoint[]
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country      Country               @relation(fields: [countryId], references: [id])
+  visaType     VisaType              @relation(fields: [visaTypeId], references: [id])
+  documents    UserDocument[]
+  payment      Payment?
+  checkpoints  Checkpoint[]
+  checkResults DocumentCheckResult[] // Phase 3: Document check results
   riskExplanation   VisaRiskExplanation?
   checklistFeedback ChecklistFeedback[]
 
@@ -147,31 +158,31 @@ model VisaApplication {
 }
 
 model Checkpoint {
-  id                String    @id @default(cuid())
-  applicationId     String
-  title             String    // e.g., "Document Verification", "Interview Scheduled"
-  description       String?
-  isCompleted       Boolean   @default(false)
-  order             Int
-  completedAt       DateTime?
-  dueDate           DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  applicationId String
+  title         String // e.g., "Document Verification", "Interview Scheduled"
+  description   String?
+  isCompleted   Boolean   @default(false)
+  order         Int
+  completedAt   DateTime?
+  dueDate       DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
   @@index([isCompleted])
 }
 
 model DocumentType {
-  id                String    @id @default(cuid())
-  name              String    @unique // e.g., "Passport", "Bank Statement"
-  description       String?
-  supportedFormats  String    // JSON array ["pdf", "jpg", "png"]
-  maxFileSize       Int       // in MB
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String   @id @default(cuid())
+  name             String   @unique // e.g., "Passport", "Bank Statement"
+  description      String?
+  supportedFormats String // JSON array ["pdf", "jpg", "png"]
+  maxFileSize      Int // in MB
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([name])
 }
@@ -181,24 +192,41 @@ model UserDocument {
   userId            String
   applicationId     String
   documentName      String
-  documentType      String    // Type of document (e.g., "passport", "bank_statement")
-  fileUrl           String    // Firebase Storage URL
+  documentType      String // Type of document (e.g., "passport", "bank_statement")
+  fileUrl           String // Firebase Storage URL
   fileName          String
-  fileSize          Int       // In bytes
+  fileSize          Int // In bytes
   uploadedAt        DateTime  @default(now())
   status            String    @default("pending") // pending, verified, rejected
   verificationNotes String?
   expiryDate        DateTime?
   verifiedByAI      Boolean?  @default(false)
-  aiConfidence      Float?    // 0-1
+  aiConfidence      Float? // 0-1
   aiNotesUz         String?
   aiNotesRu         String?
   aiNotesEn         String?
+  // Phase 1: OCR fields
+  extractedText     String?   @db.Text // Extracted text from OCR
+  ocrStatus         String?   // pending, processing, complete, failed
+  ocrConfidence     Float?    // OCR confidence score (0-1)
+  ocrLanguage       String?   // Detected language code (uzb, eng, rus, etc.)
+  // Phase 2: Image analysis fields
+  imageAnalysisResult Json?   // JSON with image analysis results (hasSignature, hasStamp, qualityScore, issues)
+  hasSignature      Boolean?  // Whether document has a signature detected
+  hasStamp          Boolean?  // Whether document has a stamp/seal detected
+  imageQualityScore Float?    // Image quality score (0-1)
+  // Phase 3: Document classification fields
+  // TODO: classification fields were removed from DB; reintroduce carefully with a proper migration if needed.
+  // classifiedType        String?   // e.g. "passport", "bank_statement", "employment_letter"
+  // classificationSource  String?   // e.g. "ai", "manual"
+  // classificationScore   Float?    // confidence score 0-1
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  // checkResults      DocumentCheckResult[] // Phase 3: Document check results - commented out as model doesn't exist
+  // @@index([classifiedType]) // Removed - column doesn't exist in DB
 
   @@index([userId])
   @@index([applicationId])
@@ -206,45 +234,45 @@ model UserDocument {
 }
 
 model Payment {
-  id                String    @id @default(cuid())
-  userId            String
-  applicationId     String    @unique
-  amount            Float     // In USD
-  refundedAmount    Float     @default(0) // Amount refunded
-  currency          String    @default("USD")
-  status            String    @default("pending") // pending, completed, failed, refunded, partially_refunded
-  paymentMethod     String    // payme, uzum, click, stripe, card
-  transactionId     String?   @unique
-  orderId           String?
-  paymentGatewayData String?  // JSON with gateway response
-  paidAt            DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String
+  applicationId      String    @unique
+  amount             Float // In USD
+  refundedAmount     Float     @default(0) // Amount refunded
+  currency           String    @default("USD")
+  status             String    @default("pending") // pending, completed, failed, refunded, partially_refunded
+  paymentMethod      String // payme, uzum, click, stripe, card
+  transactionId      String?   @unique
+  orderId            String?
+  paymentGatewayData String? // JSON with gateway response
+  paidAt             DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  refunds           Refund[]
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  refunds     Refund[]
 
   @@index([userId])
   @@index([status])
 }
 
 model WebhookIdempotency {
-  id                String    @id @default(cuid())
-  fingerprint       String    @unique // SHA256 hash of webhook unique identifier
-  webhookId         String    // Unique ID from payment gateway
-  paymentMethod     String    // payme, click, uzum, stripe
-  transactionId     String    // Payment transaction ID
-  eventType         String    // Type of webhook event
-  signature         String    // Webhook signature for verification
-  body              String    // Full webhook payload (JSON string for SQLite compatibility)
-  status            String    @default("pending") // pending, processed, failed
-  attempts          Int       @default(0) // Number of processing attempts
-  lastAttemptAt     DateTime?
-  processedAt       DateTime?
-  error             String?   // Error message if processing failed
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  fingerprint   String    @unique // SHA256 hash of webhook unique identifier
+  webhookId     String // Unique ID from payment gateway
+  paymentMethod String // payme, click, uzum, stripe
+  transactionId String // Payment transaction ID
+  eventType     String // Type of webhook event
+  signature     String // Webhook signature for verification
+  body          String // Full webhook payload (JSON string for SQLite compatibility)
+  status        String    @default("pending") // pending, processed, failed
+  attempts      Int       @default(0) // Number of processing attempts
+  lastAttemptAt DateTime?
+  processedAt   DateTime?
+  error         String? // Error message if processing failed
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([paymentMethod])
   @@index([transactionId])
@@ -253,29 +281,29 @@ model WebhookIdempotency {
 }
 
 model AdminLog {
-  id                String    @id @default(cuid())
-  action            String    // create, update, delete, approve, reject
-  entityType        String    // User, VisaApplication, Payment, etc.
-  entityId          String
-  changes           String?   // JSON with before/after
-  performedBy       String    // Admin user ID
-  reason            String?
-  createdAt         DateTime  @default(now())
+  id          String   @id @default(cuid())
+  action      String // create, update, delete, approve, reject
+  entityType  String // User, VisaApplication, Payment, etc.
+  entityId    String
+  changes     String? // JSON with before/after
+  performedBy String // Admin user ID
+  reason      String?
+  createdAt   DateTime @default(now())
 
   @@index([createdAt])
   @@index([entityType])
 }
 
 model ActivityLog {
-  id                String    @id @default(cuid())
-  userId            String
-  action            String    // login, document_upload, application_submit
-  details           String?   // JSON with additional details
-  ipAddress         String?
-  userAgent         String?
-  createdAt         DateTime  @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  action    String // login, document_upload, application_submit
+  details   String? // JSON with additional details
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
@@ -286,18 +314,18 @@ model ActivityLog {
 // ============================================================================
 
 model Document {
-  id                String    @id @default(cuid())
-  title             String
-  content           String
-  type              String    // visa_requirement, guide, faq, requirement_detail
-  countryId         String?
-  visaTypeId        String?
-  source            String?   // Internal, External URL, User Uploaded
-  metadata          String?   // JSON with additional metadata
-  embedding         String?   // Vector embedding as JSON (for RAG)
-  isPublished       Boolean   @default(false)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        String // visa_requirement, guide, faq, requirement_detail
+  countryId   String?
+  visaTypeId  String?
+  source      String? // Internal, External URL, User Uploaded
+  metadata    String? // JSON with additional metadata
+  embedding   String? // Vector embedding as JSON (for RAG)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([type])
   @@index([isPublished])
@@ -306,49 +334,49 @@ model Document {
 }
 
 model RAGChunk {
-  id                String    @id @default(cuid())
-  documentId        String
-  content           String
-  chunkIndex        Int       // Position in document
-  embedding         String?   // Vector embedding as JSON
-  metadata          String?   // JSON with source info
-  createdAt         DateTime  @default(now())
+  id         String   @id @default(cuid())
+  documentId String
+  content    String
+  chunkIndex Int // Position in document
+  embedding  String? // Vector embedding as JSON
+  metadata   String? // JSON with source info
+  createdAt  DateTime @default(now())
 
   @@index([documentId])
   @@index([chunkIndex])
 }
 
 model ChatSession {
-  id                String    @id @default(cuid())
-  userId            String
-  applicationId     String?   // null for general chat
-  title             String    @default("New Chat")
-  systemPrompt      String    @default("You are a helpful visa assistant for VisaBuddy. Provide accurate information about visa requirements and processes.")
-  messages          ChatMessage[]
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String        @id @default(cuid())
+  userId        String
+  applicationId String? // null for general chat
+  title         String        @default("New Chat")
+  systemPrompt  String        @default("You are a helpful visa assistant for VisaBuddy. Provide accurate information about visa requirements and processes.")
+  messages      ChatMessage[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([applicationId])
 }
 
 model ChatMessage {
-  id                String    @id @default(cuid())
-  sessionId         String
-  userId            String
-  role              String    // "user" or "assistant"
-  content           String
-  sources           String?   // JSON array of RAG sources/references with URLs
-  model             String    @default("gpt-4")
-  tokensUsed        Int       @default(0)
-  responseTime      Int?      // milliseconds
-  feedback          String?   // thumbs_up, thumbs_down, detailed_feedback
-  createdAt         DateTime  @default(now())
+  id           String   @id @default(cuid())
+  sessionId    String
+  userId       String
+  role         String // "user" or "assistant"
+  content      String
+  sources      String? // JSON array of RAG sources/references with URLs
+  model        String   @default("gpt-4")
+  tokensUsed   Int      @default(0)
+  responseTime Int? // milliseconds
+  feedback     String? // thumbs_up, thumbs_down, detailed_feedback
+  createdAt    DateTime @default(now())
 
-  session           ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([userId])
@@ -356,38 +384,39 @@ model ChatMessage {
 }
 
 model AIUsageMetrics {
-  id                String    @id @default(cuid())
-  userId            String
-  date              DateTime
-  totalRequests     Int       @default(0)
-  totalTokens       Int       @default(0)
-  totalCost         Float     @default(0)
-  avgResponseTime   Int       @default(0)
-  errorCount        Int       @default(0)
-  createdAt         DateTime  @default(now())
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime
+  totalRequests   Int      @default(0)
+  totalTokens     Int      @default(0)
+  totalCost       Float    @default(0)
+  avgResponseTime Int      @default(0)
+  errorCount      Int      @default(0)
+  createdAt       DateTime @default(now())
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
   @@index([date])
 }
 
 model AIModelVersion {
-  id              String        @id @default(cuid())
-  taskType         String
-  provider         String
-  baseModel        String
-  modelName        String
-  externalModelId  String?
-  status           String        @default("CANDIDATE")
-  trafficPercent   Int           @default(0)
-  promptVersion    String?
-  dataSnapshot     String?       // JSON-encoded string (SQLite compatibility)
-  notes            String?
-  createdAt        DateTime      @default(now())
-  activatedAt      DateTime?
+  id             String        @id @default(cuid())
+  taskType       String
+  provider       String
+  baseModel      String
+  modelName      String
+  externalModelId String?
+  status         AIModelStatus @default(CANDIDATE)
+  trafficPercent Int           @default(0)
+  promptVersion  String?
+  dataSnapshot   Json?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  activatedAt    DateTime?
 
   fineTuneJobs AIFineTuneJob[]
+  interactions AIInteraction[]
 
   @@index([taskType])
   @@index([status])
@@ -396,21 +425,21 @@ model AIModelVersion {
 }
 
 model AIFineTuneJob {
-  id              String           @id @default(cuid())
-  taskType         String
-  provider         String
-  baseModel        String
-  status           String           @default("QUEUED")
-  externalJobId    String?
-  resultModelName  String?
-  trainFilePath    String
-  valFilePath      String?
-  metrics          String?          // JSON-encoded string (SQLite compatibility)
-  errorMessage     String?
-  modelVersionId   String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  completedAt      DateTime?
+  id             String           @id @default(cuid())
+  taskType       String
+  provider       String
+  baseModel      String
+  status         AIFineTuneStatus @default(QUEUED)
+  externalJobId  String?
+  resultModelName String?
+  trainFilePath  String
+  valFilePath    String?
+  metrics        Json?
+  errorMessage   String?
+  modelVersionId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  completedAt    DateTime?
 
   modelVersion AIModelVersion? @relation(fields: [modelVersionId], references: [id], onDelete: SetNull)
 
@@ -420,15 +449,48 @@ model AIFineTuneJob {
   @@index([createdAt])
 }
 
+// AI Interaction logging model
+// Tracks all AI/GPT API calls for audit and training purposes
+// Migration: npx prisma migrate dev --name add_ai_interaction_model
+model AIInteraction {
+  id              String   @id @default(cuid())
+  taskType        String   // "checklist", "risk", "doc_check", "chat", "doc_explanation", "rules_extraction"
+  model           String   // "gpt-4o", "gpt-4o-mini", "deepseek", etc.
+  promptVersion   String?
+  source          String?
+  requestPayload  String   @db.Text // JSON stringified request
+  responsePayload String?  @db.Text // JSON stringified response
+  success         Boolean
+  errorMessage    String?  @db.Text
+  countryCode     String?
+  visaType        String?
+  ruleSetId       String?
+  applicationId   String?
+  userId          String?
+  modelVersionId  String?
+  latencyMs       Int?
+  createdAt       DateTime @default(now())
+
+  modelVersion AIModelVersion? @relation(fields: [modelVersionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([createdAt])
+  @@index([taskType])
+  @@index([model])
+  @@index([success])
+  @@index([modelVersionId])
+}
+
 model AnalyticsEvent {
-  id                String    @id @default(cuid())
-  userId            String?   // null for anonymous events
-  eventType         String    // signup, visa_selected, payment_completed, document_uploaded, chat_message, login, app_opened
-  source            String?   // email, google, organic, referral
-  metadata          String?   // JSON with additional event data (country, visa_type, amount, etc)
-  ipAddress         String?
-  userAgent         String?
-  createdAt         DateTime  @default(now())
+  id        String   @id @default(cuid())
+  userId    String? // null for anonymous events
+  eventType String // signup, visa_selected, payment_completed, document_uploaded, chat_message, login, app_opened
+  source    String? // email, google, organic, referral
+  metadata  String? // JSON with additional event data (country, visa_type, amount, etc)
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
   @@index([eventType])
   @@index([userId])
@@ -437,19 +499,19 @@ model AnalyticsEvent {
 }
 
 model DailyMetrics {
-  id                String    @id @default(cuid())
-  date              DateTime  @unique // YYYY-MM-DD format
-  totalSignups      Int       @default(0)
-  totalVisaSelections Int    @default(0)
-  totalPayments     Int       @default(0)
-  totalRevenue      Float     @default(0) // in USD
-  totalDocuments    Int       @default(0)
-  totalMessages     Int       @default(0)
-  activeUsers       Int       @default(0)
-  newUsers          Int       @default(0)
-  conversionRate    Float     @default(0) // signup to payment
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                  String   @id @default(cuid())
+  date                DateTime @unique // YYYY-MM-DD format
+  totalSignups        Int      @default(0)
+  totalVisaSelections Int      @default(0)
+  totalPayments       Int      @default(0)
+  totalRevenue        Float    @default(0) // in USD
+  totalDocuments      Int      @default(0)
+  totalMessages       Int      @default(0)
+  activeUsers         Int      @default(0)
+  newUsers            Int      @default(0)
+  conversionRate      Float    @default(0) // signup to payment
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   @@index([date])
 }
@@ -459,21 +521,21 @@ model DailyMetrics {
 // ============================================================================
 
 model EmailLog {
-  id                String    @id @default(cuid())
-  userId            String
-  recipientEmail    String
-  subject           String
-  templateName      String?
-  type              String?   // payment_confirmation, payment_failed, visa_status_update, welcome, etc
-  status            String    @default("pending") // pending, sent, failed
-  error             String?   // Error message if failed
-  sentAt            DateTime?
-  failureReason     String?
-  metadata          String?   // JSON with additional context
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  recipientEmail String
+  subject        String
+  templateName   String?
+  type           String? // payment_confirmation, payment_failed, visa_status_update, welcome, etc
+  status         String    @default("pending") // pending, sent, failed
+  error          String? // Error message if failed
+  sentAt         DateTime?
+  failureReason  String?
+  metadata       String? // JSON with additional context
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -481,38 +543,38 @@ model EmailLog {
 }
 
 model DeviceToken {
-  id                String    @id @default(cuid())
-  userId            String
-  deviceId          String?   // Device identifier
-  token             String    @unique
-  platform          String    // ios, android, web
-  lastUsedAt        DateTime?
-  isValid           Boolean   @default(true)
-  isActive          Boolean   @default(true)  // Active status for notifications
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id         String    @id @default(cuid())
+  userId     String
+  deviceId   String? // Device identifier
+  token      String    @unique
+  platform   String // ios, android, web
+  lastUsedAt DateTime?
+  isValid    Boolean   @default(true)
+  isActive   Boolean   @default(true) // Active status for notifications
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([platform])
 }
 
 model NotificationLog {
-  id                String    @id @default(cuid())
-  userId            String
-  deviceTokenId     String?
-  title             String
-  body              String
-  type              String    // app_update, payment_status, document_request, visa_status
-  status            String    @default("pending") // pending, sent, failed
-  sentAt            DateTime?
-  failureReason     String?
-  metadata          String?   // JSON with additional context
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  userId        String
+  deviceTokenId String?
+  title         String
+  body          String
+  type          String // app_update, payment_status, document_request, visa_status
+  status        String    @default("pending") // pending, sent, failed
+  sentAt        DateTime?
+  failureReason String?
+  metadata      String? // JSON with additional context
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -520,20 +582,20 @@ model NotificationLog {
 }
 
 model Refund {
-  id                String    @id @default(cuid())
-  paymentId         String
-  amount            Float
-  reason            String
-  notes             String?   // Additional notes about the refund
-  status            String    @default("pending") // pending, processing, completed, failed
-  gatewayRefundId   String?   @unique
-  failureReason     String?
-  initiatedBy       String    // user, admin, system
-  processedAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  paymentId       String
+  amount          Float
+  reason          String
+  notes           String? // Additional notes about the refund
+  status          String    @default("pending") // pending, processing, completed, failed
+  gatewayRefundId String?   @unique
+  failureReason   String?
+  initiatedBy     String // user, admin, system
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  payment           Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([paymentId])
   @@index([status])
@@ -541,21 +603,21 @@ model Refund {
 }
 
 model Application {
-  id                String    @id @default(cuid())
-  userId            String
-  countryId         String
-  visaTypeId        String
-  status            String    @default("draft") // draft, submitted, under_review, approved, rejected
-  submissionDate    DateTime?
-  approvalDate      DateTime?
-  expiryDate        DateTime?
-  metadata          String?   // JSON with application-specific data
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  countryId      String
+  visaTypeId     String
+  status         String    @default("draft") // draft, submitted, under_review, approved, rejected
+  submissionDate DateTime?
+  approvalDate   DateTime?
+  expiryDate     DateTime?
+  metadata       String? // JSON with application-specific data
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  country           Country   @relation(fields: [countryId], references: [id])
-  visaType          VisaType  @relation(fields: [visaTypeId], references: [id])
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country           Country            @relation(fields: [countryId], references: [id])
+  visaType          VisaType           @relation(fields: [visaTypeId], references: [id])
   documentChecklist DocumentChecklist?
 
   @@index([userId])
@@ -565,19 +627,50 @@ model Application {
 }
 
 model DocumentChecklist {
-  id                String    @id @default(cuid())
-  applicationId     String    @unique
-  status            String    @default("processing") // processing, ready, failed
-  checklistData     String?   // JSON string with checklist items
-  aiGenerated       Boolean   @default(false)
-  generatedAt       DateTime?
-  errorMessage      String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  applicationId String    @unique
+  status        String    @default("processing") // processing, ready, failed
+  checklistData String? // JSON string with checklist items
+  aiGenerated   Boolean   @default(false)
+  generatedAt   DateTime?
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
+  @@index([status])
+}
+
+// ============================================================================
+// DOCUMENT CHECK RESULT MODELS (Phase 3)
+// ============================================================================
+
+model DocumentCheckResult {
+  id              String  @id @default(cuid())
+  applicationId   String
+  checklistItemId String // ID of checklist item in DocumentChecklist
+  documentId      String? // ID of matched uploaded document (nullable if missing)
+
+  status          String // 'OK' | 'MISSING' | 'PROBLEM' | 'UNCERTAIN'
+  problemsJson    String? // JSON array of DocCheckProblem
+  suggestionsJson String? // JSON array of DocCheckSuggestion
+  confidence      Float? // optional AI confidence
+  notes           String? // optional human/AI notes
+  rawJson         String? @db.Text // Raw GPT-4 response JSON for debugging/audit
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  // document relation removed - UserDocument doesn't have opposite relation field
+  // documentId is kept as plain foreign key field for reference
+
+  @@unique([applicationId, checklistItemId])
+  @@index([applicationId])
+  @@index([checklistItemId])
+  @@index([documentId])
   @@index([status])
 }
 
@@ -617,8 +710,8 @@ model VisaRuleSet {
   id            String   @id @default(cuid())
   countryCode   String   // ISO 3166-1 alpha-2
   visaType      String   // "student" | "tourist" | "work" | etc.
-  data          String   // Structured visa rules (JSON string for SQLite compatibility)
-  data_legacy   String?  // Backup for rollback and migration (JSON string for SQLite)
+  data          Json     // Structured visa rules (see VisaRuleSetData type)
+  data_legacy   Json?    // Backup for rollback and migration
   version       Int      @default(1) // Incremental version number
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -629,7 +722,7 @@ model VisaRuleSet {
   approvedBy    String?  // Admin user ID who approved
   rejectionReason String? // If rejected, reason for rejection
   sourceId      String?  // Optional: link to EmbassySource that generated this
-  extractionMetadata String? // Metadata about GPT-4 extraction (JSON string for SQLite)
+  extractionMetadata Json? // Metadata about GPT-4 extraction (tokens, confidence, etc.)
 
   source EmbassySource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   versions VisaRuleVersion[]
@@ -646,7 +739,7 @@ model VisaRuleSet {
 model VisaRuleVersion {
   id          String   @id @default(cuid())
   ruleSetId  String
-  data       String   // Snapshot of rule set data (JSON string for SQLite compatibility)
+  data       Json     // Snapshot of rule set data at this version
   version    Int      // Version number
   changeLog  String?  // Human-readable summary of changes
   createdAt  DateTime @default(now())
@@ -662,13 +755,13 @@ model EmbassyPageContent {
   id            String   @id @default(cuid())
   sourceId      String
   url           String
-  cleanedText   String   // Cleaned plain text content
-  html          String?  // Optional: raw HTML (for debugging)
+  cleanedText   String   @db.Text
+  html          String?  @db.Text
   title         String?
   status        String   @default("success")
   httpStatus    Int?
   errorMessage  String?
-  metadata      String?  // JSON string for SQLite compatibility
+  metadata      Json?
   fetchedAt     DateTime @default(now())
 
   source EmbassySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -686,9 +779,9 @@ model VisaRuleSetCandidate {
   pageContentId String?
   countryCode   String
   visaType       String
-  data           String   // JSON string for SQLite compatibility
+  data           Json
   confidence     Float?
-  extractionMetadata String? // JSON string for SQLite compatibility
+  extractionMetadata Json?
   status         String   @default("pending")
   reviewedBy     String?
   reviewedAt     DateTime?
@@ -710,7 +803,7 @@ model VisaRuleSetChangeLog {
   ruleSetId     String
   changeType    String
   changedBy     String?
-  changeDetails String?  // JSON string for SQLite compatibility
+  changeDetails Json?
   description   String?
   createdAt     DateTime @default(now())
 
@@ -731,7 +824,7 @@ model VisaRiskExplanation {
   summaryEn     String
   summaryUz     String
   summaryRu     String
-  recommendations String // JSON string for SQLite compatibility
+  recommendations Json   // JSON array of recommendation objects
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -750,7 +843,7 @@ model ChecklistFeedback {
   userId          String
   countryCode     String
   visaType        String
-  checklistSnapshot String // JSON string for SQLite compatibility
+  checklistSnapshot Json   // JSON snapshot of checklist at time of feedback
   feedbackType    String   // "missing_docs" | "unnecessary_docs" | "other"
   feedbackText    String
   createdAt       DateTime @default(now())
@@ -774,13 +867,13 @@ model DocumentCatalog {
   nameEn               String
   nameUz               String
   nameRu               String
-  descriptionEn        String
-  descriptionUz        String
-  descriptionRu        String
+  descriptionEn        String   @db.Text
+  descriptionUz        String   @db.Text
+  descriptionRu        String   @db.Text
   defaultCategory      String
   group                String
-  validityRequirements String?
-  formatRequirements   String?
+  validityRequirements String?  @db.Text
+  formatRequirements   String?  @db.Text
   isActive             Boolean  @default(true)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -798,7 +891,7 @@ model VisaRuleReference {
   documentId          String
   condition           String?
   categoryOverride    String?
-  descriptionOverride String?
+  descriptionOverride String? @db.Text
   createdAt           DateTime @default(now())
 
   ruleSet  VisaRuleSet    @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)

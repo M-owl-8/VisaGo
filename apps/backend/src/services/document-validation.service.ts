@@ -709,10 +709,10 @@ export function mapAIStatusToDbStatus(
   if (aiStatus === 'verified') {
     return 'verified';
   }
-  if (aiStatus === 'rejected' || aiStatus === 'needs_review') {
+  if (aiStatus === 'rejected') {
     return 'rejected';
   }
-  // 'uncertain' or any unexpected / missing value → 'pending' (not yet processed)
+  // 'needs_review', 'uncertain', or any unexpected / missing value → 'pending'
   return 'pending';
 }
 
@@ -881,7 +881,7 @@ export async function saveValidationResultToDocument(
 
     // Determine if AI has made a decision (verified or rejected)
     // 'pending' means AI hasn't processed yet, so verifiedByAI should be false
-    const aiHasDecided = documentStatus === 'verified' || documentStatus === 'rejected';
+    const aiHasDecided = documentStatus === 'verified';
 
     // Build user-facing verification notes
     const verificationNotes = buildVerificationNotes(validationResult);
