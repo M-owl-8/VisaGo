@@ -186,20 +186,14 @@ export default function AdminDashboardPage() {
                 <div key={idx} className="flex items-center justify-between py-2 border-b border-white/10 last:border-0">
                   <div>
                     <p className="text-white font-medium">
-                      {typeof country === 'object' && country !== null 
-                        ? (country.country || country.countryCode || 'Unknown')
-                        : String(country)}
+                      {country.country || 'Unknown'}
                     </p>
                     <p className="text-sm text-white/60">
-                      {typeof country === 'object' && country !== null && typeof country.applicationCount === 'number'
-                        ? `${country.applicationCount} applications`
-                        : ''}
+                      {country.applicationCount} applications
                     </p>
                   </div>
                   <p className="text-white font-semibold">
-                    {typeof country === 'object' && country !== null && typeof country.revenue === 'number'
-                      ? `$${country.revenue.toFixed(2)}`
-                      : '$0.00'}
+                    ${country.revenue.toFixed(2)}
                   </p>
                 </div>
               ))}
