@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, X, LogOut, ChevronDown, MessageCircle } from 'lucide-react';
+import { Menu, X, LogOut, MessageCircle } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
@@ -130,24 +130,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="relative hidden md:flex">
+            <div className="hidden md:flex">
               <select
                 value={currentLang}
                 onChange={(e) => changeLanguage(e.target.value)}
-                className="appearance-none rounded-full border border-white/20 bg-white/10 px-3 py-1.5 pr-8 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-inner shadow-black/20 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-primary/50 [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                className="appearance-none cursor-pointer rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-primary/50 [&>option]:bg-[#0E1A2C] [&>option]:text-white"
                 style={{ color: 'white' }}
               >
                 <option value="en" className="bg-[#0E1A2C] text-white">
-                  {t('common.languageNames.en', 'EN')}
+                  EN
                 </option>
                 <option value="ru" className="bg-[#0E1A2C] text-white">
-                  {t('common.languageNames.ru', 'RU')}
+                  RU
                 </option>
                 <option value="uz" className="bg-[#0E1A2C] text-white">
-                  {t('common.languageNames.uz', 'UZ')}
+                  O'Z
                 </option>
               </select>
-              <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/70" />
             </div>
 
             <div className="hidden items-center gap-2 md:flex md:gap-3">
@@ -228,17 +227,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <select
                   value={currentLang}
                   onChange={(e) => changeLanguage(e.target.value)}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                  className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white [&>option]:bg-[#0E1A2C] [&>option]:text-white"
                   style={{ color: 'white' }}
                 >
                   <option value="en" className="bg-[#0E1A2C] text-white">
-                    {t('common.languageNames.en', 'English')}
+                    EN
                   </option>
                   <option value="ru" className="bg-[#0E1A2C] text-white">
-                    {t('common.languageNames.ru', 'Русский')}
+                    RU
                   </option>
                   <option value="uz" className="bg-[#0E1A2C] text-white">
-                    {t('common.languageNames.uz', "O'zbekcha")}
+                    O'Z
                   </option>
                 </select>
               </div>
