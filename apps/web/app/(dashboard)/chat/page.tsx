@@ -105,7 +105,7 @@ export default function ChatPage() {
   return (
     <div className="fixed inset-0 top-16 sm:top-20 flex flex-col overflow-hidden bg-background">
       {/* Messages Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-8">
+      <div className="flex-1 overflow-y-auto no-scrollbar px-3 sm:px-4 lg:px-8">
         <div className="mx-auto max-w-5xl py-4">
           {isLoading && messages.length === 0 ? (
             <div className="space-y-4">
