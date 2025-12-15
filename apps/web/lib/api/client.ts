@@ -13,23 +13,14 @@ export interface ApiResponse<T = any> {
 }
 
 class ApiClient {
-  private api: AxiosInstance | null = null;
+  private api: AxiosInstance;
   private requestQueue: Map<string, Promise<any>> = new Map();
   private lastRequestTime: Map<string, number> = new Map();
   private readonly MIN_REQUEST_INTERVAL = 100; // Minimum 100ms between requests to same endpoint
   private pendingRequests: Map<string, Promise<any>> = new Map(); // Deduplicate concurrent requests
 
   constructor() {
-    // Don't initialize axios during construction to avoid SSR issues
-    // It will be lazily initialized on first use
-  }
-
-  private getAxiosInstance(): AxiosInstance {
-    if (this.api) {
-      return this.api;
-    }
-
-    // Lazy initialization - only happens on first actual use
+    // Use getter function to ensure lazy evaluation
     const baseURL = typeof window !== 'undefined' 
       ? `${API_BASE_URL}/api` 
       : `${process.env.NEXT_PUBLIC_API_URL || 'https://visago-production.up.railway.app'}/api`;
@@ -155,8 +146,6 @@ class ApiClient {
         return Promise.reject(error);
       }
     );
-
-    return this.api;
   }
 
   // ============================================================================
@@ -170,8 +159,7 @@ class ApiClient {
     lastName?: string
   ): Promise<ApiResponse> {
     try {
-      const api = this.getAxiosInstance();
-      const response = await api.post('/auth/register', {
+      const response = await this.api.post('/auth/register', {
         email,
         password,
         firstName,
@@ -216,8 +204,7 @@ class ApiClient {
 
   async login(email: string, password: string): Promise<ApiResponse> {
     try {
-      const api = this.getAxiosInstance();
-      const response = await api.post('/auth/login', {
+      const response = await this.api.post('/auth/login', {
         email,
         password,
       });
@@ -259,15 +246,13 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.get('/auth/me');
+    const response = await this.api.get('/auth/me');
     return response.data;
   }
 
   async logout(): Promise<ApiResponse> {
     try {
-      const api = this.getAxiosInstance();
-      const response = await api.post('/auth/logout');
+      const response = await this.api.post('/auth/logout');
       return response.data;
     } catch (error) {
       return { success: true };
@@ -275,20 +260,17 @@ class ApiClient {
   }
 
   async updateProfile(updates: any): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.put('/auth/me', updates);
+    const response = await this.api.put('/auth/me', updates);
     return response.data;
   }
 
   async forgotPassword(email: string): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.post('/auth/forgot-password', { email });
+    const response = await this.api.post('/auth/forgot-password', { email });
     return response.data;
   }
 
   async resetPassword(token: string, password: string): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.post('/auth/reset-password', {
+    const response = await this.api.post('/auth/reset-password', {
       token,
       password,
     });
@@ -300,34 +282,29 @@ class ApiClient {
   // ============================================================================
 
   async getApplications(): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.get('/applications');
+    const response = await this.api.get('/applications');
     return response.data;
   }
 
   async getApplication(id: string): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.get(`/applications/${id}`);
+    const response = await this.api.get(`/applications/${id}`);
     return response.data;
   }
 
   async deleteApplication(id: string): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.delete(`/applications/${id}`);
+    const response = await this.api.delete(`/applications/${id}`);
     return response.data;
   }
 
   async getDocumentChecklist(applicationId: string): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.get(`/document-checklist/${applicationId}`);
+    const response = await this.api.get(`/document-checklist/${applicationId}`);
     return response.data;
   }
 
   async generateApplicationWithAI(questionnaireData: any): Promise<ApiResponse> {
     // Accept both legacy format and v2 format
     // Backend expects legacy format for validation but can use full v2 structure
-    const api = this.getAxiosInstance();
-    const response = await api.post('/applications/ai-generate', {
+    const response = await this.api.post('/applications/ai-generate', {
       questionnaireData,
     });
     return response.data;
@@ -347,8 +324,7 @@ class ApiClient {
     formData.append('documentType', documentType);
     formData.append('file', file);
 
-    const api = this.getAxiosInstance();
-    const response = await api.post('/documents/upload', formData, {
+    const response = await this.api.post('/documents/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -358,8 +334,7 @@ class ApiClient {
   }
 
   async getApplicationDocuments(applicationId: string): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.get(`/documents/application/${applicationId}`);
+    const response = await this.api.get(`/documents/application/${applicationId}`);
     return response.data;
   }
 
@@ -373,13 +348,12 @@ class ApiClient {
     conversationHistory?: any[]
   ): Promise<ApiResponse> {
     try {
-      const api = this.getAxiosInstance();
       const transformedHistory = (conversationHistory || []).map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
 
-      const response = await api.post(
+      const response = await this.api.post(
         '/chat',
         {
           query: content,
@@ -443,13 +417,12 @@ class ApiClient {
 
     const requestPromise = (async () => {
       try {
-        const api = this.getAxiosInstance();
         const params: any = {};
         if (applicationId) params.applicationId = applicationId;
         if (limit) params.limit = limit;
         if (offset) params.offset = offset;
 
-        const response = await api.get('/chat/history', { params });
+        const response = await this.api.get('/chat/history', { params });
         return response.data;
       } finally {
         // Remove from pending after a short delay to allow deduplication
@@ -464,16 +437,14 @@ class ApiClient {
   }
 
   async getChatSessions(limit: number = 20, offset: number = 0): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.get('/chat/sessions', {
+    const response = await this.api.get('/chat/sessions', {
       params: { limit, offset },
     });
     return response.data;
   }
 
   async getChatSessionDetails(sessionId: string, limit: number = 100): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.get(`/chat/sessions/${sessionId}`, {
+    const response = await this.api.get(`/chat/sessions/${sessionId}`, {
       params: { limit },
     });
     return response.data;
@@ -492,8 +463,7 @@ class ApiClient {
 
     const requestPromise = (async () => {
       try {
-        const api = this.getAxiosInstance();
-        const response = await api.get('/users/me');
+        const response = await this.api.get('/users/me');
         return response.data;
       } finally {
         // Remove from pending after a short delay to allow deduplication
@@ -516,8 +486,7 @@ class ApiClient {
 
     const requestPromise = (async () => {
       try {
-        const api = this.getAxiosInstance();
-        const response = await api.get(`/users/${userId}/applications`);
+        const response = await this.api.get(`/users/${userId}/applications`);
         return response.data;
       } finally {
         // Remove from pending after a short delay to allow deduplication
@@ -532,8 +501,7 @@ class ApiClient {
   }
 
   async updateUserPreferences(userId: string, preferences: any): Promise<ApiResponse> {
-    const api = this.getAxiosInstance();
-    const response = await api.patch(`/users/${userId}/preferences`, preferences);
+    const response = await this.api.patch(`/users/${userId}/preferences`, preferences);
     return response.data;
   }
 
@@ -542,32 +510,27 @@ class ApiClient {
   // ============================================================================
 
   async get<T = any>(url: string, config?: any): Promise<{ data: ApiResponse<T> }> {
-    const api = this.getAxiosInstance();
-    const response = await api.get(url, config);
+    const response = await this.api.get(url, config);
     return response;
   }
 
   async post<T = any>(url: string, data?: any, config?: any): Promise<{ data: ApiResponse<T> }> {
-    const api = this.getAxiosInstance();
-    const response = await api.post(url, data, config);
+    const response = await this.api.post(url, data, config);
     return response;
   }
 
   async put<T = any>(url: string, data?: any, config?: any): Promise<{ data: ApiResponse<T> }> {
-    const api = this.getAxiosInstance();
-    const response = await api.put(url, data, config);
+    const response = await this.api.put(url, data, config);
     return response;
   }
 
   async patch<T = any>(url: string, data?: any, config?: any): Promise<{ data: ApiResponse<T> }> {
-    const api = this.getAxiosInstance();
-    const response = await api.patch(url, data, config);
+    const response = await this.api.patch(url, data, config);
     return response;
   }
 
   async delete<T = any>(url: string, config?: any): Promise<{ data: ApiResponse<T> }> {
-    const api = this.getAxiosInstance();
-    const response = await api.delete(url, config);
+    const response = await this.api.delete(url, config);
     return response;
   }
 

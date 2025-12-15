@@ -92,12 +92,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   isSignedIn: false,
-  isLoading: false,
+  isLoading: true,
   userApplications: [],
 
   initializeApp: async () => {
     try {
       if (typeof window === 'undefined') {
+        set({ isLoading: false });
         return;
       }
 
@@ -126,6 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             token: storedToken,
             user: restoredUser,
             isSignedIn: true,
+            isLoading: false, // Set loading to false immediately after restoring from storage
           });
 
           // DO NOT fetch here - let pages fetch their own data to prevent loops
@@ -134,10 +136,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           // Clear invalid stored data
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user');
+          set({ isLoading: false });
         }
+      } else {
+        // No stored credentials, set loading to false immediately
+        set({ isLoading: false });
       }
     } catch (error) {
-      // Silently fail - user will see logged out state
+      set({ isLoading: false });
     }
   },
 
