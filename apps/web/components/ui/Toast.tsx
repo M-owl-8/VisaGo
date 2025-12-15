@@ -44,11 +44,12 @@ export function Toast({ toast, onDismiss }: ToastProps) {
   const Icon = variant.icon;
 
   useEffect(() => {
-    if (!toast.duration) return;
+    const duration = toast.duration;
+    if (!duration) return;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, 100 - (elapsed / toast.duration) * 100);
+      const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
       setProgress(remaining);
 
       if (remaining === 0) {
