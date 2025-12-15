@@ -31,7 +31,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     },
     ref
   ) => {
-    const hasValue = props.value || props.defaultValue;
+    const hasValue =
+      props.value !== undefined && props.value !== null && props.value !== ''
+        ? props.value
+        : props.defaultValue;
+    const hasValuePresent = hasValue !== undefined && hasValue !== null && hasValue !== '';
 
     return (
       <div className="w-full">
@@ -54,8 +58,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'w-full rounded-xl border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 transition',
               'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
               'disabled:cursor-not-allowed disabled:opacity-50',
-              leftIcon && 'pl-10',
-              (rightIcon || success || error || (showClearButton && hasValue)) && 'pr-10',
+              leftIcon ? 'pl-10' : undefined,
+              rightIcon || success || error || (showClearButton && hasValuePresent) ? 'pr-10' : undefined,
               error && 'border-rose-500/50 bg-rose-500/5 focus:border-rose-500 focus:ring-rose-500/20',
               success && 'border-emerald-500/50 bg-emerald-500/5 focus:border-emerald-500 focus:ring-emerald-500/20',
               !error && !success && 'border-white/10',
