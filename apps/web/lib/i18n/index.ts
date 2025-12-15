@@ -77,52 +77,77 @@ export function initializeI18n(): Promise<void> {
   return import('react-i18next')
     .then((module) => {
       if (!i18next.isInitialized) {
-        const initialLanguage = getInitialLanguage();
-        
-        i18next
-          .use(LanguageDetector)
-          .use(module.initReactI18next)
-          .init({
+        try {
+          const initialLanguage = getInitialLanguage();
+          
+          i18next
+            .use(LanguageDetector)
+            .use(module.initReactI18next)
+            .init({
+              resources,
+              lng: initialLanguage, // Use our custom detection logic
+              fallbackLng: 'en',
+              interpolation: {
+                escapeValue: false,
+              },
+              react: {
+                useSuspense: false,
+              },
+              detection: {
+                // Configure LanguageDetector to use app_language key for persistence
+                lookupLocalStorage: 'app_language',
+                caches: ['localStorage'],
+                // Use localStorage first (which will read app_language), then browser language
+                // This ensures our saved preference is respected, but also allows browser detection as fallback
+                order: ['localStorage', 'navigator'],
+              },
+            });
+        } catch (error) {
+          console.error('[i18n] Error during initialization with React plugin:', error);
+          // Fall through to fallback initialization
+        }
+      }
+      // Always resolve, even if initialization had issues
+      return Promise.resolve();
+    })
+    .catch((error) => {
+      console.warn('[i18n] Failed to import react-i18next, using fallback initialization:', error);
+      // Fallback: initialize without React plugin if import fails
+      try {
+        if (!i18next.isInitialized) {
+          const initialLanguage = getInitialLanguage();
+          
+          i18next.use(LanguageDetector).init({
             resources,
-            lng: initialLanguage, // Use our custom detection logic
+            lng: initialLanguage,
             fallbackLng: 'en',
             interpolation: {
               escapeValue: false,
-            },
-            react: {
-              useSuspense: false,
             },
             detection: {
               // Configure LanguageDetector to use app_language key for persistence
               lookupLocalStorage: 'app_language',
               caches: ['localStorage'],
-              // Use localStorage first (which will read app_language), then browser language
-              // This ensures our saved preference is respected, but also allows browser detection as fallback
               order: ['localStorage', 'navigator'],
             },
           });
+        }
+      } catch (fallbackError) {
+        console.error('[i18n] Fallback initialization also failed:', fallbackError);
+        // Last resort: initialize with minimal config
+        if (!i18next.isInitialized) {
+          i18next.init({
+            resources,
+            lng: 'en',
+            fallbackLng: 'en',
+            interpolation: {
+              escapeValue: false,
+            },
+          });
+        }
       }
-    })
-    .catch(() => {
-      // Fallback: initialize without React plugin if import fails
-      if (!i18next.isInitialized) {
-        const initialLanguage = getInitialLanguage();
-        
-        i18next.use(LanguageDetector).init({
-          resources,
-          lng: initialLanguage,
-          fallbackLng: 'en',
-          interpolation: {
-            escapeValue: false,
-          },
-          detection: {
-            // Configure LanguageDetector to use app_language key for persistence
-            lookupLocalStorage: 'app_language',
-            caches: ['localStorage'],
-            order: ['localStorage', 'navigator'],
-          },
-        });
-      }
+      // Always resolve, even if all initialization attempts failed
+      return Promise.resolve();
     });
 }
 

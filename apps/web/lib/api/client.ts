@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { API_BASE_URL } from './config';
+import { getAPI_BASE_URL } from './config';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -21,8 +21,9 @@ class ApiClient {
 
   constructor() {
     // Use getter function to ensure lazy evaluation
+    // This ensures we get the correct URL even if module is loaded during SSR
     const baseURL = typeof window !== 'undefined' 
-      ? `${API_BASE_URL}/api` 
+      ? `${getAPI_BASE_URL()}/api` 
       : `${process.env.NEXT_PUBLIC_API_URL || 'https://visago-production.up.railway.app'}/api`;
     
     this.api = axios.create({

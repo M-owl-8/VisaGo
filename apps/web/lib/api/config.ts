@@ -28,10 +28,17 @@ const getApiBaseUrl = (): string => {
   }
 
   // Priority 2: Check if we're in development mode
-  const isDevelopment =
-    typeof window !== 'undefined'
-      ? window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      : process.env.NODE_ENV === 'development';
+  let isDevelopment = false;
+  try {
+    isDevelopment =
+      typeof window !== 'undefined'
+        ? window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        : process.env.NODE_ENV === 'development';
+  } catch (error) {
+    // If window.location access fails, fall back to NODE_ENV
+    console.warn('[API Config] Could not access window.location, using NODE_ENV:', error);
+    isDevelopment = process.env.NODE_ENV === 'development';
+  }
 
   if (isDevelopment) {
     // For local development, backend runs on port 3000, Next.js on 3001
@@ -52,7 +59,10 @@ const getApiBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     logger.warn('API base URL not configured, using production fallback', {
       url: FALLBACK_API_URL,
+      envVar: process.env.NEXT_PUBLIC_API_URL || 'NOT SET',
     });
+    console.warn('[API Config] Using fallback URL:', FALLBACK_API_URL);
+    console.warn('[API Config] NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL || 'NOT SET');
   }
   cachedApiBaseUrl = FALLBACK_API_URL;
   return FALLBACK_API_URL;
