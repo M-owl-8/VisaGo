@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/lib/stores/auth';
 import AdminSidebar from '@/components/admin/AdminSidebar';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 function normalizeRole(role: string | undefined | null): 'user' | 'admin' | 'super_admin' {
@@ -21,6 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { t } = useTranslation();
   const { user, logout, isLoading, fetchUserProfile } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -137,11 +138,67 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen bg-midnight">
-      <AdminSidebar />
-      <div className="flex-1 ml-64">
-        <header className="sticky top-0 z-30 border-b border-white/10 bg-midnight/90 backdrop-blur-sm">
-          <div className="flex items-center justify-between px-6 py-4">
+    <div className="flex min-h-screen bg-midnight overflow-x-hidden">
+      {/* Desktop Sidebar - Hidden on mobile */}
+      <div className="hidden lg:block">
+        <AdminSidebar />
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          {/* Mobile Drawer */}
+          <div
+            className="fixed left-0 top-0 h-full w-72 bg-midnight shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <h2 className="text-lg font-semibold text-white">
+                {t('admin.panelTitle', 'Admin Panel')}
+              </h2>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <AdminSidebar onNavigate={() => setIsMobileMenuOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
+        {/* Mobile Header - Visible only on mobile */}
+        <header className="sticky top-0 z-40 border-b border-white/10 bg-midnight/90 backdrop-blur-sm lg:hidden">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              <Menu size={24} />
+            </button>
+            <h1 className="text-base font-semibold text-white">
+              {t('admin.panelTitle', 'Admin Panel')}
+            </h1>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-white/70 hover:text-white hover:bg-white/10"
+            >
+              <LogOut size={18} />
+            </Button>
+          </div>
+        </header>
+
+        {/* Desktop Header - Hidden on mobile */}
+        <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-midnight/90 backdrop-blur-sm lg:block">
+          <div className="flex items-center justify-between px-4 py-4 sm:px-6">
             <div>
               <h1 className="text-lg font-semibold text-white">
                 {t('admin.panelTitle', 'Admin Panel')}
@@ -161,7 +218,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Button>
           </div>
         </header>
-        <main className="p-6">{children}</main>
+
+        {/* Main Content Area */}
+        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

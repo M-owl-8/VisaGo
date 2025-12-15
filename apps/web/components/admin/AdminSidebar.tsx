@@ -25,6 +25,10 @@ interface NavItem {
   icon: LucideIcon;
 }
 
+interface AdminSidebarProps {
+  onNavigate?: () => void;
+}
+
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', labelKey: 'admin.dashboard', labelDefault: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/users', labelKey: 'admin.users', labelDefault: 'Users', icon: Users },
@@ -37,14 +41,15 @@ const navItems: NavItem[] = [
   { href: '/admin/visa-rules', labelKey: 'admin.visaRules', labelDefault: 'Visa Rules', icon: Settings },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
   const pathname = usePathname();
   const { t, i18n } = useTranslation();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-white/10 bg-midnight/90 backdrop-blur-sm">
+    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-white/10 bg-midnight/90 backdrop-blur-sm lg:w-64">
       <div className="flex h-full flex-col">
-        <div className="border-b border-white/10 p-6">
+        {/* Desktop Header - Hidden on mobile (mobile has its own header in layout) */}
+        <div className="hidden border-b border-white/10 p-6 lg:block">
           <h2 className="text-lg font-semibold text-white">
             {t('admin.panelTitle', 'Admin Panel')}
           </h2>
@@ -62,6 +67,7 @@ export default function AdminSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive
