@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { ApplicationCard } from '@/components/applications/ApplicationCard';
+import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplications } from '@/lib/hooks/useApplications';
 import { usePullToRefresh } from '@/lib/hooks/usePullToRefresh';

@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
+import { ToastContainer } from '@/components/ui/ToastContainer';
+import { NetworkStatus } from '@/components/ui/NetworkStatus';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin', 'latin-ext'],

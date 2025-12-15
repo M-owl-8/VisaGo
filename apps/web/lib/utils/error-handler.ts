@@ -50,7 +50,7 @@ export function parseAPIError(error: any): APIError {
 
     if (status === 403) {
       return {
-        message: 'You don't have permission to perform this action.',
+        message: 'You do not have permission to perform this action.',
         code: 'FORBIDDEN',
         status: 403,
       };

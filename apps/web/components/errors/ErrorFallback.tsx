@@ -49,7 +49,7 @@ export function ErrorFallback({ error, resetErrorBoundary }: ErrorFallbackProps)
 
         {/* Description */}
         <p className="mb-6 text-sm text-white/60">
-          We encountered an unexpected error. Don't worry, your data is safe. Please try refreshing the page or go back to the homepage.
+          We encountered an unexpected error. Do not worry, your data is safe. Please try refreshing the page or go back to the homepage.
         </p>
 
         {/* Error Details (collapsed by default) */}
