@@ -411,5 +411,18 @@
     "footerChat": "AI yordamchi",
     "footerGetStarted": "Boshlash",
     "footerSignUp": "Bepul ro'yxatdan o'tish"
+  },
+  "admin": {
+    "panelTitle": "Administratorlar paneli",
+    "systemManagement": "Tizim boshqaruvi",
+    "dashboard": "Boshqaruv paneli",
+    "users": "Foydalanuvchilar",
+    "applications": "Arizalar",
+    "payments": "To'lovlar",
+    "documents": "Hujjatlar",
+    "analytics": "Tahlil",
+    "activityLogs": "Faoliyat jurnali",
+    "aiInteractions": "AI aloqalari",
+    "visaRules": "Viza qoidalari"
   }
 }

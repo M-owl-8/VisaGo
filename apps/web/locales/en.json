@@ -430,5 +430,18 @@
     "footerChat": "AI Assistant",
     "footerGetStarted": "Get Started",
     "footerSignUp": "Sign Up Free"
+  },
+  "admin": {
+    "panelTitle": "Admin Panel",
+    "systemManagement": "System Management",
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "applications": "Applications",
+    "payments": "Payments",
+    "documents": "Documents",
+    "analytics": "Analytics",
+    "activityLogs": "Activity Logs",
+    "aiInteractions": "AI Interactions",
+    "visaRules": "Visa Rules"
   }
 }

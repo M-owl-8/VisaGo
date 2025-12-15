@@ -411,5 +411,18 @@
     "footerChat": "AI-помощник",
     "footerGetStarted": "Начать",
     "footerSignUp": "Зарегистрироваться бесплатно"
+  },
+  "admin": {
+    "panelTitle": "Панель администратора",
+    "systemManagement": "Управление системой",
+    "dashboard": "Панель управления",
+    "users": "Пользователи",
+    "applications": "Заявки",
+    "payments": "Платежи",
+    "documents": "Документы",
+    "analytics": "Аналитика",
+    "activityLogs": "Журнал активности",
+    "aiInteractions": "AI взаимодействия",
+    "visaRules": "Визовые правила"
   }
 }
