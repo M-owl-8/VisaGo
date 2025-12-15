@@ -74,7 +74,8 @@ export function initializeI18n(): Promise<void> {
     return Promise.resolve();
   }
 
-  return import('react-i18next')
+  // Add timeout wrapper to prevent hanging
+  const initPromise = import('react-i18next')
     .then((module) => {
       if (!i18next.isInitialized) {
         try {
@@ -149,6 +150,31 @@ export function initializeI18n(): Promise<void> {
       // Always resolve, even if all initialization attempts failed
       return Promise.resolve();
     });
+
+  // Add 3-second timeout to the import to prevent hanging
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      console.warn('[i18n] Import timeout (3s) - initializing with fallback');
+      if (!i18next.isInitialized) {
+        try {
+          i18next.init({
+            resources,
+            lng: 'en',
+            fallbackLng: 'en',
+            interpolation: {
+              escapeValue: false,
+            },
+          });
+        } catch (e) {
+          console.error('[i18n] Timeout fallback failed:', e);
+        }
+      }
+      resolve();
+    }, 3000);
+  });
+
+  // Race the import against timeout - whichever finishes first wins
+  return Promise.race([initPromise, timeoutPromise]);
 }
 
 export default i18next;

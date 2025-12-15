@@ -20,11 +20,18 @@ class ApiClient {
   private pendingRequests: Map<string, Promise<any>> = new Map(); // Deduplicate concurrent requests
 
   constructor() {
-    // Use getter function to ensure lazy evaluation
+    // Use getter function with error handling to prevent blocking
     // This ensures we get the correct URL even if module is loaded during SSR
-    const baseURL = typeof window !== 'undefined' 
-      ? `${getAPI_BASE_URL()}/api` 
-      : `${process.env.NEXT_PUBLIC_API_URL || 'https://visago-production.up.railway.app'}/api`;
+    let baseURL: string;
+    try {
+      baseURL = typeof window !== 'undefined' 
+        ? `${getAPI_BASE_URL()}/api` 
+        : `${process.env.NEXT_PUBLIC_API_URL || 'https://visago-production.up.railway.app'}/api`;
+    } catch (error) {
+      console.error('[ApiClient] Error getting base URL, using fallback:', error);
+      // Fallback URL - always use production as last resort
+      baseURL = 'https://visago-production.up.railway.app/api';
+    }
     
     this.api = axios.create({
       baseURL,

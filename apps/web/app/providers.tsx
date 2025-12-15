@@ -7,7 +7,8 @@ import { CommandPalette } from '@/components/command/CommandPalette';
 import { useCommandPalette } from '@/lib/hooks/useCommandPalette';
 import { useAuthStore } from '@/lib/stores/auth';
 
-const INITIALIZATION_TIMEOUT = 10000; // 10 seconds max
+const INITIALIZATION_TIMEOUT = 5000; // 5 seconds for normal timeout
+const MAX_INIT_TIME = 10000; // Absolute max: 10 seconds - force render
 
 export function Providers({ children }: { children: ReactNode }) {
   const { isOpen, close } = useCommandPalette();
@@ -18,54 +19,99 @@ export function Providers({ children }: { children: ReactNode }) {
   // Initialize i18n and auth on app startup
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    let maxTimeoutId: NodeJS.Timeout;
     let isMounted = true;
+
+    // Absolute failsafe - force render after max time regardless of state
+    maxTimeoutId = setTimeout(() => {
+      if (isMounted && !i18nReady) {
+        console.error('[Providers] MAX TIMEOUT - Forcing render after 10s');
+        setI18nReady(true);
+        try {
+          initializeApp();
+        } catch (e) {
+          console.error('[Providers] Error in initializeApp (max timeout):', e);
+        }
+      }
+    }, MAX_INIT_TIME);
 
     const init = async () => {
       try {
         // Set timeout to prevent infinite loading
         timeoutId = setTimeout(() => {
-          if (isMounted) {
+          if (isMounted && !i18nReady) {
             console.error('[Providers] Initialization timeout - proceeding anyway');
             setInitError('Initialization took too long, but continuing...');
             setI18nReady(true);
-            initializeApp();
+            try {
+              initializeApp();
+            } catch (e) {
+              console.error('[Providers] Error in initializeApp (timeout):', e);
+            }
           }
         }, INITIALIZATION_TIMEOUT);
 
-        // Initialize i18n first
+        // Initialize i18n first with timeout wrapper
         console.log('[Providers] Initializing i18n...');
-        await initializeI18n();
+        
+        const i18nPromise = initializeI18n();
+        const timeoutPromise = new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn('[Providers] i18n init taking too long, proceeding...');
+            resolve();
+          }, INITIALIZATION_TIMEOUT);
+        });
+
+        // Race i18n initialization against timeout
+        await Promise.race([i18nPromise, timeoutPromise]);
         
         if (isMounted) {
           clearTimeout(timeoutId);
-          console.log('[Providers] i18n initialized successfully');
+          console.log('[Providers] i18n initialized (or timed out)');
           setI18nReady(true);
           
-          // Then initialize auth (which may use i18n for error messages)
+          // Then initialize auth
           console.log('[Providers] Initializing auth...');
-          initializeApp();
+          try {
+            initializeApp();
+          } catch (e) {
+            console.error('[Providers] Error in initializeApp:', e);
+          }
         }
       } catch (error) {
         console.error('[Providers] Initialization error:', error);
         if (isMounted) {
           clearTimeout(timeoutId);
           setInitError(error instanceof Error ? error.message : 'Initialization failed');
-          // Still set ready to true so app can render (with fallback translations)
           setI18nReady(true);
-          initializeApp();
+          try {
+            initializeApp();
+          } catch (e) {
+            console.error('[Providers] Error in initializeApp (catch):', e);
+          }
         }
       }
     };
     
-    init();
+    // Start initialization with error handling
+    init().catch((error) => {
+      console.error('[Providers] Unhandled init error:', error);
+      if (isMounted) {
+        setI18nReady(true);
+        try {
+          initializeApp();
+        } catch (e) {
+          console.error('[Providers] Error in initializeApp (unhandled):', e);
+        }
+      }
+    });
 
     return () => {
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
+      if (maxTimeoutId) clearTimeout(maxTimeoutId);
     };
-  }, [initializeApp]);
+  }, [initializeApp, i18nReady]);
 
   // Don't render children until i18n is ready to prevent translation issues
   if (!i18nReady) {
