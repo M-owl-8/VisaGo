@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { CheckCircle2, Clock, XCircle, Upload, Eye, HelpCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle2, Clock, XCircle, Upload, Eye, HelpCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils/cn';
 import { DocumentExplanationModal } from '@/components/checklist/DocumentExplanationModal';
+import { DocumentUploadModal } from '@/components/documents/DocumentUploadModal';
+import { useDocumentStatus } from '@/lib/hooks/useDocumentStatus';
+import { ContextualHelp } from '@/components/help/ContextualHelp';
 
 interface DocumentChecklistItemProps {
   item: {
@@ -38,6 +41,7 @@ interface DocumentChecklistItemProps {
   applicationId: string;
   language?: string;
   t: TFunction<'translation', undefined>;
+  onPreview?: (documentId: string) => void;
 }
 
 export function DocumentChecklistItem({
@@ -45,9 +49,50 @@ export function DocumentChecklistItem({
   applicationId,
   language = 'en',
   t,
+  onPreview,
 }: DocumentChecklistItemProps) {
   const [showExplanation, setShowExplanation] = useState(false);
-  const status = item.status || 'missing';
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  
+  // Use polling hook for pending documents
+  const { status: liveStatus, isProcessing } = useDocumentStatus(
+    item.documentId,
+    item.status
+  );
+  
+  // Use live status if available, otherwise fall back to item status
+  const status = liveStatus?.status || item.status || 'missing';
+
+  // Listen for status change events
+  useEffect(() => {
+    const handleStatusChange = async (event: CustomEvent) => {
+      if (event.detail.documentId === item.documentId) {
+        const newStatus = event.detail.status;
+        if (newStatus === 'verified') {
+          setToastMessage(t('documents.statusVerified', 'Document verified!'));
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+          
+          // Celebrate with confetti
+          const { celebrateDocumentVerified } = await import('@/lib/utils/confetti');
+          celebrateDocumentVerified();
+        } else if (newStatus === 'rejected') {
+          setToastMessage(t('documents.statusRejected', 'Document rejected'));
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('document-status-changed', handleStatusChange as EventListener);
+      return () => {
+        window.removeEventListener('document-status-changed', handleStatusChange as EventListener);
+      };
+    }
+  }, [item.documentId, t]);
   const isVerified = status === 'verified';
   const isRejected = status === 'rejected';
   const isPending = status === 'pending';
@@ -93,9 +138,14 @@ export function DocumentChecklistItem({
     ? item.commonMistakesRu || item.commonMistakes
     : item.commonMistakes;
 
+  const isVerified = status === 'verified';
+  const isRejected = status === 'rejected';
+  const isPending = status === 'pending';
+
   const getStatusIcon = () => {
     if (isVerified) return <CheckCircle2 size={18} className="text-emerald-400" />;
     if (isRejected) return <XCircle size={18} className="text-rose-400" />;
+    if (isPending && isProcessing) return <Loader2 size={18} className="animate-spin text-amber-400" />;
     if (isPending) return <Clock size={18} className="text-amber-400" />;
     return null;
   };
@@ -109,11 +159,13 @@ export function DocumentChecklistItem({
         statusLabel = t('documents.statusNotUploaded', 'Not uploaded');
         break;
       case 'pending':
-        statusLabel = t('documents.statusPendingReview', 'Uploaded, awaiting AI review');
+        statusLabel = isProcessing
+          ? t('documents.statusAIReviewing', 'AI reviewing...')
+          : t('documents.statusPendingReview', 'Uploaded, awaiting AI review');
         break;
       case 'verified':
         // Check if AI verified
-        const aiVerified = (item as any).aiVerified;
+        const aiVerified = liveStatus?.verifiedByAI || (item as any).aiVerified;
         statusLabel = aiVerified
           ? t('documents.statusVerifiedByAI', 'Verified by AI ✅')
           : t('documents.statusVerified', 'Verified');
@@ -163,6 +215,14 @@ export function DocumentChecklistItem({
                 ? t('documents.categoryHighlyRecommended', 'Highly Recommended')
                 : t('documents.categoryOptional', 'Optional')}
             </Badge>
+            {/* Contextual Help */}
+            {item.category === 'required' && (
+              <ContextualHelp
+                title={t('help.requiredDocument', 'Required Document')}
+                content={t('help.requiredDocumentInfo', 'This document is mandatory for your visa application. Your application cannot proceed without it.')}
+                position="top"
+              />
+            )}
           </div>
           {description && (
             <p className="mt-1 text-sm text-white/60">{description}</p>
@@ -219,42 +279,37 @@ export function DocumentChecklistItem({
         </div>
       )}
 
-      {/* Actions */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      {/* Actions - Optimized for mobile with proper touch targets */}
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         {/* Show Upload button if missing, rejected, or pending (allows re-upload) */}
         {(status === 'missing' || status === 'rejected' || status === 'pending') && (
-          <Link
-            href={`/applications/${applicationId}/documents?documentType=${encodeURIComponent(item.documentType || 'document')}&name=${encodeURIComponent(name || 'Document')}`}
-            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/20 active:scale-95"
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary/20 active:scale-95 sm:w-auto sm:justify-start"
           >
-            <Upload size={16} />
-            {t('documents.uploadDocument', 'Upload')}
-          </Link>
+            <Upload size={18} />
+            <span>{t('documents.uploadDocument', 'Upload')}</span>
+          </button>
         )}
         {/* Show View button if file exists (for all statuses including rejected/pending) */}
         {item.fileUrl && (
-          <Link
-            href={
-              typeof window !== 'undefined' && item.fileUrl.startsWith('http://localhost')
-                ? item.fileUrl.replace('http://localhost:3000', window.location.origin)
-                : item.fileUrl
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 active:scale-95"
+          <button
+            onClick={() => onPreview && item.documentId && onPreview(item.documentId)}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10 active:scale-95 sm:w-auto sm:justify-start"
           >
-            <Eye size={16} />
-            {t('documents.viewDocument', 'View')}
-          </Link>
+            <Eye size={18} />
+            <span>{t('documents.viewDocument', 'View')}</span>
+          </button>
         )}
+        {/* Why button - icon only on mobile, full button on desktop */}
         {documentType && (
           <button
             onClick={() => setShowExplanation(true)}
-            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95"
+            className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95 sm:w-auto"
             title={t('applications.whyDoINeedThis', 'Why do I need this document?')}
           >
-            <HelpCircle size={16} />
-            <span>{t('applications.why', 'Why?')}</span>
+            <HelpCircle size={18} />
+            <span className="sm:inline">{t('applications.why', 'Why?')}</span>
           </button>
         )}
       </div>
@@ -268,6 +323,30 @@ export function DocumentChecklistItem({
           documentType={documentType}
           language={language}
         />
+      )}
+
+      {/* Upload Modal */}
+      <DocumentUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        applicationId={applicationId}
+        documentType={item.documentType || 'document'}
+        documentName={name}
+        onUploadSuccess={() => {
+          // Refresh the page to show updated status
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+        }}
+      />
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-5">
+          <div className="rounded-lg border border-white/10 bg-midnight/95 px-4 py-3 shadow-lg backdrop-blur-sm">
+            <p className="text-sm font-medium text-white">{toastMessage}</p>
+          </div>
+        </div>
       )}
     </div>
   );

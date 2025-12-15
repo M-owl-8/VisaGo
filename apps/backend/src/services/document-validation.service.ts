@@ -889,7 +889,7 @@ export async function saveValidationResultToDocument(
     // Safely extract notes with null fallbacks
     const notes = validationResult.notes ?? {};
 
-    await prisma.userDocument.update({
+    const updatedDocument = await prisma.userDocument.update({
       where: { id: documentId },
       data: {
         status: documentStatus,
@@ -911,6 +911,28 @@ export async function saveValidationResultToDocument(
       confidence: validationResult.confidence,
       hasProblems: (validationResult.problems ?? []).length > 0,
     });
+
+    // Emit WebSocket event for real-time updates
+    try {
+      const { websocketService } = await import('./websocket.service');
+      if (updatedDocument.applicationId) {
+        websocketService.emitDocumentStatusUpdate(
+          updatedDocument.applicationId,
+          documentId,
+          documentStatus,
+          {
+            verifiedByAI: aiHasDecided,
+            aiConfidence: validationResult.confidence,
+            aiNotesUz: notes.uz,
+            aiNotesEn: notes.en,
+            aiNotesRu: notes.ru,
+          }
+        );
+      }
+    } catch (wsError) {
+      // WebSocket emit is non-blocking, log error but don't fail
+      console.warn('[DocValidation] Failed to emit WebSocket event:', wsError);
+    }
   } catch (error) {
     logError(
       '[DocValidation] Failed to save validation result',

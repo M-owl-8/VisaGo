@@ -128,47 +128,8 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       });
     }
 
-    // HIGH PRIORITY FIX: Update application progress after document upload
-    // This ensures progress percentage reflects document completion status
-    try {
-      const { ApplicationsService } = await import('../services/applications.service');
-      await ApplicationsService.updateProgressFromDocuments(applicationId);
-      console.log('[Documents] Updated application progress after upload', { applicationId });
-    } catch (progressError) {
-      // Log but don't fail document upload if progress update fails
-      console.warn('[Documents] Failed to update application progress:', progressError);
-    }
-
-    // Try to find matching checklist item (optional)
-    let checklistItem: any = undefined;
-    try {
-      const { DocumentChecklistService } = await import('../services/document-checklist.service');
-      const checklist = await DocumentChecklistService.generateChecklist(applicationId, userId);
-      // Handle both checklist object and status object with proper type narrowing
-      if (isDocumentChecklist(checklist)) {
-        checklistItem = checklist.items.find(
-          (item) =>
-            item.documentType === documentType ||
-            item.documentType?.toLowerCase() === documentType.toLowerCase()
-        );
-
-        // Log checklist item lookup for debugging
-        console.log('[UPLOAD_DEBUG] Checklist item lookup', {
-          documentType,
-          checklistItemFound: !!checklistItem,
-          checklistItemDocumentType: checklistItem?.documentType,
-          allChecklistItemTypes: checklist.items.map((i: any) => i.documentType),
-        });
-      }
-      // If checklist is a status object (processing/failed), we skip the lookup
-      // This is expected and not an error - checklist lookup is optional
-    } catch (error) {
-      // Checklist lookup is optional, continue without it
-      console.log('[UPLOAD_DEBUG] Checklist lookup failed (non-blocking)', {
-        documentType,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    // Note: Progress update and checklist generation moved to background queue
+    // This allows the upload endpoint to return immediately (< 2s)
 
     // Normalize document type before storing
     const {
@@ -295,13 +256,13 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       });
     }
 
-    // Return response immediately - processing happens in background
-    res.status(201).json({
+    // Return 202 Accepted immediately - processing happens in background
+    res.status(202).json({
       success: true,
       data: {
         documentId: document.id,
         documentType: document.documentType,
-        status: document.status,
+        status: 'pending',
         fileUrl: document.fileUrl,
         fileName: document.fileName,
         uploadedAt: document.uploadedAt,
@@ -310,13 +271,61 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         type: process.env.STORAGE_TYPE || 'local',
         fileUrl: uploadResult.fileUrl,
       },
-      message: 'Document uploaded successfully. Processing in background.',
+      message: 'Document uploaded successfully. AI validation in progress.',
     });
   } catch (error: any) {
     res.status(400).json({
       success: false,
       error: {
         message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * GET /api/documents/:documentId/status
+ * Get the current status of a specific document
+ */
+router.get('/:documentId/status', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { documentId } = req.params;
+
+    const document = await prisma.userDocument.findFirst({
+      where: {
+        id: documentId,
+        userId,
+      },
+      select: {
+        status: true,
+        verifiedByAI: true,
+        aiConfidence: true,
+        aiNotesUz: true,
+        aiNotesEn: true,
+        aiNotesRu: true,
+        verificationNotes: true,
+      },
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Document not found or access denied',
+        },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: document,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message || 'Failed to fetch document status',
       },
     });
   }

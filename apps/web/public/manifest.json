@@ -1,0 +1,22 @@
+{
+  "name": "Ketdik - Visa Application Workspace",
+  "short_name": "Ketdik",
+  "description": "AI-powered visa application management",
+  "start_url": "/applications",
+  "display": "standalone",
+  "background_color": "#040816",
+  "theme_color": "#040816",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/images/ketdik-icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/images/ketdik-icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

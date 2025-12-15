@@ -56,6 +56,7 @@ import documentChecklistRoutes from './routes/document-checklist';
 import docCheckRoutes from './routes/doc-check';
 import internalRoutes from './routes/internal';
 import devRoutes from './routes/dev';
+import { websocketService } from './services/websocket.service';
 
 // Load environment variables
 dotenv.config();
@@ -680,7 +681,10 @@ async function startServer() {
     process.stdout.write('\n✅ All services initialized successfully!\n\n');
 
     // Start Express server
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
+      // Initialize WebSocket server
+      websocketService.initialize(server);
+      process.stdout.write('✅ WebSocket server initialized on path /ws\n');
       // Get actual storage status (not just STORAGE_TYPE env var)
       const storageInfo = StorageAdapter.getStorageInfo();
       const storageDisplay =
@@ -764,4 +768,4 @@ process.on('SIGTERM', async () => {
 startServer();
 
 export default app;
-export { cacheService };
+export { cacheService, websocketService };

@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { DocumentChecklistItem } from '@/components/applications/DocumentChecklistItem';
 import { ChecklistFeedbackForm } from '@/components/checklist/ChecklistFeedbackForm';
+import { DocumentPreviewModal } from '@/components/documents/DocumentPreviewModal';
 import { useTranslation } from 'react-i18next';
 
 export interface ChecklistItem {
@@ -49,6 +51,30 @@ export function DocumentChecklist({
   pollTimeout = false,
 }: DocumentChecklistProps) {
   const { t } = useTranslation();
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+
+  // Get all documents with file URLs for preview
+  const documentsWithFiles = items
+    .filter((item) => item.fileUrl)
+    .map((item) => ({
+      id: item.documentId || item.documentType || '',
+      name: item.name,
+      fileUrl: item.fileUrl || '',
+      status: item.status,
+      aiNotesUz: (item as any).aiNotesUz,
+      aiNotesEn: (item as any).aiNotesEn,
+      aiNotesRu: (item as any).aiNotesRu,
+      verificationNotes: item.verificationNotes,
+    }));
+
+  const handlePreviewDocument = (documentId: string) => {
+    const index = documentsWithFiles.findIndex((doc) => doc.id === documentId);
+    if (index !== -1) {
+      setPreviewIndex(index);
+      setShowPreview(true);
+    }
+  };
 
   // Group items by category
   const requiredItems = items.filter((item) => item.category === 'required');
@@ -103,6 +129,7 @@ export function DocumentChecklist({
                   applicationId={applicationId}
                   language={language}
                   t={t}
+                  onPreview={handlePreviewDocument}
                 />
               ))}
             </div>
@@ -128,6 +155,7 @@ export function DocumentChecklist({
                   applicationId={applicationId}
                   language={language}
                   t={t}
+                  onPreview={handlePreviewDocument}
                 />
               ))}
             </div>
@@ -153,6 +181,7 @@ export function DocumentChecklist({
                   applicationId={applicationId}
                   language={language}
                   t={t}
+                  onPreview={handlePreviewDocument}
                 />
               ))}
             </div>
@@ -165,6 +194,16 @@ export function DocumentChecklist({
         <div className="mt-6 border-t border-white/10 pt-4">
           <ChecklistFeedbackForm applicationId={applicationId} />
         </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {documentsWithFiles.length > 0 && (
+        <DocumentPreviewModal
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          documents={documentsWithFiles}
+          initialDocumentIndex={previewIndex}
+        />
       )}
     </Card>
   );

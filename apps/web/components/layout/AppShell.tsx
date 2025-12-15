@@ -137,47 +137,42 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden md:flex">
+            {/* Desktop: Language + Profile + Logout */}
+            <div className="hidden items-center gap-3 md:flex">
               <select
                 value={currentLang}
                 onChange={(e) => changeLanguage(e.target.value)}
                 className="appearance-none cursor-pointer rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-primary/50 [&>option]:bg-[#0E1A2C] [&>option]:text-white"
                 style={{ color: 'white' }}
               >
-                <option value="en" className="bg-[#0E1A2C] text-white">
-                  EN
-                </option>
-                <option value="ru" className="bg-[#0E1A2C] text-white">
-                  RU
-                </option>
-                <option value="uz" className="bg-[#0E1A2C] text-white">
-                  UZ
-                </option>
+                <option value="en">EN</option>
+                <option value="ru">RU</option>
+                <option value="uz">UZ</option>
               </select>
-            </div>
 
-            <div className="hidden items-center gap-2 md:flex md:gap-3">
-              <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white sm:px-4 sm:py-2 sm:text-sm">
+              <div className="rounded-full bg-white/10 px-4 py-2 text-sm text-white">
                 {user?.firstName} {user?.lastName}
               </div>
+              
               <Button
                 variant="secondary"
                 size="sm"
-                className="rounded-full border border-white/10 !bg-transparent px-3 py-1.5 text-xs text-white shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:px-4 sm:py-2 sm:text-sm"
+                className="rounded-full border border-white/10 !bg-transparent px-4 py-2 text-sm text-white shadow-[0_20px_40px_rgba(0,0,0,0.45)]"
                 onClick={handleLogout}
               >
-                <LogOut size={14} className="sm:size-4" />
-                <span className="ml-1.5 sm:ml-2">{t('profile.logout')}</span>
+                <LogOut size={16} />
+                <span className="ml-2">{t('profile.logout')}</span>
               </Button>
             </div>
 
+            {/* Mobile: Hamburger Menu */}
             <button
               type="button"
               onClick={() => setIsNavOpen((prev) => !prev)}
               className="flex h-11 w-11 items-center justify-center rounded-xl transition hover:bg-white/10 active:scale-95 md:hidden"
               aria-label="Toggle navigation"
             >
-              {isNavOpen ? <X size={22} className="sm:size-6" /> : <Menu size={22} className="sm:size-6" />}
+              {isNavOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>

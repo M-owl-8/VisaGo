@@ -265,16 +265,63 @@
     "uploadSuccess": "Document uploaded successfully",
     "uploadFailed": "Upload failed",
     "fileTooLarge": "File size must be less than 20MB",
+    "invalidFileType": "Only PDF, JPG, and PNG files are allowed",
     "statusVerified": "Verified",
     "statusPending": "Pending",
     "statusRejected": "Rejected",
     "statusNotUploaded": "Not uploaded",
+    "statusAIReviewing": "AI reviewing...",
+    "statusPendingReview": "Uploaded, awaiting AI review",
+    "statusVerifiedByAI": "Verified by AI ✅",
+    "statusNeedsFix": "Needs fix",
     "categoryRequired": "Required",
     "categoryHighlyRecommended": "Highly Recommended",
     "categoryOptional": "Optional",
     "viewDocument": "View",
     "uploadDocument": "Upload",
-    "whereToObtain": "Where to obtain"
+    "uploadMultiple": "Upload Multiple",
+    "bulkUpload": "Bulk Upload Documents",
+    "dragDropFile": "Drag and drop your file here",
+    "dragDropMultiple": "Drag and drop multiple files here",
+    "orClickToSelect": "or click to select from your computer",
+    "orClickToSelectMultiple": "or click to select multiple files",
+    "selectFile": "Select File",
+    "selectFiles": "Select Files",
+    "supportedFormats": "PDF, JPG, PNG - Max 20MB",
+    "uploading": "Uploading",
+    "upload": "Upload",
+    "uploadAll": "Upload All",
+    "aiReviewing": "AI is reviewing your document...",
+    "tryAgain": "Try Again",
+    "addMore": "Add More",
+    "totalFiles": "Total",
+    "success": "Success",
+    "failed": "Failed",
+    "whereToObtain": "Where to obtain",
+    "documentType": "Document Type",
+    "passport": "Passport",
+    "bankStatement": "Bank Statement",
+    "employmentLetter": "Employment Letter",
+    "invitationLetter": "Invitation Letter",
+    "travelInsurance": "Travel Insurance",
+    "flightBooking": "Flight Booking",
+    "accommodationProof": "Accommodation Proof",
+    "other": "Other",
+    "previewNotAvailable": "Preview not available",
+    "downloadToView": "Download to view",
+    "download": "Download",
+    "document": "Document",
+    "of": "of",
+    "status": "Status",
+    "aiNotes": "AI Notes",
+    "keyboardShortcuts": "Keyboard shortcuts",
+    "previousDocument": "Previous document",
+    "nextDocument": "Next document",
+    "close": "Close",
+    "incorrectDocument": "Incorrect document",
+    "pleaseUploadCorrected": "Please upload a corrected version of this document.",
+    "aiConfidence": "AI confidence",
+    "uploadInfo": "Your document will be automatically verified by AI after upload. This usually takes 10-30 seconds."
   },
   "checklist": {
     "whereToObtain": "Where to obtain",
@@ -432,7 +479,7 @@
     "footerSignUp": "Sign Up Free"
   },
   "admin": {
-    "panelTitle": "Admin Panel",
+    "adminPanelTitle": "Admin Panel",
     "systemManagement": "System Management",
     "dashboard": "Dashboard",
     "users": "Users",
@@ -443,5 +490,89 @@
     "activityLogs": "Activity Logs",
     "aiInteractions": "AI Interactions",
     "visaRules": "Visa Rules"
+  },
+  "progress": {
+    "breakdown": "Progress Breakdown",
+    "overall": "Overall Progress",
+    "questionnaire": "Questionnaire",
+    "verifiedDocuments": "Verified Documents",
+    "pendingReview": "Pending AI Review",
+    "of": "of",
+    "documentsVerified": "documents verified",
+    "documentsAwaitingReview": "documents awaiting AI review",
+    "questionnaireComplete": "Application details completed",
+    "questionnairePending": "Complete application details",
+    "tip": "Progress increases when AI verifies your documents. Pending documents count as partial progress."
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Welcome to Ketdik!",
+      "description": "Your AI-powered visa application assistant. Let us guide you through the process."
+    },
+    "startApplication": {
+      "title": "Start Your First Application",
+      "description": "Answer a few questions about your trip, and we will generate a personalized document checklist."
+    },
+    "uploadDocuments": {
+      "title": "Upload & Verify Documents",
+      "description": "Upload your documents and our AI will verify them instantly. Get real-time feedback and guidance."
+    },
+    "skip": "Skip tour",
+    "next": "Next",
+    "getStarted": "Get Started"
+  },
+  "templates": {
+    "title": "Document Templates",
+    "subtitle": "Download sample templates to help you prepare your visa documents",
+    "invitationLetter": "Invitation Letter",
+    "invitationLetterDesc": "Template for personal or business invitation letters",
+    "employmentLetter": "Employment Letter",
+    "employmentLetterDesc": "Template for employment verification letter from your employer",
+    "accommodationProof": "Accommodation Proof",
+    "accommodationProofDesc": "Template for hotel booking confirmation or host letter",
+    "coverLetter": "Cover Letter",
+    "coverLetterDesc": "Template for visa application cover letter explaining your trip purpose",
+    "travelItinerary": "Travel Itinerary",
+    "travelItineraryDesc": "Template for detailed travel itinerary with dates and locations",
+    "download": "Download Template",
+    "comingSoon": "Document templates are coming soon! Check back later.",
+    "howToUse": "How to use templates",
+    "step1": "Download the template that matches your document type",
+    "step2": "Fill in your personal information and details",
+    "step3": "Save as PDF and upload to your application",
+    "step4": "AI will verify your document and provide feedback"
+  },
+  "analytics": {
+    "insights": "Insights & Benchmarks",
+    "averageUploadTime": "Average upload time",
+    "uploadTimeDesc": "Most users complete document uploads within",
+    "days": "days",
+    "approvalRate": "Approval rate",
+    "approvalRateDesc": "Users with employment letters have",
+    "processingTime": "Processing time",
+    "processingTimeDesc": "Average embassy processing time:",
+    "community": "Community",
+    "usersApplied": "users have applied for this visa",
+    "dataNote": "Data is anonymized and aggregated from our user community"
+  },
+  "help": {
+    "requiredDocument": "Required Document",
+    "requiredDocumentInfo": "This document is mandatory for your visa application. Your application cannot proceed without it."
+  },
+  "menu": {
+    "title": "Menu",
+    "language": "Language",
+    "profile": "Profile",
+    "logout": "Logout"
+  },
+  "offline": {
+    "title": "You are offline",
+    "description": "Please check your internet connection and try again. Your data is saved locally.",
+    "retry": "Try Again"
+  },
+  "time": {
+    "justNow": "just now",
+    "ago": "ago",
+    "yesterday": "yesterday"
   }
 }

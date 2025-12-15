@@ -3,7 +3,7 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
-import { ArrowLeft, MessageCircle, CheckCircle2, Clock, XCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageCircle, CheckCircle2, Clock, XCircle, Trash2, Upload } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplication } from '@/lib/hooks/useApplication';
 import ErrorBanner from '@/components/ErrorBanner';
@@ -13,6 +13,9 @@ import { StatusBadge } from '@/components/applications/StatusBadge';
 import { DocumentChecklist } from '@/components/checklist/DocumentChecklist';
 import { ChecklistSummary } from '@/components/checklist/ChecklistSummary';
 import { RiskExplanationPanel } from '@/components/checklist/RiskExplanationPanel';
+import { ProgressBreakdown } from '@/components/checklist/ProgressBreakdown';
+import { BulkUploadModal } from '@/components/documents/BulkUploadModal';
+import { UserInsights } from '@/components/analytics/UserInsights';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { RefreshCcw } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
@@ -37,6 +40,7 @@ export default function ApplicationDetailPage() {
   } = useApplication(applicationId, { autoFetch: isSignedIn });
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
 
   // Redirect if not signed in
   if (!isSignedIn) {
@@ -180,6 +184,14 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="ghost"
+              onClick={() => setShowBulkUpload(true)}
+              className="w-full rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary hover:bg-primary/20 sm:w-auto sm:px-4 sm:text-sm"
+            >
+              <Upload size={14} className="sm:size-4" />
+              <span className="ml-1.5 sm:ml-2">{t('documents.uploadMultiple', 'Upload Multiple')}</span>
+            </Button>
             <Link href={`/chat?applicationId=${applicationId}`} className="w-full sm:w-auto">
               <Button
                 variant="ghost"
@@ -285,10 +297,37 @@ export default function ApplicationDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Progress Breakdown */}
+          <ProgressBreakdown
+            questionnaireComplete={!!application}
+            totalRequired={checklistItems.filter(item => item.category === 'required').length}
+            verifiedCount={checklistItems.filter(item => item.status === 'verified').length}
+            pendingCount={checklistItems.filter(item => item.status === 'pending').length}
+          />
+          
           {/* Checklist Summary */}
           <ChecklistSummary items={checklistItems} />
+
+          {/* User Insights */}
+          <UserInsights
+            countryCode={application.country?.code}
+            visaType={application.visaType?.name}
+          />
         </div>
       </div>
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        applicationId={applicationId}
+        onUploadComplete={() => {
+          // Refresh the page to show updated documents
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+        }}
+      />
     </div>
   );
 }

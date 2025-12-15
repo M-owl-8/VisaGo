@@ -222,6 +222,9 @@ export default function ApplicationsPage() {
         </motion.div>
       </section>
 
+      {/* Show onboarding for first-time users */}
+      {totalApplications === 0 && !hasCompletedOnboarding && <OnboardingFlow />}
+
       {totalApplications === 0 ? (
         <EmptyState />
       ) : (
@@ -378,4 +381,20 @@ function formatRelativeTime(timestamp: string) {
   if (minutes < 60) return `${minutes || 1}m ago`;
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
+}
+
+function formatTimeAgo(timestamp: string, t: any) {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diff = now.getTime() - then.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return t('time.justNow', 'just now');
+  if (minutes < 60) return `${minutes}m ${t('time.ago', 'ago')}`;
+  if (hours < 24) return `${hours}h ${t('time.ago', 'ago')}`;
+  if (days === 1) return t('time.yesterday', 'yesterday');
+  if (days < 7) return `${days}d ${t('time.ago', 'ago')}`;
+  return then.toLocaleDateString();
 }
