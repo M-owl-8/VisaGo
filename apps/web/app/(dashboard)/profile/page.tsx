@@ -47,6 +47,7 @@ export default function ProfilePage() {
       hasFetchedRef.current = true;
       fetchUserProfile().catch(() => {});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!user) {
@@ -139,7 +140,7 @@ export default function ProfilePage() {
               )}
               {memberSince && (
                 <span className="text-xs text-white/40">
-                  {i18n.language === 'uz' ? 'A'zo' : i18n.language === 'ru' ? 'Участник' : 'Member'} {memberSince}
+                  {i18n.language === 'uz' ? "A'zo" : i18n.language === 'ru' ? 'Участник' : 'Member'} {memberSince}
                 </span>
               )}
             </div>
@@ -176,7 +177,7 @@ export default function ProfilePage() {
 
         <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
           <p className="mb-2 text-xs font-medium uppercase tracking-wider text-white/50">
-            {i18n.language === 'uz' ? 'O'rtacha' : i18n.language === 'ru' ? 'Средний' : 'Average'}
+            {i18n.language === 'uz' ? "O'rtacha" : i18n.language === 'ru' ? 'Средний' : 'Average'}
           </p>
           <p className="text-lg font-semibold text-white">
             {applications.length > 0 
@@ -189,7 +190,7 @@ export default function ProfilePage() {
       {/* Personal Information */}
       <div className="glass-panel border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
         <h2 className="mb-6 text-lg font-semibold text-white">
-          {i18n.language === 'uz' ? 'Shaxsiy ma\'lumotlar' : i18n.language === 'ru' ? 'Личные данные' : 'Personal Information'}
+          {i18n.language === 'uz' ? "Shaxsiy ma'lumotlar" : i18n.language === 'ru' ? 'Личные данные' : 'Personal Information'}
         </h2>
         <div className="space-y-4">
           {/* First Name */}
@@ -232,7 +233,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="text-xs text-white/30">
-              {i18n.language === 'uz' ? 'O\'zgartirib bo\'lmaydi' : i18n.language === 'ru' ? 'Неизменяемый' : 'Immutable'}
+              {i18n.language === 'uz' ? "O'zgartirib bo'lmaydi" : i18n.language === 'ru' ? 'Неизменяемый' : 'Immutable'}
             </div>
           </div>
 
@@ -265,7 +266,7 @@ export default function ProfilePage() {
               </label>
               <p className="text-sm font-medium text-white">••••••••</p>
               <p className="mt-1 text-xs text-white/40">
-                {i18n.language === 'uz' ? '3 oy oldin o\'zgartirilgan' : i18n.language === 'ru' ? 'Изменён 3 месяца назад' : 'Changed 3 months ago'}
+                {i18n.language === 'uz' ? "3 oy oldin o'zgartirilgan" : i18n.language === 'ru' ? 'Изменён 3 месяца назад' : 'Changed 3 months ago'}
               </p>
             </div>
             <Button
@@ -275,7 +276,7 @@ export default function ProfilePage() {
               onClick={() => {/* TODO: Password change modal */}}
             >
               <Lock size={14} className="mr-1.5" />
-              {i18n.language === 'uz' ? 'O\'zgartirish' : i18n.language === 'ru' ? 'Изменить' : 'Change'}
+              {i18n.language === 'uz' ? "O'zgartirish" : i18n.language === 'ru' ? 'Изменить' : 'Change'}
             </Button>
           </div>
 
@@ -297,7 +298,7 @@ export default function ProfilePage() {
               onClick={() => {/* TODO: Sessions drawer */}}
             >
               <Monitor size={14} className="mr-1.5" />
-              {i18n.language === 'uz' ? 'Ko\'rish' : i18n.language === 'ru' ? 'Показать' : 'View'}
+              {i18n.language === 'uz' ? "Ko'rish" : i18n.language === 'ru' ? 'Показать' : 'View'}
             </Button>
           </div>
 
@@ -308,7 +309,7 @@ export default function ProfilePage() {
                 {i18n.language === 'uz' ? 'Ikki bosqichli tekshirish' : i18n.language === 'ru' ? 'Двухфакторная аутентификация' : 'Two-factor authentication'}
               </label>
               <p className="text-sm font-medium text-white">
-                {i18n.language === 'uz' ? 'O\'rnatilmagan' : i18n.language === 'ru' ? 'Не настроено' : 'Not set up'}
+                {i18n.language === 'uz' ? "O'rnatilmagan" : i18n.language === 'ru' ? 'Не настроено' : 'Not set up'}
               </p>
             </div>
             <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-white/30">
@@ -339,7 +340,7 @@ export default function ProfilePage() {
             >
               <option value="en">English (EN)</option>
               <option value="ru">Русский (RU)</option>
-              <option value="uz">O'zbekcha (UZ)</option>
+              <option value="uz">Oʻzbekcha (UZ)</option>
             </select>
           </div>
 
@@ -382,10 +383,10 @@ export default function ProfilePage() {
           <div className="flex flex-col gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-white">
-                {i18n.language === 'uz' ? 'Ma\'lumotlarni eksport qilish' : i18n.language === 'ru' ? 'Экспорт данных' : 'Export data'}
+                {i18n.language === 'uz' ? "Ma'lumotlarni eksport qilish" : i18n.language === 'ru' ? 'Экспорт данных' : 'Export data'}
               </p>
               <p className="mt-1 text-xs text-white/50">
-                {i18n.language === 'uz' ? 'Barcha shaxsiy ma\'lumotlaringizni yuklab oling' : i18n.language === 'ru' ? 'Скачать все личные данные' : 'Download all your personal data'}
+                {i18n.language === 'uz' ? "Barcha shaxsiy ma'lumotlaringizni yuklab oling" : i18n.language === 'ru' ? 'Скачать все личные данные' : 'Download all your personal data'}
               </p>
             </div>
             <Button
@@ -403,10 +404,10 @@ export default function ProfilePage() {
           <div className="flex flex-col gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex-1">
               <p className="text-sm font-medium text-red-400">
-                {i18n.language === 'uz' ? 'Hisobni o\'chirish' : i18n.language === 'ru' ? 'Удалить аккаунт' : 'Delete account'}
+                {i18n.language === 'uz' ? "Hisobni o'chirish" : i18n.language === 'ru' ? 'Удалить аккаунт' : 'Delete account'}
               </p>
               <p className="mt-1 text-xs text-red-300/70">
-                {i18n.language === 'uz' ? 'Bu amalni ortga qaytarib bo\'lmaydi' : i18n.language === 'ru' ? 'Это действие необратимо' : 'This action cannot be undone'}
+                {i18n.language === 'uz' ? "Bu amalni ortga qaytarib bo'lmaydi" : i18n.language === 'ru' ? 'Это действие необратимо' : 'This action cannot be undone'}
               </p>
             </div>
             <Button
@@ -416,7 +417,7 @@ export default function ProfilePage() {
               onClick={() => {/* TODO: Delete confirmation modal */}}
             >
               <Trash2 size={14} className="mr-1.5" />
-              {i18n.language === 'uz' ? 'O\'chirish' : i18n.language === 'ru' ? 'Удалить' : 'Delete'}
+              {i18n.language === 'uz' ? "O'chirish" : i18n.language === 'ru' ? 'Удалить' : 'Delete'}
             </Button>
           </div>
         </div>
