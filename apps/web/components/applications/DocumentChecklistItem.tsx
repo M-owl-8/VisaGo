@@ -93,9 +93,6 @@ export function DocumentChecklistItem({
       };
     }
   }, [item.documentId, t]);
-  const isVerified = status === 'verified';
-  const isRejected = status === 'rejected';
-  const isPending = status === 'pending';
   
   const documentType = item.documentType || item.document || '';
 
