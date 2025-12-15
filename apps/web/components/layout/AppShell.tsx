@@ -85,8 +85,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="blur-[200px] opacity-30 absolute left-[-5%] bottom-[-10%] h-72 w-72 rounded-full bg-primary-dark animate-blob" />
       </div>
 
-      <nav className="sticky top-0 z-40 shrink-0 px-3 py-2.5 sm:px-4 sm:py-3 lg:px-8">
-        <div className="glass-panel relative flex items-center justify-between border border-white/10 bg-midnight/80 px-3 py-2.5 text-white sm:px-4 sm:py-3 md:px-6">
+      <nav className={cn(
+        "sticky top-0 z-40 shrink-0 px-3 py-2.5 sm:px-4 sm:py-3 lg:px-8",
+        pathname === '/chat' && "bg-gradient-to-b from-background/95 to-background/80 backdrop-blur-xl"
+      )}>
+        <div className={cn(
+          "glass-panel relative flex items-center justify-between border border-white/10 px-3 py-2.5 text-white sm:px-4 sm:py-3 md:px-6",
+          pathname === '/chat' ? "bg-midnight/95 backdrop-blur-xl shadow-lg" : "bg-midnight/80"
+        )}>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/applications" className="flex items-center gap-2 sm:gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:h-12 sm:w-12">
@@ -247,10 +253,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </nav>
 
-      <main className="relative z-10 flex-1 px-3 pb-8 pt-3 sm:px-4 sm:pt-4 lg:px-8">{children}</main>
+      <main className="relative z-10 flex-1 px-3 pb-4 pt-3 sm:px-4 sm:pt-4 lg:px-8">{children}</main>
 
       {pathname !== '/chat' && (
-        <footer className="relative z-10 shrink-0 border-t border-white/10 px-4 pb-6 pt-6 text-white/60 sm:px-6 lg:px-8">
+        <footer className="relative z-10 shrink-0 border-t border-white/10 px-4 py-4 text-white/60 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             © {new Date().getFullYear()} Ketdik. {t('common.allRightsReserved')}

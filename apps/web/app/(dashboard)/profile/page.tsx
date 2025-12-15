@@ -49,7 +49,7 @@ export default function ProfilePage() {
     .slice(0, 2);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl">
       {/* Premium Header Section */}
       <div className="mb-8">
         <h1 className="mb-2 text-4xl font-bold text-white">{t('profile.myProfile')}</h1>

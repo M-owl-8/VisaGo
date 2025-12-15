@@ -103,9 +103,12 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="fixed inset-0 top-16 sm:top-20 flex flex-col overflow-hidden bg-background">
+    <div className="fixed inset-0 top-16 sm:top-20 flex flex-col overflow-hidden bg-gradient-to-b from-background via-background to-midnight">
+      {/* Gradient overlay at top for smooth transition */}
+      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-background/50 to-transparent pointer-events-none z-10" />
+      
       {/* Messages Area - Scrollable */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-3 sm:px-4 lg:px-8">
+      <div className="flex-1 overflow-y-auto no-scrollbar px-3 sm:px-4 lg:px-8 relative z-0">
         <div className="mx-auto max-w-5xl py-4">
           {isLoading && messages.length === 0 ? (
             <div className="space-y-4">
@@ -160,7 +163,7 @@ export default function ChatPage() {
       )}
 
       {/* Input Area - Fixed at bottom */}
-      <div className="shrink-0 border-t border-white/5 bg-background/90 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]">
+      <div className="shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
           <ChatInput
             value={input}

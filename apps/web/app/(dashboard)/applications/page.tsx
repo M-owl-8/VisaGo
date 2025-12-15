@@ -58,7 +58,7 @@ export default function ApplicationsPage() {
 
   // Define renderSkeleton before it's used
   const renderSkeleton = () => (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
       <SkeletonCard className="h-48" />
       <div className="grid gap-4 md:grid-cols-3">
         {[...Array(3)].map((_, idx) => (
@@ -74,7 +74,7 @@ export default function ApplicationsPage() {
 
   // Show loading while checking auth
   if (authLoading) {
-    return <div className="py-10">{renderSkeleton()}</div>;
+    return <div>{renderSkeleton()}</div>;
   }
 
   // Redirect if not signed in (after all hooks)
@@ -119,11 +119,11 @@ export default function ApplicationsPage() {
 
   // Loading state
   if (isLoading && !isRefreshing) {
-    return <div className="py-10">{renderSkeleton()}</div>;
+    return <div>{renderSkeleton()}</div>;
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-3 py-6 text-white sm:space-y-8 sm:px-4 sm:py-8 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-6 text-white sm:space-y-8">
       {error && (
         <ErrorBanner
           message={error}
