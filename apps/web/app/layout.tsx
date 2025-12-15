@@ -39,7 +39,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#040816" />
       </head>
       <body className="bg-background font-sans text-primary-900 antialiased">
-        <Providers>{children}</Providers>
+        <ErrorBoundary>
+          <Providers>{children}</Providers>
+        </ErrorBoundary>
+        <ToastContainer />
+        <NetworkStatus />
         <script
           dangerouslySetInnerHTML={{
             __html: `

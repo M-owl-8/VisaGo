@@ -14,6 +14,7 @@ import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { ApplicationCard } from '@/components/applications/ApplicationCard';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplications } from '@/lib/hooks/useApplications';
+import { usePullToRefresh } from '@/lib/hooks/usePullToRefresh';
 
 export default function ApplicationsPage() {
   const { t } = useTranslation();
@@ -21,6 +22,12 @@ export default function ApplicationsPage() {
   const { user, isSignedIn, isLoading: authLoading } = useAuthStore();
   const { applications: userApplications, isLoading, isRefreshing, error, refetch, clearError } = useApplications({
     autoFetch: isSignedIn && !authLoading,
+  });
+
+  // Pull-to-refresh for mobile
+  const { isPulling, pullDistance, shouldRefresh } = usePullToRefresh({
+    onRefresh: refetch,
+    enabled: !isLoading && !isRefreshing,
   });
 
   // All hooks must be called before any early returns
