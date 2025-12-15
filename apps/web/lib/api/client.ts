@@ -501,6 +501,35 @@ class ApiClient {
   }
 
   // ============================================================================
+  // GENERIC HTTP METHODS
+  // ============================================================================
+
+  async get<T = any>(url: string, config?: any): Promise<{ data: ApiResponse<T> }> {
+    const response = await this.api.get(url, config);
+    return response;
+  }
+
+  async post<T = any>(url: string, data?: any, config?: any): Promise<{ data: ApiResponse<T> }> {
+    const response = await this.api.post(url, data, config);
+    return response;
+  }
+
+  async put<T = any>(url: string, data?: any, config?: any): Promise<{ data: ApiResponse<T> }> {
+    const response = await this.api.put(url, data, config);
+    return response;
+  }
+
+  async patch<T = any>(url: string, data?: any, config?: any): Promise<{ data: ApiResponse<T> }> {
+    const response = await this.api.patch(url, data, config);
+    return response;
+  }
+
+  async delete<T = any>(url: string, config?: any): Promise<{ data: ApiResponse<T> }> {
+    const response = await this.api.delete(url, config);
+    return response;
+  }
+
+  // ============================================================================
   // UTILITY METHODS
   // ============================================================================
 
