@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/lib/stores/auth';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { LogOut } from 'lucide-react';
@@ -17,6 +18,7 @@ function normalizeRole(role: string | undefined | null): 'user' | 'admin' | 'sup
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user, logout, isLoading, fetchUserProfile } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
 
@@ -118,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex min-h-screen items-center justify-center bg-midnight">
         <div className="text-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-          <p className="text-white/70">Checking access...</p>
+          <p className="text-white/70">{t('common.loading', 'Loading...')}</p>
         </div>
       </div>
     );
@@ -141,7 +143,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <header className="sticky top-0 z-30 border-b border-white/10 bg-midnight/90 backdrop-blur-sm">
           <div className="flex items-center justify-between px-6 py-4">
             <div>
-              <h1 className="text-lg font-semibold text-white">Admin Panel</h1>
+              <h1 className="text-lg font-semibold text-white">
+                {t('admin.panelTitle', 'Admin Panel')}
+              </h1>
               <p className="text-xs text-white/60">
                 {user.firstName} {user.lastName} ({user.email})
               </p>
@@ -153,7 +157,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className="text-white/70 hover:text-white hover:bg-white/10"
             >
               <LogOut size={16} className="mr-2" />
-              Logout
+              {t('profile.logout', 'Logout')}
             </Button>
           </div>
         </header>

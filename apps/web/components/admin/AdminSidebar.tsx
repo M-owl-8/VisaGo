@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { 
   LayoutDashboard, 
   Users, 
@@ -19,31 +20,37 @@ import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: string;
+  labelDefault: string;
   icon: LucideIcon;
 }
 
 const navItems: NavItem[] = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/applications', label: 'Applications', icon: FileText },
-  { href: '/admin/payments', label: 'Payments', icon: CreditCard },
-  { href: '/admin/documents', label: 'Documents', icon: FileCheck },
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/admin/activity-logs', label: 'Activity Logs', icon: Activity },
-  { href: '/admin/ai-interactions', label: 'AI Interactions', icon: Brain },
-  { href: '/admin/visa-rules', label: 'Visa Rules', icon: Settings },
+  { href: '/admin/dashboard', labelKey: 'admin.dashboard', labelDefault: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/users', labelKey: 'admin.users', labelDefault: 'Users', icon: Users },
+  { href: '/admin/applications', labelKey: 'admin.applications', labelDefault: 'Applications', icon: FileText },
+  { href: '/admin/payments', labelKey: 'admin.payments', labelDefault: 'Payments', icon: CreditCard },
+  { href: '/admin/documents', labelKey: 'admin.documents', labelDefault: 'Documents', icon: FileCheck },
+  { href: '/admin/analytics', labelKey: 'admin.analytics', labelDefault: 'Analytics', icon: BarChart3 },
+  { href: '/admin/activity-logs', labelKey: 'admin.activityLogs', labelDefault: 'Activity Logs', icon: Activity },
+  { href: '/admin/ai-interactions', labelKey: 'admin.aiInteractions', labelDefault: 'AI Interactions', icon: Brain },
+  { href: '/admin/visa-rules', labelKey: 'admin.visaRules', labelDefault: 'Visa Rules', icon: Settings },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const { t, i18n } = useTranslation();
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 border-r border-white/10 bg-midnight/90 backdrop-blur-sm">
       <div className="flex h-full flex-col">
         <div className="border-b border-white/10 p-6">
-          <h2 className="text-lg font-semibold text-white">Admin Panel</h2>
-          <p className="mt-1 text-xs text-white/60">System Management</p>
+          <h2 className="text-lg font-semibold text-white">
+            {t('admin.panelTitle', 'Admin Panel')}
+          </h2>
+          <p className="mt-1 text-xs text-white/60">
+            {t('admin.systemManagement', 'System Management')}
+          </p>
         </div>
         
         <nav className="flex-1 space-y-1 overflow-y-auto p-4">
@@ -63,7 +70,7 @@ export default function AdminSidebar() {
                 )}
               >
                 <Icon size={18} className="shrink-0" />
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1">{t(item.labelKey, item.labelDefault)}</span>
                 {isActive && <ChevronRight size={16} className="shrink-0" />}
               </Link>
             );
