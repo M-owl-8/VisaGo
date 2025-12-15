@@ -2,17 +2,27 @@
  * API Configuration
  * Reads NEXT_PUBLIC_API_URL from environment variables
  * Supports both local development and production
+ * 
+ * IMPORTANT: This is lazy-loaded to prevent SSR access to window.location
  */
 
 import { logger } from '@/lib/logger';
 
+let cachedApiBaseUrl: string | null = null;
+
 const getApiBaseUrl = (): string => {
+  // Return cached value if available
+  if (cachedApiBaseUrl !== null) {
+    return cachedApiBaseUrl;
+  }
+
   // Priority 1: Environment variable (set at build time or in .env.local)
   if (typeof window !== 'undefined') {
     // In browser, check Next.js public env vars
     const envUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
     if (envUrl) {
       logger.debug('Using API URL from environment', { url: envUrl });
+      cachedApiBaseUrl = envUrl;
       return envUrl;
     }
   }
@@ -33,6 +43,7 @@ const getApiBaseUrl = (): string => {
         hint: 'Create .env.local with NEXT_PUBLIC_API_URL=http://localhost:3000',
       });
     }
+    cachedApiBaseUrl = LOCAL_API_URL;
     return LOCAL_API_URL;
   }
 
@@ -43,22 +54,38 @@ const getApiBaseUrl = (): string => {
       url: FALLBACK_API_URL,
     });
   }
+  cachedApiBaseUrl = FALLBACK_API_URL;
   return FALLBACK_API_URL;
 };
 
-export const API_BASE_URL = getApiBaseUrl();
+// Lazy getter - only evaluates when accessed, not at module load time
+export const getAPI_BASE_URL = (): string => {
+  return getApiBaseUrl();
+};
+
+// For backward compatibility - use getter function to prevent SSR evaluation
+// This will be evaluated lazily when actually needed (in browser)
+export const API_BASE_URL = (() => {
+  // During SSR, return a safe default without accessing window
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'https://visago-production.up.railway.app';
+  }
+  // In browser, evaluate lazily
+  return getApiBaseUrl();
+})();
 
 // Log the API URL being used (only once on page load, only in development)
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   if (!(window as any).__apiConfigLogged) {
     (window as any).__apiConfigLogged = true;
-    console.log('[API Config] Using API base URL:', API_BASE_URL);
-    console.log('[API Config] Full API endpoint:', `${API_BASE_URL}/api`);
+    const url = getApiBaseUrl();
+    console.log('[API Config] Using API base URL:', url);
+    console.log('[API Config] Full API endpoint:', `${url}/api`);
     console.log('[API Config] NEXT_PUBLIC_API_URL env var:', process.env.NEXT_PUBLIC_API_URL || 'NOT SET');
     
     logger.debug('API configuration', {
-      baseUrl: API_BASE_URL,
-      endpoint: `${API_BASE_URL}/api`,
+      baseUrl: url,
+      endpoint: `${url}/api`,
       envVar: process.env.NEXT_PUBLIC_API_URL || 'NOT SET',
     });
   }

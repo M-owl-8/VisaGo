@@ -18,6 +18,9 @@ import { useOnboardingStore } from '@/lib/stores/onboarding';
 import { useApplications } from '@/lib/hooks/useApplications';
 import { usePullToRefresh } from '@/lib/hooks/usePullToRefresh';
 
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
 export default function ApplicationsPage() {
   const { t } = useTranslation();
   const router = useRouter();

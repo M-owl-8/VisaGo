@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, RefreshCcw, ArrowDown } from 'lucide-react';
@@ -13,7 +13,10 @@ import { QuickActions } from '@/components/chat/QuickActions';
 import { Button } from '@/components/ui/Button';
 import ErrorBanner from '@/components/ErrorBanner';
 
-export default function ChatPage() {
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
+function ChatPageContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -209,5 +212,17 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="fixed inset-0 top-16 sm:top-20 flex items-center justify-center bg-gradient-to-b from-background via-background to-midnight">
+        <div className="text-white/60">Loading...</div>
+      </div>
+    }>
+      <ChatPageContent />
+    </Suspense>
   );
 }

@@ -3,6 +3,9 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
+
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
 import { ArrowLeft, MessageCircle, CheckCircle2, Clock, XCircle, Trash2, Upload } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplication } from '@/lib/hooks/useApplication';

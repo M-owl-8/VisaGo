@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
@@ -11,7 +11,7 @@ import { getErrorMessage } from '@/lib/utils/errorMessages';
 import ErrorBanner from '@/components/ErrorBanner';
 import SuccessBanner from '@/components/SuccessBanner';
 
-export default function DocumentsPage() {
+function DocumentsPageContent() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const params = useParams();
@@ -92,5 +92,17 @@ export default function DocumentsPage() {
         {uploading && <p className="mt-2 text-sm text-white/60">{t('common.loading')}</p>}
       </div>
     </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={
+      <div className="mx-auto max-w-3xl px-4 py-8 text-white sm:px-6 lg:px-8">
+        <div className="text-white/60">Loading...</div>
+      </div>
+    }>
+      <DocumentsPageContent />
+    </Suspense>
   );
 }

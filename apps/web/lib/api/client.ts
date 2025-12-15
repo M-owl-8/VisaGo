@@ -20,8 +20,13 @@ class ApiClient {
   private pendingRequests: Map<string, Promise<any>> = new Map(); // Deduplicate concurrent requests
 
   constructor() {
+    // Use getter function to ensure lazy evaluation
+    const baseURL = typeof window !== 'undefined' 
+      ? `${API_BASE_URL}/api` 
+      : `${process.env.NEXT_PUBLIC_API_URL || 'https://visago-production.up.railway.app'}/api`;
+    
     this.api = axios.create({
-      baseURL: `${API_BASE_URL}/api`,
+      baseURL,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',

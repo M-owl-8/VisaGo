@@ -10,6 +10,9 @@ import { mapQuestionnaireV2ToLegacy } from '@/lib/utils/questionnaireMapper';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import ErrorBanner from '@/components/ErrorBanner';
 
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
 const TOTAL_STEPS = 10;
 
 export default function QuestionnairePage() {
