@@ -14,6 +14,7 @@ import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { ApplicationCard } from '@/components/applications/ApplicationCard';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { useAuthStore } from '@/lib/stores/auth';
+import { useOnboardingStore } from '@/lib/stores/onboarding';
 import { useApplications } from '@/lib/hooks/useApplications';
 import { usePullToRefresh } from '@/lib/hooks/usePullToRefresh';
 
@@ -21,6 +22,7 @@ export default function ApplicationsPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user, isSignedIn, isLoading: authLoading } = useAuthStore();
+  const { hasCompletedOnboarding } = useOnboardingStore();
   const { applications: userApplications, isLoading, isRefreshing, error, refetch, clearError } = useApplications({
     autoFetch: isSignedIn && !authLoading,
   });
