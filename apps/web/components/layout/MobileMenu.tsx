@@ -98,9 +98,9 @@ export function MobileMenu() {
               {user && (
                 <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20">
-                    {user.photoUrl ? (
+                    {user.avatar ? (
                       <Image
-                        src={user.photoUrl}
+                        src={user.avatar}
                         alt={user.firstName || 'User'}
                         width={48}
                         height={48}
