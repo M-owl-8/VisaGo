@@ -67,9 +67,10 @@ export function DocumentChecklistItem({
 
   // Listen for status change events
   useEffect(() => {
-    const handleStatusChange = async (event: CustomEvent) => {
-      if (event.detail.documentId === item.documentId) {
-        const newStatus = event.detail.status;
+    const handleStatusChange = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail?.documentId === item.documentId) {
+        const newStatus = customEvent.detail.status;
         if (newStatus === 'verified') {
           setToastMessage(t('documents.statusVerified', 'Document verified!'));
           setShowToast(true);
@@ -87,9 +88,9 @@ export function DocumentChecklistItem({
     };
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('document-status-changed', handleStatusChange as EventListener);
+      window.addEventListener('document-status-changed', handleStatusChange);
       return () => {
-        window.removeEventListener('document-status-changed', handleStatusChange as EventListener);
+        window.removeEventListener('document-status-changed', handleStatusChange);
       };
     }
   }, [item.documentId, t]);
