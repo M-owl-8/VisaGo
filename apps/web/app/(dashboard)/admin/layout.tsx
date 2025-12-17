@@ -137,6 +137,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return null;
   }
 
+  // Desktop-only warning for small screens
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setShowMobileWarning(window.innerWidth < 1024);
+    };
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  if (showMobileWarning) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-midnight px-4">
+        <div className="max-w-md text-center">
+          <div className="mb-6 flex justify-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/20">
+              <svg className="h-10 w-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <h1 className="mb-3 text-2xl font-bold text-white">
+            {t('admin.desktopOnly', 'Desktop Only')}
+          </h1>
+          <p className="mb-6 text-white/60">
+            {t('admin.desktopOnlyMessage', 'The admin panel is optimized for desktop screens. Please use a device with a larger screen or increase your browser window size.')}
+          </p>
+          <button
+            onClick={() => router.push('/applications')}
+            className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 font-semibold text-white transition hover:bg-primary/90"
+          >
+            {t('admin.goToApplications', 'Go to Applications')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-midnight overflow-x-hidden">
       {/* Desktop Sidebar - Hidden on mobile */}

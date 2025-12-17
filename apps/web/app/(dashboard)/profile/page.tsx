@@ -74,7 +74,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 px-3 py-3 sm:px-4 sm:py-4 lg:px-8 lg:py-6">
       {/* Identity Header */}
       <div className="glass-panel relative overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-6 shadow-[0_25px_55px_rgba(1,7,17,0.65)] backdrop-blur-xl sm:p-8">
         <div className="pointer-events-none absolute inset-0 opacity-20">

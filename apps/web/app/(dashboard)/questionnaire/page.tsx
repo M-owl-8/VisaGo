@@ -870,11 +870,20 @@ export default function QuestionnairePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8 text-white">
-      <h1 className="mb-6 text-2xl font-bold text-white">
-        {t('questionnaire.title', 'Questionnaire')}
-      </h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">
+          {t('questionnaire.title', 'Tell us about your trip')}
+        </h1>
+        <p className="mt-2 text-sm text-white/60">
+          {t('questionnaire.subtitle', 'Your answers help us create a personalized checklist based on official embassy requirements. Takes about 3–5 minutes.')}
+        </p>
+      </div>
 
-      {error && <ErrorBanner message={error} onClose={() => setError('')} />}
+      {error && (
+        <div className="mb-6 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
+          <p className="text-sm text-rose-100">{error}</p>
+        </div>
+      )}
 
       <div className="mb-6">
         <div className="mb-2 flex justify-between text-sm text-white/70">
@@ -918,9 +927,16 @@ export default function QuestionnairePage() {
             disabled={loading || !canProceed()}
             className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 text-sm font-medium text-white shadow-card hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? t('common.loading') : t('common.submit')}
+            {loading ? t('questionnaire.generating', 'Generating your checklist...') : t('common.submit', 'Create My Checklist')}
           </button>
         )}
+      </div>
+
+      {/* Confidence signal */}
+      <div className="mt-6 text-center">
+        <p className="text-xs text-white/40">
+          {t('questionnaire.confidence', 'Your information is encrypted and secure. Used by travelers to 50+ countries.')}
+        </p>
       </div>
     </div>
   );

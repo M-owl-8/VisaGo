@@ -38,6 +38,16 @@ function ChatPageContent() {
     autoFetch: !!applicationId && isSignedIn,
   });
 
+  // Get flag emoji for country
+  const getFlagEmoji = (countryCode?: string): string => {
+    if (!countryCode) return '🌍';
+    const flagMap: Record<string, string> = {
+      us: '🇺🇸', ca: '🇨🇦', gb: '🇬🇧', au: '🇦🇺', de: '🇩🇪',
+      fr: '🇫🇷', es: '🇪🇸', it: '🇮🇹', jp: '🇯🇵', ae: '🇦🇪', uz: '🇺🇿',
+    };
+    return flagMap[countryCode.toLowerCase()] || '🌍';
+  };
+
   const [input, setInput] = useState('');
   const [lastFailedMessage, setLastFailedMessage] = useState<string>('');
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -130,12 +140,30 @@ function ChatPageContent() {
   };
 
   return (
-    <div className="fixed inset-0 top-16 sm:top-20 flex flex-col overflow-hidden bg-gradient-to-b from-background via-background to-midnight">
-      {/* Gradient overlay at top for smooth transition */}
-      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-background/50 to-transparent pointer-events-none z-10" />
-      
-      {/* Messages Area - Scrollable */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto no-scrollbar px-3 sm:px-4 lg:px-8 relative z-0" id="chat-messages">
+    <div className="flex min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)] flex-col bg-gradient-to-b from-background via-background to-midnight">
+      {/* AI Context Chip - Shows what application AI is helping with */}
+      {application && (
+        <div className="border-b border-white/10 bg-white/[0.02] px-3 py-2 sm:px-4 lg:px-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="flex items-center gap-2 text-sm">
+              <Sparkles size={14} className="text-primary" />
+              <span className="text-white/70">{t('chat.aiHelpingWith', 'AI is helping with')}:</span>
+              <span className="font-medium text-white">
+                {getFlagEmoji(application.country?.code)} {application.country?.name} – {application.visaType?.name}
+              </span>
+              <button
+                onClick={() => router.push(`/applications/${application.id}`)}
+                className="ml-auto text-xs text-primary hover:text-primary/80 transition"
+              >
+                {t('chat.viewApplication', 'View Application')} →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Messages Area - Scrollable via body */}
+      <div ref={messagesContainerRef} className="flex-1 px-3 sm:px-4 lg:px-8" id="chat-messages">
         <div className="mx-auto max-w-5xl py-4">
           {isLoading && messages.length === 0 ? (
             <div className="space-y-4">
@@ -149,13 +177,16 @@ function ChatPageContent() {
                 <Sparkles size={24} className="text-primary sm:size-8" />
               </div>
               <h3 className="mb-2 font-display text-lg font-semibold text-white sm:text-xl">
-                {t('chat.emptyStateTitle', 'Start a conversation')}
+                {t('chat.emptyStateTitle', 'Your AI visa assistant is ready')}
               </h3>
-              <p className="mb-6 max-w-md text-xs text-white/60 sm:mb-8 sm:text-sm">
+              <p className="mb-2 max-w-md text-xs text-white/70 sm:text-sm">
                 {t(
                   'chat.emptyStateSubtitle',
-                  'Ask me anything about visa requirements, document checklists, or application processes.'
+                  'Ask me anything about visa requirements, document checklists, or application processes. I'm trained on official embassy requirements from dozens of countries.'
                 )}
+              </p>
+              <p className="mb-6 text-xs text-white/40 sm:mb-8">
+                {t('chat.confidence', 'Responses are based on official sources. For legal advice, consult an attorney.')}
               </p>
 
               {/* Quick Actions */}
@@ -167,21 +198,24 @@ function ChatPageContent() {
         </div>
       </div>
 
-      {/* Error Banner - Above input */}
+      {/* Error Banner */}
       {chatError && (
-        <div className="shrink-0 border-t border-white/10 bg-rose-500/10 px-3 py-3 sm:px-4 lg:px-8">
+        <div className="mb-4 border border-rose-500/20 bg-rose-500/10 px-3 py-3 sm:px-4 lg:px-8 rounded-lg">
           <div className="mx-auto max-w-5xl">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-rose-100">{chatError}</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-rose-100">{t('chat.errorTitle', 'Message not sent')}</p>
+                <p className="text-xs text-rose-200/80">{chatError || t('chat.errorDefault', 'Something went wrong. Your conversation is saved — try sending again.')}</p>
+              </div>
               {lastFailedMessage && (
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={handleRetry}
-                  className="ml-4 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
+                  className="bg-rose-500/20 text-rose-100 hover:bg-rose-500/30 shrink-0"
                 >
                   <RefreshCcw size={14} />
-                  <span className="ml-2">{t('errors.tryAgain', 'Try Again')}</span>
+                  <span className="ml-2">{t('errors.tryAgain', 'Retry')}</span>
                 </Button>
               )}
             </div>
@@ -193,15 +227,15 @@ function ChatPageContent() {
       {showScrollButton && (
         <button
           onClick={scrollToBottom}
-          className="fixed bottom-24 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-midnight/90 text-white shadow-lg backdrop-blur-sm transition hover:bg-midnight hover:scale-110 active:scale-95 sm:bottom-28 sm:right-8"
+          className="fixed bottom-32 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-midnight/90 text-white shadow-lg backdrop-blur-sm transition hover:bg-midnight hover:scale-110 active:scale-95 sm:bottom-36 sm:right-8"
           aria-label="Scroll to bottom"
         >
           <ArrowDown size={20} />
         </button>
       )}
 
-      {/* Input Area - Fixed at bottom */}
-      <div className="shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)] relative z-10">
+      {/* Input Area - Sticky at bottom */}
+      <div className="sticky bottom-0 shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)] mt-4">
         <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
           <ChatInput
             value={input}
@@ -218,7 +252,7 @@ function ChatPageContent() {
 export default function ChatPage() {
   return (
     <Suspense fallback={
-      <div className="fixed inset-0 top-16 sm:top-20 flex items-center justify-center bg-gradient-to-b from-background via-background to-midnight">
+      <div className="flex min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)] items-center justify-center bg-gradient-to-b from-background via-background to-midnight">
         <div className="text-white/60">Loading...</div>
       </div>
     }>

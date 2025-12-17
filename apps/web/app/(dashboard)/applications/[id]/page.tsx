@@ -19,6 +19,9 @@ import { RiskExplanationPanel } from '@/components/checklist/RiskExplanationPane
 import { ProgressBreakdown } from '@/components/checklist/ProgressBreakdown';
 import { BulkUploadModal } from '@/components/documents/BulkUploadModal';
 import { UserInsights } from '@/components/analytics/UserInsights';
+import { NextStepGuidance } from '@/components/guidance/NextStepGuidance';
+import { getProcessingTimeEstimate, getWhatHappensNext, getMilestoneMessage } from '@/lib/utils/processingTimes';
+import { Info } from 'lucide-react';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { RefreshCcw } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
@@ -153,6 +156,67 @@ export default function ApplicationDetailPage() {
         {t('applications.backToApplications', 'Back to Applications')}
       </Link>
 
+      {/* Next Step Guidance - Context-aware */}
+      <div className="mb-6">
+        <NextStepGuidance 
+          application={application} 
+          checklist={checklist}
+          isPollingChecklist={isPollingChecklist}
+        />
+      </div>
+
+      {/* Processing Time Estimate & What Happens Next */}
+      {application && (
+        <div className="mb-6 grid gap-4 md:grid-cols-2">
+          {/* Processing Time Estimate */}
+          {application.status !== 'approved' && application.status !== 'rejected' && (
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
+                  <Clock size={16} className="text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wider text-white/40 mb-1">
+                    {t('applications.typicalProcessing', 'Typical Processing Time')}
+                  </p>
+                  <p className="text-sm text-white/80">
+                    {getProcessingTimeEstimate(
+                      application.country?.code,
+                      application.visaType?.name
+                    ).text}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* What Happens Next */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Info size={16} className="text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-medium uppercase tracking-wider text-white/40 mb-1">
+                  {t('applications.whatHappensNext', 'What Happens Next?')}
+                </p>
+                <p className="text-sm text-white/80">
+                  {getWhatHappensNext(
+                    !!checklist,
+                    checklist?.status === 'ready',
+                    checklistItems.filter(item => item.status === 'verified').length,
+                    checklistItems.filter(item => item.status === 'rejected').length,
+                    checklistItems.filter(item => item.status === 'pending' || !item.status).length,
+                    checklistItems.filter(item => item.category === 'required').length,
+                    application.status === 'submitted'
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Section */}
       <Card className="glass-panel mb-6 border border-white/10 bg-white/[0.03] p-4 sm:mb-8 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -201,7 +265,7 @@ export default function ApplicationDetailPage() {
                 className="w-full rounded-xl border border-white/10 !bg-transparent px-3 py-2 text-xs !text-white hover:!bg-white/10 sm:px-4 sm:text-sm"
               >
                 <MessageCircle size={14} className="sm:size-4" />
-                <span className="ml-1.5 sm:ml-2">{t('applications.chatAboutApplication', 'Chat')}</span>
+                <span className="ml-1.5 sm:ml-2">{t('applications.askAIAboutApplication', 'Ask AI about this application')}</span>
               </Button>
             </Link>
           </div>
@@ -210,7 +274,17 @@ export default function ApplicationDetailPage() {
         {/* Progress Bar */}
         <div className="mt-6">
           <div className="mb-2 flex items-center justify-between text-sm text-white/60">
-            <span>{t('applications.overallProgress', 'Overall Progress')}</span>
+            <div className="flex items-center gap-2">
+              <span>{t('applications.overallProgress', 'Overall Progress')}</span>
+              {(() => {
+                const milestone = getMilestoneMessage(application.progressPercentage || 0);
+                return milestone ? (
+                  <span className="text-xs text-emerald-400 font-medium">
+                    • {milestone}
+                  </span>
+                ) : null;
+              })()}
+            </div>
             <span className="font-semibold text-white">{application.progressPercentage || 0}%</span>
           </div>
           <div className="h-3 w-full rounded-full bg-white/25 border-2 border-white/20">
@@ -228,18 +302,18 @@ export default function ApplicationDetailPage() {
         <div className="space-y-6">
           {/* Polling state: Show loading message while checklist is being generated */}
           {isPollingChecklist && (
-            <Card className="glass-panel border border-white/10 bg-white/[0.03] p-6">
+            <Card className="glass-panel border border-emerald-500/20 bg-emerald-500/5 p-6">
               <div className="flex items-center gap-4">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-white">
                     {t(
                       'applications.checklistGenerating',
-                      "Checklist is being prepared, this usually takes 10–20 seconds"
+                      "We're preparing your personalized checklist"
                     )}
                   </p>
-                  <p className="mt-1 text-xs text-white/60">
-                    {t('applications.checklistGeneratingSubtext', 'Please wait while we generate your personalized document list...')}
+                  <p className="mt-1 text-xs text-emerald-200/80">
+                    {t('applications.checklistGeneratingSubtext', 'This usually takes 10–20 seconds. You don't need to refresh — it'll appear automatically. Based on official embassy requirements.')}
                   </p>
                 </div>
               </div>
@@ -257,13 +331,13 @@ export default function ApplicationDetailPage() {
                   <p className="text-sm font-medium text-amber-200">
                     {t(
                       'applications.checklistTimeout',
-                      'Checklist generation is taking longer than usual'
+                      'Your checklist is taking a bit longer than expected'
                     )}
                   </p>
                   <p className="mt-1 text-xs text-amber-200/80">
                     {t(
                       'applications.checklistTimeoutSubtext',
-                      'Please refresh after a minute or contact support if the issue persists.'
+                      'This sometimes happens when analyzing complex visa requirements. Give it a minute, then try refreshing. Your application is safe — nothing will be lost.'
                     )}
                   </p>
                   <Button
@@ -273,7 +347,7 @@ export default function ApplicationDetailPage() {
                     className="mt-3 border-amber-500/30 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30"
                   >
                     <RefreshCcw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-                    <span className="ml-2">{t('applications.refreshChecklist', 'Refresh Checklist')}</span>
+                    <span className="ml-2">{t('applications.refreshChecklist', 'Refresh')}</span>
                   </Button>
                 </div>
               </div>

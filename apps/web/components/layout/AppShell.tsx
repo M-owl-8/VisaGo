@@ -117,6 +117,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="hidden items-center gap-1 md:flex">
             {navLinks.map((link) => {
               const isActive = pathname.startsWith(link.href);
+              // De-emphasize non-application links when viewing application detail
+              const isInApplicationDetail = pathname.startsWith('/applications/') && pathname !== '/applications';
+              const isApplicationLink = link.href === '/applications';
+              const shouldDeEmphasize = isInApplicationDetail && !isApplicationLink && link.href !== '/chat';
+              
               return (
                 <Button
                   key={link.href}
@@ -126,6 +131,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     'rounded-full px-5 py-2 text-sm font-semibold transition',
                     isActive
                       ? 'bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)]'
+                      : shouldDeEmphasize
+                      ? 'text-white/30 hover:bg-white/10 hover:text-white/60'
                       : 'text-white/50 hover:bg-white/10 hover:text-white'
                   )}
                   onClick={() => router.push(link.href)}
@@ -187,13 +194,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               {navLinks.map((link) => {
                 const isActive = pathname.startsWith(link.href);
+                // De-emphasize non-application links when viewing application detail
+                const isInApplicationDetail = pathname.startsWith('/applications/') && pathname !== '/applications';
+                const isApplicationLink = link.href === '/applications';
+                const shouldDeEmphasize = isInApplicationDetail && !isApplicationLink && link.href !== '/chat';
+                
                 return (
                   <Button
                     key={link.href}
                     variant="ghost"
                     className={cn(
                       'justify-start rounded-2xl text-left h-12 text-base font-medium',
-                      isActive ? 'bg-primary text-white' : 'text-white/70 hover:bg-white/10'
+                      isActive 
+                        ? 'bg-primary text-white' 
+                        : shouldDeEmphasize
+                        ? 'text-white/40 hover:bg-white/10'
+                        : 'text-white/70 hover:bg-white/10'
                     )}
                     onClick={() => {
                       router.push(link.href);
@@ -248,10 +264,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </nav>
 
-      <main className="relative z-10 flex-1 px-3 pb-4 pt-3 sm:px-4 sm:pt-4 lg:px-8">{children}</main>
+      <main className="relative z-10 flex-1">{children}</main>
 
       {pathname !== '/chat' && (
-        <footer className="relative z-10 shrink-0 border-t border-white/10 px-4 py-4 text-white/60 sm:px-6 lg:px-8">
+        <footer className="relative z-10 shrink-0 border-t border-white/10 px-3 py-3 text-white/60 sm:px-4 sm:py-4 lg:px-6">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             © {new Date().getFullYear()} Ketdik. {t('common.allRightsReserved')}

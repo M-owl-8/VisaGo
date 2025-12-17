@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/Card';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { ApplicationCard } from '@/components/applications/ApplicationCard';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
+import { NextStepGuidance } from '@/components/guidance/NextStepGuidance';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useOnboardingStore } from '@/lib/stores/onboarding';
 import { useApplications } from '@/lib/hooks/useApplications';
@@ -136,7 +137,7 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 text-white sm:space-y-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-3 py-3 text-white sm:space-y-8 sm:px-4 sm:py-4 lg:px-8 lg:py-6">
       {error && (
         <ErrorBanner
           message={error}
@@ -154,6 +155,9 @@ export default function ApplicationsPage() {
           }
         />
       )}
+
+      {/* Next Step Guidance - Dominant but not loud */}
+      <NextStepGuidance applications={userApplications} />
 
       <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[2fr,1fr]">
         <motion.div
@@ -351,22 +355,22 @@ const EmptyState = () => {
   return (
     <Card className="glass-panel flex flex-col items-center justify-center border-dashed border-white/10 bg-white/[0.03] px-8 py-20 text-center text-white">
       <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 text-primary">
-        <Plus size={32} />
+        <Sparkles size={32} />
       </div>
       <h3 className="font-display text-2xl font-semibold text-white">
-        {t('applications.noApplicationsYet', 'No applications yet')}
+        {t('applications.noApplicationsYet', 'Ready to start your visa journey?')}
       </h3>
-      <p className="mt-3 max-w-xl text-sm text-white/60">
+      <p className="mt-3 max-w-xl text-sm text-white/70">
         {t(
           'applications.emptySubtitle',
-          'Start your first application to unlock personalized timelines, AI planning, and shared mobile progress.'
+          'Answer a few questions about your trip, and we'll create a personalized checklist with AI-powered guidance. Used by travelers applying to dozens of countries worldwide.'
         )}
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link href="/questionnaire">
           <Button className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 shadow-[0_20px_45px_rgba(62,166,255,0.45)]">
-            <Plus size={18} />
-            <span className="ml-2">{t('applications.startNewApplication', 'Start New Application')}</span>
+            <Sparkles size={18} />
+            <span className="ml-2">{t('applications.startNewApplication', 'Start Your Application')}</span>
           </Button>
         </Link>
         <Link href="/chat">
@@ -375,9 +379,17 @@ const EmptyState = () => {
             className="rounded-2xl border border-white/10 !bg-transparent text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)]"
           >
             <MessageCircle size={18} />
-            <span className="ml-2">{t('applications.heroAiCta', 'Open AI assistant')}</span>
+            <span className="ml-2">{t('applications.heroAiCta', 'Chat with AI')}</span>
           </Button>
         </Link>
+      </div>
+      <div className="mt-6 space-y-2">
+        <p className="text-xs text-white/40">
+          {t('applications.emptyStateConfidence', 'Your data is secure and synced with our mobile app')}
+        </p>
+        <p className="text-xs text-white/40">
+          {t('applications.emptyStateExperience', 'Typical checklist preparation takes 3–5 minutes')}
+        </p>
       </div>
     </Card>
   );
