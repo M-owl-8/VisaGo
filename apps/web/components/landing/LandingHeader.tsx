@@ -13,11 +13,15 @@ export function LandingHeader() {
     <header className="sticky top-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
         {/* Logo - Smaller on mobile */}
-        <Link href="/" className="flex items-center gap-2 sm:gap-3">
+        <Link
+          href="/"
+          className="flex items-center gap-2 rounded-lg transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary/50 sm:gap-3"
+          aria-label="Ketdik home"
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 sm:h-10 sm:w-10">
             <Image
               src="/images/ketdik-icon.jpg?v=2"
-              alt="Ketdik"
+              alt=""
               width={32}
               height={32}
               className="h-6 w-6 rounded-lg object-cover sm:h-8 sm:w-8"
@@ -52,7 +56,7 @@ export function LandingHeader() {
           <Link href="/login" className="hidden md:block">
             <Button
               variant="ghost"
-              className="rounded-xl border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white hover:bg-white/10 sm:px-4 sm:py-2 sm:text-sm"
+              className="rounded-xl border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white hover:bg-white/10 focus:ring-2 focus:ring-primary/50 sm:px-4 sm:py-2 sm:text-sm"
             >
               {t('landing.navSignIn', 'Sign In')}
             </Button>
@@ -60,7 +64,7 @@ export function LandingHeader() {
           
           {/* Get Started - Primary CTA, always visible but smaller on mobile */}
           <Link href="/register">
-            <Button className="rounded-xl bg-gradient-to-r from-primary to-primary-dark px-3 py-1.5 text-xs font-semibold shadow-[0_10px_25px_rgba(62,166,255,0.35)] sm:px-4 sm:py-2 sm:text-sm">
+            <Button className="rounded-xl bg-gradient-to-r from-primary to-primary-dark px-3 py-1.5 text-xs font-semibold shadow-[0_10px_25px_rgba(62,166,255,0.35)] focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background sm:px-4 sm:py-2 sm:text-sm">
               {t('landing.navGetStarted', 'Get Started')}
             </Button>
           </Link>

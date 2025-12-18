@@ -56,7 +56,7 @@ export function ApplicationCard({
   };
 
   return (
-    <Card className="group relative overflow-hidden border-white/5 bg-white/[0.04] p-4 transition-all hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_30px_60px_rgba(7,12,30,0.6)] sm:p-6">
+    <Card className="group relative overflow-hidden border-white/5 bg-white/[0.04] p-4 transition-all duration-200 hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_30px_60px_rgba(7,12,30,0.6)] sm:p-6">
       {/* Country Flag & Header */}
       <div className="mb-3 flex items-start justify-between gap-2 sm:mb-4">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -100,19 +100,20 @@ export function ApplicationCard({
       <div className="flex flex-col gap-2 border-t border-white/5 pt-3 sm:flex-row sm:items-center sm:gap-3 sm:pt-4">
         <Link
           href={`/applications/${application.id}`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 active:scale-95 sm:px-4 sm:py-2"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-white/10 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/50 sm:px-4 sm:py-2"
+          aria-label={`View details for ${application.country?.name} ${application.visaType?.name} application`}
         >
           <span>{t('applications.viewDetails', 'View details')}</span>
-          <ArrowUpRight size={16} className="sm:size-4" />
+          <ArrowUpRight size={16} className="sm:size-4" aria-hidden="true" />
         </Link>
         {isDraft && (
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-400 transition hover:bg-rose-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-2"
-            title={t('applications.removeApplication', 'Remove application')}
+            className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-400 transition-all duration-200 hover:bg-rose-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-rose-500/50 sm:px-4 sm:py-2"
+            aria-label={t('applications.removeApplication', 'Remove application')}
           >
-            <Trash2 size={16} className="sm:size-4" />
+            <Trash2 size={16} className="sm:size-4" aria-hidden="true" />
             <span className="hidden sm:inline">{t('applications.remove', 'Remove')}</span>
           </button>
         )}

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
+import { validationRules, validateField } from '@/lib/utils/formValidation';
 
 export default function RegisterPage() {
   const { t, i18n } = useTranslation();
@@ -21,25 +22,65 @@ export default function RegisterPage() {
     firstName: '',
     lastName: '',
   });
+  const [fieldErrors, setFieldErrors] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
+  });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const validateEmail = (value: string) => {
+    const error = validateField(value, [validationRules.required, validationRules.email]);
+    setFieldErrors((prev) => ({ ...prev, email: error || '' }));
+    return !error;
+  };
+
+  const validatePassword = (value: string) => {
+    const error = validateField(value, [validationRules.required, validationRules.minLength(6)]);
+    setFieldErrors((prev) => ({ ...prev, password: error || '' }));
+    return !error;
+  };
+
+  const validateConfirmPassword = (value: string) => {
+    let error = validateField(value, [validationRules.required]);
+    if (!error && value !== formData.password) {
+      error = 'Passwords do not match';
+    }
+    setFieldErrors((prev) => ({ ...prev, confirmPassword: error || '' }));
+    return !error;
+  };
+
+  const validateName = (value: string, field: 'firstName' | 'lastName') => {
+    const error = validateField(value, [validationRules.required]);
+    setFieldErrors((prev) => ({ ...prev, [field]: error || '' }));
+    return !error;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate all fields
+    const isFirstNameValid = validateName(formData.firstName, 'firstName');
+    const isLastNameValid = validateName(formData.lastName, 'lastName');
+    const isEmailValid = validateEmail(formData.email);
+    const isPasswordValid = validatePassword(formData.password);
+    const isConfirmPasswordValid = validateConfirmPassword(formData.confirmPassword);
+
+    if (
+      !isFirstNameValid ||
+      !isLastNameValid ||
+      !isEmailValid ||
+      !isPasswordValid ||
+      !isConfirmPasswordValid
+    ) {
+      return;
+    }
+
     setIsSubmitting(true);
-
-    if (formData.password !== formData.confirmPassword) {
-      setError(t('errors.passwordsDoNotMatch'));
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError(t('errors.passwordMinLength'));
-      setIsSubmitting(false);
-      return;
-    }
 
     try {
       await register(formData.email, formData.password, formData.firstName, formData.lastName);
@@ -53,12 +94,13 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout formTitle={t('auth.registerTitle')} formSubtitle={t('auth.subtitle')}>
-      <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit}>
+      <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit} noValidate>
         {error && (
           <div
             className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200"
             role="alert"
             aria-live="polite"
+            aria-atomic="true"
           >
             <div className="flex items-start gap-2">
               <span className="flex-1">{error}</span>
@@ -75,7 +117,12 @@ export default function RegisterPage() {
             type="text"
             placeholder={t('auth.firstName')}
             value={formData.firstName}
-            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, firstName: e.target.value });
+              if (fieldErrors.firstName) validateName(e.target.value, 'firstName');
+            }}
+            onBlur={() => validateName(formData.firstName, 'firstName')}
+            error={fieldErrors.firstName}
             required
           />
           <AuthField
@@ -86,7 +133,12 @@ export default function RegisterPage() {
             type="text"
             placeholder={t('auth.lastName')}
             value={formData.lastName}
-            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, lastName: e.target.value });
+              if (fieldErrors.lastName) validateName(e.target.value, 'lastName');
+            }}
+            onBlur={() => validateName(formData.lastName, 'lastName')}
+            error={fieldErrors.lastName}
             required
           />
         </div>
@@ -100,7 +152,12 @@ export default function RegisterPage() {
           placeholder="you@email.com"
           autoComplete="email"
           value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          onChange={(e) => {
+            setFormData({ ...formData, email: e.target.value });
+            if (fieldErrors.email) validateEmail(e.target.value);
+          }}
+          onBlur={() => validateEmail(formData.email)}
+          error={fieldErrors.email}
           required
         />
 
@@ -113,9 +170,20 @@ export default function RegisterPage() {
           placeholder={t('auth.password')}
           autoComplete="new-password"
           value={formData.password}
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          onChange={(e) => {
+            setFormData({ ...formData, password: e.target.value });
+            if (fieldErrors.password) validatePassword(e.target.value);
+            if (fieldErrors.confirmPassword && formData.confirmPassword)
+              validateConfirmPassword(formData.confirmPassword);
+          }}
+          onBlur={() => validatePassword(formData.password)}
+          error={fieldErrors.password}
           required
-          hint={t('auth.passwordHint', 'Minimum 6 characters to sync with mobile app.')}
+          hint={
+            !fieldErrors.password
+              ? t('auth.passwordHint', 'Minimum 6 characters to sync with mobile app.')
+              : undefined
+          }
         />
 
         <AuthField
@@ -127,7 +195,12 @@ export default function RegisterPage() {
           placeholder={t('auth.confirmPassword')}
           autoComplete="new-password"
           value={formData.confirmPassword}
-          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+          onChange={(e) => {
+            setFormData({ ...formData, confirmPassword: e.target.value });
+            if (fieldErrors.confirmPassword) validateConfirmPassword(e.target.value);
+          }}
+          onBlur={() => validateConfirmPassword(formData.confirmPassword)}
+          error={fieldErrors.confirmPassword}
           required
         />
 
@@ -135,13 +208,17 @@ export default function RegisterPage() {
           type="submit"
           disabled={isSubmitting}
           className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#4A9EFF] to-[#3EA6FF] py-3 text-sm font-semibold text-white shadow-[0_15px_30px_rgba(74,158,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814] sm:py-3 sm:text-base"
+          aria-busy={isSubmitting}
         >
           {isSubmitting ? t('common.loading') : t('auth.createAccount')}
         </button>
 
         <div className="text-center text-xs text-white/70 sm:text-sm">
           <span>{t('auth.alreadyHaveAccount')}</span>{' '}
-          <Link href="/login" className="font-semibold text-white hover:text-[#4A9EFF]">
+          <Link
+            href="/login"
+            className="font-semibold text-white hover:text-[#4A9EFF] transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary/50"
+          >
             {t('auth.signIn')}
           </Link>
         </div>

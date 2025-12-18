@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
+import { validationRules, validateField } from '@/lib/utils/formValidation';
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation();
@@ -16,13 +17,36 @@ export default function LoginPage() {
   const { login } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const validateEmail = (value: string) => {
+    const error = validateField(value, [validationRules.required, validationRules.email]);
+    setEmailError(error || '');
+    return !error;
+  };
+
+  const validatePassword = (value: string) => {
+    const error = validateField(value, [validationRules.required]);
+    setPasswordError(error || '');
+    return !error;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate all fields
+    const isEmailValid = validateEmail(email);
+    const isPasswordValid = validatePassword(password);
+
+    if (!isEmailValid || !isPasswordValid) {
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -37,12 +61,13 @@ export default function LoginPage() {
 
   return (
     <AuthLayout formTitle={t('auth.signIn')} formSubtitle={t('auth.subtitle')}>
-      <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit}>
+      <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit} noValidate>
         {error && (
           <div
             className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200"
             role="alert"
             aria-live="polite"
+            aria-atomic="true"
           >
             <div className="flex items-start gap-2">
               <span className="flex-1">{error}</span>
@@ -59,14 +84,22 @@ export default function LoginPage() {
           autoComplete="email"
           placeholder="you@email.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (emailError) validateEmail(e.target.value);
+          }}
+          onBlur={() => validateEmail(email)}
+          error={emailError}
           required
         />
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm text-white/70">
             <span className="font-semibold">{t('auth.password')}</span>
-            <Link href="/forgot-password" className="text-[#4A9EFF] hover:text-white">
+            <Link 
+              href="/forgot-password" 
+              className="text-[#4A9EFF] hover:text-white transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
               {t('auth.forgotPassword')}
             </Link>
           </div>
@@ -79,13 +112,19 @@ export default function LoginPage() {
             autoComplete="current-password"
             placeholder={t('auth.password')}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordError) validatePassword(e.target.value);
+            }}
+            onBlur={() => validatePassword(password)}
+            error={passwordError}
             required
             trailing={
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="text-white/50 transition hover:text-white"
+                className="text-white/50 transition hover:text-white rounded focus:outline-none focus:ring-2 focus:ring-primary/50"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -97,6 +136,7 @@ export default function LoginPage() {
           type="submit"
           disabled={isSubmitting}
           className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-[#3EA6FF] to-[#4A9EFF] py-3 text-sm font-semibold text-white shadow-[0_15px_30px_rgba(62,166,255,0.35)] transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#030814] sm:py-3 sm:text-base"
+          aria-busy={isSubmitting}
         >
           {isSubmitting ? t('common.loading') : t('auth.signInButton')}
         </button>

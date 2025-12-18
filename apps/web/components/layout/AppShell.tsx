@@ -264,7 +264,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </nav>
 
-      <main className="relative z-10 flex-1">{children}</main>
+      <main id="main-content" className="relative z-10 flex-1" role="main">
+        {children}
+      </main>
 
       {pathname !== '/chat' && (
         <footer className="relative z-10 shrink-0 border-t border-white/10 px-3 py-3 text-white/60 sm:px-4 sm:py-4 lg:px-6">
