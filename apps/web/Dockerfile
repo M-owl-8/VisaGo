@@ -9,6 +9,9 @@ WORKDIR /app
 COPY package.json ./
 COPY package-lock.json* ./
 
+# Remove workspace dependency that doesn't exist in Docker build context
+RUN sed -i '/"visabuddy-monorepo"/d' package.json || true
+
 # Install dependencies (handle lockfile gracefully - fallback to install if lockfile has issues)
 RUN if [ -f package-lock.json ]; then \
       npm install --prefer-offline --no-audit || npm install --no-audit; \
