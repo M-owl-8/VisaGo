@@ -6,10 +6,15 @@ FROM base AS deps
 WORKDIR /app
 
 # Copy dependency manifests
-COPY package.json package-lock.json ./
+COPY package.json ./
+COPY package-lock.json* ./
 
-# Install dependencies (npm install respects lockfile and is more compatible than npm ci)
-RUN npm install --prefer-offline --no-audit
+# Install dependencies (handle lockfile gracefully - fallback to install if lockfile has issues)
+RUN if [ -f package-lock.json ]; then \
+      npm install --prefer-offline --no-audit || npm install --no-audit; \
+    else \
+      npm install --no-audit; \
+    fi
 
 # Build stage
 FROM base AS builder
