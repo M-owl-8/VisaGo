@@ -17,7 +17,6 @@ import { StatusBadge } from '@/components/applications/StatusBadge';
 import { DocumentChecklist } from '@/components/checklist/DocumentChecklist';
 import { ChecklistSummary } from '@/components/checklist/ChecklistSummary';
 import { RiskExplanationPanel } from '@/components/checklist/RiskExplanationPanel';
-import { UserInsights } from '@/components/analytics/UserInsights';
 import { NextStepGuidance } from '@/components/guidance/NextStepGuidance';
 import { getMilestoneMessage } from '@/lib/utils/processingTimes';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
@@ -331,12 +330,6 @@ export default function ApplicationDetailPage() {
         <div className="space-y-6">
           {/* Checklist Summary */}
           <ChecklistSummary items={checklistItems} />
-
-          {/* User Insights */}
-          <UserInsights
-            countryCode={application.country?.code}
-            visaType={application.visaType?.name}
-          />
         </div>
       </div>
 

@@ -198,7 +198,7 @@ function determineNextStep(
         const rejectedItems = items.filter(item => item.status === 'rejected');
         const rejectedNames = rejectedItems
           .slice(0, 3)
-          .map(item => item.name || item.documentType || 'document')
+          .map(item => item.name || item.document || 'document')
           .join(', ');
         const moreText = rejectedCount > 3 ? ` and ${rejectedCount - 3} more` : '';
         
