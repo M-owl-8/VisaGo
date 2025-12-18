@@ -21,6 +21,22 @@ import {
 
 const prisma = new PrismaClient();
 
+const clampPercent = (value: number | undefined) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return undefined;
+  return Math.min(100, Math.max(0, Math.round(value)));
+};
+
+const riskLevelToStrengthPercent = (riskLevel: 'low' | 'medium' | 'high') => {
+  switch (riskLevel) {
+    case 'low':
+      return 80;
+    case 'medium':
+      return 60;
+    default:
+      return 40;
+  }
+};
+
 /**
  * Risk Explanation Response Schema (EXPERT VERSION - Phase 3)
  * Extended with expert fields: factorWeights, improvementImpact, timeline, costEstimate, officerPerspective
@@ -30,6 +46,9 @@ const RiskExplanationResponseSchema = z.object({
   summaryEn: z.string(),
   summaryUz: z.string(),
   summaryRu: z.string(),
+  // Percentage confidence/strength derived from canonical risk score
+  profileStrengthPercent: z.number().min(0).max(100).optional(),
+  confidencePercent: z.number().min(0).max(100).optional(),
   recommendations: z.array(
     z.object({
       id: z.string(),
@@ -145,11 +164,16 @@ export class VisaRiskExplanationService {
             ? JSON.parse(existing.recommendations)
             : existing.recommendations;
 
+        const cachedRiskLevel = existing.riskLevel as 'low' | 'medium' | 'high';
+        const cachedStrengthPercent = riskLevelToStrengthPercent(cachedRiskLevel);
+
         return {
-          riskLevel: existing.riskLevel as 'low' | 'medium' | 'high',
+          riskLevel: cachedRiskLevel,
           summaryEn: existing.summaryEn,
           summaryUz: existing.summaryUz,
           summaryRu: existing.summaryRu,
+          profileStrengthPercent: cachedStrengthPercent,
+          confidencePercent: cachedStrengthPercent,
           recommendations: Array.isArray(recommendations) ? recommendations : [],
         };
       }
@@ -333,6 +357,8 @@ export class VisaRiskExplanationService {
       // Phase 2: Use centralized computeRiskLevel for consistency
       const canonicalRiskScorePercent = canonicalContext?.riskScore?.probabilityPercent || 70;
       const canonicalRiskLevel = computeRiskLevel(canonicalRiskScorePercent);
+      const profileStrengthPercent = clampPercent(100 - canonicalRiskScorePercent);
+      const confidencePercent = clampPercent(100 - canonicalRiskScorePercent);
 
       // Check for country name mismatches in text
       const countryMismatches: string[] = [];
@@ -478,6 +504,14 @@ export class VisaRiskExplanationService {
           riskLevel: canonicalRiskLevel,
         };
       }
+
+      // Always attach normalized strength/confidence derived from canonical risk score
+      explanation = {
+        ...explanation,
+        profileStrengthPercent:
+          profileStrengthPercent ?? riskLevelToStrengthPercent(explanation.riskLevel),
+        confidencePercent: confidencePercent ?? riskLevelToStrengthPercent(explanation.riskLevel),
+      };
 
       // Store in database
       await prisma.visaRiskExplanation.upsert({

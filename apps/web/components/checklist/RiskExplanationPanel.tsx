@@ -13,6 +13,8 @@ interface RiskExplanation {
   summaryEn: string;
   summaryUz: string;
   summaryRu: string;
+  profileStrengthPercent?: number;
+  confidencePercent?: number;
   recommendations: Array<{
     id: string;
     titleEn: string;
@@ -117,9 +119,16 @@ export function RiskExplanationPanel({
   const riskLevel = explanation.riskLevel;
   const recommendations = explanation.recommendations || [];
 
-  // Calculate profile strength (0-10 scale)
-  const profileStrength = riskLevel === 'low' ? 8 : riskLevel === 'medium' ? 6 : 4;
-  const strengthPercentage = (profileStrength / 10) * 100;
+  const fallbackStrength = riskLevel === 'low' ? 80 : riskLevel === 'medium' ? 60 : 40;
+  const strengthPercentage = Math.round(
+    explanation.profileStrengthPercent !== undefined
+      ? Math.min(100, Math.max(0, explanation.profileStrengthPercent))
+      : fallbackStrength
+  );
+  const confidencePercentage =
+    explanation.confidencePercent !== undefined
+      ? Math.round(Math.min(100, Math.max(0, explanation.confidencePercent)))
+      : undefined;
 
   // Risk level badge styling
   const getRiskBadge = () => {
