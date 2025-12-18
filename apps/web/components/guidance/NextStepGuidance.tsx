@@ -198,7 +198,8 @@ function determineNextStep(
         return {
           category: 'Small Fix Needed',
           title: `${rejectedCount} document${rejectedCount > 1 ? 's need' : ' needs'} a quick update`,
-          description: 'We reviewed your documents and noticed a few need small adjustments. Check the feedback below and upload corrected versions — it's usually an easy fix.',
+          description:
+            "We reviewed your documents and noticed a few need small adjustments. Check the feedback below and upload corrected versions — it's usually an easy fix.",
           urgency: 'high',
           icon: AlertTriangle,
           helpText: getRejectionReassurance(),
@@ -225,7 +226,7 @@ function determineNextStep(
         const milestone = getMilestoneMessage(application.progressPercentage || 0);
         return {
           category: 'Looking Good',
-          title: milestone || 'Keep going — you're making progress',
+          title: milestone || "Keep going — you're making progress",
           description: `${verifiedCount} documents approved, ${pendingCount} to go. Upload the remaining documents and we'll review them promptly.`,
           urgency: 'medium',
           icon: Upload,
@@ -303,7 +304,7 @@ function determineNextStep(
     if (inProgressApps.length > 0) {
       const app = inProgressApps[0];
       return {
-        category: 'You're On Your Way',
+        category: "You're On Your Way",
         title: 'Keep building momentum',
         description: `You have ${inProgressApps.length} active application${inProgressApps.length > 1 ? 's' : ''}. Upload a few more documents and you'll be closer to done.`,
         urgency: 'medium',
