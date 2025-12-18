@@ -78,10 +78,12 @@ function ChatPageContent() {
   }, [messages.length]);
 
   const scrollToBottom = () => {
-    messagesContainerRef.current?.scrollTo({
-      top: messagesContainerRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
   };
 
   // Prepare application context for QuickActions
@@ -140,10 +142,10 @@ function ChatPageContent() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)] flex-col bg-gradient-to-b from-background via-background to-midnight">
+    <div className="flex h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
       {/* AI Context Chip - Shows what application AI is helping with */}
       {application && (
-        <div className="border-b border-white/10 bg-white/[0.02] px-3 py-2 sm:px-4 lg:px-8">
+        <div className="shrink-0 border-b border-white/10 bg-white/[0.02] px-3 py-2 sm:px-4 lg:px-8">
           <div className="mx-auto max-w-5xl">
             <div className="flex items-center gap-2 text-sm">
               <Sparkles size={14} className="text-primary" />
@@ -162,9 +164,39 @@ function ChatPageContent() {
         </div>
       )}
 
-      {/* Messages Area - Scrollable via body */}
-      <div ref={messagesContainerRef} className="flex-1 px-3 sm:px-4 lg:px-8" id="chat-messages">
-        <div className="mx-auto max-w-5xl py-4">
+      {/* Error Banner - Above messages but below context */}
+      {chatError && (
+        <div className="shrink-0 border-b border-rose-500/20 bg-rose-500/10 px-3 py-2 sm:px-4 lg:px-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-rose-100">{t('chat.errorTitle', 'Message not sent')}</p>
+                <p className="text-xs text-rose-200/80">{chatError || t('chat.errorDefault', 'Something went wrong. Your conversation is saved — try sending again.')}</p>
+              </div>
+              {lastFailedMessage && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleRetry}
+                  className="bg-rose-500/20 text-rose-100 hover:bg-rose-500/30 shrink-0"
+                >
+                  <RefreshCcw size={14} />
+                  <span className="ml-2">{t('errors.tryAgain', 'Retry')}</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Messages Area - Scrollable container */}
+      <div 
+        ref={messagesContainerRef} 
+        className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-8" 
+        id="chat-messages"
+        style={{ scrollBehavior: 'smooth' }}
+      >
+        <div className="mx-auto max-w-5xl py-4 pb-24">
           {isLoading && messages.length === 0 ? (
             <div className="space-y-4">
               <div className="h-20 animate-pulse rounded-xl bg-white/5" />
@@ -198,44 +230,19 @@ function ChatPageContent() {
         </div>
       </div>
 
-      {/* Error Banner */}
-      {chatError && (
-        <div className="mb-4 border border-rose-500/20 bg-rose-500/10 px-3 py-3 sm:px-4 lg:px-8 rounded-lg">
-          <div className="mx-auto max-w-5xl">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-rose-100">{t('chat.errorTitle', 'Message not sent')}</p>
-                <p className="text-xs text-rose-200/80">{chatError || t('chat.errorDefault', 'Something went wrong. Your conversation is saved — try sending again.')}</p>
-              </div>
-              {lastFailedMessage && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleRetry}
-                  className="bg-rose-500/20 text-rose-100 hover:bg-rose-500/30 shrink-0"
-                >
-                  <RefreshCcw size={14} />
-                  <span className="ml-2">{t('errors.tryAgain', 'Retry')}</span>
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Scroll to Bottom Button */}
       {showScrollButton && (
         <button
           onClick={scrollToBottom}
-          className="fixed bottom-32 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-midnight/90 text-white shadow-lg backdrop-blur-sm transition hover:bg-midnight hover:scale-110 active:scale-95 sm:bottom-36 sm:right-8"
+          className="fixed bottom-32 right-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-midnight/90 text-white shadow-lg backdrop-blur-sm transition hover:bg-midnight hover:scale-110 active:scale-95 sm:bottom-36 sm:right-8"
           aria-label="Scroll to bottom"
         >
           <ArrowDown size={20} />
         </button>
       )}
 
-      {/* Input Area - Sticky at bottom */}
-      <div className="sticky bottom-0 shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)] mt-4">
+      {/* Input Area - Fixed at bottom */}
+      <div className="shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
           <ChatInput
             value={input}
