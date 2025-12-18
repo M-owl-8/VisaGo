@@ -12,12 +12,12 @@ COPY package-lock.json* ./
 # Remove workspace dependency that doesn't exist in Docker build context
 RUN sed -i '/"visabuddy-monorepo"/d' package.json || true
 
-# Install dependencies (handle lockfile gracefully - fallback to install if lockfile has issues)
-RUN if [ -f package-lock.json ]; then \
-      npm install --prefer-offline --no-audit || npm install --no-audit; \
-    else \
-      npm install --no-audit; \
-    fi
+# After mutating package.json, the existing lockfile can become invalid (and can even crash npm).
+# Drop the lockfile inside the container and do a clean resolve instead.
+RUN rm -f package-lock.json
+
+# Install dependencies (more resilient on hosted builders)
+RUN npm install --no-audit --no-fund --legacy-peer-deps
 
 # Build stage
 FROM base AS builder
