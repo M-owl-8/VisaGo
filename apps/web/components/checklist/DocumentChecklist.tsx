@@ -76,10 +76,14 @@ export function DocumentChecklist({
     }
   };
 
-  // Group items by category
-  const requiredItems = items.filter((item) => item.category === 'required');
-  const highlyRecommendedItems = items.filter((item) => item.category === 'highly_recommended');
-  const optionalItems = items.filter((item) => item.category === 'optional');
+  // Get rejected items first (shown separately at top)
+  const rejectedItems = items.filter((item) => item.status === 'rejected');
+  
+  // Group non-rejected items by category
+  const nonRejectedItems = items.filter((item) => item.status !== 'rejected');
+  const requiredItems = nonRejectedItems.filter((item) => item.category === 'required');
+  const highlyRecommendedItems = nonRejectedItems.filter((item) => item.category === 'highly_recommended');
+  const optionalItems = nonRejectedItems.filter((item) => item.category === 'optional');
 
   // Show empty state only if not polling and not timed out
   // (Polling and timeout states are handled by the parent component)
@@ -109,7 +113,33 @@ export function DocumentChecklist({
         {t('applications.documentChecklist', 'Document Checklist')}
       </h2>
 
-      <div className="space-y-8">
+      <div className="space-y-8" id="checklist">
+        {/* Rejected Documents Section - Show first if any exist */}
+        {rejectedItems.length > 0 && (
+          <div id="rejected-documents">
+            <div className="mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-white">
+                {t('documents.needsFix', 'Documents Needing Fix')}
+              </h3>
+              <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-xs font-semibold text-rose-300">
+                {rejectedItems.length}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {rejectedItems.map((item, index) => (
+                <DocumentChecklistItem
+                  key={item.documentType || item.document || `rejected-${index}`}
+                  item={item}
+                  applicationId={applicationId}
+                  language={language}
+                  t={t}
+                  onPreview={handlePreviewDocument}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Required Documents */}
         {requiredItems.length > 0 && (
           <div>

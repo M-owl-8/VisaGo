@@ -173,7 +173,7 @@ export function RiskExplanationPanel({
       <div className="mb-6">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm text-white/70">{t('applications.yourProfileStrength', 'Your profile strength')}</span>
-          <span className="text-2xl font-bold text-white">{profileStrength}/10</span>
+          <span className="text-2xl font-bold text-white">{Math.round(strengthPercentage)}%</span>
         </div>
         <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
           <div

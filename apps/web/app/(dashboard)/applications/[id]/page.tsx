@@ -6,9 +6,10 @@ import Link from 'next/link';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
-import { ArrowLeft, MessageCircle, CheckCircle2, Clock, XCircle, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, XCircle, Trash2, Clock } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { useApplication } from '@/lib/hooks/useApplication';
+import { useOverallProgress } from '@/lib/hooks/useOverallProgress';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -16,16 +17,13 @@ import { StatusBadge } from '@/components/applications/StatusBadge';
 import { DocumentChecklist } from '@/components/checklist/DocumentChecklist';
 import { ChecklistSummary } from '@/components/checklist/ChecklistSummary';
 import { RiskExplanationPanel } from '@/components/checklist/RiskExplanationPanel';
-import { ProgressBreakdown } from '@/components/checklist/ProgressBreakdown';
-import { BulkUploadModal } from '@/components/documents/BulkUploadModal';
 import { UserInsights } from '@/components/analytics/UserInsights';
 import { NextStepGuidance } from '@/components/guidance/NextStepGuidance';
-import { getProcessingTimeEstimate, getWhatHappensNext, getMilestoneMessage } from '@/lib/utils/processingTimes';
-import { Info } from 'lucide-react';
+import { getMilestoneMessage } from '@/lib/utils/processingTimes';
 import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/Skeleton';
 import { RefreshCcw } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function ApplicationDetailPage() {
   const { t, i18n } = useTranslation();
@@ -46,7 +44,27 @@ export default function ApplicationDetailPage() {
   } = useApplication(applicationId, { autoFetch: isSignedIn });
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  
+  // Calculate overall progress across ALL applications (verified documents only)
+  const { overallProgress: globalOverallProgress, isLoading: progressLoading } = useOverallProgress();
+
+  // Handle scroll to rejected documents when hash is present
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#rejected-documents') {
+      // Wait for checklist to render
+      setTimeout(() => {
+        const element = document.getElementById('rejected-documents');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Highlight the section briefly
+          element.classList.add('ring-2', 'ring-rose-500/50', 'rounded-xl');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-rose-500/50', 'rounded-xl');
+          }, 2000);
+        }
+      }, 500);
+    }
+  }, [checklist]);
 
   // Redirect if not signed in
   if (!isSignedIn) {
@@ -165,58 +183,6 @@ export default function ApplicationDetailPage() {
         />
       </div>
 
-      {/* Processing Time Estimate & What Happens Next */}
-      {application && (
-        <div className="mb-6 grid gap-4 md:grid-cols-2">
-          {/* Processing Time Estimate */}
-          {application.status !== 'approved' && application.status !== 'rejected' && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
-                  <Clock size={16} className="text-blue-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-medium uppercase tracking-wider text-white/40 mb-1">
-                    {t('applications.typicalProcessing', 'Typical Processing Time')}
-                  </p>
-                  <p className="text-sm text-white/80">
-                    {getProcessingTimeEstimate(
-                      application.country?.code,
-                      application.visaType?.name
-                    ).text}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* What Happens Next */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Info size={16} className="text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-medium uppercase tracking-wider text-white/40 mb-1">
-                  {t('applications.whatHappensNext', 'What Happens Next?')}
-                </p>
-                <p className="text-sm text-white/80">
-                  {getWhatHappensNext(
-                    !!checklist,
-                    checklist?.status === 'ready',
-                    checklistItems.filter(item => item.status === 'verified').length,
-                    checklistItems.filter(item => item.status === 'rejected').length,
-                    checklistItems.filter(item => item.status === 'pending' || !item.status).length,
-                    checklistItems.filter(item => item.category === 'required').length,
-                    application.status === 'submitted'
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Summary Section */}
       <Card className="glass-panel mb-6 border border-white/10 bg-white/[0.03] p-4 sm:mb-8 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -250,34 +216,15 @@ export default function ApplicationDetailPage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="ghost"
-              onClick={() => setShowBulkUpload(true)}
-              className="w-full rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary hover:bg-primary/20 sm:w-auto sm:px-4 sm:text-sm"
-            >
-              <Upload size={14} className="sm:size-4" />
-              <span className="ml-1.5 sm:ml-2">{t('documents.uploadMultiple', 'Upload Multiple')}</span>
-            </Button>
-            <Link href={`/chat?applicationId=${applicationId}`} className="w-full sm:w-auto">
-              <Button
-                variant="ghost"
-                className="w-full rounded-xl border border-white/10 !bg-transparent px-3 py-2 text-xs !text-white hover:!bg-white/10 sm:px-4 sm:text-sm"
-              >
-                <MessageCircle size={14} className="sm:size-4" />
-                <span className="ml-1.5 sm:ml-2">{t('applications.askAIAboutApplication', 'Ask AI about this application')}</span>
-              </Button>
-            </Link>
-          </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* Overall Progress Bar - Across ALL applications (verified documents only) */}
         <div className="mt-6">
           <div className="mb-2 flex items-center justify-between text-sm text-white/60">
             <div className="flex items-center gap-2">
               <span>{t('applications.overallProgress', 'Overall Progress')}</span>
               {(() => {
-                const milestone = getMilestoneMessage(application.progressPercentage || 0);
+                const milestone = getMilestoneMessage(globalOverallProgress);
                 return milestone ? (
                   <span className="text-xs text-emerald-400 font-medium">
                     • {milestone}
@@ -285,14 +232,19 @@ export default function ApplicationDetailPage() {
                 ) : null;
               })()}
             </div>
-            <span className="font-semibold text-white">{application.progressPercentage || 0}%</span>
+            <span className="font-semibold text-white">
+              {progressLoading ? '...' : `${globalOverallProgress}%`}
+            </span>
           </div>
           <div className="h-3 w-full rounded-full bg-white/25 border-2 border-white/20">
             <div
               className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-[width] shadow-[0_0_8px_rgba(62,166,255,0.5)]"
-              style={{ width: `${application.progressPercentage || 0}%` }}
+              style={{ width: `${progressLoading ? 0 : globalOverallProgress}%` }}
             />
           </div>
+          <p className="mt-2 text-xs text-white/50">
+            {t('applications.overallProgressHint', 'Based on verified documents across all your applications')}
+          </p>
         </div>
       </Card>
 
@@ -377,14 +329,6 @@ export default function ApplicationDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Progress Breakdown */}
-          <ProgressBreakdown
-            questionnaireComplete={!!application}
-            totalRequired={checklistItems.filter(item => item.category === 'required').length}
-            verifiedCount={checklistItems.filter(item => item.status === 'verified').length}
-            pendingCount={checklistItems.filter(item => item.status === 'pending').length}
-          />
-          
           {/* Checklist Summary */}
           <ChecklistSummary items={checklistItems} />
 
@@ -396,18 +340,6 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
-      {/* Bulk Upload Modal */}
-      <BulkUploadModal
-        isOpen={showBulkUpload}
-        onClose={() => setShowBulkUpload(false)}
-        applicationId={applicationId}
-        onUploadComplete={() => {
-          // Refresh the page to show updated documents
-          if (typeof window !== 'undefined') {
-            window.location.reload();
-          }
-        }}
-      />
     </div>
   );
 }

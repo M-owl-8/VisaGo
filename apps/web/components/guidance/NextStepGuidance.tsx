@@ -195,15 +195,24 @@ function determineNextStep(
 
       // CASE 2c-i: Has rejected documents - highest priority
       if (rejectedCount > 0) {
+        const rejectedItems = items.filter(item => item.status === 'rejected');
+        const rejectedNames = rejectedItems
+          .slice(0, 3)
+          .map(item => item.name || item.documentType || 'document')
+          .join(', ');
+        const moreText = rejectedCount > 3 ? ` and ${rejectedCount - 3} more` : '';
+        
         return {
           category: 'Small Fix Needed',
           title: `${rejectedCount} document${rejectedCount > 1 ? 's need' : ' needs'} a quick update`,
           description:
-            "We reviewed your documents and noticed a few need small adjustments. Check the feedback below and upload corrected versions — it's usually an easy fix.",
+            rejectedCount === 1
+              ? `We reviewed your ${rejectedNames} and noticed it needs a small adjustment. Check the feedback below and upload a corrected version — it's usually an easy fix.`
+              : `We reviewed your documents and noticed ${rejectedNames}${moreText} need small adjustments. Check the feedback below and upload corrected versions — it's usually an easy fix.`,
           urgency: 'high',
           icon: AlertTriangle,
           helpText: getRejectionReassurance(),
-          primaryAction: { label: 'See What to Fix', href: `/applications/${appId}#checklist` },
+          primaryAction: { label: 'See What to Fix', href: `/applications/${appId}#rejected-documents` },
           secondaryAction: { label: 'Ask AI for Help', href: `/chat?applicationId=${appId}` },
         };
       }
