@@ -5,11 +5,11 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 
-# Copy dependency manifest only (lockfile handled outside Docker)
-COPY package.json ./
+# Copy dependency manifests
+COPY package.json package-lock.json ./
 
-# Install dependencies with npm
-RUN npm install
+# Install dependencies using lockfile for deterministic builds
+RUN npm ci --prefer-offline
 
 # Build stage
 FROM base AS builder
