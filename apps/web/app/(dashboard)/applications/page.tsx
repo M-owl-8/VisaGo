@@ -363,7 +363,7 @@ const EmptyState = () => {
       <p className="mt-3 max-w-xl text-sm text-white/70">
         {t(
           'applications.emptySubtitle',
-          'Answer a few questions about your trip, and we'll create a personalized checklist with AI-powered guidance. Used by travelers applying to dozens of countries worldwide.'
+          "Answer a few questions about your trip, and we'll create a personalized checklist with AI-powered guidance. Used by travelers applying to dozens of countries worldwide."
         )}
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">

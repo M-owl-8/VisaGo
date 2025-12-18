@@ -182,7 +182,7 @@ function ChatPageContent() {
               <p className="mb-2 max-w-md text-xs text-white/70 sm:text-sm">
                 {t(
                   'chat.emptyStateSubtitle',
-                  'Ask me anything about visa requirements, document checklists, or application processes. I'm trained on official embassy requirements from dozens of countries.'
+                  "Ask me anything about visa requirements, document checklists, or application processes. I'm trained on official embassy requirements from dozens of countries."
                 )}
               </p>
               <p className="mb-6 text-xs text-white/40 sm:mb-8">

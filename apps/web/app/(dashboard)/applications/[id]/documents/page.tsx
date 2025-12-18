@@ -74,18 +74,35 @@ function DocumentsPageContent() {
       const response = await apiClient.uploadDocument(params.id as string, effectiveDocumentType, file);
 
       if (response.success) {
-        setSuccess(t('documents.uploadSuccess', 'Upload successful! We're reviewing your document now. Most reviews finish within a few minutes. You'll be notified when it's done.'));
+        setSuccess(
+          t(
+            'documents.uploadSuccess',
+            "Upload successful! We're reviewing your document now. Most reviews finish within a few minutes. You'll be notified when it's done."
+          )
+        );
         setTimeout(() => {
           router.push(`/applications/${params.id}`);
           router.refresh(); // Refetch checklist data
         }, 3000);
       } else {
         const errorMsg = getErrorMessage(response.error || {}, t, i18n.language);
-        setError(errorMsg || t('documents.uploadFailed', 'Something didn't go as expected. Please try again, or chat with our AI assistant if you need help.'));
+        setError(
+          errorMsg ||
+            t(
+              'documents.uploadFailed',
+              "Something didn't go as expected. Please try again, or chat with our AI assistant if you need help."
+            )
+        );
       }
     } catch (err: any) {
       const errorMsg = getErrorMessage(err, t, i18n.language);
-      setError(errorMsg || t('documents.uploadFailed', 'We couldn't complete the upload. Check your connection and try again. Your previous uploads are safe.'));
+      setError(
+        errorMsg ||
+          t(
+            'documents.uploadFailed',
+            "We couldn't complete the upload. Check your connection and try again. Your previous uploads are safe."
+          )
+      );
     } finally {
       setUploading(false);
     }
@@ -190,7 +207,10 @@ function DocumentsPageContent() {
           <Info size={18} className="text-white/40 mt-0.5 shrink-0" />
           <div className="flex-1 text-sm text-white/60">
             <p>
-              {t('documents.normalProcess', 'Many applicants upload a document more than once to meet embassy standards — this is a common part of the process. Take your time and upload when you're ready.')}
+              {t(
+                'documents.normalProcess',
+                "Many applicants upload a document more than once to meet embassy standards — this is a common part of the process. Take your time and upload when you're ready."
+              )}
             </p>
           </div>
         </div>

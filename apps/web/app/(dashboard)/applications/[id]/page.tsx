@@ -313,7 +313,10 @@ export default function ApplicationDetailPage() {
                     )}
                   </p>
                   <p className="mt-1 text-xs text-emerald-200/80">
-                    {t('applications.checklistGeneratingSubtext', 'This usually takes 10–20 seconds. You don't need to refresh — it'll appear automatically. Based on official embassy requirements.')}
+                    {t(
+                      'applications.checklistGeneratingSubtext',
+                      "This usually takes 10–20 seconds. You don't need to refresh — it'll appear automatically. Based on official embassy requirements."
+                    )}
                   </p>
                 </div>
               </div>

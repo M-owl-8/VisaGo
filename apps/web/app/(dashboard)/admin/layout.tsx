@@ -22,6 +22,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, logout, isLoading, fetchUserProfile } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Desktop-only warning for small screens (must not be conditional; hooks must run every render)
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -110,6 +112,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isLoading]);
 
+  // Track screen size for desktop-only admin panel
+  useEffect(() => {
+    // (Client component, but keep it safe)
+    if (typeof window === 'undefined') return;
+    const checkScreenSize = () => {
+      setShowMobileWarning(window.innerWidth < 1024);
+    };
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
   const handleLogout = async () => {
     await logout();
     router.push('/login');
@@ -136,18 +150,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (role !== 'admin' && role !== 'super_admin') {
     return null;
   }
-
-  // Desktop-only warning for small screens
-  const [showMobileWarning, setShowMobileWarning] = useState(false);
-
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setShowMobileWarning(window.innerWidth < 1024);
-    };
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
 
   if (showMobileWarning) {
     return (
