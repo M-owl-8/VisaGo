@@ -119,7 +119,7 @@ class ApiClient {
           }
         }
 
-        if (error.response?.status === 401) {
+        if (error.response?.status === 401 || error.response?.status === 403) {
           // Token expired or invalid - clear auth
           if (typeof window !== 'undefined') {
             localStorage.removeItem('auth_token');
