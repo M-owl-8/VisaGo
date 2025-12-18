@@ -8,8 +8,8 @@ WORKDIR /app
 # Copy dependency manifests
 COPY package.json package-lock.json ./
 
-# Install dependencies using lockfile for deterministic builds
-RUN npm ci --prefer-offline
+# Install dependencies (npm install respects lockfile and is more compatible than npm ci)
+RUN npm install --prefer-offline --no-audit
 
 # Build stage
 FROM base AS builder
