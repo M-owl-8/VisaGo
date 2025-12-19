@@ -157,6 +157,7 @@ export async function validateDocumentWithAI(params: {
                 where: { id: document.id },
                 select: {
                   extractedText: true,
+                  fileUrl: true, // Get current fileUrl to compare
                   imageAnalysisResult: true,
                   hasSignature: true,
                   hasStamp: true,
@@ -164,20 +165,43 @@ export async function validateDocumentWithAI(params: {
                 },
               });
               if (docRecord) {
-                // Use cached OCR text if available and has content
-                if (docRecord.extractedText && docRecord.extractedText.trim().length > 0) {
+                // Check if file was re-uploaded (fileUrl changed)
+                const fileUrlChanged = docRecord.fileUrl !== document.fileUrl;
+
+                // Use cached OCR text only if:
+                // 1. OCR text exists and has content
+                // 2. File URL hasn't changed (same file as when OCR was extracted)
+                if (
+                  !fileUrlChanged &&
+                  docRecord.extractedText &&
+                  docRecord.extractedText.trim().length > 0
+                ) {
                   logInfo('[DocValidation] Using cached OCR text', {
                     documentId: document.id,
                     textLength: docRecord.extractedText.length,
                   });
                   ocrText = docRecord.extractedText;
                 } else {
-                  // Extract text if not cached or empty
-                  logInfo('[DocValidation] Extracting OCR text (not cached or empty)', {
-                    documentId: document.id,
-                    hasCachedText: !!docRecord.extractedText,
-                    cachedTextLength: docRecord.extractedText?.length || 0,
-                  });
+                  // Re-extract OCR if:
+                  // 1. No cached text
+                  // 2. Cached text is empty
+                  // 3. File URL changed (new file uploaded)
+                  if (fileUrlChanged) {
+                    logInfo('[DocValidation] File URL changed, re-extracting OCR', {
+                      documentId: document.id,
+                      oldFileUrl: docRecord.fileUrl.substring(0, 100), // Log first 100 chars
+                      newFileUrl: document.fileUrl.substring(0, 100),
+                    });
+                  } else {
+                    // Extract text if not cached or empty
+                    logInfo('[DocValidation] Extracting OCR text (not cached or empty)', {
+                      documentId: document.id,
+                      hasCachedText: !!docRecord.extractedText,
+                      cachedTextLength: docRecord.extractedText?.length || 0,
+                    });
+                  }
+
+                  // Extract OCR text (runs in both cases: fileUrl changed or no cached text)
                   const extractedText = await DocumentClassifierService.extractTextForDocument({
                     id: document.id,
                     fileName: document.fileName,
