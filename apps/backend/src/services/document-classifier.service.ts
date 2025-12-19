@@ -229,9 +229,15 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
         return document.extractedText;
       }
 
-      // Skip if OCR already failed (avoid retrying repeatedly)
-      if (document?.ocrStatus === 'failed') {
-        logWarn('[DocumentClassifier] OCR previously failed, skipping retry', {
+      // Retry if OCR previously failed but we have a valid file URL (might be a transient error)
+      if (document?.ocrStatus === 'failed' && doc.fileUrl) {
+        logInfo('[DocumentClassifier] Retrying OCR after previous failure', {
+          documentId: doc.id,
+          previousConfidence: document.ocrConfidence,
+        });
+        // Continue to extraction below
+      } else if (document?.ocrStatus === 'failed' && !doc.fileUrl) {
+        logWarn('[DocumentClassifier] OCR previously failed and no file URL, skipping retry', {
           documentId: doc.id,
         });
         return null;

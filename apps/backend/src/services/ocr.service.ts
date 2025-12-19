@@ -47,6 +47,11 @@ export class OCRService {
 
     logInfo('[OCR] Initializing OCR service', {
       provider: this.defaultProvider,
+      ocrProviderEnv: process.env.OCR_PROVIDER,
+      hasGoogleVisionKey: !!process.env.GOOGLE_VISION_API_KEY,
+      googleVisionKeyLength: process.env.GOOGLE_VISION_API_KEY?.length || 0,
+      hasGoogleVisionKey: !!process.env.GOOGLE_VISION_API_KEY,
+      googleVisionKeyLength: process.env.GOOGLE_VISION_API_KEY?.length || 0,
     });
 
     if (provider === 'google_vision') {
@@ -102,7 +107,8 @@ export class OCRService {
       }
 
       logInfo('[OCR] Google Cloud Vision API initialized', {
-        method: apiKey ? 'api_key' : 'credentials_file',
+        usingApiKey: !!apiKey,
+        usingCredentialsFile: !!credentialsPath,
       });
     } catch (error) {
       logError(
@@ -129,6 +135,13 @@ export class OCRService {
   ): Promise<OCRResult> {
     const provider = options.provider || this.defaultProvider;
     const startTime = Date.now();
+
+    logInfo('[OCR] Starting text extraction', {
+      provider,
+      defaultProvider: this.defaultProvider,
+      filePath: filePath.substring(0, 100), // Log first 100 chars to avoid huge URLs
+      mimeType,
+    });
 
     try {
       // Determine if file is PDF or image

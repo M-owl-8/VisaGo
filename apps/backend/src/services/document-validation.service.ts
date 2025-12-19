@@ -164,11 +164,20 @@ export async function validateDocumentWithAI(params: {
                 },
               });
               if (docRecord) {
-                // Use cached OCR text if available
-                if (docRecord.extractedText) {
+                // Use cached OCR text if available and has content
+                if (docRecord.extractedText && docRecord.extractedText.trim().length > 0) {
+                  logInfo('[DocValidation] Using cached OCR text', {
+                    documentId: document.id,
+                    textLength: docRecord.extractedText.length,
+                  });
                   ocrText = docRecord.extractedText;
                 } else {
-                  // Extract text if not cached
+                  // Extract text if not cached or empty
+                  logInfo('[DocValidation] Extracting OCR text (not cached or empty)', {
+                    documentId: document.id,
+                    hasCachedText: !!docRecord.extractedText,
+                    cachedTextLength: docRecord.extractedText?.length || 0,
+                  });
                   const extractedText = await DocumentClassifierService.extractTextForDocument({
                     id: document.id,
                     fileName: document.fileName,
@@ -177,6 +186,14 @@ export async function validateDocumentWithAI(params: {
                   });
                   if (extractedText) {
                     ocrText = extractedText;
+                    logInfo('[DocValidation] OCR text extracted successfully', {
+                      documentId: document.id,
+                      textLength: extractedText.length,
+                    });
+                  } else {
+                    logWarn('[DocValidation] OCR extraction returned no text', {
+                      documentId: document.id,
+                    });
                   }
                 }
 
