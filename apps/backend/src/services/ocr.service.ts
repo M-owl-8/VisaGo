@@ -50,8 +50,6 @@ export class OCRService {
       ocrProviderEnv: process.env.OCR_PROVIDER,
       hasGoogleVisionKey: !!process.env.GOOGLE_VISION_API_KEY,
       googleVisionKeyLength: process.env.GOOGLE_VISION_API_KEY?.length || 0,
-      hasGoogleVisionKey: !!process.env.GOOGLE_VISION_API_KEY,
-      googleVisionKeyLength: process.env.GOOGLE_VISION_API_KEY?.length || 0,
     });
 
     if (provider === 'google_vision') {
