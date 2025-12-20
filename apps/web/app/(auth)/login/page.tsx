@@ -4,17 +4,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Mail, Lock, Eye, EyeOff, Shield, Globe } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { validationRules, validateField } from '@/lib/utils/formValidation';
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { login, loginWithGoogle } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -57,6 +58,25 @@ export default function LoginPage() {
       setError(errorMessage);
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleLogin = async (idToken: string) => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginWithGoogle(idToken);
+      router.push('/applications');
+    } catch (err: any) {
+      const errorMessage = getErrorMessage(err, t, i18n.language);
+      setError(errorMessage);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleError = (error: Error) => {
+    const errorMessage = getErrorMessage(error, t, i18n.language);
+    setError(errorMessage);
+    setIsSubmitting(false);
   };
 
   return (
@@ -147,15 +167,12 @@ export default function LoginPage() {
           <div className="h-px flex-1 bg-white/10" />
         </div>
 
-        <button
-          type="button"
-          disabled
-          className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 py-3 text-sm font-semibold text-white/80 shadow-inner shadow-black/20"
-          title={t('auth.googleOAuthComingSoon', 'Google OAuth coming soon')}
-        >
-          <Globe size={18} />
-          {t('auth.continueWithGoogle', 'Continue with Google')}
-        </button>
+        <GoogleSignInButton
+          onSuccess={handleGoogleLogin}
+          onError={handleGoogleError}
+          disabled={isSubmitting}
+          className="w-full"
+        />
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
           <div className="flex items-center gap-2">

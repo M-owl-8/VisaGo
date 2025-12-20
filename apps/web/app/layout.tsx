@@ -5,6 +5,7 @@ import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 import { NetworkStatus } from '@/components/ui/NetworkStatus';
+import { SkipLink } from '@/components/a11y/SkipLink';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin', 'latin-ext'],
@@ -40,8 +41,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#040816" />
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
       </head>
       <body className="bg-background font-sans text-primary-900 antialiased">
+        <SkipLink />
         <ErrorBoundary>
           <Providers>{children}</Providers>
         </ErrorBoundary>

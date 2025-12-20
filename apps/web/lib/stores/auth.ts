@@ -79,6 +79,7 @@ interface AuthState {
   // Actions
   initializeApp: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -218,6 +219,82 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: false });
     } catch (error: any) {
       console.error('Login failed:', error.message);
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  loginWithGoogle: async (idToken: string) => {
+    try {
+      set({ isLoading: true });
+
+      const response = await apiClient.loginWithGoogle(idToken);
+
+      if (!response.success || !response.data) {
+        // Provide user-friendly error messages
+        let errorMessage = response.error?.message || 'Google Sign-In failed';
+
+        // Translate common error codes to user-friendly messages
+        if (response.error?.code === 'NETWORK_ERROR' || response.error?.status === 0) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else if (response.error?.status === 401) {
+          errorMessage = 'Google Sign-In failed. Please try again.';
+        } else if (response.error?.status === 400) {
+          errorMessage = response.error?.message || 'Invalid Google token. Please try again.';
+        }
+
+        const error = new Error(errorMessage) as any;
+        error.code = response.error?.code;
+        error.status = response.error?.status;
+        throw error;
+      }
+
+      const { user, token } = response.data;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+
+      const fullUser = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        avatar: user.avatar,
+        language: user.language || 'en',
+        currency: user.currency || 'USD',
+        emailVerified: user.emailVerified,
+        bio: user.bio,
+        questionnaireCompleted: user.questionnaireCompleted || false,
+        role: normalizeRole(user.role),
+      };
+
+      set({
+        user: fullUser,
+        token,
+        isSignedIn: true,
+      });
+
+      // Fetch complete user profile
+      try {
+        await get().fetchUserProfile();
+      } catch (error) {
+        // Silently fail - profile will be fetched on next page load
+      }
+
+      // Load user applications in background (non-blocking)
+      get()
+        .fetchUserApplications()
+        .catch((error) => {
+          // Silently fail - applications will be fetched on next page load
+        });
+
+      // Set loading to false immediately after successful login
+      set({ isLoading: false });
+    } catch (error: any) {
+      console.error('Google Sign-In failed:', error.message);
       set({ isLoading: false });
       throw error;
     }

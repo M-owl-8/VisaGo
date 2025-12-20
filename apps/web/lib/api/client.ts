@@ -285,6 +285,58 @@ class ApiClient {
     return response.data;
   }
 
+  async loginWithGoogle(idToken: string): Promise<ApiResponse> {
+    if (!idToken || typeof idToken !== 'string') {
+      return {
+        success: false,
+        error: {
+          status: 400,
+          message: 'Google ID token is required',
+          code: 'ID_TOKEN_REQUIRED',
+        },
+      };
+    }
+
+    try {
+      const response = await this.api.post('/auth/google', {
+        idToken,
+      });
+      return response.data;
+    } catch (error: any) {
+      // Handle network errors
+      if (!error.response) {
+        return {
+          success: false,
+          error: {
+            status: 0,
+            message:
+              error.message ||
+              'Network error. Please check your internet connection and try again.',
+            code: 'NETWORK_ERROR',
+          },
+        };
+      }
+
+      // Handle API errors
+      const code =
+        error.response?.data?.error?.code || error.response?.data?.code || 'UNKNOWN_ERROR';
+      const message =
+        error.response?.data?.error?.message ||
+        error.response?.data?.message ||
+        error.message ||
+        'Google Sign-In failed. Please try again.';
+
+      return {
+        success: false,
+        error: {
+          status: error.response?.status || 400,
+          message,
+          code,
+        },
+      };
+    }
+  }
+
   // ============================================================================
   // APPLICATIONS ENDPOINTS
   // ============================================================================

@@ -9,12 +9,13 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { validationRules, validateField } from '@/lib/utils/formValidation';
 
 export default function RegisterPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { register } = useAuthStore();
+  const { register, loginWithGoogle } = useAuthStore();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -90,6 +91,25 @@ export default function RegisterPage() {
       setError(errorMessage);
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleLogin = async (idToken: string) => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await loginWithGoogle(idToken);
+      router.push('/applications');
+    } catch (err: any) {
+      const errorMessage = getErrorMessage(err, t, i18n.language);
+      setError(errorMessage);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleError = (error: Error) => {
+    const errorMessage = getErrorMessage(error, t, i18n.language);
+    setError(errorMessage);
+    setIsSubmitting(false);
   };
 
   return (
@@ -212,6 +232,19 @@ export default function RegisterPage() {
         >
           {isSubmitting ? t('common.loading') : t('auth.createAccount')}
         </button>
+
+        <div className="flex items-center gap-4 text-white/50">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-xs uppercase tracking-[0.4em]">{t('auth.or', 'Or')}</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <GoogleSignInButton
+          onSuccess={handleGoogleLogin}
+          onError={handleGoogleError}
+          disabled={isSubmitting}
+          className="w-full"
+        />
 
         <div className="text-center text-xs text-white/70 sm:text-sm">
           <span>{t('auth.alreadyHaveAccount')}</span>{' '}
