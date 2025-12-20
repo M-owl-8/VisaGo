@@ -51,9 +51,17 @@ export function GoogleSignInButton({
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
+    // Debug logging
+    console.log('[GoogleSignIn] Client ID check:', {
+      hasClientId: !!clientId,
+      clientIdLength: clientId?.length || 0,
+      clientIdPreview: clientId ? `${clientId.substring(0, 20)}...` : 'not set',
+    });
+
     if (!clientId) {
       console.error('[GoogleSignIn] NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set');
-      onError?.(new Error('Google OAuth is not configured'));
+      console.error('[GoogleSignIn] Available env vars:', Object.keys(process.env).filter(k => k.startsWith('NEXT_PUBLIC_')));
+      onError?.(new Error('Google OAuth is not configured. Please check environment variables.'));
       return;
     }
 
