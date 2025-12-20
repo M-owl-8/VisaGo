@@ -233,18 +233,23 @@ export default function RegisterPage() {
           {isSubmitting ? t('common.loading') : t('auth.createAccount')}
         </button>
 
-        <div className="flex items-center gap-4 text-white/50">
-          <div className="h-px flex-1 bg-white/10" />
-          <span className="text-xs uppercase tracking-[0.4em]">{t('auth.or', 'Or')}</span>
-          <div className="h-px flex-1 bg-white/10" />
-        </div>
+        {/* Only show Google OAuth if configured */}
+        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          <>
+            <div className="flex items-center gap-4 text-white/50">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs uppercase tracking-[0.4em]">{t('auth.or', 'Or')}</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
 
-        <GoogleSignInButton
-          onSuccess={handleGoogleLogin}
-          onError={handleGoogleError}
-          disabled={isSubmitting}
-          className="w-full"
-        />
+            <GoogleSignInButton
+              onSuccess={handleGoogleLogin}
+              onError={handleGoogleError}
+              disabled={isSubmitting}
+              className="w-full"
+            />
+          </>
+        )}
 
         <div className="text-center text-xs text-white/70 sm:text-sm">
           <span>{t('auth.alreadyHaveAccount')}</span>{' '}

@@ -49,19 +49,25 @@ export function GoogleSignInButton({
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    // Get client ID - check both process.env and window (for runtime injection)
+    const clientId = 
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+      (typeof window !== 'undefined' && (window as any).__NEXT_PUBLIC_GOOGLE_CLIENT_ID__);
 
-    // Debug logging
-    console.log('[GoogleSignIn] Client ID check:', {
-      hasClientId: !!clientId,
-      clientIdLength: clientId?.length || 0,
-      clientIdPreview: clientId ? `${clientId.substring(0, 20)}...` : 'not set',
-    });
+    // Debug logging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[GoogleSignIn] Client ID check:', {
+        hasClientId: !!clientId,
+        clientIdLength: clientId?.length || 0,
+        clientIdPreview: clientId ? `${clientId.substring(0, 20)}...` : 'not set',
+        availableEnvVars: Object.keys(process.env).filter(k => k.startsWith('NEXT_PUBLIC_')),
+      });
+    }
 
-    if (!clientId) {
-      console.error('[GoogleSignIn] NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set');
-      console.error('[GoogleSignIn] Available env vars:', Object.keys(process.env).filter(k => k.startsWith('NEXT_PUBLIC_')));
-      onError?.(new Error('Google OAuth is not configured. Please check environment variables.'));
+    if (!clientId || clientId.trim() === '') {
+      console.warn('[GoogleSignIn] NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set');
+      console.warn('[GoogleSignIn] Google OAuth button will be hidden. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID in Railway and rebuild the app.');
+      // Don't call onError - just don't render the button
       return;
     }
 
@@ -123,6 +129,16 @@ export function GoogleSignInButton({
     // Start checking once component mounts
     checkGoogleLoaded();
   }, [onSuccess, onError, isInitialized]);
+
+  // If client ID is not available, don't render anything (button will be hidden)
+  const clientId = 
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    (typeof window !== 'undefined' && (window as any).__NEXT_PUBLIC_GOOGLE_CLIENT_ID__);
+
+  if (!clientId || clientId.trim() === '') {
+    // Return null to hide the button completely
+    return null;
+  }
 
   // Fallback button if Google script fails to load
   if (!isInitialized && !window.google?.accounts?.id) {
