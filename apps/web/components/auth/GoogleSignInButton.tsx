@@ -65,8 +65,12 @@ export function GoogleSignInButton({
     }
 
     if (!clientId || clientId.trim() === '') {
-      console.warn('[GoogleSignIn] NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set');
-      console.warn('[GoogleSignIn] Google OAuth button will be hidden. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID in Railway and rebuild the app.');
+      // Silently hide the button - don't show error to user
+      // This is expected when NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[GoogleSignIn] NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set');
+        console.warn('[GoogleSignIn] Google OAuth button will be hidden. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID in Railway and rebuild the app.');
+      }
       // Don't call onError - just don't render the button
       return;
     }
