@@ -108,7 +108,15 @@
     "tips": "Tips",
     "whereToObtain": "Where to obtain",
     "commonMistakes": "Common mistakes",
-    "unableToLoadExplanation": "Unable to load explanation. Please try again."
+    "unableToLoadExplanation": "Unable to load explanation. Please try again.",
+    "selectApplicationType": "Select Application Type",
+    "startVisaApplication": "Start Visa Application",
+    "applyToUniversities": "Apply to Universities",
+    "jobContract": "Job Contract",
+    "visaApplicationDescription": "Create a new visa application and get personalized document checklist",
+    "universitiesDescription": "Apply to universities and manage your applications",
+    "jobContractDescription": "Find and apply for job contracts",
+    "comingSoon": "Coming Soon"
   },
   "checklist": {
     "summary": {

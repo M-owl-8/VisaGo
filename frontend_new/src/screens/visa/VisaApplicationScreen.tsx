@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import {ScrollView} from 'react-native-gesture-handler';
 import {AppIcon, IconSizes, IconColors} from '../../components/icons/AppIcon';
@@ -18,6 +19,7 @@ import {useAuthStore} from '../../store/auth';
 import {useFocusEffect} from '@react-navigation/native';
 import {getTranslatedCountryName} from '../../data/countryTranslations';
 import {getTranslatedVisaTypeName} from '../../utils/visaTypeTranslations';
+import {ApplicationTypeModal} from '../../components/modals/ApplicationTypeModal';
 
 const getOrdinalSuffix = (num: number): string => {
   const j = num % 10;
@@ -39,6 +41,8 @@ export default function VisaApplicationScreen({navigation}: any) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showApplicationTypeModal, setShowApplicationTypeModal] =
+    useState(false);
 
   // MEDIUM PRIORITY FIX: Refresh applications list when screen comes into focus
   // This ensures newly created applications appear immediately when returning from creation screen
@@ -80,6 +84,30 @@ export default function VisaApplicationScreen({navigation}: any) {
     navigation?.navigate('ApplicationDetail', {applicationId});
   };
 
+  const handleStartNewApplication = () => {
+    setShowApplicationTypeModal(true);
+  };
+
+  const handleSelectVisa = () => {
+    navigation?.navigate('Questionnaire');
+  };
+
+  const handleSelectUniversities = () => {
+    Alert.alert(
+      t('applications.applyToUniversities', 'Apply to Universities'),
+      t('applications.comingSoon', 'Coming Soon'),
+      [{text: t('common.ok', 'OK')}],
+    );
+  };
+
+  const handleSelectJobContract = () => {
+    Alert.alert(
+      t('applications.jobContract', 'Job Contract'),
+      t('applications.comingSoon', 'Coming Soon'),
+      [{text: t('common.ok', 'OK')}],
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.gradientBackground}>
@@ -108,7 +136,7 @@ export default function VisaApplicationScreen({navigation}: any) {
             </Text>
             <TouchableOpacity
               style={styles.addButton}
-              onPress={() => navigation?.navigate('Questionnaire')}>
+              onPress={handleStartNewApplication}>
               <AppIcon
                 name={DocumentIcons.add.name}
                 library={DocumentIcons.add.library}
@@ -235,6 +263,15 @@ export default function VisaApplicationScreen({navigation}: any) {
           <View style={{height: 40}} />
         </ScrollView>
       </View>
+
+      {/* Application Type Modal */}
+      <ApplicationTypeModal
+        visible={showApplicationTypeModal}
+        onClose={() => setShowApplicationTypeModal(false)}
+        onSelectVisa={handleSelectVisa}
+        onSelectUniversities={handleSelectUniversities}
+        onSelectJobContract={handleSelectJobContract}
+      />
     </View>
   );
 }
