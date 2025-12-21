@@ -152,7 +152,6 @@ app.use(securityHeaders);
 app.use(cacheControl);
 
 // CORS configuration with validation
-const envConfig = getEnvConfig();
 const originConfig = envConfig.CORS_ORIGIN;
 
 const parseAllowedOrigins = (originValue?: string): string[] => {

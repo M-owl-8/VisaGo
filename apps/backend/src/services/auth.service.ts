@@ -465,13 +465,12 @@ export class AuthService {
       } catch (error: any) {
         logError(
           '[GoogleAuth] Token verification failed',
-          error,
+          error instanceof Error ? error : new Error(String(error)),
           {
             errorName: error?.name,
             errorMessage: error?.message,
             reason: 'google_verify_failed',
-          },
-          false // do not log stack with potential token info
+          }
         );
         throw errors.unauthorized('GOOGLE_OAUTH_FAILED');
       }
