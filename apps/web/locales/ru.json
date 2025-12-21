@@ -342,7 +342,15 @@
     "categoryOptional": "Необязательно",
     "viewDocument": "Просмотр",
     "uploadDocument": "Загрузить",
-    "whereToObtain": "Где получить"
+    "whereToObtain": "Где получить",
+    "selectApplicationType": "Выберите тип заявки",
+    "startVisaApplication": "Начать визовую заявку",
+    "applyToUniversities": "Подать заявку в университеты",
+    "jobContract": "Трудовой договор",
+    "visaApplicationDescription": "Создайте новую визовую заявку и получите персонализированный список документов",
+    "universitiesDescription": "Подайте заявку в университеты и управляйте своими заявками",
+    "jobContractDescription": "Найдите и подайте заявку на трудовые договоры",
+    "comingSoon": "Скоро"
   },
   "checklist": {
     "whereToObtain": "Где получить",

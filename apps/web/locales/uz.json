@@ -342,7 +342,15 @@
     "categoryOptional": "Ixtiyoriy",
     "viewDocument": "Ko'rish",
     "uploadDocument": "Yuklash",
-    "whereToObtain": "Qayerdan olish mumkin"
+    "whereToObtain": "Qayerdan olish mumkin",
+    "selectApplicationType": "Ariza turini tanlang",
+    "startVisaApplication": "Viza arizasini boshlash",
+    "applyToUniversities": "Universitetlarga ariza berish",
+    "jobContract": "Ish shartnomasi",
+    "visaApplicationDescription": "Yangi viza arizasini yarating va shaxsiylashtirilgan hujjatlar ro'yxatini oling",
+    "universitiesDescription": "Universitetlarga ariza bering va arizalaringizni boshqaring",
+    "jobContractDescription": "Ish shartnomalarini toping va ariza bering",
+    "comingSoon": "Tez orada"
   },
   "checklist": {
     "whereToObtain": "Qayerdan olish mumkin",

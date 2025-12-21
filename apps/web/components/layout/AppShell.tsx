@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, X, LogOut, MessageCircle } from 'lucide-react';
+import { Menu, X, LogOut, MessageCircle, Plus } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
+import { ApplicationTypeModal } from '@/components/modals/ApplicationTypeModal';
 
 function normalizeRole(role: string | undefined | null): 'user' | 'admin' | 'super_admin' {
   if (!role) return 'user';
@@ -26,6 +27,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, isSignedIn } = useAuthStore();
   const [currentLang, setCurrentLang] = useState('en');
   const [isNavOpen, setIsNavOpen] = useState(false);
+  const [showApplicationTypeModal, setShowApplicationTypeModal] = useState(false);
 
   // Check if user is admin (using normalizeRole for consistency)
   const userRole = normalizeRole(user?.role);
@@ -140,6 +142,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </Button>
               );
             })}
+            
+            {/* Start New Application button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full px-5 py-2 text-sm font-semibold transition bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)] hover:bg-primary-dark"
+              onClick={() => setShowApplicationTypeModal(true)}
+            >
+              <Plus size={16} className="mr-2" />
+              {t('applications.startNewApplication', 'Start New Application')}
+            </Button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -220,6 +233,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
 
+              {/* Start New Application button in mobile menu */}
+              <Button
+                variant="ghost"
+                className="justify-start rounded-2xl text-left h-12 text-base font-medium bg-primary text-white"
+                onClick={() => {
+                  setShowApplicationTypeModal(true);
+                  setIsNavOpen(false);
+                }}
+              >
+                <Plus size={20} className="mr-3" />
+                {t('applications.startNewApplication', 'Start New Application')}
+              </Button>
+
               <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-sm font-semibold text-white">
                   {user?.firstName} {user?.lastName}
@@ -292,6 +318,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
       )}
+
+      {/* Application Type Modal */}
+      <ApplicationTypeModal 
+        isOpen={showApplicationTypeModal} 
+        onClose={() => setShowApplicationTypeModal(false)} 
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,7 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { useOnboardingStore } from '@/lib/stores/onboarding';
 import { useApplications } from '@/lib/hooks/useApplications';
 import { usePullToRefresh } from '@/lib/hooks/usePullToRefresh';
+import { ApplicationTypeModal } from '@/components/modals/ApplicationTypeModal';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ export default function ApplicationsPage() {
   const { applications: userApplications, isLoading, isRefreshing, error, refetch, clearError } = useApplications({
     autoFetch: isSignedIn && !authLoading,
   });
+  const [showApplicationTypeModal, setShowApplicationTypeModal] = useState(false);
 
   // Pull-to-refresh for mobile
   const { isPulling, pullDistance, shouldRefresh } = usePullToRefresh({
@@ -187,12 +189,13 @@ export default function ApplicationsPage() {
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
-              <Link href="/questionnaire" className="w-full sm:w-auto">
-                <Button className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 text-sm shadow-[0_20px_45px_rgba(62,166,255,0.45)] sm:w-auto sm:px-6 sm:py-3 sm:text-base">
-                  <Plus size={16} className="sm:size-5" />
-                  <span className="ml-2">{t('applications.startNewApplication')}</span>
-                </Button>
-              </Link>
+              <Button 
+                className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 text-sm shadow-[0_20px_45px_rgba(62,166,255,0.45)] sm:w-auto sm:px-6 sm:py-3 sm:text-base"
+                onClick={() => setShowApplicationTypeModal(true)}
+              >
+                <Plus size={16} className="sm:size-5" />
+                <span className="ml-2">{t('applications.startNewApplication')}</span>
+              </Button>
               <Link href="/chat" className="w-full sm:w-auto">
                 <Button
                   variant="secondary"
@@ -243,7 +246,7 @@ export default function ApplicationsPage() {
       {totalApplications === 0 && !hasCompletedOnboarding && <OnboardingFlow />}
 
       {totalApplications === 0 ? (
-        <EmptyState />
+        <EmptyState onStartNewApplication={() => setShowApplicationTypeModal(true)} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[2fr,1fr]">
           <motion.div
@@ -329,6 +332,12 @@ export default function ApplicationsPage() {
           </div>
         </div>
       )}
+
+      {/* Application Type Modal */}
+      <ApplicationTypeModal 
+        isOpen={showApplicationTypeModal} 
+        onClose={() => setShowApplicationTypeModal(false)} 
+      />
     </div>
   );
 }
@@ -350,7 +359,7 @@ const Metric = ({
 );
 
 
-const EmptyState = () => {
+const EmptyState = ({ onStartNewApplication }: { onStartNewApplication: () => void }) => {
   const { t } = useTranslation();
   return (
     <Card className="glass-panel flex flex-col items-center justify-center border-dashed border-white/10 bg-white/[0.03] px-8 py-20 text-center text-white">
@@ -367,12 +376,13 @@ const EmptyState = () => {
         )}
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <Link href="/questionnaire">
-          <Button className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 shadow-[0_20px_45px_rgba(62,166,255,0.45)]">
-            <Sparkles size={18} />
-            <span className="ml-2">{t('applications.startNewApplication', 'Start Your Application')}</span>
-          </Button>
-        </Link>
+        <Button 
+          className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 py-3 shadow-[0_20px_45px_rgba(62,166,255,0.45)]"
+          onClick={onStartNewApplication}
+        >
+          <Sparkles size={18} />
+          <span className="ml-2">{t('applications.startNewApplication', 'Start Your Application')}</span>
+        </Button>
         <Link href="/chat">
           <Button
             variant="secondary"
