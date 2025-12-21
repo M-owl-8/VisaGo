@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -116,7 +116,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="hidden items-center gap-1 md:flex">
-            {navLinks.map((link) => {
+            {navLinks.map((link, index) => {
               const isActive = pathname.startsWith(link.href);
               // De-emphasize non-application links when viewing application detail
               const isInApplicationDetail = pathname.startsWith('/applications/') && pathname !== '/applications';
@@ -124,35 +124,38 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               const shouldDeEmphasize = isInApplicationDetail && !isApplicationLink && link.href !== '/chat';
               
               return (
-                <Button
-                  key={link.href}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    'rounded-full px-5 py-2 text-sm font-semibold transition',
-                    isActive
-                      ? 'bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)]'
-                      : shouldDeEmphasize
-                      ? 'text-white/30 hover:bg-white/10 hover:text-white/60'
-                      : 'text-white/50 hover:bg-white/10 hover:text-white'
+                <React.Fragment key={link.href}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'rounded-full px-5 py-2 text-sm font-semibold transition',
+                      isActive
+                        ? 'bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)] hover:bg-primary-dark'
+                        : shouldDeEmphasize
+                        ? 'text-white/30 hover:bg-white/10 hover:text-white/60'
+                        : 'text-white/50 hover:bg-white/10 hover:text-white'
+                    )}
+                    onClick={() => router.push(link.href)}
+                  >
+                    {link.label}
+                  </Button>
+                  
+                  {/* Insert Start New Application button right after Applications */}
+                  {isApplicationLink && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full px-5 py-2 text-sm font-semibold transition bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)] hover:bg-primary-dark"
+                      onClick={() => setShowApplicationTypeModal(true)}
+                    >
+                      <Plus size={16} className="mr-2" />
+                      {t('applications.startNewApplication', 'Start New Application')}
+                    </Button>
                   )}
-                  onClick={() => router.push(link.href)}
-                >
-                  {link.label}
-                </Button>
+                </React.Fragment>
               );
             })}
-            
-            {/* Start New Application button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-full px-5 py-2 text-sm font-semibold transition bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)] hover:bg-primary-dark"
-              onClick={() => setShowApplicationTypeModal(true)}
-            >
-              <Plus size={16} className="mr-2" />
-              {t('applications.startNewApplication', 'Start New Application')}
-            </Button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -212,39 +215,42 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 const shouldDeEmphasize = isInApplicationDetail && !isApplicationLink && link.href !== '/chat';
                 
                 return (
-                  <Button
-                    key={link.href}
-                    variant="ghost"
-                    className={cn(
-                      'justify-start rounded-2xl text-left h-12 text-base font-medium',
-                      isActive 
-                        ? 'bg-primary text-white' 
-                        : shouldDeEmphasize
-                        ? 'text-white/40 hover:bg-white/10'
-                        : 'text-white/70 hover:bg-white/10'
+                  <React.Fragment key={link.href}>
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        'justify-start rounded-2xl text-left h-12 text-base font-medium',
+                        isActive 
+                          ? 'bg-primary text-white hover:bg-primary-dark' 
+                          : shouldDeEmphasize
+                          ? 'text-white/40 hover:bg-white/10'
+                          : 'text-white/70 hover:bg-white/10'
+                      )}
+                      onClick={() => {
+                        router.push(link.href);
+                        setIsNavOpen(false);
+                      }}
+                    >
+                      {link.label}
+                    </Button>
+                    
+                    {/* Insert Start New Application button right after Applications in mobile menu */}
+                    {isApplicationLink && (
+                      <Button
+                        variant="ghost"
+                        className="justify-start rounded-2xl text-left h-12 text-base font-medium bg-primary text-white hover:bg-primary-dark"
+                        onClick={() => {
+                          setShowApplicationTypeModal(true);
+                          setIsNavOpen(false);
+                        }}
+                      >
+                        <Plus size={20} className="mr-3" />
+                        {t('applications.startNewApplication', 'Start New Application')}
+                      </Button>
                     )}
-                    onClick={() => {
-                      router.push(link.href);
-                      setIsNavOpen(false);
-                    }}
-                  >
-                    {link.label}
-                  </Button>
+                  </React.Fragment>
                 );
               })}
-
-              {/* Start New Application button in mobile menu */}
-              <Button
-                variant="ghost"
-                className="justify-start rounded-2xl text-left h-12 text-base font-medium bg-primary text-white"
-                onClick={() => {
-                  setShowApplicationTypeModal(true);
-                  setIsNavOpen(false);
-                }}
-              >
-                <Plus size={20} className="mr-3" />
-                {t('applications.startNewApplication', 'Start New Application')}
-              </Button>
 
               <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-sm font-semibold text-white">
