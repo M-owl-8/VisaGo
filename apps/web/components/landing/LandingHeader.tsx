@@ -20,8 +20,8 @@ export function LandingHeader() {
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 sm:h-10 sm:w-10">
             <Image
-              src="/images/ketdik-icon.jpg?v=2"
-              alt=""
+              src="/images/ketdik-icon.png"
+              alt="Ketdik logo"
               width={32}
               height={32}
               className="h-6 w-6 rounded-lg object-cover sm:h-8 sm:w-8"

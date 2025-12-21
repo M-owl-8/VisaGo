@@ -24,7 +24,8 @@ export const metadata: Metadata = {
   description:
     'Premium visa application management for travelers in Uzbekistan. Track documents, chat with AI, and stay synced with mobile.',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/images/ketdik-icon.png',
+    apple: '/images/ketdik-icon.png',
   },
   openGraph: {
     title: 'Ketdik — Visa Application Workspace',

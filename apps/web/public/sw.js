@@ -160,8 +160,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Ketdik';
   const options = {
     body: data.body || 'You have a new notification',
-    icon: '/images/ketdik-icon.jpg',
-    badge: '/images/ketdik-icon.jpg',
+    icon: '/images/ketdik-icon.png',
+    badge: '/images/ketdik-icon.png',
     data: data.url,
   };
 

@@ -23,7 +23,7 @@
       "INTERNET"
     ],
     "adaptiveIcon": {
-      "foregroundImage": "./src/assets/ketdik-icon.png.jpg",
+      "foregroundImage": "./src/assets/ketdik-icon.png",
       "backgroundColor": "#02152B"
     }
   }

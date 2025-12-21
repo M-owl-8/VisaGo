@@ -15,7 +15,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useAuthStore} from '../../store/auth';
 import {signInWithGoogle} from '../../services/google-oauth';
-import KetdikLogo from '../../assets/ketdik-icon.png.jpg';
+import KetdikLogo from '../../assets/ketdik-icon.png';
 
 const {width, height} = Dimensions.get('window');
 

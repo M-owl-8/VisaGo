@@ -135,7 +135,7 @@ export default function RegisterScreen({navigation}: any) {
           {/* Logo and Header */}
           <View style={styles.header}>
             <Image
-              source={require('../../assets/ketdik-icon.png.jpg')}
+              source={require('../../assets/ketdik-icon.png')}
               style={styles.logo}
               resizeMode="contain"
             />

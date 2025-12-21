@@ -26,7 +26,7 @@ export function AuthLayout({ children, formTitle, formSubtitle }: AuthLayoutProp
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[26px] border border-white/10 bg-white/5 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:mb-6 sm:h-20 sm:w-20">
             <Image
-              src="/images/ketdik-icon.jpg?v=2"
+              src="/images/ketdik-icon.png"
               alt="Ketdik icon"
               width={60}
               height={60}

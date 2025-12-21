@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Source icon path
-const SOURCE_ICON = path.join(__dirname, '../src/assets/ketdik-icon.png.jpg');
+const SOURCE_ICON = path.join(__dirname, '../src/assets/ketdik-icon.png');
 const OUTPUT_DIR = path.join(__dirname, '../ios/frontend_new/Images.xcassets/AppIcon.appiconset');
 
 // iOS icon sizes (from Contents.json structure)
@@ -113,6 +113,11 @@ async function generateIOSIcons() {
 
 // Run the script
 generateIOSIcons();
+
+
+
+
+
 
 
 

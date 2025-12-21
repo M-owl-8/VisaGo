@@ -41,7 +41,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     () => {
       const links = [
         { href: '/applications', label: t('applications.title') },
-        { href: '/questionnaire', label: t('applications.startNewApplication') },
         { href: '/chat', label: t('chat.aiAssistant') },
         { href: '/profile', label: t('profile.profile') },
         { href: '/support', label: t('helpSupport.title') },
@@ -97,7 +96,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/applications" className="flex items-center gap-2 sm:gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.45)] sm:h-12 sm:w-12">
                 <Image
-                  src="/images/ketdik-icon.jpg?v=2"
+                  src="/images/ketdik-icon.png"
                   alt="Ketdik icon"
                   width={40}
                   height={40}

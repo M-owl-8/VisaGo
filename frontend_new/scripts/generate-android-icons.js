@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Source icon path
-const SOURCE_ICON = path.join(__dirname, '../src/assets/ketdik-icon.png.jpg');
+const SOURCE_ICON = path.join(__dirname, '../src/assets/ketdik-icon.png');
 const OUTPUT_DIR = path.join(__dirname, '../android/app/src/main/res');
 
 // Android mipmap sizes (in dp, converted to px at different densities)
@@ -151,6 +151,11 @@ async function generateAndroidIcons() {
 
 // Run the script
 generateAndroidIcons();
+
+
+
+
+
 
 
 
