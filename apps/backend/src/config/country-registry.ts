@@ -8,8 +8,10 @@
  */
 
 import { PRIORITY_VISA_COUNTRIES } from './priority-visas';
+import { ISO_COUNTRIES } from '../data/countries-iso2';
 
-export type VisaCategory = 'tourist' | 'student';
+// Keep legacy visa categories for priority countries, but do not restrict globally.
+export type VisaCategory = 'tourist' | 'student' | string;
 
 /**
  * Country configuration
@@ -171,6 +173,16 @@ export function getCountryConfigByAnyCode(codeOrAlias: string): CountryConfig | 
   const direct = getCountryConfigByCode(upper);
   if (direct) return direct;
 
+  // Try ISO dataset match by code
+  const isoMatch = ISO_COUNTRIES.find((c) => c.code.toUpperCase() === upper);
+  if (isoMatch) {
+    return {
+      code: isoMatch.code.toUpperCase(),
+      name: isoMatch.name,
+      visaCategories: ['tourist', 'student'],
+    };
+  }
+
   // Then try aliases
   for (const config of Object.values(COUNTRY_REGISTRY)) {
     if (config.aliases) {
@@ -198,8 +210,23 @@ export function getCountryConfigByAnyCode(codeOrAlias: string): CountryConfig | 
  */
 export function normalizeCountryCode(codeOrName: string | null | undefined): string | null {
   if (!codeOrName) return null;
-  const config = getCountryConfigByAnyCode(codeOrName);
-  return config?.code || null;
+  const value = codeOrName.trim();
+  const config = getCountryConfigByAnyCode(value);
+  if (config?.code) return config.code.toUpperCase();
+
+  // Try ISO dataset name match
+  const lower = value.toLowerCase();
+  const isoByName = ISO_COUNTRIES.find(
+    (c) =>
+      c.name.toLowerCase() === lower ||
+      c.name.toLowerCase().includes(lower) ||
+      lower.includes(c.name.toLowerCase()) ||
+      (c.altNames || []).some((a) => a.toLowerCase() === lower)
+  );
+  if (isoByName) return isoByName.code.toUpperCase();
+
+  // Fallback: uppercase trimmed string (best-effort)
+  return value.toUpperCase();
 }
 
 /**

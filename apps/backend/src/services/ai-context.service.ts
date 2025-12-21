@@ -1,3 +1,4 @@
+import { normalizeVisaTypeForRules } from '../utils/visa-type-aliases';
 /**
  * AI Context Service
  * Builds structured AIUserContext for AI service consumption
@@ -73,7 +74,7 @@ const prisma = new PrismaClient();
  */
 function calculateRequiredFundsEstimate(
   countryCode: string,
-  visaType: 'student' | 'tourist',
+  visaType: string,
   duration: string
 ): number | null {
   // Country-specific cost estimates (USD)
@@ -168,7 +169,8 @@ function calculateRequiredFundsEstimate(
     return null; // Unknown country
   }
 
-  const visaEstimate = countryEstimate[visaType];
+  const visaKey = visaType?.toLowerCase() === 'student' ? 'student' : 'tourist';
+  const visaEstimate = (countryEstimate as any)[visaKey];
   if (!visaEstimate) {
     return null;
   }
@@ -245,7 +247,7 @@ function classifyFinancialSufficiency(
  */
 function estimateRequiredFundsUSD(
   countryCode: string,
-  visaType: 'student' | 'tourist',
+  visaType: string,
   plannedDurationDays: number | null
 ): number | null {
   // Base daily cost estimates by destination region (USD)
@@ -266,15 +268,16 @@ function estimateRequiredFundsUSD(
   const costs = baseDailyCosts[countryCode];
   if (!costs) {
     // Global default for unknown countries
-    return visaType === 'tourist' ? 70 * (plannedDurationDays || 14) + 500 : null;
+    return visaType?.toLowerCase() === 'student' ? null : 70 * (plannedDurationDays || 14) + 500;
   }
 
-  const dailyCost = costs[visaType];
+  const visaKey = visaType?.toLowerCase() === 'student' ? 'student' : 'tourist';
+  const dailyCost = (costs as any)[visaKey];
   let durationDays = plannedDurationDays;
 
   // If duration is unknown, use defaults
   if (durationDays === null) {
-    durationDays = visaType === 'tourist' ? 14 : 365;
+    durationDays = visaKey === 'tourist' ? 14 : 365;
   }
 
   if (visaType === 'tourist') {
@@ -1285,7 +1288,7 @@ export async function buildAIUserContext(
     }
 
     // Determine visa type from application or summary
-    let visaType: 'student' | 'tourist' = 'tourist';
+    let visaType: string = 'tourist';
     if (questionnaireSummary) {
       visaType = questionnaireSummary.visaType;
     } else {
@@ -1293,6 +1296,8 @@ export async function buildAIUserContext(
       const visaTypeName = application.visaType.name.toLowerCase();
       if (visaTypeName.includes('student') || visaTypeName.includes('study')) {
         visaType = 'student';
+      } else {
+        visaType = normalizeVisaTypeForRules(countryCode, visaTypeName);
       }
     }
 

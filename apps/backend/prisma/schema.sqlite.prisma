@@ -194,6 +194,14 @@ model UserDocument {
   aiNotesUz         String?
   aiNotesRu         String?
   aiNotesEn         String?
+  extractedText     String?
+  ocrStatus         String?
+  ocrConfidence     Float?
+  ocrLanguage       String?
+  imageAnalysisResult String?
+  hasSignature      Boolean?  @default(false)
+  hasStamp          Boolean?  @default(false)
+  imageQualityScore Float?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -545,6 +553,7 @@ model Application {
   userId            String
   countryId         String
   visaTypeId        String
+  legacyVisaApplicationId String? @unique
   status            String    @default("draft") // draft, submitted, under_review, approved, rejected
   submissionDate    DateTime?
   approvalDate      DateTime?
@@ -557,6 +566,7 @@ model Application {
   country           Country   @relation(fields: [countryId], references: [id])
   visaType          VisaType  @relation(fields: [visaTypeId], references: [id])
   documentChecklist DocumentChecklist?
+  documentCheckResults DocumentCheckResult[]
 
   @@index([userId])
   @@index([status])
@@ -578,6 +588,56 @@ model DocumentChecklist {
   application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
+  @@index([status])
+}
+
+model AIInteraction {
+  id              String   @id @default(cuid())
+  taskType        String
+  model           String
+  promptVersion   String?
+  source          String?
+  requestPayload  String
+  responsePayload String?
+  success         Boolean
+  errorMessage    String?
+  countryCode     String?
+  visaType        String?
+  ruleSetId       String?
+  applicationId   String?
+  userId          String?
+  modelVersionId  String?
+  latencyMs       Int?
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([createdAt])
+  @@index([taskType])
+  @@index([model])
+  @@index([success])
+}
+
+model DocumentCheckResult {
+  id              String  @id @default(cuid())
+  applicationId   String
+  checklistItemId String
+  documentId      String?
+  status          String
+  problemsJson    String?
+  suggestionsJson String?
+  confidence      Float?
+  notes           String?
+  rawJson         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, checklistItemId])
+  @@index([applicationId])
+  @@index([checklistItemId])
+  @@index([documentId])
   @@index([status])
 }
 

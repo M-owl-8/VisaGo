@@ -375,6 +375,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getMetaCountries(): Promise<ApiResponse> {
+    const response = await this.api.get('/meta/countries');
+    return response.data;
+  }
+
   // ============================================================================
   // DOCUMENT ENDPOINTS
   // ============================================================================

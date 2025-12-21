@@ -4,17 +4,9 @@
  * Matches backend: apps/backend/src/types/questionnaire-v2.ts
  */
 
-export type VisaType = 'tourist' | 'student';
+export type VisaType = string;
 
-export type TargetCountry =
-  | 'US'
-  | 'GB'
-  | 'ES'
-  | 'DE'
-  | 'JP'
-  | 'AE'
-  | 'CA'
-  | 'AU';
+export type TargetCountry = string;
 
 /**
  * Questionnaire V2 - New streamlined structure

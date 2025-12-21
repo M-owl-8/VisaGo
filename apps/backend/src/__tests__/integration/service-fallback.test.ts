@@ -3,7 +3,7 @@
  * Tests fallback mechanisms for external services
  */
 
-import { StorageAdapter } from '../../services/storage-adapter';
+import StorageAdapter from '../../services/storage-adapter';
 import { createTestUser } from '../helpers/test-helpers';
 
 describe('Service Fallback Integration', () => {

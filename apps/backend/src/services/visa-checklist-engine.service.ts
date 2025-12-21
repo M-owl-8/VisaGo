@@ -104,7 +104,8 @@ export class VisaChecklistEngineService {
     countryCode: string,
     visaType: string,
     aiUserContext: AIUserContext,
-    previousChecklist?: ChecklistItem[]
+    previousChecklist?: ChecklistItem[],
+    explicitRuleSetId?: string
   ): Promise<ChecklistResponse> {
     // Phase 7: Normalize country code using CountryRegistry
     const normalizedCountryCode = normalizeCountryCode(countryCode) || countryCode.toUpperCase();
@@ -126,7 +127,7 @@ export class VisaChecklistEngineService {
 
     // Variables for error handling (declared outside try block for catch access)
     let capturedBaseDocuments: any[] = [];
-    let capturedRuleSetId: string | null = null;
+    let capturedRuleSetId: string | null = explicitRuleSetId || null;
 
     try {
       logInfo('[VisaChecklistEngine] Generating checklist', {
@@ -289,7 +290,8 @@ export class VisaChecklistEngineService {
         canonicalContext,
         ruleSet,
         baseDocuments,
-        playbook || undefined
+        playbook || undefined,
+        embassySummary
       );
 
       // Step 4: Resolve model from registry (with fallback)
@@ -1174,12 +1176,13 @@ export class VisaChecklistEngineService {
    */
   static async generateChecklistForApplication(
     application: { country: { code: string; name: string }; visaType: { name: string } },
-    aiUserContext: AIUserContext
+    aiUserContext: AIUserContext,
+    ruleSetId?: string
   ): Promise<ChecklistResponse | null> {
     const countryCode = application.country.code.toUpperCase();
     const visaType = application.visaType.name.toLowerCase();
 
-    return this.generateChecklist(countryCode, visaType, aiUserContext);
+    return this.generateChecklist(countryCode, visaType, aiUserContext, undefined, ruleSetId);
   }
 
   /**

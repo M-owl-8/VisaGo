@@ -63,15 +63,9 @@ export class AIApplicationService {
 
       // Handle QuestionnaireV2 format
       if (questionnaireData.version === '2.0' && questionnaireData.targetCountry) {
-        // Try to find country by code
-        const country = await CountriesService.getCountryByCodeOrName(
-          questionnaireData.targetCountry
-        );
-        if (country) {
-          countryId = country.id;
-        } else {
-          throw new Error(`Country not found for code: ${questionnaireData.targetCountry}`);
-        }
+        // Try to find or create country by code/name
+        const country = await CountriesService.getOrCreateCountry(questionnaireData.targetCountry);
+        countryId = country.id;
       } else if (
         !questionnaireData.country ||
         questionnaireData.country === 'not_sure' ||
@@ -85,78 +79,43 @@ export class AIApplicationService {
         );
 
         // Try to find the suggested country in database
-        const countries = await CountriesService.getAllCountries();
-        const matchedCountry = countries.find(
-          (c) =>
-            c.name.toLowerCase() === suggestion.countryName.toLowerCase() ||
-            c.name.toLowerCase().includes(suggestion.countryName.toLowerCase())
-        );
-
-        if (matchedCountry) {
-          countryId = matchedCountry.id;
-          suggestedCountry = matchedCountry.name;
-        } else {
-          // Fallback: use first country with matching visa type
-          const fallbackCountry = await this.getFallbackCountry(questionnaireData.purpose);
-          countryId = fallbackCountry.id;
-          suggestedCountry = fallbackCountry.name;
-        }
+        const matchedCountry = await CountriesService.getOrCreateCountry(suggestion.countryName);
+        countryId = matchedCountry.id;
+        suggestedCountry = matchedCountry.name;
         aiRecommendations = suggestion.reasoning;
       } else {
         // Country is specified, try to find it by ID first
-        let country = await prisma.country
-          .findUnique({
-            where: { id: questionnaireData.country },
-          })
-          .catch(() => null);
-
-        // If not found by ID, try fallback to code/name from summary
-        if (!country) {
-          const summary = (questionnaireData as any).summary;
-          const targetCountry = summary?.targetCountry;
-
-          if (targetCountry) {
-            console.warn('[AIApplication] Country ID not found, falling back to code or name', {
-              countryId: questionnaireData.country,
-              targetCountry: targetCountry,
-            });
-
-            country = await CountriesService.getCountryByCodeOrName(targetCountry).catch(
-              () => null
-            );
-
-            if (country) {
-              console.log('[AIApplication] Country found via fallback', {
-                originalId: questionnaireData.country,
-                foundId: country.id,
-                foundName: country.name,
-                foundCode: country.code,
-              });
-            }
-          }
-        }
-
-        if (!country) {
-          throw new Error(
-            'Country not found for questionnaire. Please reselect the country and try again.'
-          );
-        }
+        const summary = (questionnaireData as any).summary;
+        const targetCountry = summary?.targetCountry || questionnaireData.country;
+        const country = await CountriesService.getOrCreateCountry(targetCountry);
         countryId = country.id;
       }
 
       // Step 2: Find visa type for the country based on purpose
-      const visaTypes = await prisma.visaType.findMany({
+      let visaTypes = await prisma.visaType.findMany({
         where: { countryId },
         include: { country: true },
       });
 
       if (visaTypes.length === 0) {
-        const countryName =
-          (await prisma.country.findUnique({ where: { id: countryId } }))?.name ||
-          'selected country';
-        throw new Error(
-          `No visa types found for ${countryName}. The database may need to be seeded with visa types.`
-        );
+        // Create a generic visa type for this country
+        const country = await prisma.country.findUnique({ where: { id: countryId } });
+        const fallbackVisaTypeName =
+          questionnaireData.visaType || questionnaireData.purpose || 'tourist';
+        const createdVisaType = await prisma.visaType.create({
+          data: {
+            countryId,
+            name: fallbackVisaTypeName,
+            description: fallbackVisaTypeName,
+            processingDays: 15,
+            validity: 'Varies',
+            fee: 0,
+            requirements: '{}',
+            documentTypes: JSON.stringify([]),
+          },
+          include: { country: true },
+        });
+        visaTypes = [createdVisaType];
       }
 
       // Match visa type by purpose
@@ -182,13 +141,24 @@ export class AIApplicationService {
         aiRecommendations += ` Note: Using ${visaType.name} as closest match for ${questionnaireData.purpose} purpose.`;
       }
 
+      // Still no visa type? Create one based on provided input.
       if (!visaType) {
-        const countryName =
-          (await prisma.country.findUnique({ where: { id: countryId } }))?.name ||
-          'selected country';
-        throw new Error(
-          `No matching visa type found for ${questionnaireData.purpose} purpose in ${countryName}.`
-        );
+        const fallbackVisaTypeName =
+          questionnaireData.visaType || questionnaireData.purpose || 'tourist';
+        const createdVisaType = await prisma.visaType.create({
+          data: {
+            countryId,
+            name: fallbackVisaTypeName,
+            description: fallbackVisaTypeName,
+            processingDays: 15,
+            validity: 'Varies',
+            fee: 0,
+            requirements: '{}',
+            documentTypes: JSON.stringify([]),
+          },
+          include: { country: true },
+        });
+        visaType = createdVisaType;
       }
 
       visaTypeId = visaType.id;

@@ -269,6 +269,8 @@ export class DocCheckService {
             const openaiClient = AIOpenAIService.getOpenAIClient();
 
             // Build user prompt for document validation
+            const appLanguage = (application.user.language as 'uz' | 'ru' | 'en') || 'en';
+
             const userPrompt = buildDocumentValidationUserPrompt({
               document: {
                 documentType: checklistItem.document || checklistItem.id,
@@ -290,9 +292,11 @@ export class DocCheckService {
             });
 
             // Add document text if available
+            const localizedPrompt = `${userPrompt}\n\nLANGUAGE PREFERENCE: Provide reviewer notes in ${appLanguage.toUpperCase()} and English.`;
+
             const enhancedPrompt = documentText
-              ? `${userPrompt}\n\nDOCUMENT TEXT CONTENT:\n${documentText.substring(0, 2000)}`
-              : userPrompt;
+              ? `${localizedPrompt}\n\nDOCUMENT TEXT CONTENT:\n${documentText.substring(0, 2000)}`
+              : localizedPrompt;
 
             const response = await openaiClient.chat.completions.create({
               model: AIOpenAIService.MODEL,

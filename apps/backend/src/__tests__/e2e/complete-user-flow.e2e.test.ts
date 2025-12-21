@@ -13,8 +13,8 @@ describe('Complete User Flow E2E', () => {
   let applicationId: string;
 
   beforeAll(async () => {
-    const { default: createApp } = await import('../../index');
-    app = createApp();
+    const { default: appInstance } = await import('../../index');
+    app = appInstance;
   });
 
   describe('Complete User Journey', () => {

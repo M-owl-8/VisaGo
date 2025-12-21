@@ -1,11 +1,6 @@
 import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
 import './globals.css';
-import { Providers } from './providers';
-import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
-import { ToastContainer } from '@/components/ui/ToastContainer';
-import { NetworkStatus } from '@/components/ui/NetworkStatus';
-import { SkipLink } from '@/components/a11y/SkipLink';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin', 'latin-ext'],
@@ -44,27 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#040816" />
         <script src="https://accounts.google.com/gsi/client" async defer></script>
       </head>
-      <body className="bg-background font-sans text-primary-900 antialiased">
-        <SkipLink />
-        <ErrorBoundary>
-          <Providers>{children}</Providers>
-        </ErrorBoundary>
-        <ToastContainer />
-        <NetworkStatus />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('[SW] Registered:', reg.scope))
-                    .catch(err => console.error('[SW] Registration failed:', err));
-                });
-              }
-            `,
-          }}
-        />
-      </body>
+      <body className="bg-background font-sans text-primary-900 antialiased">{children}</body>
     </html>
   );
 }

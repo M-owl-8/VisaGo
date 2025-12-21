@@ -13,8 +13,8 @@ describe('Authentication Flow Integration', () => {
 
   beforeAll(async () => {
     // Import app after test setup
-    const { default: createApp } = await import('../../index');
-    app = createApp();
+    const { default: appInstance } = await import('../../index');
+    app = appInstance;
   });
 
   beforeEach(() => {

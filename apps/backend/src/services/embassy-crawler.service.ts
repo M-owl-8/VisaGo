@@ -353,11 +353,11 @@ export class EmbassyCrawlerService {
           title: crawled.title,
           status: 'success',
           httpStatus: crawled.metadata.statusCode,
-          metadata: {
+          metadata: JSON.stringify({
             fetchedAt: crawled.metadata.fetchedAt,
             contentType: crawled.metadata.contentType,
             contentLength: crawled.metadata.contentLength,
-          },
+          }),
         },
       });
 
@@ -402,9 +402,9 @@ export class EmbassyCrawlerService {
             status: 'failed',
             httpStatus,
             errorMessage,
-            metadata: {
+            metadata: JSON.stringify({
               fetchedAt: new Date().toISOString(),
-            },
+            }),
           },
         });
       } catch (storeError) {

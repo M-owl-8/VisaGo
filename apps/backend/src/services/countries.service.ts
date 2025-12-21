@@ -1,5 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { errors } from '../utils/errors';
+import { ISO_COUNTRIES } from '../data/countries-iso2';
+import { normalizeCountryCode } from '../config/country-registry';
 
 const prisma = new PrismaClient();
 
@@ -19,8 +21,6 @@ export class CountriesService {
         }
       : {};
 
-    // CRITICAL: No limit, no take() - return ALL countries from database
-    // The questionnaire requires all 8 destination countries to be available
     const countries = await prisma.country.findMany({
       where,
       include: {
@@ -30,12 +30,64 @@ export class CountriesService {
       // Explicitly NO limit - return all countries
     });
 
-    // Log warning if we don't have 8 countries (expected count from seed)
-    if (!search && countries.length !== 8) {
-      console.warn('[CountriesService] Expected 8 countries in database, found:', countries.length);
+    return countries;
+  }
+
+  /**
+   * Resolve a country by code or name against ISO dataset.
+   */
+  static resolveIsoCountry(codeOrName: string | null | undefined) {
+    if (!codeOrName) return null;
+    const trimmed = codeOrName.trim();
+    if (!trimmed) return null;
+
+    const upper = trimmed.toUpperCase();
+    const exactCode = ISO_COUNTRIES.find((c) => c.code === upper);
+    if (exactCode) return exactCode;
+
+    const lower = trimmed.toLowerCase();
+    const byName = ISO_COUNTRIES.find(
+      (c) =>
+        c.name.toLowerCase() === lower ||
+        c.name.toLowerCase().includes(lower) ||
+        lower.includes(c.name.toLowerCase()) ||
+        (c.altNames || []).some((a) => a.toLowerCase() === lower)
+    );
+    if (byName) return byName;
+
+    return { code: upper, name: trimmed };
+  }
+
+  /**
+   * Get or create a country record using ISO mapping, tolerant to unknown inputs.
+   */
+  static async getOrCreateCountry(codeOrName: string) {
+    const resolved = this.resolveIsoCountry(codeOrName);
+    const code =
+      normalizeCountryCode(resolved?.code || codeOrName) || (resolved?.code || '').toUpperCase();
+    const name = resolved?.name || codeOrName.trim();
+
+    if (!code || !name) {
+      throw errors.validationError('Country code or name is required');
     }
 
-    return countries;
+    const existing = await prisma.country.findFirst({
+      where: {
+        OR: [{ code }, { name }],
+      },
+    });
+    if (existing) return existing;
+
+    const created = await prisma.country.create({
+      data: {
+        code,
+        name,
+        flagEmoji: '🏳️', // Neutral placeholder; editable later
+        description: null,
+        requirements: null,
+      },
+    });
+    return created;
   }
 
   /**

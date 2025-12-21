@@ -132,6 +132,14 @@ export class EvaluationService {
 
       // Evaluate checklist generation
       const checklistScore = await this.evaluateChecklist(caseData, canonicalContext);
+      if (checklistScore.accuracy < 80) {
+        logWarn('[Evaluation] Checklist accuracy below threshold', {
+          caseId: caseData.id,
+          accuracy: checklistScore.accuracy,
+          missing: checklistScore.missing,
+          extra: checklistScore.extra,
+        });
+      }
 
       // Evaluate document verification (if sample docs provided)
       let docVerificationScore;
@@ -148,6 +156,7 @@ export class EvaluationService {
         docVerificationScore,
         errors: errors.length > 0 ? errors : undefined,
         latencyMs,
+        tokenUsage: 0, // Placeholder until downstream services return usage
       };
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
@@ -386,7 +395,8 @@ export class EvaluationService {
         // Employment/Education (required)
         currentStatus: profile.currentStatus,
         isStudent: profile.currentStatus === 'student',
-        isEmployed: profile.currentStatus === 'employed' || profile.currentStatus === 'self_employed',
+        isEmployed:
+          profile.currentStatus === 'employed' || profile.currentStatus === 'self_employed',
         // University / invitation (required defaults)
         hasUniversityInvitation: false,
         hasOtherInvitation: false,
@@ -520,6 +530,15 @@ export class EvaluationService {
       checklistAccuracy: metrics.checklistAccuracy,
       docVerificationAccuracy: metrics.docVerificationAccuracy,
     });
+
+    if (metrics.failedTestCases > 0) {
+      logWarn('[Evaluation] Some evaluation cases failed accuracy thresholds', {
+        failed: metrics.failedTestCases,
+        total: metrics.totalTestCases,
+        checklistAccuracy: metrics.checklistAccuracy,
+        docVerificationAccuracy: metrics.docVerificationAccuracy,
+      });
+    }
 
     return {
       results,

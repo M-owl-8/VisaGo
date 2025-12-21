@@ -1770,7 +1770,8 @@ export function buildVisaChecklistUserPromptV2(
   canonicalContext: any, // CanonicalAIUserContext
   ruleSet: any, // VisaRuleSetData
   baseItems: Array<{ documentType: string; category: string; required: boolean }>,
-  playbook?: any // CountryVisaPlaybook
+  playbook?: any, // CountryVisaPlaybook
+  embassyContent?: string
 ): string {
   const profile = canonicalContext.applicantProfile;
   const riskScore = canonicalContext.riskScore;
@@ -1822,6 +1823,14 @@ export function buildVisaChecklistUserPromptV2(
       prompt += `... and ${ruleSet.requiredDocuments.length - 10} more documents\n`;
     }
     prompt += `\n`;
+  }
+
+  // ============================================================================
+  // EMBASSY CONTENT (if available)
+  // ============================================================================
+  if (embassyContent) {
+    prompt += `EMBASSY CONTENT (recently crawled):\n`;
+    prompt += `${embassyContent}\n\n`;
   }
 
   // ============================================================================

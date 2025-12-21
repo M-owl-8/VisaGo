@@ -5,6 +5,10 @@
 
 import { QuestionnaireV2 } from '../types/questionnaire-v2';
 import { VisaQuestionnaireSummary } from '../types/ai-context';
+import {
+  getQuestionnaireV2Completeness,
+  validateQuestionnaireV2 as validateQuestionnaireV2Runtime,
+} from '../utils/questionnaire-validation';
 
 /**
  * Map income range to approximate USD amount
@@ -38,9 +42,9 @@ function mapAgeRangeToNumber(ageRange: string): number | undefined {
  */
 function mapDurationCategory(
   category: string,
-  visaType: 'tourist' | 'student'
+  visaType: string
 ): 'less_than_1_month' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year' {
-  if (visaType === 'student') {
+  if (visaType?.toLowerCase() === 'student') {
     // Students typically have longer stays
     if (category === 'more_than_90_days') {
       return 'more_than_1_year';
@@ -133,9 +137,9 @@ function mapCurrentStatus(status: string): {
  */
 function mapAccommodationType(
   type: string,
-  visaType: 'tourist' | 'student'
+  visaType: string
 ): 'reserved' | 'university_housing' | 'not_reserved' {
-  if (visaType === 'student') {
+  if (visaType?.toLowerCase() === 'student') {
     if (type === 'dormitory') {
       return 'university_housing';
     }
@@ -181,6 +185,11 @@ export function buildSummaryFromQuestionnaireV2(
   q: QuestionnaireV2,
   appLanguage: 'uz' | 'ru' | 'en' = 'en'
 ): VisaQuestionnaireSummary {
+  const completeness = getQuestionnaireV2Completeness(q);
+  if (!completeness.valid) {
+    throw new Error(`QuestionnaireV2 incomplete: missing ${completeness.missingFields.join(', ')}`);
+  }
+
   const statusMapping = mapCurrentStatus(q.status.currentStatus);
   const duration = mapDurationCategory(q.travel.durationCategory, q.visaType);
   const sponsorType = mapPayerToSponsorType(q.finance.payer);
@@ -351,34 +360,5 @@ export function convertV2ToLegacyQuestionnaireData(q: QuestionnaireV2): any {
  * Validate QuestionnaireV2 structure
  */
 export function validateQuestionnaireV2(q: any): q is QuestionnaireV2 {
-  if (!q || typeof q !== 'object') return false;
-  if (q.version !== '2.0') return false;
-  if (!['tourist', 'student'].includes(q.visaType)) return false;
-  if (!['US', 'GB', 'ES', 'DE', 'JP', 'AE', 'CA', 'AU'].includes(q.targetCountry)) return false;
-
-  // Check required sections
-  const requiredSections = [
-    'personal',
-    'travel',
-    'status',
-    'finance',
-    'invitation',
-    'stay',
-    'history',
-    'ties',
-    'documents',
-    'special',
-  ];
-  for (const section of requiredSections) {
-    if (!q[section] || typeof q[section] !== 'object') return false;
-  }
-
-  // Validate visa-type-specific fields
-  if (q.visaType === 'student') {
-    if (!q.invitation.studentInvitationType) return false;
-  } else if (q.visaType === 'tourist') {
-    if (!q.invitation.touristInvitationType) return false;
-  }
-
-  return true;
+  return validateQuestionnaireV2Runtime(q);
 }

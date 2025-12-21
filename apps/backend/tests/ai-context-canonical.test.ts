@@ -14,7 +14,7 @@ import {
 
 describe('CanonicalAIUserContext Mapping', () => {
   describe('Legacy → Canonical', () => {
-    it('should map legacy questionnaire data with all defaults', () => {
+    it('should map legacy questionnaire data with all defaults', async () => {
       const legacyContext: AIUserContext = {
         userProfile: {
           userId: 'user-123',
@@ -36,12 +36,20 @@ describe('CanonicalAIUserContext Mapping', () => {
           duration: '1_3_months',
           sponsorType: undefined, // Missing
           previousVisaRejections: undefined, // Missing
+          documents: {
+            hasPassport: false,
+            hasBankStatement: false,
+            hasEmploymentOrStudyProof: false,
+            hasInsurance: false,
+            hasFlightBooking: false,
+            hasHotelBookingOrAccommodation: false,
+          },
         },
         uploadedDocuments: [],
         appActions: [],
       };
 
-      const canonical = buildCanonicalAIUserContext(legacyContext);
+      const canonical = await buildCanonicalAIUserContext(legacyContext);
 
       // Check that all required fields are present
       expect(canonical.applicantProfile).toBeDefined();
@@ -65,7 +73,7 @@ describe('CanonicalAIUserContext Mapping', () => {
       expect(canonical.metadata?.fallbackFieldsUsed).toContain('currentStatus');
     });
 
-    it('should map legacy data with sponsor information', () => {
+    it('should map legacy data with sponsor information', async () => {
       const legacyContext: AIUserContext = {
         userProfile: {
           userId: 'user-123',
@@ -92,12 +100,20 @@ describe('CanonicalAIUserContext Mapping', () => {
             currentStatus: 'student',
             isEmployed: false,
           },
+          documents: {
+            hasPassport: true,
+            hasBankStatement: true,
+            hasEmploymentOrStudyProof: false,
+            hasInsurance: false,
+            hasFlightBooking: false,
+            hasHotelBookingOrAccommodation: false,
+          },
         },
         uploadedDocuments: [],
         appActions: [],
       };
 
-      const canonical = buildCanonicalAIUserContext(legacyContext);
+      const canonical = await buildCanonicalAIUserContext(legacyContext);
 
       // Check that sponsor type is preserved
       expect(canonical.applicantProfile.sponsorType).toBe('parent');
@@ -114,7 +130,7 @@ describe('CanonicalAIUserContext Mapping', () => {
   });
 
   describe('V2 → Canonical', () => {
-    it('should map V2 questionnaire data correctly', () => {
+    it('should map V2 questionnaire data correctly', async () => {
       const v2Context: AIUserContext = {
         userProfile: {
           userId: 'user-123',
@@ -155,12 +171,20 @@ describe('CanonicalAIUserContext Mapping', () => {
             propertyDocs: true,
             familyTies: true,
           },
+          documents: {
+            hasPassport: true,
+            hasBankStatement: true,
+            hasEmploymentOrStudyProof: true,
+            hasInsurance: false,
+            hasFlightBooking: false,
+            hasHotelBookingOrAccommodation: false,
+          },
         },
         uploadedDocuments: [],
         appActions: [],
       };
 
-      const canonical = buildCanonicalAIUserContext(v2Context);
+      const canonical = await buildCanonicalAIUserContext(v2Context);
 
       // Check V2 fields are mapped correctly
       expect(canonical.applicantProfile.sponsorType).toBe('parent');
@@ -179,7 +203,7 @@ describe('CanonicalAIUserContext Mapping', () => {
   });
 
   describe('Missing Questionnaire → Canonical', () => {
-    it('should handle missing questionnaire with all defaults', () => {
+    it('should handle missing questionnaire with all defaults', async () => {
       const contextWithoutSummary: AIUserContext = {
         userProfile: {
           userId: 'user-123',
@@ -196,7 +220,7 @@ describe('CanonicalAIUserContext Mapping', () => {
         appActions: [],
       };
 
-      const canonical = buildCanonicalAIUserContext(contextWithoutSummary);
+      const canonical = await buildCanonicalAIUserContext(contextWithoutSummary);
 
       // Check that all fields have defaults
       expect(canonical.applicantProfile).toBeDefined();
@@ -222,7 +246,7 @@ describe('CanonicalAIUserContext Mapping', () => {
   });
 
   describe('Field Type Safety', () => {
-    it('should always return boolean for boolean fields', () => {
+    it('should always return boolean for boolean fields', async () => {
       const context: AIUserContext = {
         userProfile: {
           userId: 'user-123',
@@ -239,7 +263,7 @@ describe('CanonicalAIUserContext Mapping', () => {
         appActions: [],
       };
 
-      const canonical = buildCanonicalAIUserContext(context);
+      const canonical = await buildCanonicalAIUserContext(context);
 
       // All boolean fields should be boolean, not undefined
       expect(typeof canonical.applicantProfile.isStudent).toBe('boolean');
@@ -262,7 +286,7 @@ describe('CanonicalAIUserContext Mapping', () => {
       expect(typeof canonical.applicantProfile.documents.hasHotelBookingOrAccommodation).toBe('boolean');
     });
 
-    it('should handle null values for optional numeric fields', () => {
+    it('should handle null values for optional numeric fields', async () => {
       const context: AIUserContext = {
         userProfile: {
           userId: 'user-123',
@@ -280,12 +304,20 @@ describe('CanonicalAIUserContext Mapping', () => {
           targetCountry: 'US',
           appLanguage: 'en',
           // No bankBalance or monthlyIncome
+          documents: {
+            hasPassport: false,
+            hasBankStatement: false,
+            hasEmploymentOrStudyProof: false,
+            hasInsurance: false,
+            hasFlightBooking: false,
+            hasHotelBookingOrAccommodation: false,
+          },
         },
         uploadedDocuments: [],
         appActions: [],
       };
 
-      const canonical = buildCanonicalAIUserContext(context);
+      const canonical = await buildCanonicalAIUserContext(context);
 
       // Numeric fields can be null (explicit "unknown")
       expect(canonical.applicantProfile.bankBalanceUSD).toBeNull();

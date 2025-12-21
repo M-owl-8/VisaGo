@@ -1,78 +1,42 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import Link from 'next/link';
-import { AlertCircle, Home, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+export const dynamic = 'force-dynamic';
 
-export default function Error({
+export default function GlobalError({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const { t } = useTranslation();
-
-  useEffect(() => {
-    // Log error to monitoring service in production
-    if (process.env.NODE_ENV === 'production') {
-      // In production, send to error tracking service
-      // Example: Sentry.captureException(error);
-    }
-  }, [error]);
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="mx-auto max-w-md text-center">
-        <div className="mb-6 flex justify-center">
-          <div className="rounded-full bg-red-500/10 p-4">
-            <AlertCircle className="h-12 w-12 text-red-500" />
-          </div>
-        </div>
-
-        <h1 className="mb-4 text-2xl font-bold text-white">
-          {t('errors.somethingWentWrong', 'Something went wrong')}
-        </h1>
-
-        <p className="mb-6 text-neutral-400">
-          {t(
-            'errors.unexpectedError',
-            'An unexpected error occurred. Please try again or return to the home page.'
-          )}
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#040816', color: '#ffffff', padding: '2rem' }}>
+      <div style={{ maxWidth: '28rem', width: '100%', padding: '1.5rem', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '1rem', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem' }}>Something went wrong</h1>
+        <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '1rem' }}>
+          Please try again. If it keeps happening, return to home.
         </p>
 
-        {process.env.NODE_ENV === 'development' && error.message && (
-          <div className="mb-6 rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-left">
-            <p className="mb-2 text-sm font-semibold text-red-400">Error Details:</p>
-            <p className="text-xs text-red-300">{error.message}</p>
-            {error.stack && (
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs text-red-400">Stack trace</summary>
-                <pre className="mt-2 overflow-auto text-xs text-red-300">{error.stack}</pre>
-              </details>
-            )}
-          </div>
+        {typeof window !== 'undefined' && process.env.NODE_ENV !== 'production' && (
+          <pre style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', padding: '0.75rem', backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: '0.5rem', marginBottom: '1rem', overflow: 'auto' }}>
+            {String(error?.message || error)}
+          </pre>
         )}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button
-            variant="primary"
-            onClick={reset}
-            className="flex items-center justify-center gap-2"
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => reset()}
+            style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255, 255, 255, 0.2)', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', cursor: 'pointer' }}
           >
-            <RefreshCw size={18} />
-            {t('errors.tryAgain', 'Try again')}
-          </Button>
-
-          <Link
-            href="/applications"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 shadow-inner shadow-primary-600/10 transition-all hover:border-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 border border-primary-100"
+            Try again
+          </button>
+          <a
+            href="/"
+            style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255, 255, 255, 0.2)', backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', textDecoration: 'none', display: 'inline-block' }}
           >
-            <Home size={18} />
-            {t('errors.goHome', 'Go home')}
-          </Link>
+            Go home
+          </a>
         </div>
       </div>
     </div>

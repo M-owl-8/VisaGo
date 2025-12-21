@@ -29,7 +29,7 @@ export interface VisaProbabilityResult {
  */
 export interface VisaQuestionnaireSummary {
   version: string; // e.g. "2.0" (updated for new structure)
-  visaType: 'student' | 'tourist';
+  visaType: string;
   targetCountry: string; // "US" | "CA" | "NZ" | "AU" | "JP" | "KR" | "UK" | "ES" | "DE" | "PL"
   appLanguage: 'uz' | 'ru' | 'en';
 
@@ -135,7 +135,7 @@ export interface AIUserContext {
   };
   application: {
     applicationId: string;
-    visaType: 'student' | 'tourist';
+    visaType: string;
     country: string;
     status: 'draft' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
   };
@@ -175,7 +175,7 @@ export interface CanonicalAIUserContext {
 
   application: {
     applicationId: string;
-    visaType: 'student' | 'tourist';
+    visaType: string;
     country: string; // ISO country code
     status: 'draft' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
   };
@@ -187,7 +187,7 @@ export interface CanonicalAIUserContext {
     age: number | null; // null if unknown
 
     // Visa details
-    visaType: 'student' | 'tourist';
+    visaType: string;
     targetCountry: string;
     duration:
       | 'less_than_1_month'

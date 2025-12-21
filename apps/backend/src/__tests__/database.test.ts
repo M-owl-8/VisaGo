@@ -221,7 +221,7 @@ describe('Database Operations', () => {
         where: { userId: mockPayment.userId },
       });
 
-      const total = allPayments.reduce((sum, p) => sum + p.amount, 0);
+      const total = allPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
       expect(total).toBe(150);
     });
   });

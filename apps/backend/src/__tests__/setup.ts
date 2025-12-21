@@ -7,6 +7,9 @@ dotenv.config({ path: '.env.test' });
 
 // Set test environment
 process.env.NODE_ENV = 'test';
+// Ensure test database and redis URLs are set for prisma and rate limiter
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./test.db';
+process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 // Set test JWT secret if not already set (test file - safe to ignore secret scanner)
 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 if (!process.env.JWT_SECRET) {

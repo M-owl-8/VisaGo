@@ -445,15 +445,15 @@ export class VisaConversationOrchestratorService {
             items: items.map((item) => ({
               documentType: normalizeDocumentType(item.documentType) || item.documentType,
               name: item.name,
-              status: item.status,
+              status: item.status === 'processing' ? 'pending' : item.status,
               // Note: aiDecision would need to be extracted from document validation results
               // For now, we infer from status
               aiDecision:
-                item.status === 'verified'
+                (item.status === 'processing' ? 'pending' : item.status) === 'verified'
                   ? 'APPROVED'
-                  : item.status === 'rejected'
+                  : (item.status === 'processing' ? 'pending' : item.status) === 'rejected'
                     ? 'REJECTED'
-                    : item.status === 'pending'
+                    : (item.status === 'processing' ? 'pending' : item.status) === 'pending'
                       ? 'NEED_FIX'
                       : undefined,
             })),

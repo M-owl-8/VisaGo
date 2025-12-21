@@ -4,9 +4,10 @@
  * Compatible with backend: apps/backend/src/types/questionnaire-v2.ts
  */
 
-export type VisaType = 'tourist' | 'student';
+// Visa type and country are now free-form strings to support all destinations.
+export type VisaType = string;
 
-export type TargetCountry = 'US' | 'GB' | 'ES' | 'DE' | 'JP' | 'AE' | 'CA' | 'AU';
+export type TargetCountry = string;
 
 /**
  * Questionnaire V2 - Streamlined structure
@@ -113,13 +114,6 @@ export interface QuestionnaireV2 {
 /**
  * Country options for dropdown
  */
-export const COUNTRY_OPTIONS: Array<{ code: TargetCountry; name: string }> = [
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'AE', name: 'United Arab Emirates' },
-];
+// Country list is now provided dynamically by the backend meta endpoint; keep a small
+// suggestion list as fallback for UI components. These are suggestions only, not enforced.
+export const COUNTRY_OPTIONS: Array<{ code: TargetCountry; name: string }> = [];

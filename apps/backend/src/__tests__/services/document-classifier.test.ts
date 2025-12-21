@@ -32,6 +32,11 @@ describe('DocumentClassifierService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPrisma = new PrismaClient();
+    // Ensure mockPrisma has userDocument initialized for direct stubbing
+    mockPrisma.userDocument = mockPrisma.userDocument || {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    };
   });
 
   describe('analyzeAndUpdateDocument', () => {

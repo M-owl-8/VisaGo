@@ -57,10 +57,10 @@ export interface ChecklistItem {
   description: string;
   descriptionUz: string;
   descriptionRu: string;
-  category?: 'required' | 'highly_recommended' | 'optional'; // Optional for backward compatibility
+  category?: 'required' | 'highly_recommended' | 'optional' | 'conditional'; // Optional for backward compatibility
   required: boolean; // Kept for backward compatibility
   priority: string; // Loosened type - runtime normalization ensures valid values
-  status: 'missing' | 'pending' | 'verified' | 'rejected';
+  status: 'missing' | 'pending' | 'processing' | 'verified' | 'rejected';
   userDocumentId?: string;
   fileUrl?: string;
   fileName?: string;
@@ -142,24 +142,46 @@ export class DocumentChecklistService {
     userId: string
   ): Promise<DocumentChecklist | { status: 'processing' | 'failed'; errorMessage?: string }> {
     try {
-      // Get application with related data
-      const application = await prisma.visaApplication.findUnique({
-        where: { id: applicationId },
-        include: {
-          country: true,
-          visaType: true,
-          user: true,
-          documents: true,
-        },
-      });
+      const application = await this.findOrCreateCanonicalApplication(applicationId);
 
       // Get stored checklist from database
       const storedChecklist = await prisma.documentChecklist.findUnique({
         where: { applicationId },
       });
 
-      if (!application) {
-        throw errors.notFound('Application');
+      // Watchdog: if processing/pending and stale (>2 minutes), repair with fallback
+      if (
+        storedChecklist &&
+        (storedChecklist.status === 'processing' || storedChecklist.status === 'pending') &&
+        storedChecklist.updatedAt &&
+        Date.now() - storedChecklist.updatedAt.getTime() > 2 * 60 * 1000
+      ) {
+        logWarn('[Checklist][Watchdog] Detected stale processing checklist, repairing', {
+          applicationId,
+          status: storedChecklist.status,
+          updatedAt: storedChecklist.updatedAt,
+        });
+        await this.repairStuckChecklist(application, storedChecklist);
+        // Reload after repair
+        const reloaded = await prisma.documentChecklist.findUnique({
+          where: { applicationId },
+        });
+        if (reloaded?.status === 'ready' && reloaded.checklistData) {
+          const checklistData = JSON.parse(reloaded.checklistData);
+          const items = Array.isArray(checklistData) ? checklistData : checklistData.items || [];
+          const aiFallbackUsed = checklistData.aiFallbackUsed || false;
+          const aiErrorOccurred = checklistData.aiErrorOccurred || false;
+          return this.buildChecklistResponse(
+            applicationId,
+            application.countryId,
+            application.visaTypeId,
+            items,
+            application.documents,
+            reloaded.aiGenerated,
+            aiFallbackUsed,
+            aiErrorOccurred
+          );
+        }
       }
 
       // Verify ownership
@@ -210,8 +232,8 @@ export class DocumentChecklistService {
           }
         }
 
-        // If checklist is pending, return status
-        if (storedChecklist.status === 'pending') {
+        // If checklist is pending/processing, return status
+        if (storedChecklist.status === 'pending' || storedChecklist.status === 'processing') {
           logInfo('[Checklist][Status] Checklist generation in progress', {
             applicationId,
           });
@@ -295,16 +317,16 @@ export class DocumentChecklistService {
       }
 
       // No checklist exists or needs regeneration - start async generation
-      // Create checklist entry with status 'pending'
+      // Create checklist entry with status 'processing'
       const checklistEntry = await prisma.documentChecklist.upsert({
         where: { applicationId },
         create: {
           applicationId,
-          status: 'pending',
+          status: 'processing',
           checklistData: '[]',
         },
         update: {
-          status: 'pending',
+          status: 'processing',
           errorMessage: null,
         },
       });
@@ -394,11 +416,14 @@ export class DocumentChecklistService {
       //   - the rules-based flow failed hard (AI error, schema issues, etc.)
       // ========================================================================
 
-      // STEP 1: Check if approved VisaRuleSet exists
-      // VisaRuleSet (with isApproved = true) is the SINGLE source of truth for document requirements.
-      // Use normalized visa type for rules lookup
+      // STEP 1: Ensure an approved VisaRuleSet exists (auto-provision generic if missing)
       const { VisaRulesService } = await import('./visa-rules.service');
-      const ruleSet = await VisaRulesService.getActiveRuleSet(countryCode, normalizedVisaType);
+      const ensuredRuleSet = await VisaRulesService.ensureRuleSetExists(
+        countryCode,
+        normalizedVisaType
+      );
+      const ruleSet = ensuredRuleSet?.data;
+      const ensuredRuleSetId = ensuredRuleSet?.id;
 
       // Special check for US/tourist - ensure rules are found
       const isUSTourist =
@@ -458,7 +483,8 @@ export class DocumentChecklistService {
 
           const engineResponse = await VisaChecklistEngineService.generateChecklistForApplication(
             application,
-            userContext
+            userContext,
+            ensuredRuleSetId
           );
 
           if (
@@ -944,6 +970,26 @@ export class DocumentChecklistService {
         }
       );
 
+      // Mark as failed to avoid being stuck in processing
+      try {
+        const message =
+          (error as Error)?.message?.slice(0, 500) ||
+          (typeof error === 'string' ? error.slice(0, 500) : 'Unknown error');
+        await prisma.documentChecklist.update({
+          where: { applicationId },
+          data: {
+            status: 'failed',
+            errorMessage: message,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (updateError) {
+        logWarn('[Checklist][Async] Failed to mark checklist as failed', {
+          applicationId,
+          error: (updateError as Error)?.message,
+        });
+      }
+
       try {
         // Generate emergency fallback checklist
         const emergencyItems = await this.generateRobustFallbackChecklist(
@@ -1009,8 +1055,7 @@ export class DocumentChecklistService {
           itemCount: sanitizedItems.length,
         });
       } catch (fallbackError: any) {
-        // If even fallback fails, log but don't set status to 'failed'
-        // The route handler will generate fallback on-the-fly
+        // If even fallback fails, keep status failed and let GET handler attempt on-demand fallback
         logError('[Checklist][Async] Even fallback generation failed', fallbackError as Error, {
           applicationId,
         });
@@ -1078,6 +1123,152 @@ export class DocumentChecklistService {
       aiFallbackUsed,
       aiErrorOccurred,
     };
+  }
+
+  /**
+   * Find canonical Application; if only legacy VisaApplication exists, create shadow Application
+   * with legacyVisaApplicationId mapping. Prefer existing Application rows.
+   */
+  private static async findOrCreateCanonicalApplication(applicationId: string) {
+    // 1) Try Application by id
+    let app = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: {
+        country: true,
+        visaType: true,
+        user: true,
+      },
+    });
+    if (app) {
+      const documents = await prisma.userDocument.findMany({
+        where: { applicationId: app.id },
+      });
+      return { ...app, documents };
+    }
+
+    // 2) Try Application by legacyVisaApplicationId
+    app = await prisma.application.findUnique({
+      where: { legacyVisaApplicationId: applicationId },
+      include: {
+        country: true,
+        visaType: true,
+        user: true,
+      },
+    });
+    if (app) {
+      const documents = await prisma.userDocument.findMany({
+        where: { applicationId: app.id },
+      });
+      return { ...app, documents };
+    }
+
+    // 3) Fallback: load legacy VisaApplication and create shadow Application using same id
+    const legacy = await prisma.visaApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        country: true,
+        visaType: true,
+        user: true,
+        documents: true,
+      },
+    });
+    if (!legacy) {
+      throw errors.notFound('Application');
+    }
+
+    // Create shadow Application with same id for stability, map legacy id
+    const created = await prisma.application.create({
+      data: {
+        id: legacy.id,
+        userId: legacy.userId,
+        countryId: legacy.countryId,
+        visaTypeId: legacy.visaTypeId,
+        legacyVisaApplicationId: legacy.id,
+        status: legacy.status,
+        submissionDate: legacy.submissionDate,
+        approvalDate: legacy.approvalDate,
+        expiryDate: legacy.expiryDate,
+        metadata: legacy.notes || null,
+      },
+    });
+
+    // Refetch with includes and documents
+    const createdApp = await prisma.application.findUnique({
+      where: { id: created.id },
+      include: {
+        country: true,
+        visaType: true,
+        user: true,
+      },
+    });
+    const documents = await prisma.userDocument.findMany({
+      where: { applicationId: created.id },
+    });
+
+    return { ...createdApp!, documents };
+  }
+
+  /**
+   * Repair a stuck checklist by writing a fallback and flipping to ready.
+   */
+  private static async repairStuckChecklist(application: any, storedChecklist: any): Promise<void> {
+    try {
+      const emergencyItems = await this.generateRobustFallbackChecklist(
+        application.country,
+        application.visaType,
+        (application.documents || []).map((doc: any) => ({
+          type: doc.documentType,
+          status: doc.status,
+          id: doc.id,
+          fileUrl: doc.fileUrl,
+          fileName: doc.fileName,
+          fileSize: doc.fileSize,
+          uploadedAt: doc.uploadedAt,
+          verificationNotes: doc.verificationNotes,
+          verifiedByAI: doc.verifiedByAI ?? false,
+          aiConfidence: doc.aiConfidence ?? null,
+          aiNotesUz: doc.aiNotesUz ?? null,
+          aiNotesRu: doc.aiNotesRu ?? null,
+          aiNotesEn: doc.aiNotesEn ?? null,
+        }))
+      );
+
+      const existingDocumentsMap = this.buildExistingDocumentsMap(application.documents || []);
+      const enrichedItems = this.mergeChecklistItemsWithDocuments(
+        emergencyItems,
+        existingDocumentsMap as Map<string, any>,
+        application.id
+      );
+      const sanitizedItems = this.applyCountryTerminology(
+        enrichedItems,
+        application.country,
+        application.visaType.name
+      );
+
+      const emergencyMetadata: ChecklistMetadata = {
+        items: sanitizedItems,
+        aiGenerated: false,
+        aiFallbackUsed: true,
+        aiErrorOccurred: true,
+        generationMode: 'static_fallback',
+        modelName: undefined,
+      };
+
+      await prisma.documentChecklist.update({
+        where: { applicationId: application.id },
+        data: {
+          status: 'ready',
+          checklistData: JSON.stringify(emergencyMetadata),
+          aiGenerated: false,
+          generatedAt: new Date(),
+          errorMessage: 'auto-repaired: stuck processing',
+        },
+      });
+    } catch (error) {
+      logError('[Checklist][Watchdog] Failed to repair stuck checklist', error as Error, {
+        applicationId: application?.id,
+      });
+    }
   }
 
   /**
@@ -2133,11 +2324,7 @@ Only return the JSON object, no other text.`;
     status: ChecklistItem['status'],
     documentId?: string
   ): Promise<void> {
-    // This would update the checklist in the database
-    // For now, we'll track it in the application notes
-    const application = await prisma.visaApplication.findUnique({
-      where: { id: applicationId },
-    });
+    const application = await this.findOrCreateCanonicalApplication(applicationId);
 
     if (!application) {
       throw errors.notFound('Application');

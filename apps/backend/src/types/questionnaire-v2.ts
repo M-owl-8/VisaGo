@@ -3,9 +3,11 @@
  * New 10-question, fully multiple-choice, branching questionnaire
  */
 
-export type VisaType = 'tourist' | 'student';
+// Visa type and country are now free-form strings to support all destinations and visa categories.
+// Normalization happens downstream; keep inputs permissive here.
+export type VisaType = string;
 
-export type TargetCountry = 'US' | 'GB' | 'ES' | 'DE' | 'JP' | 'AE' | 'CA' | 'AU';
+export type TargetCountry = string;
 
 /**
  * Questionnaire V2 - New streamlined structure

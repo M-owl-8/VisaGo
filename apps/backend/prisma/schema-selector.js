@@ -10,7 +10,9 @@ if (!fs || typeof fs.copyFileSync !== 'function') {
   process.exit(1);
 }
 
-const databaseUrl = process.env.DATABASE_URL || 'file:./dev.db';
+// In test runs, default to SQLite test database when DATABASE_URL is not provided
+const databaseUrl =
+  process.env.DATABASE_URL || (process.env.NODE_ENV === 'test' ? 'file:./test.db' : 'file:./dev.db');
 // Check for PostgreSQL - Railway and other providers may use different formats
 const isPostgres = 
   databaseUrl.startsWith('postgres://') || 

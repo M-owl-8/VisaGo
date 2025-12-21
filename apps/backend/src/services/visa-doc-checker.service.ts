@@ -13,11 +13,7 @@ import { logInfo, logError, logWarn } from '../middleware/logger';
 import { logDocumentVerification, extractApplicationId } from '../utils/gpt-logging';
 import { z } from 'zod';
 import { PROMPT_VERSIONS } from '../ai-training/config';
-import {
-  getCountryVisaPlaybook,
-  type VisaCategory,
-  type CountryVisaPlaybook,
-} from '../config/country-visa-playbooks';
+import { getCountryVisaPlaybook, type CountryVisaPlaybook } from '../config/country-visa-playbooks';
 import { normalizeDocumentType } from '../config/document-types-map';
 import {
   normalizeCountryCode,
@@ -234,7 +230,7 @@ export class VisaDocCheckerService {
       let ruleSet: VisaRuleSetData | null = null;
       let playbook: CountryVisaPlaybook | null = null;
       let countryCodeForRules = countryCode;
-      let visaCategory: VisaCategory | undefined = visaType;
+      let visaCategory: string | undefined = visaType;
 
       // Try to get country/visaType from context if not provided
       if (!countryCodeForRules && canonicalContext) {
@@ -278,7 +274,7 @@ export class VisaDocCheckerService {
             normalizedCountryCodeForRules,
             visaCategory
           );
-          playbook = getCountryVisaPlaybook(normalizedCountryCodeForRules, visaCategory);
+          playbook = getCountryVisaPlaybook(normalizedCountryCodeForRules, visaCategory as any);
         } catch (error) {
           logWarn('[VisaDocChecker] Failed to fetch embassy rules or playbook', {
             error: error instanceof Error ? error.message : String(error),
@@ -980,7 +976,7 @@ Return ONLY valid JSON matching the schema, no other text.`;
     countryCode?: string,
     countryName?: string,
     schengen?: boolean,
-    visaCategory?: VisaCategory,
+    visaCategory?: string,
     imageAnalysis?: {
       hasSignature?: boolean;
       hasStamp?: boolean;

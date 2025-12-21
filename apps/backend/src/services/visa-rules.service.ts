@@ -13,8 +13,13 @@
 
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError, logWarn } from '../middleware/logger';
-import { normalizeVisaTypeForRules, wasAliasApplied } from '../utils/visa-type-aliases';
+import {
+  normalizeVisaTypeForRules,
+  slugifyVisaType,
+  wasAliasApplied,
+} from '../utils/visa-type-aliases';
 import { normalizeCountryCode } from '../config/country-registry';
+import { DEFAULT_GENERIC_RULESET_DATA } from '../data/generic-ruleset';
 
 const prisma = new PrismaClient();
 
@@ -194,6 +199,133 @@ export class VisaRulesService {
         visaType,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Ensure an approved rule set exists for a country/visaType.
+   * If none exists, auto-provision a generic approved ruleset (editable later).
+   */
+  static async ensureRuleSetExists(
+    countryCode: string,
+    visaType: string
+  ): Promise<{
+    id: string;
+    countryCode: string;
+    visaType: string;
+    data: VisaRuleSetData;
+  }> {
+    const normalizedCountryCode = normalizeCountryCode(countryCode) || countryCode.toUpperCase();
+    const normalizedVisaType = normalizeVisaTypeForRules(
+      normalizedCountryCode,
+      visaType || slugifyVisaType(visaType)
+    );
+
+    // Concurrency-safe: transaction + retry on unique constraint
+    const attemptCreate = async (): Promise<{
+      id: string;
+      countryCode: string;
+      visaType: string;
+      data: VisaRuleSetData;
+    }> => {
+      return prisma.$transaction(async (tx) => {
+        // 1) Try approved rule set first
+        const approved = await tx.visaRuleSet.findFirst({
+          where: {
+            countryCode: normalizedCountryCode,
+            visaType: normalizedVisaType,
+            isApproved: true,
+          },
+          orderBy: { version: 'desc' },
+        });
+
+        if (approved) {
+          const data =
+            typeof approved.data === 'string' ? JSON.parse(approved.data) : approved.data;
+          return {
+            id: approved.id,
+            countryCode: approved.countryCode,
+            visaType: approved.visaType,
+            data: data as VisaRuleSetData,
+          };
+        }
+
+        // 2) No approved ruleset -> create a generic one (approved to be used immediately)
+        const latest = await tx.visaRuleSet.findFirst({
+          where: { countryCode: normalizedCountryCode, visaType: normalizedVisaType },
+          orderBy: { version: 'desc' },
+        });
+        const nextVersion = latest ? latest.version + 1 : 1;
+
+        const serializedData = JSON.stringify(DEFAULT_GENERIC_RULESET_DATA);
+
+        const created = await tx.visaRuleSet.create({
+          data: {
+            countryCode: normalizedCountryCode,
+            visaType: normalizedVisaType,
+            data: serializedData as any,
+            version: nextVersion,
+            createdBy: 'system',
+            sourceSummary: 'Generic default (editable)',
+            isApproved: true,
+            approvedAt: new Date(),
+            approvedBy: 'system',
+          },
+        });
+
+        await tx.visaRuleVersion.create({
+          data: {
+            ruleSetId: created.id,
+            version: nextVersion,
+            data: serializedData,
+            changeLog: 'Auto-created generic ruleset',
+          },
+        });
+
+        logInfo('[VisaRules] Auto-provisioned generic ruleset', {
+          countryCode: normalizedCountryCode,
+          visaType: normalizedVisaType,
+          version: nextVersion,
+          ruleSetId: created.id,
+        });
+
+        return {
+          id: created.id,
+          countryCode: created.countryCode,
+          visaType: created.visaType,
+          data: DEFAULT_GENERIC_RULESET_DATA,
+        };
+      });
+    };
+
+    try {
+      return await attemptCreate();
+    } catch (err: any) {
+      // Unique constraint collision (concurrent create): retry fetch approved
+      logWarn('[VisaRules] ensureRuleSetExists retry after collision', {
+        countryCode: normalizedCountryCode,
+        visaType: normalizedVisaType,
+        error: err?.message,
+      });
+      const approved = await prisma.visaRuleSet.findFirst({
+        where: {
+          countryCode: normalizedCountryCode,
+          visaType: normalizedVisaType,
+          isApproved: true,
+        },
+        orderBy: { version: 'desc' },
+      });
+      if (approved) {
+        const data = typeof approved.data === 'string' ? JSON.parse(approved.data) : approved.data;
+        return {
+          id: approved.id,
+          countryCode: approved.countryCode,
+          visaType: approved.visaType,
+          data: data as VisaRuleSetData,
+        };
+      }
+      // If still none, rethrow
+      throw err;
     }
   }
 

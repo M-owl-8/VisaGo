@@ -607,6 +607,7 @@ model Application {
   userId         String
   countryId      String
   visaTypeId     String
+  legacyVisaApplicationId String? @unique
   status         String    @default("draft") // draft, submitted, under_review, approved, rejected
   submissionDate DateTime?
   approvalDate   DateTime?
@@ -619,6 +620,7 @@ model Application {
   country           Country            @relation(fields: [countryId], references: [id])
   visaType          VisaType           @relation(fields: [visaTypeId], references: [id])
   documentChecklist DocumentChecklist?
+  documentCheckResults DocumentCheckResult[]
 
   @@index([userId])
   @@index([status])
@@ -663,7 +665,7 @@ model DocumentCheckResult {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   // document relation removed - UserDocument doesn't have opposite relation field
   // documentId is kept as plain foreign key field for reference
 

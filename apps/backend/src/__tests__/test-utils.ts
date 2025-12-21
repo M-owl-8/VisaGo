@@ -8,6 +8,82 @@ import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
+// Basic mock fixtures used by database.test
+export const mockUser = {
+  id: 'user-1',
+  email: 'mock@example.com',
+  passwordHash: 'hashed-password',
+  firstName: 'Mock',
+  lastName: 'User',
+};
+
+export const mockApplication = {
+  id: 'app-1',
+  userId: mockUser.id,
+  countryId: 'country-1',
+  visaTypeId: 'visa-type-1',
+  status: 'draft',
+};
+
+export const mockPayment = {
+  id: 'pay-1',
+  userId: mockUser.id,
+  applicationId: mockApplication.id,
+  amount: 100,
+  currency: 'USD',
+  status: 'pending',
+};
+
+export const mockDocument = {
+  id: 'doc-1',
+  userId: mockUser.id,
+  applicationId: mockApplication.id,
+  documentType: 'passport',
+  documentName: 'passport.pdf',
+  fileUrl: 'http://example.com/passport.pdf',
+  fileName: 'passport.pdf',
+  fileSize: 1234,
+  status: 'pending',
+};
+
+// Jest-friendly Prisma mock factory
+export const createMockPrisma = () => ({
+  user: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  application: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  payment: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  userDocument: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  documentChecklist: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+    findMany: jest.fn(),
+  },
+});
+
 /**
  * Test User Fixtures
  */

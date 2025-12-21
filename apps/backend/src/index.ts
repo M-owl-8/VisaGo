@@ -56,6 +56,7 @@ import documentChecklistRoutes from './routes/document-checklist';
 import docCheckRoutes from './routes/doc-check';
 import internalRoutes from './routes/internal';
 import devRoutes from './routes/dev';
+import metaRoutes from './routes/meta';
 import { websocketService } from './services/websocket.service';
 
 // Load environment variables
@@ -294,6 +295,8 @@ app.use('/api/forms', formRoutes);
 app.use('/api/document-checklist', documentChecklistRoutes);
 // Document check routes (Phase 3: Document checking & readiness)
 app.use('/api/doc-check', docCheckRoutes);
+// Meta endpoints (countries list, etc.)
+app.use('/api/meta', metaRoutes);
 // Chat routes with user-level rate limiting and cost tracking
 // NOTE: chatRateLimitMiddleware must run AFTER authentication (which is in chatRoutes)
 // So we apply it inside the chatRoutes router, not here

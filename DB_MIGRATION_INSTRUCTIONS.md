@@ -125,3 +125,9 @@ After running the migration:
 
 **Migration Name:** `add_document_checklist`  
 **Created:** November 27, 2025
+
+## Current release (Dec 2025) status
+
+- No additional Prisma columns were added for the latest GPT readiness work (questionnaire validation, conditional rules tests, embassy prompt wiring).
+- After pulling new code, run `npm run db:generate` to keep Prisma Client in sync.
+- If you maintain a Postgres + schema selector setup, ensure `prisma/schema-selector.js` picks the right schema before running commands.

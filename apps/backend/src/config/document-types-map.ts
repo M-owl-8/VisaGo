@@ -75,7 +75,9 @@ export type CanonicalDocumentType =
   | 'leave_letter'
   | 'ds160_confirmation'
   | 'visa_fee_receipt'
-  | 'appointment_confirmation';
+  | 'appointment_confirmation'
+  | 'financial_proof'
+  | 'employment_or_study_proof';
 
 /**
  * Document type mapping with canonical type and aliases
@@ -152,6 +154,18 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'Employment Letter', // Common GPT output
       'employment verification letter',
       'Employment Verification Letter', // Common GPT output
+    ],
+  },
+  {
+    canonical: 'employment_or_study_proof',
+    aliases: [
+      'employment_or_study_proof',
+      'employment_proof',
+      'study_proof',
+      'student_status_letter',
+      'employment_status_letter',
+      'proof_of_employment',
+      'proof_of_study',
     ],
   },
   {
@@ -278,6 +292,16 @@ export const DOCUMENT_TYPE_MAPPINGS: DocumentTypeMapping[] = [
       'bank statements / income proof',
       'Bank Statements / Income Proof', // Common GPT output
       'financial means',
+    ],
+  },
+  {
+    canonical: 'financial_proof',
+    aliases: [
+      'financial_proof',
+      'proof_of_financial_support',
+      'proof_of_financial_status',
+      'funds_statement',
+      'financial_evidence_generic',
     ],
   },
   {
@@ -628,7 +652,8 @@ export function toCanonicalDocumentType(raw: string): NormalizedDocumentTypeResu
 
   // 4) If no match, return null (caller can handle this)
   return {
-    canonicalType: null,
+    // Best-effort: return slugified fallback to avoid dropping unknown document types
+    canonicalType: normalized as any,
     originalType: raw,
     wasNormalized: false,
   };

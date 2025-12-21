@@ -234,7 +234,7 @@ const VISA_TYPE_RULE_ALIASES: VisaTypeAliasMap = {
  */
 export function normalizeVisaTypeForRules(countryCode: string, visaType: string): string {
   const normalizedCountryCode = countryCode.toUpperCase();
-  let normalizedVisaType = visaType.toLowerCase().trim();
+  let normalizedVisaType = (visaType || '').toLowerCase().trim();
 
   // Normalize B1/B2 variations (handle slash, space, dash variations)
   normalizedVisaType = normalizedVisaType.replace(/\s*[\/\-]\s*/g, '/'); // Normalize separators to slash
@@ -253,8 +253,8 @@ export function normalizeVisaTypeForRules(countryCode: string, visaType: string)
     return countryAliases[withoutVisa];
   }
 
-  // THIRD: Return normalized version without "visa" suffix
-  return withoutVisa;
+  // THIRD: Use slugified fallback for all other visa types (e.g., "Work Visa" -> "work_visa")
+  return slugifyVisaType(withoutVisa || normalizedVisaType);
 }
 
 /**
@@ -280,4 +280,19 @@ export function wasAliasApplied(
     .replace(/\s+visa\s*$/i, '')
     .trim();
   return normalizedOriginal !== originalLower && normalizedOriginal === normalizedVisaType;
+}
+
+/**
+ * Slugify arbitrary visa type to a stable ruleset key.
+ */
+export function slugifyVisaType(raw: string): string {
+  if (!raw) return 'unknown';
+  return (
+    raw
+      .toLowerCase()
+      .trim()
+      .replace(/\s+visa\s*$/i, '') // drop trailing "visa"
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'unknown'
+  );
 }

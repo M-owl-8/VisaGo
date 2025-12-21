@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/lib/stores/auth';
@@ -22,6 +22,23 @@ export default function QuestionnairePage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [countries, setCountries] = useState<Array<{ code: string; name: string }>>([]);
+  const [countriesError, setCountriesError] = useState<string | null>(null);
+
+  // Load country suggestions from backend meta endpoint
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        const res = await apiClient.getMetaCountries();
+        if (res.success && Array.isArray(res.data)) {
+          setCountries(res.data);
+        }
+      } catch (err) {
+        setCountriesError('Failed to load countries');
+      }
+    };
+    loadCountries();
+  }, []);
 
   // Initialize v2 structure with proper types
   const [formData, setFormData] = useState<Partial<QuestionnaireV2>>({
@@ -266,33 +283,48 @@ export default function QuestionnairePage() {
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.targetCountry')} *
               </label>
-              <select
+              <input
+                type="text"
                 value={formData.targetCountry || ''}
                 onChange={(e) => updateField('targetCountry', e.target.value as TargetCountry)}
-                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-midnight [&>option]:text-white"
-              >
-                <option value="">{t('questionnaire.selectCountry', 'Select country')}</option>
-                {COUNTRY_OPTIONS.map((country) => (
+                placeholder={t('questionnaire.selectCountry', 'Enter country code or name')}
+                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                list="country-suggestions"
+              />
+              <datalist id="country-suggestions">
+                {(countries.length ? countries : COUNTRY_OPTIONS).map((country) => (
                   <option key={country.code} value={country.code}>
                     {country.name}
                   </option>
                 ))}
-              </select>
+              </datalist>
+              {countriesError && (
+                <p className="mt-2 text-xs text-red-300">
+                  {t('errors.generic', countriesError)}
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
                 {t('questionnaire.visaType')} *
               </label>
-              <select
+              <input
+                type="text"
                 value={formData.visaType || ''}
-                onChange={(e) => updateField('visaType', e.target.value as 'tourist' | 'student')}
-                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-midnight [&>option]:text-white"
-              >
-                <option value="">{t('questionnaire.selectOption', 'Select option')}</option>
-                <option value="tourist">{t('questionnaire.visaTypeTourist', 'Tourist')}</option>
-                <option value="student">{t('questionnaire.visaTypeStudent', 'Student')}</option>
-              </select>
+                onChange={(e) => updateField('visaType', e.target.value as any)}
+                placeholder={t('questionnaire.selectVisaType', 'Enter visa type (e.g., Tourist, Student, Work)')}
+                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                list="visa-type-suggestions"
+              />
+              <datalist id="visa-type-suggestions">
+                <option value="Tourist" />
+                <option value="Student" />
+                <option value="Work" />
+                <option value="Business" />
+                <option value="Transit" />
+                <option value="Family Reunion" />
+              </datalist>
             </div>
           </div>
         );

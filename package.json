@@ -36,17 +36,6 @@
     "next": "^14.2.35",
     "ws": "^8.18.3"
   },
-  "overrides": {
-    "@next/swc-darwin-arm64": "14.2.34",
-    "@next/swc-darwin-x64": "14.2.34",
-    "@next/swc-linux-arm64-gnu": "14.2.34",
-    "@next/swc-linux-arm64-musl": "14.2.34",
-    "@next/swc-linux-x64-gnu": "14.2.34",
-    "@next/swc-linux-x64-musl": "14.2.34",
-    "@next/swc-win32-arm64-msvc": "14.2.34",
-    "@next/swc-win32-ia32-msvc": "14.2.34",
-    "@next/swc-win32-x64-msvc": "14.2.34"
-  },
   "devDependencies": {
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0"

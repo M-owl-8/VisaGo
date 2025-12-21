@@ -24,6 +24,8 @@ export class RAGService {
   private prisma: PrismaClient;
   private knowledgeBase: KnowledgeEntry[];
   private tokenBudget: number = 2000; // Tokens reserved for RAG context
+  private embassyCache: Map<string, { expires: number; documents: KnowledgeEntry[] }> = new Map();
+  private embassyCacheTtlMs = 5 * 60 * 1000; // 5 minutes
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
@@ -401,11 +403,17 @@ export class RAGService {
         }
       }
 
+      // Retrieve embassy-derived documents (cached)
+      const embassyDocuments = await this.getEmbassyDocuments(country, visaType);
+
       // Search knowledge base
-      const relevantDocuments = this.searchKnowledgeBase(query, country, visaType);
+      const kbDocuments = this.searchKnowledgeBase(query, country, visaType);
+
+      // Combine embassy docs with KB docs before ranking
+      const combined = [...embassyDocuments, ...kbDocuments];
 
       // Score and rank results
-      const rankedDocuments = this.rankResults(query, relevantDocuments).slice(0, 5);
+      const rankedDocuments = this.rankResults(query, combined).slice(0, 5);
 
       // Build system prompt
       const systemPrompt = this.buildSystemPrompt(rankedDocuments, userContext, query);
@@ -426,6 +434,58 @@ export class RAGService {
         systemPrompt: this.getDefaultSystemPrompt(),
         totalTokens: 500,
       };
+    }
+  }
+
+  /**
+   * Fetch latest embassy page contents for country/visaType, with in-memory caching.
+   */
+  private async getEmbassyDocuments(
+    country?: string,
+    visaType?: string
+  ): Promise<KnowledgeEntry[]> {
+    if (!country || !visaType) return [];
+
+    const key = `${country.toUpperCase()}-${visaType.toLowerCase()}`;
+    const cached = this.embassyCache.get(key);
+    if (cached && cached.expires > Date.now()) {
+      return cached.documents;
+    }
+
+    try {
+      const pages = await this.prisma.embassyPageContent.findMany({
+        where: {
+          status: 'success',
+          source: {
+            countryCode: country.toUpperCase(),
+            visaType: visaType.toLowerCase(),
+            isActive: true,
+          },
+        },
+        include: { source: true },
+        orderBy: { fetchedAt: 'desc' },
+        take: 3,
+      });
+
+      const documents: KnowledgeEntry[] = pages.map((page) => ({
+        id: `embassy-${page.id}`,
+        topic: page.title || `Embassy guidance ${country}`,
+        country: page.source?.countryCode || country,
+        visaType: page.source?.visaType || visaType,
+        content: (page.cleanedText || '').slice(0, 4000), // keep prompt small
+        keywords: [
+          'embassy',
+          'official',
+          page.source?.countryCode || country,
+          page.source?.visaType || visaType,
+        ],
+      }));
+
+      this.embassyCache.set(key, { expires: Date.now() + this.embassyCacheTtlMs, documents });
+      return documents;
+    } catch (error) {
+      console.error('Embassy fetch error:', error);
+      return [];
     }
   }
 
