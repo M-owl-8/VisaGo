@@ -32,6 +32,11 @@ class ApiClient {
       // Fallback URL - always use production as last resort
       baseURL = 'https://visago-production.up.railway.app/api';
     }
+
+    // Safe startup log to confirm which API base URL is in use (no secrets)
+    if (typeof console !== 'undefined') {
+      console.log('[ApiClient] Using API base URL:', baseURL);
+    }
     
     this.api = axios.create({
       baseURL,

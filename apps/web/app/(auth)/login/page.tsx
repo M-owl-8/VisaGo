@@ -16,6 +16,7 @@ export default function LoginPage() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { login, loginWithGoogle } = useAuthStore();
+  const isGoogleEnvPresent = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -92,6 +93,12 @@ export default function LoginPage() {
             <div className="flex items-start gap-2">
               <span className="flex-1">{error}</span>
             </div>
+          </div>
+        )}
+
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-white/60">
+            Google Client ID present: {isGoogleEnvPresent ? 'true' : 'false'}
           </div>
         )}
 

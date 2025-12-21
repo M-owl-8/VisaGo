@@ -24,7 +24,7 @@ import { getCacheInvalidationService } from './services/cache-invalidation.servi
 import { getSlowQueryLogger } from './services/slow-query-logger';
 import { AIOpenAIService } from './services/ai-openai.service';
 import db from './db';
-import { getEnvConfig, validateCorsOrigin } from './config/env';
+import { getEnvConfig } from './config/env';
 import { SERVER_CONFIG, RATE_LIMIT_CONFIG, API_MESSAGES, HTTP_STATUS } from './config/constants';
 import { requestLogger, errorLogger } from './middleware/logger';
 import {
@@ -152,9 +152,34 @@ app.use(securityHeaders);
 app.use(cacheControl);
 
 // CORS configuration with validation
+const envConfig = getEnvConfig();
+const originConfig = envConfig.CORS_ORIGIN;
+
+const parseAllowedOrigins = (originValue?: string): string[] => {
+  if (!originValue || originValue.trim() === '') {
+    throw new Error('CORS_ORIGIN must be set to explicit origin(s); wildcard is not allowed.');
+  }
+
+  // Support comma or space separated list
+  const parsed = originValue
+    .split(/[,\s]+/)
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  if (parsed.length === 0) {
+    throw new Error('CORS_ORIGIN must include at least one origin.');
+  }
+
+  if (parsed.some((o) => o === '*' || o === 'http://*' || o === 'https://*')) {
+    throw new Error('Wildcard origins are not allowed when credentials are enabled.');
+  }
+
+  return parsed;
+};
+
 let allowedOrigins: string[];
 try {
-  allowedOrigins = validateCorsOrigin();
+  allowedOrigins = parseAllowedOrigins(originConfig);
 } catch (error) {
   process.stderr.write(
     `❌ CORS configuration error: ${error instanceof Error ? error.message : error}\n`
@@ -162,16 +187,14 @@ try {
   process.exit(1);
 }
 
+// Log resolved CORS origins (no secrets)
+process.stdout.write(`[Startup] CORS allowed origins: ${allowedOrigins.join(', ') || 'none'}\n`);
+
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) {
-        return callback(null, true);
-      }
-
-      // In development, allow all origins if CORS_ORIGIN is "*"
-      if (allowedOrigins.includes('*') && NODE_ENV === 'development') {
         return callback(null, true);
       }
 

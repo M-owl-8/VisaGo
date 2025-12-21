@@ -175,7 +175,16 @@ router.post(
     } catch (error) {
       // Provide user-friendly error messages
       if (error instanceof ApiError) {
-        next(error);
+        if (error.status === HTTP_STATUS.UNAUTHORIZED) {
+          return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+            success: false,
+            error: {
+              code: 'GOOGLE_OAUTH_FAILED',
+              reason: error.message || 'Google token verification failed',
+            },
+          });
+        }
+        return next(error);
       } else {
         // Generic error for OAuth failures
         next(

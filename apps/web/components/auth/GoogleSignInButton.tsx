@@ -152,8 +152,18 @@ export function GoogleSignInButton({
     return null; // Or you could show a loading spinner
   }
 
-  // If client ID is not available, don't render anything (button will be hidden)
+  // If client ID is not available, surface helpful info in development and a safe warning in production
   if (!clientId || clientId.trim() === '') {
+    if (process.env.NODE_ENV === 'development') {
+      return (
+        <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-100">
+          Google OAuth not configured. Set <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> and restart.
+        </div>
+      );
+    }
+
+    // Production: keep UI clean, but log a safe warning
+    console.warn('[GoogleSignIn] Google Client ID not configured; Google button hidden.');
     return null;
   }
 
