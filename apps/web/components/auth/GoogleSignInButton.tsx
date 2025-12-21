@@ -47,35 +47,48 @@ export function GoogleSignInButton({
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [isLoadingClientId, setIsLoadingClientId] = useState(true);
 
+  // Fetch client ID from API at runtime (works even if not set at build time)
   useEffect(() => {
-    // Get client ID - check both process.env and window (for runtime injection)
-    const clientId = 
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-      (typeof window !== 'undefined' && (window as any).__NEXT_PUBLIC_GOOGLE_CLIENT_ID__);
+    const fetchClientId = async () => {
+      try {
+        // First, check if it's available in build-time env (faster)
+        const buildTimeClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+        if (buildTimeClientId && buildTimeClientId.trim() !== '') {
+          setClientId(buildTimeClientId);
+          setIsLoadingClientId(false);
+          return;
+        }
 
-    // Debug logging (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[GoogleSignIn] Client ID check:', {
-        hasClientId: !!clientId,
-        clientIdLength: clientId?.length || 0,
-        clientIdPreview: clientId ? `${clientId.substring(0, 20)}...` : 'not set',
-        availableEnvVars: Object.keys(process.env).filter(k => k.startsWith('NEXT_PUBLIC_')),
-      });
-    }
+        // If not available at build time, fetch from API endpoint
+        const response = await fetch('/api/config/google-client-id');
+        const data = await response.json();
 
-    if (!clientId || clientId.trim() === '') {
-      // Silently hide the button - don't show error to user
-      // This is expected when NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[GoogleSignIn] NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set');
-        console.warn('[GoogleSignIn] Google OAuth button will be hidden. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID in Railway and rebuild the app.');
+        if (data.success && data.clientId) {
+          setClientId(data.clientId);
+        } else {
+          // Client ID not configured
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[GoogleSignIn] Google Client ID not configured');
+            console.warn('[GoogleSignIn] Set NEXT_PUBLIC_GOOGLE_CLIENT_ID or GOOGLE_CLIENT_ID in Railway');
+          }
+        }
+      } catch (error) {
+        console.error('[GoogleSignIn] Failed to fetch client ID:', error);
+        // Silently fail - button will be hidden
+      } finally {
+        setIsLoadingClientId(false);
       }
-      // Don't call onError - just don't render the button
-      return;
-    }
+    };
 
-    if (typeof window === 'undefined') {
+    fetchClientId();
+  }, []);
+
+  // Initialize Google Sign-In once we have the client ID
+  useEffect(() => {
+    if (!clientId || clientId.trim() === '' || typeof window === 'undefined') {
       return;
     }
 
@@ -130,17 +143,17 @@ export function GoogleSignInButton({
       }
     };
 
-    // Start checking once component mounts
+    // Start checking once we have client ID
     checkGoogleLoaded();
-  }, [onSuccess, onError, isInitialized]);
+  }, [clientId, onSuccess, onError, isInitialized]);
+
+  // If still loading client ID, show nothing (or a loading state)
+  if (isLoadingClientId) {
+    return null; // Or you could show a loading spinner
+  }
 
   // If client ID is not available, don't render anything (button will be hidden)
-  const clientId = 
-    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-    (typeof window !== 'undefined' && (window as any).__NEXT_PUBLIC_GOOGLE_CLIENT_ID__);
-
   if (!clientId || clientId.trim() === '') {
-    // Return null to hide the button completely
     return null;
   }
 

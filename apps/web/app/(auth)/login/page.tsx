@@ -9,7 +9,7 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
-import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { GoogleOAuthSection } from '@/components/auth/GoogleOAuthSection';
 import { validationRules, validateField } from '@/lib/utils/formValidation';
 
 export default function LoginPage() {
@@ -161,23 +161,11 @@ export default function LoginPage() {
           {isSubmitting ? t('common.loading') : t('auth.signInButton')}
         </button>
 
-        {/* Only show Google OAuth if configured */}
-        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
-          <>
-            <div className="flex items-center gap-4 text-white/50">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-xs uppercase tracking-[0.4em]">{t('auth.or', 'Or')}</span>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
-
-            <GoogleSignInButton
-              onSuccess={handleGoogleLogin}
-              onError={handleGoogleError}
-              disabled={isSubmitting}
-              className="w-full"
-            />
-          </>
-        )}
+        <GoogleOAuthSection
+          onSuccess={handleGoogleLogin}
+          onError={handleGoogleError}
+          disabled={isSubmitting}
+        />
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
           <div className="flex items-center gap-2">
