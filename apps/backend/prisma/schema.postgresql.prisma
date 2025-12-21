@@ -148,7 +148,6 @@ model VisaApplication {
   documents    UserDocument[]
   payment      Payment?
   checkpoints  Checkpoint[]
-  checkResults DocumentCheckResult[] // Phase 3: Document check results
   riskExplanation   VisaRiskExplanation?
   checklistFeedback ChecklistFeedback[]
 
