@@ -50,7 +50,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       
       // Add admin link if user is admin
       if (isAdmin) {
-        links.push({ href: '/admin/dashboard', label: 'Admin Panel' });
+        links.push({ href: '/admin/users', label: 'Admin Panel' });
       }
       
       return links;

@@ -1,36 +1,6 @@
 import { apiClient } from './client';
 import { API_BASE_URL } from './config';
 
-export interface DashboardMetrics {
-  totalUsers: number;
-  totalApplications: number;
-  totalRevenue: number;
-  totalDocumentsVerified: number;
-  applicationsBreakdown: {
-    draft: number;
-    submitted: number;
-    approved: number;
-    rejected: number;
-    expired: number;
-  };
-  paymentBreakdown: {
-    pending: number;
-    completed: number;
-    failed: number;
-    refunded: number;
-  };
-  revenueByCountry: Array<{
-    country: string;
-    revenue: number;
-    applicationCount: number;
-  }>;
-  documentStats: {
-    pendingVerification: number;
-    verificationRate: number;
-    averageUploadTime: number;
-  };
-}
-
 export interface UserData {
   id: string;
   email: string;
@@ -143,16 +113,6 @@ class AdminApiClient {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
-  }
-
-  async getDashboard(): Promise<DashboardMetrics> {
-    const response = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
-      headers: this.getAuthHeaders(),
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
-    }
-    return response.json();
   }
 
   async getUsers(params?: { skip?: number; take?: number }): Promise<PaginatedResponse<UserData>> {

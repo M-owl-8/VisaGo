@@ -15,25 +15,6 @@ const prisma = new PrismaClient();
 const router = express.Router();
 
 /**
- * GET /api/admin/dashboard
- * Get main dashboard metrics
- */
-router.get('/dashboard', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    console.log('[AdminRoute] GET /api/admin/dashboard - User ID:', (req as any).userId);
-    const metrics = await AdminService.getDashboardMetrics();
-    console.log('[AdminRoute] Dashboard metrics retrieved successfully');
-    res.json(metrics);
-  } catch (error) {
-    console.error('[AdminRoute] Error fetching dashboard metrics:', error);
-    if (error instanceof Error) {
-      console.error('[AdminRoute] Error details:', error.message, error.stack);
-    }
-    res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
-  }
-});
-
-/**
  * GET /api/admin/analytics
  * Get analytics summary
  */

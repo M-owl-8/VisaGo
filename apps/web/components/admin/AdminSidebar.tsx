@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { 
-  LayoutDashboard, 
   Users, 
   FileText, 
   CreditCard, 
@@ -30,7 +29,6 @@ interface AdminSidebarProps {
 }
 
 const navItems: NavItem[] = [
-  { href: '/admin/dashboard', labelKey: 'admin.dashboard', labelDefault: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/users', labelKey: 'admin.users', labelDefault: 'Users', icon: Users },
   { href: '/admin/applications', labelKey: 'admin.applications', labelDefault: 'Applications', icon: FileText },
   { href: '/admin/payments', labelKey: 'admin.payments', labelDefault: 'Payments', icon: CreditCard },
