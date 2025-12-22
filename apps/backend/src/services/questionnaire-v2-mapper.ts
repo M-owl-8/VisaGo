@@ -197,6 +197,7 @@ export function buildSummaryFromQuestionnaireV2(
   const visitedCountries = mapRegionsToCountries(q.history.regionsVisited);
   const monthlyIncome = mapIncomeRangeToUSD(q.finance.approxMonthlyIncomeRange);
   const age = mapAgeRangeToNumber(q.personal.ageRange);
+  const travelHistoryLevel = q.history.travelHistoryLevel;
 
   // Map invitation types
   const hasUniversityInvitation =
@@ -233,6 +234,7 @@ export function buildSummaryFromQuestionnaireV2(
     visaType: q.visaType,
     targetCountry: q.targetCountry,
     appLanguage,
+    contact: q.contact,
 
     // Legacy fields
     age,
@@ -292,6 +294,7 @@ export function buildSummaryFromQuestionnaireV2(
             : duration === '3_6_months'
               ? '3_6_months'
               : 'more_than_6_months',
+      tripDurationDays: q.travel.tripDurationDays ?? null,
     },
     employment: {
       isEmployed: statusMapping.isEmployed,
@@ -311,11 +314,14 @@ export function buildSummaryFromQuestionnaireV2(
         q.finance.payer !== 'self'
           ? {
               relationship:
-                q.finance.payer === 'parents'
+                q.finance.sponsorRelationship ||
+                (q.finance.payer === 'parents'
                   ? 'parent'
                   : q.finance.payer === 'other_family'
                     ? 'relative'
-                    : 'other',
+                    : q.finance.payer === 'employer'
+                      ? 'company'
+                      : 'other'),
               employment: q.finance.hasStableIncome ? 'employed' : 'other',
               annualIncomeUSD: monthlyIncome ? monthlyIncome * 12 : undefined,
             }
@@ -325,11 +331,19 @@ export function buildSummaryFromQuestionnaireV2(
       visitedCountries: visitedCountries.length > 0 ? visitedCountries : undefined,
       hasRefusals: q.history.hasVisaRefusals,
       traveledBefore: q.history.hasTraveledBefore,
+      travelHistoryLevel,
+      hasOverstay: q.history.hasOverstay ?? false,
     },
     ties: {
       propertyDocs: q.ties.hasProperty || q.documents.hasPropertyDocs,
       familyTies: q.ties.hasCloseFamilyInUzbekistan,
     },
+    // Modules (optional)
+    studentModule: q.studentModule,
+    workModule: q.workModule,
+    familyModule: q.familyModule,
+    businessModule: q.businessModule,
+    transitModule: q.transitModule,
   };
 
   return summary;
@@ -351,6 +365,16 @@ export function convertV2ToLegacyQuestionnaireData(q: QuestionnaireV2): any {
     maritalStatus: q.personal.maritalStatus,
     hasChildren: q.special.travelingWithChildren ? 'one' : 'no',
     englishLevel: 'intermediate', // Default, as V2 doesn't explicitly ask
+    tripDurationDays: q.travel.tripDurationDays,
+    travelHistoryLevel: q.history.travelHistoryLevel,
+    hasOverstay: q.history.hasOverstay,
+    sponsorRelationship: q.finance.sponsorRelationship,
+    contact: q.contact,
+    studentModule: q.studentModule,
+    workModule: q.workModule,
+    familyModule: q.familyModule,
+    businessModule: q.businessModule,
+    transitModule: q.transitModule,
     // Include summary for direct use
     summary: buildSummaryFromQuestionnaireV2(q, 'en'),
   };

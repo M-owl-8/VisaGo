@@ -1518,7 +1518,8 @@ export async function buildCanonicalAIUserContext(
     summary?.hasInternationalTravel ?? summary?.travelHistory?.traveledBefore ?? false;
 
   // Extract previousOverstay (default: false)
-  const previousOverstay = summary?.previousOverstay ?? false;
+  const previousOverstay =
+    summary?.previousOverstay ?? summary?.travelHistory?.hasOverstay ?? false;
 
   // Extract bankBalanceUSD (can be null)
   const bankBalanceUSD = summary?.bankBalanceUSD ?? summary?.financialInfo?.selfFundsUSD ?? null;
@@ -1615,7 +1616,7 @@ export async function buildCanonicalAIUserContext(
     estimateRequiredFundsUSD(
       currentContext.application.country,
       currentContext.application.visaType,
-      null // Duration in days not available, will use defaults
+      summary?.travelInfo?.tripDurationDays ?? null // Use user-provided days if available
     );
 
   // Calculate available funds (Phase 2: Enhanced)
@@ -1728,19 +1729,30 @@ export async function buildCanonicalAIUserContext(
     hasOverstay: previousOverstay,
   });
 
+  const travelHistoryLabelFromLevel =
+    summary?.travelHistory?.travelHistoryLevel === 'none'
+      ? 'none'
+      : summary?.travelHistory?.travelHistoryLevel === 'limited'
+        ? 'limited'
+        : summary?.travelHistory?.travelHistoryLevel === 'moderate'
+          ? 'good'
+          : summary?.travelHistory?.travelHistoryLevel === 'strong'
+            ? 'strong'
+            : undefined;
+
   const travelHistory = travelHistoryBase
     ? {
         ...travelHistoryBase,
         previousVisaRejections: previousVisaRejections ? 1 : 0, // Phase 2: Added count
         hasOverstayHistory: previousOverstay, // Phase 2: Added
         travelHistoryScore: travelHistoryScore.score, // Phase 2: Added
-        travelHistoryLabel: travelHistoryScore.label, // Phase 2: Added
+        travelHistoryLabel: travelHistoryLabelFromLevel || travelHistoryScore.label, // Phase 2: Added
       }
     : {
         previousVisaRejections: previousVisaRejections ? 1 : 0,
         hasOverstayHistory: previousOverstay,
         travelHistoryScore: travelHistoryScore.score,
-        travelHistoryLabel: travelHistoryScore.label,
+        travelHistoryLabel: travelHistoryLabelFromLevel || travelHistoryScore.label,
       };
 
   // Family expert fields

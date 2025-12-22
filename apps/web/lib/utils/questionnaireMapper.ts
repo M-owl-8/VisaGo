@@ -24,6 +24,16 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
   maritalStatus: string;
   hasChildren: string;
   englishLevel: string;
+  tripDurationDays?: number | null;
+  travelHistoryLevel?: string;
+  hasOverstay?: boolean;
+  sponsorRelationship?: string;
+  contact?: QuestionnaireV2['contact'];
+  studentModule?: QuestionnaireV2['studentModule'];
+  workModule?: QuestionnaireV2['workModule'];
+  familyModule?: QuestionnaireV2['familyModule'];
+  businessModule?: QuestionnaireV2['businessModule'];
+  transitModule?: QuestionnaireV2['transitModule'];
 } {
   // Map visaType to purpose
   const normalizedVisaType = (v2.visaType || '').toLowerCase();
@@ -93,5 +103,15 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
     maritalStatus,
     hasChildren,
     englishLevel,
+    tripDurationDays: v2.travel.tripDurationDays,
+    travelHistoryLevel: v2.history.travelHistoryLevel,
+    hasOverstay: v2.history.hasOverstay,
+    sponsorRelationship: v2.finance.sponsorRelationship,
+    contact: v2.contact,
+    studentModule: v2.studentModule,
+    workModule: v2.workModule,
+    familyModule: v2.familyModule,
+    businessModule: v2.businessModule,
+    transitModule: v2.transitModule,
   };
 }

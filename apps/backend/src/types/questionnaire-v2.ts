@@ -17,6 +17,11 @@ export interface QuestionnaireV2 {
   version: '2.0';
   targetCountry: TargetCountry;
   visaType: VisaType;
+  // Optional contact for follow-ups
+  contact?: {
+    email?: string;
+    phone?: string;
+  };
 
   // Q1: Personal & passport
   personal: {
@@ -31,6 +36,7 @@ export interface QuestionnaireV2 {
     durationCategory: 'up_to_30_days' | '31_90_days' | 'more_than_90_days';
     plannedWhen: 'within_3_months' | '3_to_12_months' | 'not_sure';
     isExactDatesKnown: boolean;
+    tripDurationDays?: number | null;
   };
 
   // Q3: Current status & education
@@ -57,6 +63,7 @@ export interface QuestionnaireV2 {
       | 'not_applicable';
     hasBankStatement: boolean;
     hasStableIncome: boolean;
+    sponsorRelationship?: 'parent' | 'relative' | 'company' | 'other';
   };
 
   // Q5: Invitation / admission (branch on visaType)
@@ -85,6 +92,8 @@ export interface QuestionnaireV2 {
     hasTraveledBefore: boolean;
     regionsVisited: ('schengen' | 'usa_canada' | 'uk' | 'asia' | 'middle_east')[];
     hasVisaRefusals: boolean;
+    hasOverstay?: boolean;
+    travelHistoryLevel?: 'none' | 'limited' | 'moderate' | 'strong';
   };
 
   // Q8: Ties to Uzbekistan
@@ -108,5 +117,51 @@ export interface QuestionnaireV2 {
     travelingWithChildren: boolean;
     hasMedicalReasonForTrip: boolean;
     hasCriminalRecord: boolean;
+  };
+
+  // Optional visa-type specific modules (asked conditionally)
+  studentModule?: {
+    schoolName?: string;
+    acceptanceStatus?: 'accepted' | 'applied' | 'not_applied';
+    programStartDate?: string;
+    tuitionAmountUSD?: number | null;
+    tuitionPaidStatus?: 'paid' | 'partial' | 'unpaid';
+    scholarship?: boolean;
+    accommodationType?: 'dorm' | 'private' | 'host';
+    hasAdmissionLetter?: boolean;
+    previousEducationDocs?: boolean;
+  };
+
+  workModule?: {
+    employerName?: string;
+    position?: string;
+    contractType?: 'permanent' | 'contract' | 'probation';
+    salaryMonthlyUSD?: number | null;
+    sponsorshipStatus?: 'employer_sponsored' | 'not_sponsored';
+    hasWorkPermit?: boolean;
+    yearsOfExperience?: number | null;
+    professionalLicenses?: boolean;
+  };
+
+  familyModule?: {
+    inviterRelationship?: 'spouse' | 'parent' | 'sibling' | 'relative' | 'friend';
+    inviterResidencyStatus?: 'citizen' | 'pr' | 'work_permit' | 'student' | 'other';
+    hasInvitationLetter?: boolean;
+    willHost?: boolean;
+    willSponsor?: boolean;
+  };
+
+  businessModule?: {
+    companyName?: string;
+    invitationFromCompany?: boolean;
+    eventType?: string;
+    eventDatesKnown?: boolean;
+    funding?: 'company' | 'self';
+  };
+
+  transitModule?: {
+    onwardTicket?: boolean;
+    layoverHours?: number | null;
+    finalDestinationVisa?: 'yes' | 'no' | 'not_required';
   };
 }

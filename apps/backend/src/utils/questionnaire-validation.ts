@@ -12,6 +12,12 @@ export const questionnaireV2Schema = z
     targetCountry: z.string().trim().min(2, 'targetCountry must be at least 2 characters'),
     // Allow any visa type; normalization happens later.
     visaType: z.string().trim().min(2, 'visaType must be at least 2 characters'),
+    contact: z
+      .object({
+        email: z.string().email().optional(),
+        phone: z.string().trim().min(5).max(30).optional(),
+      })
+      .optional(),
     personal: z.object({
       ageRange: z.enum(['under_18', '18_25', '26_35', '36_50', '51_plus']),
       maritalStatus: z.enum(['single', 'married', 'divorced', 'widowed']),
@@ -22,6 +28,13 @@ export const questionnaireV2Schema = z
       durationCategory: z.enum(['up_to_30_days', '31_90_days', 'more_than_90_days']),
       plannedWhen: z.enum(['within_3_months', '3_to_12_months', 'not_sure']),
       isExactDatesKnown: z.boolean(),
+      tripDurationDays: z
+        .number()
+        .int()
+        .positive()
+        .max(365 * 3)
+        .nullable()
+        .optional(),
     }),
     status: z.object({
       currentStatus: z.enum([
@@ -53,6 +66,7 @@ export const questionnaireV2Schema = z
       ]),
       hasBankStatement: z.boolean(),
       hasStableIncome: z.boolean(),
+      sponsorRelationship: z.enum(['parent', 'relative', 'company', 'other']).optional(),
     }),
     invitation: z.object({
       hasInvitation: z.boolean(),
@@ -78,6 +92,8 @@ export const questionnaireV2Schema = z
       hasTraveledBefore: z.boolean(),
       regionsVisited: z.array(z.enum(['schengen', 'usa_canada', 'uk', 'asia', 'middle_east'])),
       hasVisaRefusals: z.boolean(),
+      hasOverstay: z.boolean().optional(),
+      travelHistoryLevel: z.enum(['none', 'limited', 'moderate', 'strong']).optional(),
     }),
     ties: z.object({
       hasProperty: z.boolean(),
@@ -96,6 +112,60 @@ export const questionnaireV2Schema = z
       hasMedicalReasonForTrip: z.boolean(),
       hasCriminalRecord: z.boolean(),
     }),
+    studentModule: z
+      .object({
+        schoolName: z.string().trim().optional(),
+        acceptanceStatus: z.enum(['accepted', 'applied', 'not_applied']).optional(),
+        programStartDate: z.string().trim().optional(),
+        tuitionAmountUSD: z.number().nonnegative().nullable().optional(),
+        tuitionPaidStatus: z.enum(['paid', 'partial', 'unpaid']).optional(),
+        scholarship: z.boolean().optional(),
+        accommodationType: z.enum(['dorm', 'private', 'host']).optional(),
+        hasAdmissionLetter: z.boolean().optional(),
+        previousEducationDocs: z.boolean().optional(),
+      })
+      .optional(),
+    workModule: z
+      .object({
+        employerName: z.string().trim().optional(),
+        position: z.string().trim().optional(),
+        contractType: z.enum(['permanent', 'contract', 'probation']).optional(),
+        salaryMonthlyUSD: z.number().nonnegative().nullable().optional(),
+        sponsorshipStatus: z.enum(['employer_sponsored', 'not_sponsored']).optional(),
+        hasWorkPermit: z.boolean().optional(),
+        yearsOfExperience: z.number().nonnegative().nullable().optional(),
+        professionalLicenses: z.boolean().optional(),
+      })
+      .optional(),
+    familyModule: z
+      .object({
+        inviterRelationship: z
+          .enum(['spouse', 'parent', 'sibling', 'relative', 'friend'])
+          .optional(),
+        inviterResidencyStatus: z
+          .enum(['citizen', 'pr', 'work_permit', 'student', 'other'])
+          .optional(),
+        hasInvitationLetter: z.boolean().optional(),
+        willHost: z.boolean().optional(),
+        willSponsor: z.boolean().optional(),
+      })
+      .optional(),
+    businessModule: z
+      .object({
+        companyName: z.string().trim().optional(),
+        invitationFromCompany: z.boolean().optional(),
+        eventType: z.string().trim().optional(),
+        eventDatesKnown: z.boolean().optional(),
+        funding: z.enum(['company', 'self']).optional(),
+      })
+      .optional(),
+    transitModule: z
+      .object({
+        onwardTicket: z.boolean().optional(),
+        layoverHours: z.number().nonnegative().nullable().optional(),
+        finalDestinationVisa: z.enum(['yes', 'no', 'not_required']).optional(),
+      })
+      .optional(),
   })
   // Cross-field refinement relying on visaType in parent scope
   .superRefine((val, ctx) => {

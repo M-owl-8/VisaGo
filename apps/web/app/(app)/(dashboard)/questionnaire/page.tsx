@@ -13,7 +13,7 @@ import ErrorBanner from '@/components/ErrorBanner';
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 11;
 
 export default function QuestionnairePage() {
   const { t, i18n } = useTranslation();
@@ -43,6 +43,7 @@ export default function QuestionnairePage() {
   // Initialize v2 structure with proper types
   const [formData, setFormData] = useState<Partial<QuestionnaireV2>>({
     version: '2.0',
+    contact: {},
     personal: {
       nationality: 'UZ',
       ageRange: undefined as any,
@@ -53,6 +54,7 @@ export default function QuestionnairePage() {
       isExactDatesKnown: false,
       durationCategory: undefined as any,
       plannedWhen: undefined as any,
+      tripDurationDays: undefined,
     },
     status: {
       isMinor: false,
@@ -64,6 +66,7 @@ export default function QuestionnairePage() {
       hasStableIncome: false,
       payer: undefined as any,
       approxMonthlyIncomeRange: undefined as any,
+      sponsorRelationship: undefined,
     },
     invitation: {
       hasInvitation: false,
@@ -76,6 +79,8 @@ export default function QuestionnairePage() {
       hasTraveledBefore: false,
       regionsVisited: [],
       hasVisaRefusals: false,
+      hasOverstay: undefined,
+      travelHistoryLevel: undefined,
     },
     ties: {
       hasProperty: false,
@@ -94,6 +99,11 @@ export default function QuestionnairePage() {
       hasMedicalReasonForTrip: false,
       hasCriminalRecord: false,
     },
+    studentModule: {},
+    workModule: {},
+    familyModule: {},
+    businessModule: {},
+    transitModule: {},
   });
 
   if (!isSignedIn) {
@@ -183,6 +193,8 @@ export default function QuestionnairePage() {
           formData.special?.hasMedicalReasonForTrip !== undefined &&
           formData.special?.hasCriminalRecord !== undefined
         );
+      case 10: // Visa specific modules (all optional)
+        return true;
       default:
         return false;
     }
@@ -325,6 +337,37 @@ export default function QuestionnairePage() {
                 <option value="Transit" />
                 <option value="Family Reunion" />
               </datalist>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.contactEmail', 'Contact email (for checklist updates)')}
+                </label>
+                <input
+                  type="email"
+                value={formData.contact?.email || ''}
+                onChange={(e) =>
+                  updateField('contact.email', e.target.value ? e.target.value : undefined)
+                }
+                  placeholder={t('questionnaire.contactEmailPlaceholder', 'example@email.com')}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.contactPhone', 'Contact phone (optional)')}
+                </label>
+                <input
+                  type="tel"
+                value={formData.contact?.phone || ''}
+                onChange={(e) =>
+                  updateField('contact.phone', e.target.value ? e.target.value : undefined)
+                }
+                  placeholder={t('questionnaire.contactPhonePlaceholder', '+998 90 123 45 67')}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
             </div>
           </div>
         );
@@ -510,6 +553,26 @@ export default function QuestionnairePage() {
               </div>
             )}
 
+            <div>
+              <label className="block text-sm font-medium text-white/90 mb-2">
+                {t('questionnaire.tripDurationDays', 'Planned trip length (days)')}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={1095}
+                value={formData.travel?.tripDurationDays || ''}
+                onChange={(e) =>
+                  updateField(
+                    'travel.tripDurationDays',
+                    e.target.value ? Number(e.target.value) : undefined
+                  )
+                }
+                placeholder={t('questionnaire.tripDurationPlaceholder', 'e.g., 14')}
+                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+              />
+            </div>
+
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -548,6 +611,30 @@ export default function QuestionnairePage() {
                 <option value="other_sponsor">{t('questionnaire.payerOtherSponsor')}</option>
               </select>
             </div>
+
+            {formData.finance?.payer && formData.finance.payer !== 'self' && (
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.sponsorRelationship', 'Sponsor relationship')}
+                </label>
+                <select
+                  value={formData.finance?.sponsorRelationship || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'finance.sponsorRelationship',
+                      e.target.value ? e.target.value : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="parent">{t('questionnaire.sponsorParent', 'Parent')}</option>
+                  <option value="relative">{t('questionnaire.sponsorRelative', 'Relative')}</option>
+                  <option value="company">{t('questionnaire.sponsorCompany', 'Company')}</option>
+                  <option value="other">{t('questionnaire.sponsorOther', 'Other')}</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">
@@ -733,6 +820,41 @@ export default function QuestionnairePage() {
                 {t('questionnaire.hasVisaRefusals')}
               </label>
             </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="hasOverstay"
+                checked={formData.history?.hasOverstay || false}
+                onChange={(e) => updateField('history.hasOverstay', e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+              />
+              <label htmlFor="hasOverstay" className="ml-2 block text-sm text-white/90">
+                {t('questionnaire.hasOverstay', 'Any overstay in past visas')}
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/90 mb-2">
+                {t('questionnaire.travelHistoryLevel', 'Travel history strength')}
+              </label>
+              <select
+                value={formData.history?.travelHistoryLevel || ''}
+                onChange={(e) =>
+                  updateField(
+                    'history.travelHistoryLevel',
+                    e.target.value ? e.target.value : undefined
+                  )
+                }
+                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+              >
+                <option value="">{t('questionnaire.selectOption')}</option>
+                <option value="none">{t('questionnaire.travelHistoryNone', 'No travel')}</option>
+                <option value="limited">{t('questionnaire.travelHistoryLimited', 'Limited')}</option>
+                <option value="moderate">{t('questionnaire.travelHistoryModerate', 'Moderate')}</option>
+                <option value="strong">{t('questionnaire.travelHistoryStrong', 'Strong')}</option>
+              </select>
+            </div>
           </div>
         );
 
@@ -895,9 +1017,561 @@ export default function QuestionnairePage() {
           </div>
         );
 
+      case 10: // Visa-specific details (modules)
+        return renderVisaSpecifics();
+
       default:
         return null;
     }
+  };
+
+  function renderVisaSpecifics() {
+    const visaTypeLower = (formData.visaType || '').toLowerCase();
+    const isStudent = visaTypeLower.includes('student');
+    const isWork = visaTypeLower.includes('work');
+    const isBusiness =
+      visaTypeLower.includes('business') || visaTypeLower.includes('conference');
+    const isFamily =
+      visaTypeLower.includes('family') ||
+      visaTypeLower.includes('visit') ||
+      visaTypeLower.includes('visitor');
+    const isTransit = visaTypeLower.includes('transit');
+
+    return (
+      <div className="space-y-6">
+        <h3 className="text-lg font-semibold text-white">
+          {t('questionnaire.stepVisaSpecific', 'Visa-specific details')}
+        </h3>
+        <p className="text-sm text-white/60">
+          {t(
+            'questionnaire.stepVisaSpecificDescription',
+            'Answer the questions relevant to your visa type. Skip anything that does not apply.'
+          )}
+        </p>
+
+        {isStudent && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.schoolName', 'School / university name')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.studentModule?.schoolName || ''}
+                  onChange={(e) => updateField('studentModule.schoolName', e.target.value)}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.acceptanceStatus', 'Acceptance status')}
+                </label>
+                <select
+                  value={formData.studentModule?.acceptanceStatus || ''}
+                onChange={(e) =>
+                  updateField(
+                    'studentModule.acceptanceStatus',
+                    e.target.value ? e.target.value : undefined
+                  )
+                }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="accepted">{t('questionnaire.accepted', 'Accepted')}</option>
+                  <option value="applied">{t('questionnaire.applied', 'Applied')}</option>
+                  <option value="not_applied">{t('questionnaire.notApplied', 'Not applied')}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.programStartDate', 'Program start date')}
+                </label>
+                <input
+                  type="date"
+                  value={formData.studentModule?.programStartDate || ''}
+                  onChange={(e) => updateField('studentModule.programStartDate', e.target.value)}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.tuitionAmount', 'Tuition amount (USD)')}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.studentModule?.tuitionAmountUSD || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'studentModule.tuitionAmountUSD',
+                      e.target.value ? Number(e.target.value) : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.tuitionPaidStatus', 'Tuition payment status')}
+                </label>
+                <select
+                  value={formData.studentModule?.tuitionPaidStatus || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'studentModule.tuitionPaidStatus',
+                      e.target.value ? e.target.value : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="paid">{t('questionnaire.paid', 'Paid')}</option>
+                  <option value="partial">{t('questionnaire.partial', 'Partial')}</option>
+                  <option value="unpaid">{t('questionnaire.unpaid', 'Unpaid')}</option>
+                </select>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="scholarship"
+                  checked={formData.studentModule?.scholarship || false}
+                  onChange={(e) => updateField('studentModule.scholarship', e.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="scholarship" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.scholarship', 'Scholarship')}
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.studentAccommodation', 'Accommodation')}
+                </label>
+                <select
+                  value={formData.studentModule?.accommodationType || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'studentModule.accommodationType',
+                      e.target.value ? e.target.value : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="dorm">{t('questionnaire.dormitory', 'Dormitory')}</option>
+                  <option value="private">{t('questionnaire.privateHousing', 'Private housing')}</option>
+                  <option value="host">{t('questionnaire.hostFamily', 'Host family')}</option>
+                </select>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="hasAdmissionLetter"
+                  checked={formData.studentModule?.hasAdmissionLetter || false}
+                  onChange={(e) => updateField('studentModule.hasAdmissionLetter', e.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="hasAdmissionLetter" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.hasAdmissionLetter', 'Admission/acceptance letter available')}
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="previousEducationDocs"
+                checked={formData.studentModule?.previousEducationDocs || false}
+                onChange={(e) => updateField('studentModule.previousEducationDocs', e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+              />
+              <label htmlFor="previousEducationDocs" className="ml-2 block text-sm text-white/90">
+                {t('questionnaire.previousEducationDocs', 'Diploma/transcript ready')}
+              </label>
+            </div>
+          </div>
+        )}
+
+        {isWork && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.employerName', 'Employer name')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.workModule?.employerName || ''}
+                  onChange={(e) => updateField('workModule.employerName', e.target.value)}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.position', 'Position / role')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.workModule?.position || ''}
+                  onChange={(e) => updateField('workModule.position', e.target.value)}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.contractType', 'Contract type')}
+                </label>
+                <select
+                  value={formData.workModule?.contractType || ''}
+                onChange={(e) =>
+                  updateField('workModule.contractType', e.target.value ? e.target.value : undefined)
+                }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="permanent">{t('questionnaire.permanent', 'Permanent')}</option>
+                  <option value="contract">{t('questionnaire.contract', 'Contract')}</option>
+                  <option value="probation">{t('questionnaire.probation', 'Probation')}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.salaryMonthly', 'Monthly salary (USD)')}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.workModule?.salaryMonthlyUSD || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'workModule.salaryMonthlyUSD',
+                      e.target.value ? Number(e.target.value) : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.sponsorshipStatus', 'Work sponsorship status')}
+                </label>
+                <select
+                  value={formData.workModule?.sponsorshipStatus || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'workModule.sponsorshipStatus',
+                      e.target.value ? e.target.value : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="employer_sponsored">
+                    {t('questionnaire.employerSponsored', 'Employer-sponsored')}
+                  </option>
+                  <option value="not_sponsored">
+                    {t('questionnaire.notSponsored', 'Not sponsored')}
+                  </option>
+                </select>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="hasWorkPermit"
+                  checked={formData.workModule?.hasWorkPermit || false}
+                  onChange={(e) => updateField('workModule.hasWorkPermit', e.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="hasWorkPermit" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.hasWorkPermit', 'Work permit already issued')}
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.yearsOfExperience', 'Years of experience')}
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.workModule?.yearsOfExperience || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'workModule.yearsOfExperience',
+                      e.target.value ? Number(e.target.value) : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="professionalLicenses"
+                  checked={formData.workModule?.professionalLicenses || false}
+                  onChange={(e) => updateField('workModule.professionalLicenses', e.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="professionalLicenses" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.professionalLicenses', 'Professional licenses required')}
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isFamily && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.inviterRelationship', 'Inviter relationship')}
+                </label>
+                <select
+                  value={formData.familyModule?.inviterRelationship || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'familyModule.inviterRelationship',
+                      e.target.value ? e.target.value : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="spouse">{t('questionnaire.spouse', 'Spouse')}</option>
+                  <option value="parent">{t('questionnaire.parent', 'Parent')}</option>
+                  <option value="sibling">{t('questionnaire.sibling', 'Sibling')}</option>
+                  <option value="relative">{t('questionnaire.relative', 'Relative')}</option>
+                  <option value="friend">{t('questionnaire.friend', 'Friend')}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.inviterResidencyStatus', 'Inviter residency status')}
+                </label>
+                <select
+                  value={formData.familyModule?.inviterResidencyStatus || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'familyModule.inviterResidencyStatus',
+                      e.target.value ? e.target.value : undefined
+                    )
+                  }
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+                >
+                  <option value="">{t('questionnaire.selectOption')}</option>
+                  <option value="citizen">{t('questionnaire.citizen', 'Citizen')}</option>
+                  <option value="pr">{t('questionnaire.permanentResident', 'Permanent resident')}</option>
+                  <option value="work_permit">{t('questionnaire.workPermit', 'Work permit')}</option>
+                  <option value="student">{t('questionnaire.student', 'Student')}</option>
+                  <option value="other">{t('questionnaire.other', 'Other')}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="hasInvitationLetter"
+                  checked={formData.familyModule?.hasInvitationLetter || false}
+                  onChange={(e) => updateField('familyModule.hasInvitationLetter', e.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="hasInvitationLetter" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.hasInvitationLetter', 'Invitation letter available')}
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="willHost"
+                  checked={formData.familyModule?.willHost || false}
+                  onChange={(e) => updateField('familyModule.willHost', e.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="willHost" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.willHost', 'Inviter will host')}
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="willSponsor"
+                checked={formData.familyModule?.willSponsor || false}
+                onChange={(e) => updateField('familyModule.willSponsor', e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+              />
+              <label htmlFor="willSponsor" className="ml-2 block text-sm text-white/90">
+                {t('questionnaire.willSponsor', 'Inviter will sponsor financially')}
+              </label>
+            </div>
+          </div>
+        )}
+
+        {isBusiness && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.companyName', 'Company / organizer')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.businessModule?.companyName || ''}
+                  onChange={(e) => updateField('businessModule.companyName', e.target.value)}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/90 mb-2">
+                  {t('questionnaire.eventType', 'Event / conference')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.businessModule?.eventType || ''}
+                  onChange={(e) => updateField('businessModule.eventType', e.target.value)}
+                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="invitationFromCompany"
+                  checked={formData.businessModule?.invitationFromCompany || false}
+                  onChange={(e) =>
+                    updateField('businessModule.invitationFromCompany', e.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="invitationFromCompany" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.invitationFromCompany', 'Invitation from company available')}
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="eventDatesKnown"
+                  checked={formData.businessModule?.eventDatesKnown || false}
+                  onChange={(e) => updateField('businessModule.eventDatesKnown', e.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+                />
+                <label htmlFor="eventDatesKnown" className="ml-2 block text-sm text-white/90">
+                  {t('questionnaire.eventDatesKnown', 'Event dates confirmed')}
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/90 mb-2">
+                {t('questionnaire.businessFunding', 'Trip funded by')}
+              </label>
+              <select
+                value={formData.businessModule?.funding || ''}
+                onChange={(e) =>
+                  updateField('businessModule.funding', e.target.value ? e.target.value : undefined)
+                }
+                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+              >
+                <option value="">{t('questionnaire.selectOption')}</option>
+                <option value="company">{t('questionnaire.company', 'Company')}</option>
+                <option value="self">{t('questionnaire.self', 'Self')}</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {isTransit && (
+          <div className="space-y-3">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="onwardTicket"
+                checked={formData.transitModule?.onwardTicket || false}
+                onChange={(e) => updateField('transitModule.onwardTicket', e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
+              />
+              <label htmlFor="onwardTicket" className="ml-2 block text-sm text-white/90">
+                {t('questionnaire.onwardTicket', 'Onward/return ticket booked')}
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/90 mb-2">
+                {t('questionnaire.layoverHours', 'Layover duration (hours)')}
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={formData.transitModule?.layoverHours || ''}
+                onChange={(e) =>
+                  updateField(
+                    'transitModule.layoverHours',
+                    e.target.value ? Number(e.target.value) : undefined
+                  )
+                }
+                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/90 mb-2">
+                {t(
+                  'questionnaire.finalDestinationVisa',
+                  'Visa for final destination (if required)'
+                )}
+              </label>
+              <select
+                value={formData.transitModule?.finalDestinationVisa || ''}
+                onChange={(e) =>
+                  updateField(
+                    'transitModule.finalDestinationVisa',
+                    e.target.value ? e.target.value : undefined
+                  )
+                }
+                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
+              >
+                <option value="">{t('questionnaire.selectOption')}</option>
+                <option value="yes">{t('questionnaire.yes', 'Yes')}</option>
+                <option value="no">{t('questionnaire.no', 'No')}</option>
+                <option value="not_required">{t('questionnaire.notRequired', 'Not required')}</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {!isStudent && !isWork && !isBusiness && !isFamily && !isTransit && (
+          <p className="text-sm text-white/60">
+            {t(
+              'questionnaire.noExtraQuestions',
+              'No additional questions for this visa type. You can continue.'
+            )}
+          </p>
+        )}
+      </div>
+    );
   };
 
   return (

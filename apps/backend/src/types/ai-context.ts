@@ -32,6 +32,10 @@ export interface VisaQuestionnaireSummary {
   visaType: string;
   targetCountry: string; // "US" | "CA" | "NZ" | "AU" | "JP" | "KR" | "UK" | "ES" | "DE" | "PL"
   appLanguage: 'uz' | 'ru' | 'en';
+  contact?: {
+    email?: string;
+    phone?: string;
+  };
 
   // Legacy fields (for backward compatibility)
   age?: number;
@@ -87,6 +91,7 @@ export interface VisaQuestionnaireSummary {
       | '1_3_months'
       | '3_6_months'
       | 'more_than_6_months'; // v2: explicit duration
+    tripDurationDays?: number | null;
   };
   employment?: {
     isEmployed?: boolean;
@@ -115,10 +120,53 @@ export interface VisaQuestionnaireSummary {
     hasRefusals?: boolean;
     refusalDetails?: string; // v2: explicit refusal details
     traveledBefore?: boolean; // v2: explicit travel history flag
+    travelHistoryLevel?: 'none' | 'limited' | 'moderate' | 'strong';
+    hasOverstay?: boolean;
   };
   ties?: {
     propertyDocs?: boolean;
     familyTies?: boolean;
+  };
+  // New visa-type specific modules (optional)
+  studentModule?: {
+    schoolName?: string;
+    acceptanceStatus?: 'accepted' | 'applied' | 'not_applied';
+    programStartDate?: string;
+    tuitionAmountUSD?: number | null;
+    tuitionPaidStatus?: 'paid' | 'partial' | 'unpaid';
+    scholarship?: boolean;
+    accommodationType?: 'dorm' | 'private' | 'host';
+    hasAdmissionLetter?: boolean;
+    previousEducationDocs?: boolean;
+  };
+  workModule?: {
+    employerName?: string;
+    position?: string;
+    contractType?: 'permanent' | 'contract' | 'probation';
+    salaryMonthlyUSD?: number | null;
+    sponsorshipStatus?: 'employer_sponsored' | 'not_sponsored';
+    hasWorkPermit?: boolean;
+    yearsOfExperience?: number | null;
+    professionalLicenses?: boolean;
+  };
+  familyModule?: {
+    inviterRelationship?: 'spouse' | 'parent' | 'sibling' | 'relative' | 'friend';
+    inviterResidencyStatus?: 'citizen' | 'pr' | 'work_permit' | 'student' | 'other';
+    hasInvitationLetter?: boolean;
+    willHost?: boolean;
+    willSponsor?: boolean;
+  };
+  businessModule?: {
+    companyName?: string;
+    invitationFromCompany?: boolean;
+    eventType?: string;
+    eventDatesKnown?: boolean;
+    funding?: 'company' | 'self';
+  };
+  transitModule?: {
+    onwardTicket?: boolean;
+    layoverHours?: number | null;
+    finalDestinationVisa?: 'yes' | 'no' | 'not_required';
   };
 }
 
