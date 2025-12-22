@@ -313,15 +313,17 @@ export function buildSummaryFromQuestionnaireV2(
       sponsorDetails:
         q.finance.payer !== 'self'
           ? {
-              relationship:
-                q.finance.sponsorRelationship ||
-                (q.finance.payer === 'parents'
+              relationship: (() => {
+                const rel = q.finance.sponsorRelationship;
+                if (rel === 'company') return 'other'; // Map 'company' to 'other' as type doesn't support 'company'
+                if (rel === 'parent' || rel === 'relative' || rel === 'other') return rel;
+                // Fallback to payer-based mapping
+                return q.finance.payer === 'parents'
                   ? 'parent'
                   : q.finance.payer === 'other_family'
                     ? 'relative'
-                    : q.finance.payer === 'employer'
-                      ? 'company'
-                      : 'other'),
+                    : 'other';
+              })(),
               employment: q.finance.hasStableIncome ? 'employed' : 'other',
               annualIncomeUSD: monthlyIncome ? monthlyIncome * 12 : undefined,
             }
