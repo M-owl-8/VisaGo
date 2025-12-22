@@ -52,5 +52,56 @@ export const DEFAULT_GENERIC_RULESET_DATA: VisaRuleSetData = {
       category: 'highly_recommended',
       description: 'Travel/medical insurance covering the full stay.',
     },
+    // Work / employment
+    {
+      documentType: 'employment_contract',
+      category: 'required',
+      description: 'Signed job offer or employment contract specifying role and salary.',
+    },
+    {
+      documentType: 'work_permit_sponsorship',
+      category: 'required',
+      description: 'Work permit or employer sponsorship/authorization (if applicable).',
+    },
+    // Business / conference
+    {
+      documentType: 'business_invitation',
+      category: 'required',
+      description:
+        'Official invitation from partner/company or event organizer with purpose/dates.',
+    },
+    {
+      documentType: 'company_cover_letter',
+      category: 'highly_recommended',
+      description: 'Letter from employer explaining business trip, dates, and who pays.',
+    },
+    // Family / visitor
+    {
+      documentType: 'relationship_proof',
+      category: 'highly_recommended',
+      description: 'Birth/marriage certificates or other documents proving relationship to host.',
+    },
+    {
+      documentType: 'host_invitation',
+      category: 'required',
+      description: 'Invitation letter from host stating relationship, stay dates, and address.',
+    },
+    // Transit
+    {
+      documentType: 'onward_ticket',
+      category: 'required',
+      description: 'Confirmed onward/return ticket matching transit plan.',
+    },
+    {
+      documentType: 'final_destination_visa',
+      category: 'required',
+      description: 'Visa for final destination if that country requires one.',
+    },
+    // Ties / return intent
+    {
+      documentType: 'ties_supporting_docs',
+      category: 'optional',
+      description: 'Property, family, or employment evidence showing intent to return.',
+    },
   ],
 };
