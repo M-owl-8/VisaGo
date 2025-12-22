@@ -32,7 +32,6 @@ export interface QuestionnaireV2 {
 
   // Q2: Travel purpose & duration
   travel: {
-    durationCategory: 'up_to_30_days' | '31_90_days' | 'more_than_90_days';
     plannedWhen: 'within_3_months' | '3_to_12_months' | 'not_sure';
     isExactDatesKnown: boolean;
     tripDurationDays?: number | null;

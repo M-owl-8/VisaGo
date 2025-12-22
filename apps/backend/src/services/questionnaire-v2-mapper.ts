@@ -38,30 +38,39 @@ function mapAgeRangeToNumber(ageRange: string): number | undefined {
 }
 
 /**
- * Map duration category to summary duration format
+ * Map trip duration days to summary duration format
  */
-function mapDurationCategory(
-  category: string,
+function mapTripDurationDays(
+  days: number | null | undefined,
   visaType: string
 ): 'less_than_1_month' | '1_3_months' | '3_6_months' | '6_12_months' | 'more_than_1_year' {
-  if (visaType?.toLowerCase() === 'student') {
-    // Students typically have longer stays
-    if (category === 'more_than_90_days') {
-      return 'more_than_1_year';
-    }
-    return '6_12_months';
+  if (!days || days <= 0) {
+    // Default fallback
+    return visaType?.toLowerCase() === 'student' ? '6_12_months' : '1_3_months';
   }
 
-  // Tourist mapping
-  switch (category) {
-    case 'up_to_30_days':
-      return 'less_than_1_month';
-    case '31_90_days':
-      return '1_3_months';
-    case 'more_than_90_days':
-      return '3_6_months';
-    default:
-      return '1_3_months';
+  if (visaType?.toLowerCase() === 'student') {
+    // Students typically have longer stays
+    if (days > 365) {
+      return 'more_than_1_year';
+    }
+    if (days > 180) {
+      return '6_12_months';
+    }
+    return '3_6_months';
+  }
+
+  // Tourist/other visa mapping
+  if (days <= 30) {
+    return 'less_than_1_month';
+  } else if (days <= 90) {
+    return '1_3_months';
+  } else if (days <= 180) {
+    return '3_6_months';
+  } else if (days <= 365) {
+    return '6_12_months';
+  } else {
+    return 'more_than_1_year';
   }
 }
 
@@ -191,7 +200,7 @@ export function buildSummaryFromQuestionnaireV2(
   }
 
   const statusMapping = mapCurrentStatus(q.status.currentStatus);
-  const duration = mapDurationCategory(q.travel.durationCategory, q.visaType);
+  const duration = mapTripDurationDays(q.travel.tripDurationDays, q.visaType);
   const sponsorType = mapPayerToSponsorType(q.finance.payer);
   const accommodation = mapAccommodationType(q.stay.accommodationType, q.visaType);
   const visitedCountries = mapRegionsToCountries(q.history.regionsVisited);
@@ -359,7 +368,7 @@ export function convertV2ToLegacyQuestionnaireData(q: QuestionnaireV2): any {
   return {
     purpose: q.visaType === 'student' ? 'study' : 'tourism',
     country: q.targetCountry, // This will need to be mapped to country ID by the service
-    duration: mapDurationCategory(q.travel.durationCategory, q.visaType),
+    duration: mapTripDurationDays(q.travel.tripDurationDays, q.visaType),
     traveledBefore: q.history.hasTraveledBefore,
     currentStatus: q.status.currentStatus,
     hasInvitation: q.invitation.hasInvitation,

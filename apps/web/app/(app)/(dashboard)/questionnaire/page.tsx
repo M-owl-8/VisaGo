@@ -52,7 +52,6 @@ export default function QuestionnairePage() {
     },
     travel: {
       isExactDatesKnown: false,
-      durationCategory: undefined as any,
       plannedWhen: undefined as any,
       tripDurationDays: undefined,
     },
@@ -148,7 +147,7 @@ export default function QuestionnairePage() {
         return !!(
           formData.travel?.plannedWhen !== undefined &&
           formData.travel?.isExactDatesKnown !== undefined &&
-          (formData.visaType === 'student' || formData.travel?.durationCategory !== undefined)
+          (formData.visaType === 'student' || (formData.travel?.tripDurationDays !== undefined && formData.travel?.tripDurationDays !== null))
         );
       case 4: // Financial
         return !!(
@@ -532,26 +531,6 @@ export default function QuestionnairePage() {
                 <option value="not_sure">{t('questionnaire.plannedWhenNotSure')}</option>
               </select>
             </div>
-
-            {formData.visaType !== 'student' && (
-              <div>
-                <label className="block text-sm font-medium text-white/90 mb-2">
-                  {t('questionnaire.duration')} *
-                </label>
-                <select
-                  value={formData.travel?.durationCategory || ''}
-                  onChange={(e) => updateField('travel.durationCategory', e.target.value)}
-                  className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary [&>option]:bg-[#0E1A2C] [&>option]:text-white"
-                >
-                  <option value="">{t('questionnaire.selectDuration')}</option>
-                  <option value="up_to_30_days">{t('questionnaire.durationUpTo30Days')}</option>
-                  <option value="31_90_days">{t('questionnaire.duration31_90Days')}</option>
-                  <option value="more_than_90_days">
-                    {t('questionnaire.durationMoreThan90Days')}
-                  </option>
-                </select>
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-medium text-white/90 mb-2">

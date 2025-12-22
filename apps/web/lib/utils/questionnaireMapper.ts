@@ -47,13 +47,24 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
   // Map targetCountry to country (use code directly, backend can handle it)
   const country = v2.targetCountry;
 
-  // Map duration category to legacy duration format
-  const durationMap: Record<string, string> = {
-    up_to_30_days: '1_3_months',
-    '31_90_days': '3_6_months',
-    more_than_90_days: '6_12_months',
+  // Map trip duration days to legacy duration format
+  const mapDaysToLegacyDuration = (days: number | null | undefined, visaType: string): string => {
+    if (!days || days <= 0) {
+      return visaType === 'student' ? '6_12_months' : '3_6_months';
+    }
+    if (days <= 30) {
+      return '1_3_months';
+    } else if (days <= 90) {
+      return '3_6_months';
+    } else if (days <= 180) {
+      return '3_6_months';
+    } else if (days <= 365) {
+      return '6_12_months';
+    } else {
+      return '6_12_months';
+    }
   };
-  const duration = durationMap[v2.travel.durationCategory] || '3_6_months';
+  const duration = mapDaysToLegacyDuration(v2.travel.tripDurationDays, v2.visaType);
 
   // Map current status
   const currentStatusMap: Record<string, string> = {

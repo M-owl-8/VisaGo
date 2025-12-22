@@ -25,7 +25,6 @@ export const questionnaireV2Schema = z
       passportStatus: z.enum(['valid_6plus_months', 'valid_less_6_months', 'no_passport']),
     }),
     travel: z.object({
-      durationCategory: z.enum(['up_to_30_days', '31_90_days', 'more_than_90_days']),
       plannedWhen: z.enum(['within_3_months', '3_to_12_months', 'not_sure']),
       isExactDatesKnown: z.boolean(),
       tripDurationDays: z
