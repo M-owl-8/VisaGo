@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, X, LogOut, MessageCircle, Plus } from 'lucide-react';
+import { Menu, X, LogOut, MessageCircle } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
@@ -146,10 +146,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="rounded-full px-5 py-2 text-sm font-semibold transition bg-primary text-white shadow-[0_15px_35px_rgba(15,15,20,0.35)] hover:bg-primary-dark"
+                      className="rounded-full px-5 py-2 text-sm font-semibold transition text-white/50 hover:bg-white/10 hover:text-white"
                       onClick={() => setShowApplicationTypeModal(true)}
                     >
-                      <Plus size={16} className="mr-2" />
                       {t('applications.startNewApplication', 'Start New Application')}
                     </Button>
                   )}
@@ -238,13 +237,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     {isApplicationLink && (
                       <Button
                         variant="ghost"
-                        className="justify-start rounded-2xl text-left h-12 text-base font-medium bg-primary text-white hover:bg-primary-dark"
+                        className="justify-start rounded-2xl text-left h-12 text-base font-medium text-white/70 hover:bg-white/10"
                         onClick={() => {
                           setShowApplicationTypeModal(true);
                           setIsNavOpen(false);
                         }}
                       >
-                        <Plus size={20} className="mr-3" />
                         {t('applications.startNewApplication', 'Start New Application')}
                       </Button>
                     )}

@@ -142,7 +142,7 @@ function ChatPageContent() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
+    <div className="flex flex-1 min-h-0 flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
       {/* AI Context Chip - Shows what application AI is helping with */}
       {application && (
         <div className="shrink-0 border-b border-white/10 bg-white/[0.02] px-3 py-2 sm:px-4 lg:px-8">
@@ -259,7 +259,7 @@ function ChatPageContent() {
 export default function ChatPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)] items-center justify-center bg-gradient-to-b from-background via-background to-midnight">
+      <div className="flex flex-1 min-h-0 items-center justify-center bg-gradient-to-b from-background via-background to-midnight">
         <div className="text-white/60">Loading...</div>
       </div>
     }>
