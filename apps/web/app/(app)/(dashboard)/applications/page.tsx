@@ -161,87 +161,6 @@ export default function ApplicationsPage() {
       {/* Next Step Guidance - Dominant but not loud */}
       <NextStepGuidance applications={userApplications} />
 
-      <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[2fr,1fr]">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="glass-panel relative overflow-hidden border border-white/10 bg-gradient-to-br from-[#0C1525] to-[#060a18] px-4 py-6 text-white sm:px-6 sm:py-8 md:px-8 md:py-10"
-        >
-          <div className="absolute right-[-10%] top-[-20%] h-60 w-60 rounded-full bg-primary/20 blur-[140px]" />
-          <div className="absolute left-[-15%] bottom-[-20%] h-72 w-72 rounded-full bg-[#1D4ED8]/15 blur-[160px]" />
-          <div className="relative space-y-4 sm:space-y-6">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-white/50 sm:text-sm">
-                {t('applications.heroEyebrow', 'Dashboard')}
-              </p>
-              <h1 className="mt-1.5 font-display text-2xl font-semibold text-white sm:mt-2 sm:text-3xl md:text-4xl">
-                {t('applications.heroTitle', {
-                  name: user?.firstName || t('applications.heroDefaultName', 'Traveler'),
-                })}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm text-white/70 sm:mt-3 sm:text-base">
-                {t(
-                  'applications.heroSubtitle',
-                  'Keep every visa document, AI chat, and payment status perfectly synced with your mobile app.'
-                )}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
-              <Button 
-                className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 text-sm shadow-[0_20px_45px_rgba(62,166,255,0.45)] sm:w-auto sm:px-6 sm:py-3 sm:text-base"
-                onClick={() => setShowApplicationTypeModal(true)}
-              >
-                <Plus size={16} className="sm:size-5" />
-                <span className="ml-2">{t('applications.startNewApplication')}</span>
-              </Button>
-              <Link href="/chat" className="w-full sm:w-auto">
-                <Button
-                  variant="secondary"
-                  className="w-full rounded-2xl border border-white/10 !bg-transparent px-4 py-2.5 text-sm text-white shadow-[0_15px_35px_rgba(7,12,30,0.7)] sm:w-auto sm:px-6 sm:py-3 sm:text-base"
-                >
-                  <MessageCircle size={16} className="sm:size-5" />
-                  <span className="ml-2">{t('applications.heroAiCta', 'Open AI assistant')}</span>
-                </Button>
-              </Link>
-              <Button
-                variant="ghost"
-                className="w-full rounded-2xl border border-white/10 px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 sm:w-auto"
-                onClick={refetch}
-                disabled={isRefreshing}
-              >
-                <RefreshCcw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-                <span className="ml-2">{t('applications.refresh', 'Refresh')}</span>
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="glass-panel grid grid-cols-1 gap-3 border border-white/10 bg-white/[0.04] px-4 py-4 text-white sm:gap-4 sm:px-6 sm:py-6"
-        >
-          <Metric
-            label={t('applications.metrics.active', 'Active applications')}
-            value={totalApplications}
-            helper={t('applications.metrics.synced', 'Synced with mobile')}
-          />
-          <Metric
-            label={t('applications.metrics.documentsReady', 'Documents ready')}
-            value={`${documentsReady.uploaded}/${documentsReady.required || 1}`}
-            helper={t('applications.metrics.documentsLabel', 'Ready for upload')}
-          />
-          <Metric
-            label={t('applications.metrics.avgProgress', 'Average progress')}
-            value={`${overallProgress}%`}
-            helper={t('applications.metrics.progressHelper', 'Across all journeys')}
-          />
-        </motion.div>
-      </section>
-
       {/* Show onboarding for first-time users */}
       {totalApplications === 0 && !hasCompletedOnboarding && <OnboardingFlow />}
 
@@ -341,23 +260,6 @@ export default function ApplicationsPage() {
     </div>
   );
 }
-
-const Metric = ({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: string | number;
-  helper: string;
-}) => (
-  <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4 text-white shadow-[0_25px_55px_rgba(1,7,17,0.65)]">
-    <p className="text-xs uppercase tracking-[0.3em] text-white/50">{label}</p>
-    <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
-    <p className="text-sm text-white/60">{helper}</p>
-  </div>
-);
-
 
 const EmptyState = ({ onStartNewApplication }: { onStartNewApplication: () => void }) => {
   const { t } = useTranslation();

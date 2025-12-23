@@ -9,6 +9,7 @@ import { QuestionnaireV2, TargetCountry, COUNTRY_OPTIONS } from '@/lib/types/que
 import { mapQuestionnaireV2ToLegacy } from '@/lib/utils/questionnaireMapper';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import ErrorBanner from '@/components/ErrorBanner';
+import { CountrySelector } from '@/components/questionnaire/CountrySelector';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -291,29 +292,14 @@ export default function QuestionnairePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/90 mb-2">
-                {t('questionnaire.targetCountry')} *
-              </label>
-              <input
-                type="text"
-                value={formData.targetCountry || ''}
-                onChange={(e) => updateField('targetCountry', e.target.value as TargetCountry)}
-                placeholder={t('questionnaire.selectCountry', 'Enter country code or name')}
-                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
-                list="country-suggestions"
+              <CountrySelector
+                countries={countries.length ? countries : COUNTRY_OPTIONS}
+                value={formData.targetCountry}
+                onChange={(countryCode) => updateField('targetCountry', countryCode as TargetCountry)}
+                placeholder={t('questionnaire.selectCountry', 'Select country')}
+                label={t('questionnaire.targetCountry', 'Destination Country') + ' *'}
+                error={countriesError || undefined}
               />
-              <datalist id="country-suggestions">
-                {(countries.length ? countries : COUNTRY_OPTIONS).map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.name}
-                  </option>
-                ))}
-              </datalist>
-              {countriesError && (
-                <p className="mt-2 text-xs text-red-300">
-                  {t('errors.generic', countriesError)}
-                </p>
-              )}
             </div>
 
             <div>
