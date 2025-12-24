@@ -34,8 +34,7 @@ export class DocumentProcessingQueueService {
     }
 
     const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-    this.queue = new Queue<DocumentProcessingJobData>('document-processing', {
-      connection: redisUrl,
+    this.queue = new Queue<DocumentProcessingJobData>('document-processing', redisUrl, {
       defaultJobOptions: {
         attempts: 3,
         backoff: {
