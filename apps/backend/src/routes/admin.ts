@@ -252,6 +252,57 @@ router.patch(
   }
 );
 
+/**
+ * POST /api/admin/documents/:documentId/retry
+ * Manually retry processing a stuck document
+ */
+router.post(
+  '/documents/:documentId/retry',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { documentId } = req.params;
+
+      // Check if document exists
+      const document = await prisma.userDocument.findUnique({
+        where: { id: documentId },
+        include: {
+          application: {
+            include: {
+              country: true,
+              visaType: true,
+            },
+          },
+        },
+      });
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Enqueue document for processing
+      const { DocumentProcessingQueueService } = await import(
+        '../services/document-processing-queue.service'
+      );
+      await DocumentProcessingQueueService.enqueueDocumentProcessing(
+        documentId,
+        document.applicationId,
+        document.userId
+      );
+
+      res.json({
+        message: 'Document queued for reprocessing',
+        documentId,
+        status: 'queued',
+      });
+    } catch (error) {
+      console.error('Error retrying document:', error);
+      res.status(500).json({ error: 'Failed to retry document processing' });
+    }
+  }
+);
+
 // ============================================================================
 // ANALYTICS ENDPOINTS
 // ============================================================================

@@ -34,7 +34,24 @@ export class DocumentProcessingQueueService {
     }
 
     const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-    this.queue = new Queue<DocumentProcessingJobData>('document-processing', redisUrl);
+    this.queue = new Queue<DocumentProcessingJobData>('document-processing', {
+      connection: redisUrl,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000, // 2s, 4s, 8s
+        },
+        removeOnComplete: {
+          age: 24 * 3600, // Keep completed jobs for 24 hours
+          count: 1000, // Keep max 1000 completed jobs
+        },
+        removeOnFail: {
+          age: 7 * 24 * 3600, // Keep failed jobs for 7 days
+        },
+        timeout: 5 * 60 * 1000, // 5 minutes max per job (prevents infinite hangs)
+      },
+    });
 
     // Set up processor with configurable concurrency
     const concurrency = parseInt(process.env.DOC_QUEUE_CONCURRENCY || '3', 10);
@@ -338,15 +355,62 @@ export class DocumentProcessingQueueService {
         } catch (alertError) {
           // Non-blocking
         }
+
+        // Check if this is a timeout error
+        const isTimeout =
+          error?.message?.toLowerCase().includes('timeout') ||
+          error?.code === 'ETIMEDOUT' ||
+          jobDuration > 4 * 60 * 1000; // Job ran for more than 4 minutes
+
         logError('[DocumentProcessingQueue] Job failed', error as Error, {
           documentId,
           applicationId,
           jobId: job.id,
           attempt: job.attemptsMade + 1,
           duration: `${jobDuration}ms`,
+          isTimeout,
         });
 
-        // Re-throw to trigger retry mechanism
+        // If timeout or last attempt, set fallback status
+        if (isTimeout || job.attemptsMade + 1 >= 3) {
+          try {
+            await prisma.userDocument.update({
+              where: { id: documentId },
+              data: {
+                status: 'pending',
+                verifiedByAI: false,
+                aiConfidence: 0.0,
+                aiNotesUz: isTimeout
+                  ? "Hujjatni tekshirish vaqti tugadi. Iltimos yana yuklang yoki qo'lda tekshiring."
+                  : "Hujjatni tekshirishning imkoni bo'lmadi. Iltimos yana yuklang.",
+                aiNotesRu: isTimeout
+                  ? 'Время проверки документа истекло. Пожалуйста, загрузите снова или проверьте вручную.'
+                  : 'Не удалось проверить документ. Пожалуйста, загрузите снова.',
+                aiNotesEn: isTimeout
+                  ? 'Document verification timed out. Please upload again or verify manually.'
+                  : 'Could not validate document. Please upload again.',
+                verificationNotes: isTimeout
+                  ? 'Verification timed out after multiple attempts. Please try uploading again.'
+                  : 'Verification failed after multiple attempts. Please try uploading again.',
+              },
+            });
+            logInfo('[DocumentProcessingQueue] Set fallback status for failed document', {
+              documentId,
+              isTimeout,
+              attempts: job.attemptsMade + 1,
+            });
+          } catch (updateError) {
+            logError(
+              '[DocumentProcessingQueue] Failed to set fallback status',
+              updateError as Error,
+              {
+                documentId,
+              }
+            );
+          }
+        }
+
+        // Re-throw to trigger retry mechanism (unless it's the last attempt)
         throw error;
       }
     });
