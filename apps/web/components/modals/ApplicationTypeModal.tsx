@@ -94,3 +94,5 @@ export function ApplicationTypeModal({ isOpen, onClose }: ApplicationTypeModalPr
 }
 
 
+
+

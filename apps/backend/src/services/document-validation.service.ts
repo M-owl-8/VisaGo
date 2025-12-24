@@ -25,6 +25,7 @@ import {
   buildDocumentValidationUserPrompt,
 } from '../config/ai-prompts';
 import { toCanonicalDocumentType, logUnknownDocumentType } from '../config/document-types-map';
+import { resilientOperation } from '../utils/db-resilience';
 
 const prisma = new PrismaClient();
 
@@ -63,8 +64,37 @@ export async function validateDocumentWithAI(params: {
   modelOverride?: string; // Optional: override default model
   useEnsemble?: boolean; // Optional: use ensemble validation (Phase 7)
 }): Promise<DocumentValidationResultAI> {
+  // Declare variables at function scope for use across different code paths
+  let ocrConfidenceFromDb: number | undefined;
+  let ocrLanguageFromDb: string | undefined;
   try {
     const { document, checklistItem, application, countryName, visaTypeName, useEnsemble } = params;
+
+    // Validate document type early to avoid ambiguous processing
+    if (!document.documentType || !document.documentType.trim()) {
+      logWarn('[DocumentValidation] Missing documentType, returning needs_review', {
+        documentId: document.id,
+        applicationId: application.id,
+      });
+      return {
+        status: 'needs_review',
+        confidence: 0.0,
+        verifiedByAI: false,
+        problems: [
+          {
+            code: 'MISSING_DOCUMENT_TYPE',
+            message: 'Document type is missing. Cannot validate without a type.',
+            userMessage: 'Hujjat turi ko‘rsatilmagan. Iltimos, hujjat turini tanlang.',
+          },
+        ],
+        suggestions: [],
+        notes: {
+          uz: "Hujjat turi ko'rsatilmagan. To'g'ri turini tanlab yana yuklang.",
+          ru: 'Не указан тип документа. Укажите правильный тип и загрузите снова.',
+          en: 'Document type is missing. Please choose the correct type and re-upload.',
+        },
+      };
+    }
 
     // Phase 7: Optional ensemble validation (feature-flagged)
     if (useEnsemble || process.env.ENABLE_ENSEMBLE_VALIDATION === 'true') {
@@ -150,6 +180,7 @@ export async function validateDocumentWithAI(params: {
 
           // Try to extract OCR text if document ID is available
           let ocrText = '';
+          let ocrTextLength: number | undefined = undefined;
           let imageAnalysis: any = undefined;
           if (document.id) {
             try {
@@ -162,11 +193,15 @@ export async function validateDocumentWithAI(params: {
                   hasSignature: true,
                   hasStamp: true,
                   imageQualityScore: true,
+                  ocrConfidence: true,
+                  ocrLanguage: true,
                 },
               });
               if (docRecord) {
                 // Check if file was re-uploaded (fileUrl changed)
                 const fileUrlChanged = docRecord.fileUrl !== document.fileUrl;
+                ocrConfidenceFromDb = docRecord.ocrConfidence ?? undefined;
+                ocrLanguageFromDb = docRecord.ocrLanguage ?? undefined;
 
                 // Use cached OCR text only if:
                 // 1. OCR text exists and has content
@@ -181,6 +216,7 @@ export async function validateDocumentWithAI(params: {
                     textLength: docRecord.extractedText.length,
                   });
                   ocrText = docRecord.extractedText;
+                  ocrTextLength = docRecord.extractedText.length;
                 } else {
                   // Re-extract OCR if:
                   // 1. No cached text
@@ -210,6 +246,7 @@ export async function validateDocumentWithAI(params: {
                   });
                   if (extractedText) {
                     ocrText = extractedText;
+                    ocrTextLength = extractedText.length;
                     logInfo('[DocValidation] OCR text extracted successfully', {
                       documentId: document.id,
                       textLength: extractedText.length,
@@ -261,6 +298,9 @@ export async function validateDocumentWithAI(params: {
             {
               fileType: document.fileName.split('.').pop()?.toLowerCase(),
               expiryDate: document.expiryDate?.toISOString(),
+              ocrConfidence: ocrConfidenceFromDb,
+              ocrLanguage: ocrLanguageFromDb,
+              textLength: ocrTextLength ?? (ocrText ? ocrText.length : undefined),
             },
             normalizedCountryCode,
             visaTypeName.toLowerCase() as 'tourist' | 'student',
@@ -320,7 +360,8 @@ export async function validateDocumentWithAI(params: {
           const result: DocumentValidationResultAI = {
             status,
             confidence,
-            verifiedByAI: status === 'verified' && confidence >= 0.7,
+            // Consider AI decision made for both verified and rejected when confidence is reasonable
+            verifiedByAI: (status === 'verified' || status === 'rejected') && confidence >= 0.3,
             problems,
             suggestions: [], // VisaDocChecker doesn't provide structured suggestions
             notes,
@@ -359,6 +400,7 @@ export async function validateDocumentWithAI(params: {
     }
 
     // Phase 5: Load comprehensive context (VisaRuleSet, CountryPlaybook, CanonicalAIUserContext, extracted text)
+    // Note: ocrConfidenceFromDb and ocrLanguageFromDb are declared at function scope above
     let visaRuleSetData: any = null;
     let countryPlaybookData: any = null;
     let canonicalAIUserContextData: any = null;
@@ -544,16 +586,41 @@ export async function validateDocumentWithAI(params: {
         maxTokens: aiConfig.maxTokens,
       });
 
-      const response = await openaiClient.chat.completions.create({
-        model: aiConfig.model,
-        messages: [
-          { role: 'system', content: DOCUMENT_VALIDATION_SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: aiConfig.maxTokens,
-        temperature: aiConfig.temperature,
-        response_format: aiConfig.responseFormat || undefined,
-      });
+      // Retry GPT call on transient errors (429/500/502/503/timeouts)
+      const maxRetries = 3;
+      let response: any;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          response = await openaiClient.chat.completions.create({
+            model: aiConfig.model,
+            messages: [
+              { role: 'system', content: DOCUMENT_VALIDATION_SYSTEM_PROMPT },
+              { role: 'user', content: userPrompt },
+            ],
+            max_tokens: aiConfig.maxTokens,
+            temperature: aiConfig.temperature,
+            response_format: aiConfig.responseFormat || undefined,
+          });
+          break;
+        } catch (error: any) {
+          const statusCode = error?.status || error?.response?.status;
+          const isRetryable =
+            [429, 500, 502, 503].includes(statusCode) ||
+            (error?.message || '').toLowerCase().includes('timeout');
+          if (!isRetryable || attempt === maxRetries) {
+            throw error;
+          }
+          const delayMs = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
+          logWarn('[DocumentValidation] GPT call retrying', {
+            applicationId: application.id,
+            documentType: document.documentType,
+            attempt,
+            statusCode,
+            delayMs,
+          });
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
 
       const responseTime = Date.now() - startTime;
       const inputTokens = response.usage?.prompt_tokens || 0;
@@ -596,16 +663,16 @@ export async function validateDocumentWithAI(params: {
           problems: [],
           suggestions: [],
           notes: {
-            uz: "AI bu hujjatni avtomatik baholay olmadi. Qo'lda tekshirish kerak.",
-            ru: 'AI не смог автоматически оценить этот документ. Требуется ручная проверка.',
-            en: 'AI could not automatically evaluate this document. Manual review required.',
+            uz: `AI javobi noto'g'ri formatda. ${document.documentType} hujjatini qayta yuklang.`,
+            ru: 'Ответ AI в неверном формате. Загрузите документ заново.',
+            en: 'AI response was not valid JSON. Please re-upload this document.',
           },
         };
         return validationResult;
       }
 
       // Validate and normalize the result to match DocumentValidationResultAI
-      const status = ['verified', 'rejected', 'needs_review', 'uncertain'].includes(parsed.status)
+      let status = ['verified', 'rejected', 'needs_review', 'uncertain'].includes(parsed.status)
         ? (parsed.status as 'verified' | 'rejected' | 'needs_review' | 'uncertain')
         : 'needs_review';
 
@@ -618,7 +685,18 @@ export async function validateDocumentWithAI(params: {
               ? 0.5
               : 0.5;
 
-      const verifiedByAI = status === 'verified' && confidence >= 0.7;
+      // If context completeness is low, avoid hard rejections
+      const dataCompletenessScore = canonicalAIUserContextData?.meta?.dataCompletenessScore;
+      if (
+        dataCompletenessScore !== undefined &&
+        dataCompletenessScore < 0.6 &&
+        status === 'rejected'
+      ) {
+        status = 'needs_review';
+      }
+
+      // Treat AI decisions as authoritative for both verified and rejected when confidence is reasonable
+      const verifiedByAI = (status === 'verified' || status === 'rejected') && confidence >= 0.3;
 
       // Normalize problems array
       const problems = Array.isArray(parsed.problems)
@@ -922,7 +1000,8 @@ export async function saveValidationResultToDocument(
 
     // Determine if AI has made a decision (verified or rejected)
     // 'pending' means AI hasn't processed yet, so verifiedByAI should be false
-    const aiHasDecided = documentStatus === 'verified';
+    const aiHasDecided = documentStatus === 'verified' || documentStatus === 'rejected';
+    const needsReview = validationResult.status === 'needs_review';
 
     // Build user-facing verification notes
     const verificationNotes = buildVerificationNotes(validationResult);
@@ -930,19 +1009,25 @@ export async function saveValidationResultToDocument(
     // Safely extract notes with null fallbacks
     const notes = validationResult.notes ?? {};
 
-    const updatedDocument = await prisma.userDocument.update({
-      where: { id: documentId },
-      data: {
-        status: documentStatus,
-        verifiedByAI: aiHasDecided,
-        aiConfidence:
-          typeof validationResult.confidence === 'number' ? validationResult.confidence : null,
-        aiNotesUz: notes.uz ?? null,
-        aiNotesRu: notes.ru ?? null,
-        aiNotesEn: notes.en ?? null,
-        verificationNotes: verificationNotes,
-      },
-    });
+    const updatedDocument = await resilientOperation(
+      prisma,
+      () =>
+        prisma.userDocument.update({
+          where: { id: documentId },
+          data: {
+            status: documentStatus,
+            verifiedByAI: aiHasDecided,
+            needsReview,
+            aiConfidence:
+              typeof validationResult.confidence === 'number' ? validationResult.confidence : null,
+            aiNotesUz: notes.uz ?? null,
+            aiNotesRu: notes.ru ?? null,
+            aiNotesEn: notes.en ?? null,
+            verificationNotes: verificationNotes,
+          },
+        }),
+      { retry: { maxAttempts: 3 } }
+    );
 
     logInfo('[DocValidation] Saved validation result to UserDocument', {
       documentId,
@@ -951,6 +1036,25 @@ export async function saveValidationResultToDocument(
       verifiedByAI: aiHasDecided,
       confidence: validationResult.confidence,
       hasProblems: (validationResult.problems ?? []).length > 0,
+    });
+
+    // Record status history (non-blocking retry)
+    await resilientOperation(
+      prisma,
+      () =>
+        prisma.documentStatusHistory.create({
+          data: {
+            documentId,
+            status: documentStatus,
+            notes: verificationNotes ?? undefined,
+          },
+        }),
+      { retry: { maxAttempts: 3 } }
+    ).catch((historyError) => {
+      logWarn('[DocValidation] Failed to write status history (non-blocking)', {
+        documentId,
+        error: historyError instanceof Error ? historyError.message : String(historyError),
+      });
     });
 
     // Emit WebSocket event for real-time updates

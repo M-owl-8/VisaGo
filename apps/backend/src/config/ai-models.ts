@@ -90,7 +90,7 @@ export const AI_CONFIG: Record<string, AIModelConfig> = {
   docVerification: {
     model: AI_MODELS.DOC_VERIFICATION,
     temperature: 0.2, // Very low for strict evaluation
-    maxTokens: 500, // Concise responses
+    maxTokens: 300, // Concise responses (reduced for cost/perf)
     timeout: 30000, // 30 seconds
     responseFormat: { type: 'json_object' },
   },

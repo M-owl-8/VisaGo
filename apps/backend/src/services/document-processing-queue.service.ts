@@ -36,8 +36,9 @@ export class DocumentProcessingQueueService {
     const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
     this.queue = new Queue<DocumentProcessingJobData>('document-processing', redisUrl);
 
-    // Set up processor
-    this.queue.process(async (job) => {
+    // Set up processor with configurable concurrency
+    const concurrency = parseInt(process.env.DOC_QUEUE_CONCURRENCY || '3', 10);
+    this.queue.process(concurrency, async (job) => {
       const { documentId, applicationId, userId } = job.data;
       const jobStartTime = Date.now();
 
@@ -67,50 +68,84 @@ export class DocumentProcessingQueueService {
           throw new Error(`Document not found: ${documentId}`);
         }
 
-        // Step 2: Image Analysis (Phase 2) - Run before AI validation
-        try {
-          const { ImageAnalysisService } = await import('./image-analysis.service');
+        // Step 2: Kick off heavy tasks in parallel (Image Analysis + OCR warm-up)
+        const imageAnalysisPromise = (async () => {
+          try {
+            const { ImageAnalysisService } = await import('./image-analysis.service');
 
-          // Only analyze if not already analyzed
-          if (!document.imageAnalysisResult) {
-            const imageAnalysisResult = await ImageAnalysisService.analyzeImageFromUrl(
-              document.fileUrl,
-              document.fileName,
-              undefined, // MIME type will be detected from fileName
-              {
-                detectSignatures: true,
-                detectStamps: true,
-                checkQuality: true,
-              }
-            );
+            // Only analyze if not already analyzed
+            if (!document.imageAnalysisResult) {
+              const imageAnalysisResult = await ImageAnalysisService.analyzeImageFromUrl(
+                document.fileUrl,
+                document.fileName,
+                undefined, // MIME type will be detected from fileName
+                {
+                  detectSignatures: true,
+                  detectStamps: true,
+                  checkQuality: true,
+                }
+              );
 
-            // Save image analysis results to database
-            await prisma.userDocument.update({
-              where: { id: documentId },
-              data: {
-                imageAnalysisResult: imageAnalysisResult as any,
+              // Save image analysis results to database
+              await prisma.userDocument.update({
+                where: { id: documentId },
+                data: {
+                  imageAnalysisResult: imageAnalysisResult as any,
+                  hasSignature: imageAnalysisResult.hasSignature,
+                  hasStamp: imageAnalysisResult.hasStamp,
+                  imageQualityScore: imageAnalysisResult.imageQualityScore,
+                },
+              });
+
+              logInfo('[DocumentProcessingQueue] Image analysis completed', {
+                documentId,
                 hasSignature: imageAnalysisResult.hasSignature,
                 hasStamp: imageAnalysisResult.hasStamp,
-                imageQualityScore: imageAnalysisResult.imageQualityScore,
-              },
-            });
-
-            logInfo('[DocumentProcessingQueue] Image analysis completed', {
+                qualityScore: imageAnalysisResult.imageQualityScore,
+                issuesCount: imageAnalysisResult.issues.length,
+              });
+            }
+          } catch (imageAnalysisError) {
+            // Non-blocking: log but continue with validation
+            logWarn('[DocumentProcessingQueue] Image analysis failed (non-blocking)', {
               documentId,
-              hasSignature: imageAnalysisResult.hasSignature,
-              hasStamp: imageAnalysisResult.hasStamp,
-              qualityScore: imageAnalysisResult.imageQualityScore,
-              issuesCount: imageAnalysisResult.issues.length,
+              error:
+                imageAnalysisError instanceof Error
+                  ? imageAnalysisError.message
+                  : String(imageAnalysisError),
             });
           }
-        } catch (imageAnalysisError) {
-          // Non-blocking: log but continue with validation
-          logWarn('[DocumentProcessingQueue] Image analysis failed (non-blocking)', {
+        })();
+
+        const ocrWarmupPromise = (async () => {
+          try {
+            const { DocumentClassifierService } = await import('./document-classifier.service');
+            await DocumentClassifierService.extractTextForDocument({
+              id: document.id,
+              fileName: document.fileName,
+              fileUrl: document.fileUrl,
+              mimeType: undefined,
+            });
+          } catch (ocrError) {
+            logWarn('[DocumentProcessingQueue] OCR warm-up failed (non-blocking)', {
+              documentId,
+              error: ocrError instanceof Error ? ocrError.message : String(ocrError),
+            });
+          }
+        })();
+
+        await Promise.allSettled([imageAnalysisPromise, ocrWarmupPromise]);
+        // Emit progress update after preprocessing steps
+        try {
+          const { websocketService } = await import('./websocket.service');
+          websocketService.emitDocumentStatusUpdate(applicationId, documentId, 'pending', {
+            stage: 'pre_validation',
+            progress: 50,
+          } as any);
+        } catch (wsPreError) {
+          logWarn('[DocumentProcessingQueue] Failed to emit preprocessing progress', {
             documentId,
-            error:
-              imageAnalysisError instanceof Error
-                ? imageAnalysisError.message
-                : String(imageAnalysisError),
+            error: wsPreError instanceof Error ? wsPreError.message : String(wsPreError),
           });
         }
 
@@ -121,20 +156,27 @@ export class DocumentProcessingQueueService {
               './document-validation.service'
             );
 
-            // Try to find matching checklist item
+            // Try to find matching checklist item (use cached checklist only; avoid regeneration here)
             let checklistItem: any = undefined;
             try {
-              const { DocumentChecklistService } = await import('./document-checklist.service');
-              const checklist = await DocumentChecklistService.generateChecklist(
-                applicationId,
-                userId
-              );
-              if (checklist && 'items' in checklist && Array.isArray(checklist.items)) {
-                checklistItem = checklist.items.find(
+              const cachedChecklist = await prisma.documentChecklist.findUnique({
+                where: { applicationId },
+                select: { status: true, checklistData: true },
+              });
+
+              if (cachedChecklist?.status === 'ready' && cachedChecklist.checklistData) {
+                const parsed = JSON.parse(cachedChecklist.checklistData);
+                const items = Array.isArray(parsed) ? parsed : parsed.items || [];
+                checklistItem = items.find(
                   (item: any) =>
                     item.documentType === document.documentType ||
                     item.documentType?.toLowerCase() === document.documentType?.toLowerCase()
                 );
+              } else {
+                logInfo('[DocumentProcessingQueue] Checklist not ready, skipping cached lookup', {
+                  applicationId,
+                  checklistStatus: cachedChecklist?.status || 'missing',
+                });
               }
             } catch (checklistError) {
               // Checklist lookup is optional
@@ -214,6 +256,14 @@ export class DocumentProcessingQueueService {
               documentId,
             });
 
+            // Alert on GPT API errors
+            try {
+              const { alertGPTAPIError } = await import('./verification-alerts.service');
+              alertGPTAPIError(documentId, validationError as Error, 0);
+            } catch (alertError) {
+              // Non-blocking
+            }
+
             // Set fallback status
             await prisma.userDocument.update({
               where: { id: documentId },
@@ -262,6 +312,14 @@ export class DocumentProcessingQueueService {
         }
 
         const jobDuration = Date.now() - jobStartTime;
+
+        // Alert on slow processing
+        try {
+          const { alertSlowProcessing } = await import('./verification-alerts.service');
+          alertSlowProcessing(documentId, jobDuration, 60000); // 60s threshold
+        } catch (alertError) {
+          // Non-blocking
+        }
         logInfo('[DocumentProcessingQueue] Job completed successfully', {
           documentId,
           applicationId,
@@ -272,6 +330,14 @@ export class DocumentProcessingQueueService {
         return { success: true, documentId, applicationId };
       } catch (error: any) {
         const jobDuration = Date.now() - jobStartTime;
+
+        // Alert on slow processing
+        try {
+          const { alertSlowProcessing } = await import('./verification-alerts.service');
+          alertSlowProcessing(documentId, jobDuration, 60000); // 60s threshold
+        } catch (alertError) {
+          // Non-blocking
+        }
         logError('[DocumentProcessingQueue] Job failed', error as Error, {
           documentId,
           applicationId,

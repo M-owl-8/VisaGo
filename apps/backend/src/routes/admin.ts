@@ -9,6 +9,7 @@ import { EmbassySourceService } from '../services/embassy-source.service';
 import { EmbassySyncJobService } from '../services/embassy-sync-job.service';
 import { EmbassySyncSchedulerService } from '../services/embassy-sync-scheduler.service';
 import { EvaluationService } from '../services/evaluation.service';
+import { getVerificationMetrics } from '../services/verification-metrics.service';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -195,6 +196,25 @@ router.get(
     } catch (error) {
       console.error('Error fetching document verification queue:', error);
       res.status(500).json({ error: 'Failed to fetch document verification queue' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/documents/verification-metrics
+ * Get aggregated document verification metrics
+ */
+router.get(
+  '/documents/verification-metrics',
+  authenticateToken,
+  requireAdmin,
+  async (_req: Request, res: Response) => {
+    try {
+      const metrics = await getVerificationMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching verification metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch verification metrics' });
     }
   }
 );

@@ -178,6 +178,9 @@ export class VisaDocCheckerService {
       amounts?: Array<{ value: number; currency: string }>;
       bankName?: string;
       accountHolder?: string;
+      ocrConfidence?: number;
+      ocrLanguage?: string;
+      textLength?: number;
     },
     countryCode?: string,
     visaType?: 'tourist' | 'student',
@@ -342,23 +345,31 @@ export class VisaDocCheckerService {
         maxTokens: aiConfig.maxTokens,
       });
 
-      const response = await AIOpenAIService.getOpenAIClient().chat.completions.create({
-        model: docCheckModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: aiConfig.temperature,
-        max_tokens: aiConfig.maxTokens,
-        response_format: aiConfig.responseFormat || undefined,
-      });
+      const response = await this.callWithRetry(
+        () =>
+          AIOpenAIService.getOpenAIClient().chat.completions.create({
+            model: docCheckModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: aiConfig.temperature,
+            max_tokens: aiConfig.maxTokens,
+            response_format: aiConfig.responseFormat || undefined,
+          }),
+        {
+          task: 'document_check',
+          model: docCheckModel,
+          documentType: requiredDocumentRule.documentType,
+        }
+      );
 
       const responseTime = Date.now() - startTime;
       const inputTokens = response.usage?.prompt_tokens || 0;
       const outputTokens = response.usage?.completion_tokens || 0;
       const totalTokens = inputTokens + outputTokens;
 
-      const rawContent = response.choices[0]?.message?.content || '{}';
+      let rawContent = response.choices[0]?.message?.content || '{}';
 
       logInfo('[VisaDocChecker] GPT-4 response received', {
         task: 'document_check',
@@ -369,38 +380,87 @@ export class VisaDocCheckerService {
         responseTimeMs: responseTime,
       });
 
-      // Parse and validate JSON
+      // Alert on high token usage (non-blocking)
+      try {
+        const { alertHighCost } = await import('./verification-alerts.service');
+        // Use documentId from metadata if available, otherwise use a placeholder
+        const documentId = (metadata as any)?.documentId || 'unknown';
+        alertHighCost(documentId, totalTokens, 5000); // 5k token threshold
+      } catch (alertError) {
+        // Non-blocking
+      }
+
+      // Parse and validate JSON (with retry if parsing fails)
       let parsed: any;
       let jsonValidationRetries = 0;
       let jsonValidationPassed = false;
-      try {
-        parsed = JSON.parse(rawContent);
-        jsonValidationPassed = true;
-      } catch (parseError) {
-        jsonValidationRetries++;
-        // Try to extract JSON from markdown code blocks
-        const jsonMatch = rawContent.match(/```json\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch) {
-          try {
-            parsed = JSON.parse(jsonMatch[1]);
-            jsonValidationPassed = true;
-          } catch (e) {
-            // Continue to next attempt
-          }
-        }
-        if (!jsonValidationPassed) {
-          const objectMatch = rawContent.match(/\{[\s\S]*\}/);
-          if (objectMatch) {
+      for (let parseAttempt = 1; parseAttempt <= 2 && !jsonValidationPassed; parseAttempt++) {
+        try {
+          parsed = JSON.parse(rawContent);
+          jsonValidationPassed = true;
+          break;
+        } catch (parseError) {
+          jsonValidationRetries++;
+          // Try to extract JSON from markdown code blocks
+          const jsonMatch = rawContent.match(/```json\s*([\s\S]*?)\s*```/i);
+          if (jsonMatch) {
             try {
-              parsed = JSON.parse(objectMatch[0]);
+              parsed = JSON.parse(jsonMatch[1]);
               jsonValidationPassed = true;
+              break;
             } catch (e) {
-              // Continue
+              // Continue to next attempt
             }
           }
-        }
-        if (!jsonValidationPassed) {
-          throw new Error('No valid JSON found in response');
+          if (!jsonValidationPassed) {
+            const objectMatch = rawContent.match(/\{[\s\S]*\}/);
+            if (objectMatch) {
+              try {
+                parsed = JSON.parse(objectMatch[0]);
+                jsonValidationPassed = true;
+                break;
+              } catch (e) {
+                // Continue
+              }
+            }
+          }
+
+          // If first parse attempt fails, retry GPT with stricter instructions
+          if (!jsonValidationPassed && parseAttempt === 1) {
+            logWarn(
+              '[VisaDocChecker] JSON parse failed, retrying GPT with strict JSON-only prompt',
+              {
+                documentType: requiredDocumentRule.documentType,
+                rawLength: rawContent.length,
+              }
+            );
+
+            const strictUserPrompt = `${userPrompt}\n\nCRITICAL: Return ONLY valid JSON. No markdown, no code fences, no explanations.`;
+            const retryResponse = await this.callWithRetry(
+              () =>
+                AIOpenAIService.getOpenAIClient().chat.completions.create({
+                  model: docCheckModel,
+                  messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: strictUserPrompt },
+                  ],
+                  temperature: aiConfig.temperature,
+                  max_tokens: aiConfig.maxTokens,
+                  response_format: aiConfig.responseFormat || undefined,
+                }),
+              {
+                task: 'document_check',
+                model: docCheckModel,
+                documentType: requiredDocumentRule.documentType,
+                reason: 'json_parse_retry',
+              }
+            );
+
+            rawContent = retryResponse.choices[0]?.message?.content || '{}';
+            // Loop continues to attempt parsing the new content
+          } else if (!jsonValidationPassed && parseAttempt === 2) {
+            throw new Error('No valid JSON found in response');
+          }
         }
       }
 
@@ -984,11 +1044,14 @@ Return ONLY valid JSON matching the schema, no other text.`;
       issues?: string[];
     }
   ): string {
-    // Limit document text to 8000 chars (reasonable for GPT)
-    const truncatedText =
-      userDocumentText.length > 8000
-        ? userDocumentText.substring(0, 8000) + '\n\n[Text truncated]'
-        : userDocumentText;
+    // Limit document text to reduce tokens (keep head+tail for context)
+    const MAX_TEXT = 5000;
+    let truncatedText = userDocumentText;
+    if (userDocumentText.length > MAX_TEXT) {
+      const head = userDocumentText.substring(0, 4000);
+      const tail = userDocumentText.substring(userDocumentText.length - 1000);
+      truncatedText = `${head}\n\n[Text truncated]\n\n${tail}`;
+    }
 
     let prompt = `EXPERT DECISION REQUIRED:
 
@@ -997,6 +1060,7 @@ You are reviewing a document uploaded by an Uzbek applicant. Your task:
 2. Consider:
    - REQUIRED_DOCUMENT_RULE as ground truth (check document type, validity, format, amounts)
    - USER_DOCUMENT_TEXT and METADATA to validate content, dates, amounts
+   - OCR confidence and IMAGE_ANALYSIS to judge reliability (low confidence → be cautious)
    - APPLICANT_CONTEXT to understand how critical this document is for this applicant
 3. Write short_reason in neutral, embassy-style English (≤200 chars)
 4. Write notes.uz as the primary explanation (clear, simple Uzbek, required)
@@ -1323,5 +1387,52 @@ APPLICANT_CONTEXT
       status,
       embassy_risk_level: riskLevel,
     };
+  }
+
+  /**
+   * Retry helper for GPT calls with exponential backoff.
+   */
+  private static async callWithRetry<T>(
+    fn: () => Promise<T>,
+    context: Record<string, unknown>,
+    maxRetries = 3
+  ): Promise<T> {
+    let attempt = 0;
+    let lastError: unknown = null;
+
+    while (attempt < maxRetries) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+        attempt += 1;
+
+        const statusCode = error?.status || error?.response?.status;
+        const errorCode = error?.code;
+        const retryableStatus = [429, 500, 502, 503].includes(statusCode);
+        const retryable =
+          retryableStatus ||
+          errorCode === 'ETIMEDOUT' ||
+          (error?.message || '').toLowerCase().includes('timeout');
+
+        if (!retryable || attempt >= maxRetries) {
+          throw error;
+        }
+
+        const delayMs = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
+        logWarn('[VisaDocChecker] GPT call retrying', {
+          ...context,
+          attempt,
+          statusCode,
+          errorCode,
+          delayMs,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    // Should never hit here, but for type completeness
+    throw lastError ?? new Error('Unknown error in callWithRetry');
   }
 }

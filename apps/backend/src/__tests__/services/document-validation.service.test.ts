@@ -9,9 +9,13 @@ import type { DocumentValidationResultAI } from '../../types/ai-responses';
 
 // Mock Prisma before importing the service
 const mockUpdate = jest.fn();
+const mockHistoryCreate = jest.fn();
 const mockPrismaInstance = {
   userDocument: {
     update: mockUpdate,
+  },
+  documentStatusHistory: {
+    create: mockHistoryCreate,
   },
 };
 
@@ -192,6 +196,7 @@ describe('Document Validation Service', () => {
   describe('saveValidationResultToDocument', () => {
     beforeEach(() => {
       mockUpdate.mockClear();
+      mockHistoryCreate.mockClear();
       mockUpdate.mockResolvedValue({
         id: 'doc-123',
         status: 'verified',
@@ -219,11 +224,19 @@ describe('Document Validation Service', () => {
         data: {
           status: 'verified',
           verifiedByAI: true,
+          needsReview: false,
           aiConfidence: 0.9,
           aiNotesUz: "Hujjat to'g'ri",
           aiNotesRu: null,
           aiNotesEn: 'Document is correct',
           verificationNotes: 'Document is correct',
+        },
+      });
+      expect(mockHistoryCreate).toHaveBeenCalledWith({
+        data: {
+          documentId: 'doc-123',
+          status: 'verified',
+          notes: 'Document is correct',
         },
       });
     });
@@ -254,11 +267,19 @@ describe('Document Validation Service', () => {
         data: {
           status: 'rejected',
           verifiedByAI: true,
+          needsReview: true,
           aiConfidence: 0.7,
           aiNotesUz: "Hujjat noto'g'ri",
           aiNotesRu: null,
           aiNotesEn: 'Document is incorrect',
           verificationNotes: '1) The document needs a signature',
+        },
+      });
+      expect(mockHistoryCreate).toHaveBeenCalledWith({
+        data: {
+          documentId: 'doc-123',
+          status: 'rejected',
+          notes: '1) The document needs a signature',
         },
       });
     });
@@ -283,11 +304,19 @@ describe('Document Validation Service', () => {
         data: {
           status: 'pending',
           verifiedByAI: false,
+          needsReview: false,
           aiConfidence: 0.3,
           aiNotesUz: 'Hujjat aniq emas',
           aiNotesRu: null,
           aiNotesEn: 'Document status is uncertain',
           verificationNotes: 'Document status is uncertain',
+        },
+      });
+      expect(mockHistoryCreate).toHaveBeenCalledWith({
+        data: {
+          documentId: 'doc-123',
+          status: 'pending',
+          notes: 'Document status is uncertain',
         },
       });
     });
@@ -518,6 +547,170 @@ describe('Document Validation Service', () => {
 
       const notes = buildVerificationNotes(result);
       expect(notes).toBe('Document is valid');
+    });
+  });
+
+  describe('DocumentStatusHistory integration', () => {
+    beforeEach(() => {
+      mockHistoryCreate.mockClear();
+      mockUpdate.mockClear();
+    });
+
+    it('should create status history entry when saving verified status', async () => {
+      const result: DocumentValidationResultAI = {
+        status: 'verified',
+        confidence: 0.9,
+        verifiedByAI: true,
+        problems: [],
+        suggestions: [],
+        notes: {
+          uz: 'Hujjat tasdiqlandi',
+          en: 'Document verified',
+        },
+      };
+
+      mockUpdate.mockResolvedValue({
+        id: 'doc-123',
+        status: 'verified',
+        verifiedByAI: true,
+      });
+
+      await saveValidationResultToDocument('doc-123', result);
+
+      expect(mockHistoryCreate).toHaveBeenCalledWith({
+        data: {
+          documentId: 'doc-123',
+          status: 'verified',
+          notes: expect.any(String),
+        },
+      });
+    });
+
+    it('should create status history entry when saving rejected status', async () => {
+      const result: DocumentValidationResultAI = {
+        status: 'rejected',
+        confidence: 0.7,
+        verifiedByAI: true,
+        problems: [
+          {
+            code: 'MISSING_SIGNATURE',
+            message: 'Missing signature',
+            userMessage: 'Signature required',
+          },
+        ],
+        suggestions: [],
+        notes: {
+          uz: 'Hujjat rad etildi',
+          en: 'Document rejected',
+        },
+      };
+
+      mockUpdate.mockResolvedValue({
+        id: 'doc-123',
+        status: 'rejected',
+        verifiedByAI: true,
+      });
+
+      await saveValidationResultToDocument('doc-123', result);
+
+      expect(mockHistoryCreate).toHaveBeenCalledWith({
+        data: {
+          documentId: 'doc-123',
+          status: 'rejected',
+          notes: expect.stringContaining('Signature required'),
+        },
+      });
+    });
+
+    it('should create status history entry with needsReview flag', async () => {
+      const result: DocumentValidationResultAI = {
+        status: 'needs_review',
+        confidence: 0.5,
+        verifiedByAI: false,
+        problems: [],
+        suggestions: [],
+        notes: {
+          uz: "Qo'lda ko'rib chiqish kerak",
+          en: 'Needs manual review',
+        },
+      };
+
+      mockUpdate.mockResolvedValue({
+        id: 'doc-123',
+        status: 'rejected',
+        needsReview: true,
+        verifiedByAI: false,
+      });
+
+      await saveValidationResultToDocument('doc-123', result);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            needsReview: true,
+          }),
+        })
+      );
+    });
+  });
+
+  describe('needsReview field handling', () => {
+    it('should set needsReview to true when status is needs_review', async () => {
+      const result: DocumentValidationResultAI = {
+        status: 'needs_review',
+        confidence: 0.4,
+        verifiedByAI: false,
+        problems: [],
+        suggestions: [],
+        notes: { uz: "Ko'rib chiqish kerak", en: 'Needs review' },
+      };
+
+      mockUpdate.mockResolvedValue({
+        id: 'doc-123',
+        status: 'rejected',
+        needsReview: true,
+      });
+
+      await saveValidationResultToDocument('doc-123', result);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            needsReview: true,
+            status: 'rejected',
+            verifiedByAI: false,
+          }),
+        })
+      );
+    });
+
+    it('should set needsReview to false when status is verified', async () => {
+      const result: DocumentValidationResultAI = {
+        status: 'verified',
+        confidence: 0.9,
+        verifiedByAI: true,
+        problems: [],
+        suggestions: [],
+        notes: { uz: 'Tasdiqlandi', en: 'Verified' },
+      };
+
+      mockUpdate.mockResolvedValue({
+        id: 'doc-123',
+        status: 'verified',
+        needsReview: false,
+      });
+
+      await saveValidationResultToDocument('doc-123', result);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            needsReview: false,
+            status: 'verified',
+            verifiedByAI: true,
+          }),
+        })
+      );
     });
   });
 });

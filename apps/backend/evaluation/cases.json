@@ -41,6 +41,14 @@
             "status": "APPROVED",
             "embassy_risk_level": "LOW"
           }
+        },
+        {
+          "documentType": "passport",
+          "text": "PASSPORT\nName: John Doe\nPassport No: AB1234567\nIssued: 2020-01-15\nExpires: 2030-01-14\nValid for 10 years",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
         }
       ]
     },
@@ -161,7 +169,17 @@
           { "documentType": "bank_statement", "category": "required" },
           { "documentType": "tuition_payment_proof", "category": "required" }
         ]
-      }
+      },
+      "sampleDocs": [
+        {
+          "documentType": "bank_statement",
+          "text": "BANK STATEMENT\nAccount: Student Name\nPeriod: Jan-Mar 2024\nBalance: $25,000\n6 months history\nRegular deposits",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
     },
     {
       "id": "case-005",
@@ -196,6 +214,600 @@
           { "documentType": "additional_supporting_documents", "category": "highly_recommended" }
         ]
       }
+    },
+    {
+      "id": "case-006",
+      "name": "Passport - Expired",
+      "description": "Expired passport document should be rejected",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 5000,
+          "monthlyIncomeUSD": 2000,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 50
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "passport", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "passport",
+          "text": "PASSPORT\nName: John Doe\nPassport No: AB1234567\nIssued: 2010-01-15\nExpires: 2020-01-14\nEXPIRED",
+          "expectedVerification": {
+            "status": "REJECTED",
+            "embassy_risk_level": "HIGH"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-007",
+      "name": "Bank Statement - Insufficient Balance",
+      "description": "Bank statement with insufficient balance for visa requirements",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 1000,
+          "monthlyIncomeUSD": 500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "UK",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "high",
+          "score": 30
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "bank_statement", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "bank_statement",
+          "text": "BANK STATEMENT\nAccount: Jane Doe\nPeriod: Jan-Mar 2024\nBalance: $1,000\n1 month history\nLow balance warning",
+          "expectedVerification": {
+            "status": "REJECTED",
+            "embassy_risk_level": "HIGH"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-008",
+      "name": "Employment Letter - Missing Signature",
+      "description": "Employment letter without signature should require review",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 60
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "employment_letter", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "employment_letter",
+          "text": "EMPLOYMENT LETTER\nCompany: ABC Corp\nEmployee: John Doe\nPosition: Software Engineer\nSalary: $2500/month\nDate: 2024-03-01\nNo signature present",
+          "expectedVerification": {
+            "status": "NEED_FIX",
+            "embassy_risk_level": "MEDIUM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-009",
+      "name": "Travel Insurance - Valid Policy",
+      "description": "Valid travel insurance document should be approved",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "low",
+          "score": 70
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "travel_insurance", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "travel_insurance",
+          "text": "TRAVEL INSURANCE\nPolicy Number: INS-123456\nInsured: John Doe\nCoverage: €30,000 medical\nValid from: 2024-06-01\nValid until: 2024-06-30\nCoverage area: Schengen Zone",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-010",
+      "name": "Hotel Booking - Confirmed Reservation",
+      "description": "Confirmed hotel booking should be approved",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "low",
+          "score": 70
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "hotel_booking", "category": "highly_recommended" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "hotel_booking",
+          "text": "HOTEL BOOKING CONFIRMATION\nGuest: John Doe\nHotel: Grand Hotel Berlin\nCheck-in: 2024-06-15\nCheck-out: 2024-06-25\nBooking Reference: HOT-789456\nStatus: Confirmed\nPayment: Prepaid",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-011",
+      "name": "I-20 Form - Valid Student Document",
+      "description": "Valid I-20 form for US student visa",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "student",
+          "bankBalanceUSD": 30000,
+          "monthlyIncomeUSD": 0,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "US",
+          "visaType": "student"
+        },
+        "riskScore": {
+          "level": "low",
+          "score": 75
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "i20_form", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "i20_form",
+          "text": "I-20 FORM\nSEVIS ID: N1234567890\nSchool: University of California\nProgram: Computer Science\nStart Date: 2024-09-01\nEnd Date: 2028-05-31\nTuition: $45,000/year\nLiving Expenses: $20,000/year\nTotal: $65,000/year",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-012",
+      "name": "Sponsor Letter - Valid Parent Support",
+      "description": "Valid sponsor letter from parent for student visa",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "parent",
+          "currentStatus": "student",
+          "bankBalanceUSD": 2000,
+          "monthlyIncomeUSD": 0,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "US",
+          "visaType": "student"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 60
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "sponsor_letter", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "sponsor_letter",
+          "text": "SPONSOR LETTER\nDate: 2024-03-01\nI, Parent Name, hereby confirm that I will financially support my child, Student Name, during their studies in the United States. I commit to covering all tuition, living expenses, and other costs.\nSigned: Parent Name\nNotarized: Yes",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-013",
+      "name": "Bank Statement - Less Than 3 Months",
+      "description": "Bank statement with less than 3 months history should need review",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 55
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "bank_statement", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "bank_statement",
+          "text": "BANK STATEMENT\nAccount: John Doe\nPeriod: Mar 2024\nBalance: $8,500\n1 month history only",
+          "expectedVerification": {
+            "status": "NEED_FIX",
+            "embassy_risk_level": "MEDIUM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-014",
+      "name": "Passport - Expiring Soon",
+      "description": "Passport expiring within 6 months should need review",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 55
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "passport", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "passport",
+          "text": "PASSPORT\nName: John Doe\nPassport No: AB1234567\nIssued: 2015-01-15\nExpires: 2024-07-14\nExpiring in 4 months",
+          "expectedVerification": {
+            "status": "NEED_FIX",
+            "embassy_risk_level": "MEDIUM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-015",
+      "name": "Employment Letter - Recent Job Start",
+      "description": "Employment letter for job started less than 3 months ago",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 55
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "employment_letter", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "employment_letter",
+          "text": "EMPLOYMENT LETTER\nCompany: ABC Corp\nEmployee: John Doe\nPosition: Software Engineer\nStart Date: 2024-02-01\nSalary: $2500/month\nEmployment Duration: 1 month\nSigned: HR Manager",
+          "expectedVerification": {
+            "status": "NEED_FIX",
+            "embassy_risk_level": "MEDIUM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-016",
+      "name": "Travel Insurance - Insufficient Coverage",
+      "description": "Travel insurance with coverage less than required minimum",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 8000,
+          "monthlyIncomeUSD": 2500,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 55
+        }
+      },
+      "expected": {
+        "checklist": [{ "documentType": "travel_insurance", "category": "required" }]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "travel_insurance",
+          "text": "TRAVEL INSURANCE\nPolicy Number: INS-123456\nInsured: John Doe\nCoverage: €5,000 medical\nValid from: 2024-06-01\nValid until: 2024-06-30\nCoverage area: Schengen Zone\nNote: Coverage below €30,000 minimum",
+          "expectedVerification": {
+            "status": "NEED_FIX",
+            "embassy_risk_level": "MEDIUM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-017",
+      "name": "Multiple Documents - Complete Application",
+      "description": "Complete application with all required documents",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "employed",
+          "bankBalanceUSD": 10000,
+          "monthlyIncomeUSD": 3000,
+          "hasPreviousRefusals": false,
+          "hasProperty": true,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "low",
+          "score": 80
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "bank_statement", "category": "required" },
+          { "documentType": "employment_letter", "category": "required" },
+          { "documentType": "travel_insurance", "category": "required" },
+          { "documentType": "hotel_booking", "category": "highly_recommended" },
+          { "documentType": "flight_reservation", "category": "highly_recommended" }
+        ]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "passport",
+          "text": "PASSPORT\nName: John Doe\nPassport No: AB1234567\nIssued: 2020-01-15\nExpires: 2030-01-14\nValid",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        },
+        {
+          "documentType": "bank_statement",
+          "text": "BANK STATEMENT\nAccount: John Doe\nPeriod: Jan-Mar 2024\nBalance: $10,000\n3 months history\nRegular deposits",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        },
+        {
+          "documentType": "employment_letter",
+          "text": "EMPLOYMENT LETTER\nCompany: ABC Corp\nEmployee: John Doe\nPosition: Software Engineer\nSalary: $3000/month\nDate: 2024-03-01\nSigned: HR Manager",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-018",
+      "name": "Unemployed Applicant - Company Sponsor",
+      "description": "Unemployed applicant sponsored by company",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "company",
+          "currentStatus": "unemployed",
+          "bankBalanceUSD": 5000,
+          "monthlyIncomeUSD": 0,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "high",
+          "score": 35
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "sponsor_letter", "category": "required" },
+          { "documentType": "company_bank_statement", "category": "required" },
+          { "documentType": "travel_insurance", "category": "required" }
+        ]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "sponsor_letter",
+          "text": "SPONSOR LETTER\nCompany: XYZ Corporation\nI hereby confirm that XYZ Corporation will cover all expenses for John Doe's travel to Germany for business purposes.\nSigned: Company Director\nDate: 2024-03-01",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "MEDIUM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-019",
+      "name": "Self-Employed - Business Registration",
+      "description": "Self-employed applicant with business registration documents",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "self_employed",
+          "bankBalanceUSD": 12000,
+          "monthlyIncomeUSD": 4000,
+          "hasPreviousRefusals": false,
+          "hasProperty": true,
+          "hasFamilyTies": true
+        },
+        "application": {
+          "countryCode": "DE",
+          "visaType": "tourist"
+        },
+        "riskScore": {
+          "level": "medium",
+          "score": 55
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "bank_statement", "category": "required" },
+          { "documentType": "business_registration", "category": "required" },
+          { "documentType": "tax_returns", "category": "required" },
+          { "documentType": "travel_insurance", "category": "required" }
+        ]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "business_registration",
+          "text": "BUSINESS REGISTRATION\nBusiness Name: Doe Enterprises\nOwner: John Doe\nRegistration Date: 2020-01-15\nTax ID: TAX123456\nStatus: Active",
+          "expectedVerification": {
+            "status": "APPROVED",
+            "embassy_risk_level": "LOW"
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-020",
+      "name": "Student Visa - Missing Financial Proof",
+      "description": "Student visa application missing sufficient financial documentation",
+      "input": {
+        "applicantProfile": {
+          "sponsorType": "self",
+          "currentStatus": "student",
+          "bankBalanceUSD": 5000,
+          "monthlyIncomeUSD": 0,
+          "hasPreviousRefusals": false,
+          "hasProperty": false,
+          "hasFamilyTies": false
+        },
+        "application": {
+          "countryCode": "US",
+          "visaType": "student"
+        },
+        "riskScore": {
+          "level": "high",
+          "score": 30
+        }
+      },
+      "expected": {
+        "checklist": [
+          { "documentType": "passport", "category": "required" },
+          { "documentType": "acceptance_letter", "category": "required" },
+          { "documentType": "i20_form", "category": "required" },
+          { "documentType": "bank_statement", "category": "required" }
+        ]
+      },
+      "sampleDocs": [
+        {
+          "documentType": "bank_statement",
+          "text": "BANK STATEMENT\nAccount: Student Name\nPeriod: Jan-Mar 2024\nBalance: $5,000\nInsufficient funds for tuition and living expenses",
+          "expectedVerification": {
+            "status": "REJECTED",
+            "embassy_risk_level": "HIGH"
+          }
+        }
+      ]
     }
   ]
 }

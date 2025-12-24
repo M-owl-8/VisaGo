@@ -200,6 +200,7 @@ model UserDocument {
   verificationNotes String?
   expiryDate        DateTime?
   verifiedByAI      Boolean?  @default(false)
+  needsReview       Boolean   @default(false) // True when AI marks needs_review (granular pending state)
   aiConfidence      Float? // 0-1
   aiNotesUz         String?
   aiNotesRu         String?
@@ -221,6 +222,7 @@ model UserDocument {
   // classificationScore   Float?    // confidence score 0-1
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  history           DocumentStatusHistory[]
 
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -230,6 +232,18 @@ model UserDocument {
   @@index([userId])
   @@index([applicationId])
   @@index([status])
+}
+
+model DocumentStatusHistory {
+  id          String   @id @default(cuid())
+  documentId  String
+  status      String
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  document UserDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
 }
 
 model Payment {

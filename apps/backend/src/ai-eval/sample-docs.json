@@ -1,0 +1,9 @@
+[
+  {
+    "id": "sample-1",
+    "application": { "countryCode": "US", "visaType": "tourist" },
+    "documentType": "passport",
+    "text": "Uzbekistan passport sample text...",
+    "expectedVerification": { "status": "APPROVED", "embassy_risk_level": "LOW" }
+  }
+]

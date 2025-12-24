@@ -262,15 +262,43 @@ Be strict: if you're not confident, use "other" with lower confidence.`;
       // Import OCR service dynamically to avoid initialization issues
       const { OCRService } = await import('./ocr.service');
 
-      // Extract text using OCR service
-      const ocrResult = await OCRService.extractTextFromUrl(
-        doc.fileUrl,
-        doc.fileName,
-        doc.mimeType,
-        {
-          language: 'uzb+eng+rus', // Support Uzbek, English, and Russian
+      // Extract text using OCR service (primary: Tesseract)
+      let ocrResult = await OCRService.extractTextFromUrl(doc.fileUrl, doc.fileName, doc.mimeType, {
+        language: 'uzb+eng+rus', // Support Uzbek, English, and Russian
+      });
+
+      // If confidence is low, try Google Vision as a fallback for better accuracy
+      if (ocrResult.confidence < 0.5) {
+        try {
+          const visionResult = await OCRService.extractTextFromUrl(
+            doc.fileUrl,
+            doc.fileName,
+            doc.mimeType,
+            {
+              language: 'uzb+eng+rus',
+              provider: 'google_vision',
+            }
+          );
+
+          // Prefer the fallback if it yields higher confidence or longer text
+          if (
+            visionResult.confidence > ocrResult.confidence ||
+            visionResult.text.length > ocrResult.text.length
+          ) {
+            logInfo('[DocumentClassifier] Using Google Vision OCR fallback', {
+              documentId: doc.id,
+              prevConfidence: ocrResult.confidence,
+              newConfidence: visionResult.confidence,
+            });
+            ocrResult = visionResult;
+          }
+        } catch (visionError) {
+          logWarn('[DocumentClassifier] Google Vision fallback failed', {
+            documentId: doc.id,
+            error: visionError instanceof Error ? visionError.message : String(visionError),
+          });
         }
-      );
+      }
 
       // Update database with OCR results
       if (ocrResult.text && ocrResult.text.length > 0) {
