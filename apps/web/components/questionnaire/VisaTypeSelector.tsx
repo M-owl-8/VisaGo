@@ -1,47 +1,79 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Search, ChevronDown, Check } from 'lucide-react';
+import { Search, ChevronDown, Check, Briefcase, GraduationCap, Plane, Users, Building2, Home } from 'lucide-react';
 
-interface Country {
-  code: string;
-  name: string;
+interface VisaTypeOption {
+  value: string; // Internal value (normalized)
+  label: string; // Display label
+  description?: string;
+  icon?: React.ReactNode;
 }
 
-interface CountrySelectorProps {
-  countries: Country[];
-  value?: string; // country code
-  onChange: (countryCode: string) => void;
+const VISA_TYPE_OPTIONS: VisaTypeOption[] = [
+  {
+    value: 'Tourist Visa',
+    label: 'Tourist Visa',
+    description: 'For tourism and leisure travel',
+    icon: <Plane size={18} />,
+  },
+  {
+    value: 'Student Visa',
+    label: 'Student Visa',
+    description: 'For academic or language study',
+    icon: <GraduationCap size={18} />,
+  },
+  {
+    value: 'Work Visa',
+    label: 'Work Visa',
+    description: 'For employment and skilled workers',
+    icon: <Briefcase size={18} />,
+  },
+  {
+    value: 'Business Visa',
+    label: 'Business Visa',
+    description: 'For business meetings and conferences',
+    icon: <Building2 size={18} />,
+  },
+  {
+    value: 'Family/Visitor Visa',
+    label: 'Family/Visitor Visa',
+    description: 'For family visits and reunions',
+    icon: <Users size={18} />,
+  },
+  {
+    value: 'Transit Visa',
+    label: 'Transit Visa',
+    description: 'For airport or short transit',
+    icon: <Plane size={18} />,
+  },
+];
+
+interface VisaTypeSelectorProps {
+  value?: string; // visa type value (normalized)
+  onChange: (visaType: string) => void;
   placeholder?: string;
   label?: string;
   error?: string;
 }
 
-function codeToFlag(code: string): string {
-  if (!code || code.length !== 2) return '🌍';
-  const base = 0x1f1e6;
-  const upper = code.toUpperCase();
-  const chars = upper.split('').map((c) => base + (c.charCodeAt(0) - 65));
-  return String.fromCodePoint(...chars);
-}
-
-export function CountrySelector({
-  countries,
+export function VisaTypeSelector({
   value,
   onChange,
-  placeholder = 'Select country',
+  placeholder = 'Select visa type',
   label,
   error,
-}: CountrySelectorProps) {
+}: VisaTypeSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const selectedCountry = countries.find((c) => c.code === value);
+  const selectedOption = VISA_TYPE_OPTIONS.find((opt) => opt.value === value);
 
-  const filteredCountries = countries.filter((country) =>
-    country.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredOptions = VISA_TYPE_OPTIONS.filter((option) =>
+    option.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    option.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   useEffect(() => {
@@ -58,8 +90,8 @@ export function CountrySelector({
     }
   }, [isOpen]);
 
-  const handleSelect = (countryCode: string) => {
-    onChange(countryCode);
+  const handleSelect = (visaTypeValue: string) => {
+    onChange(visaTypeValue);
     setIsOpen(false);
     setSearchQuery('');
   };
@@ -85,10 +117,12 @@ export function CountrySelector({
         } ${isOpen ? 'border-primary ring-2 ring-primary/20' : ''}`}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          {selectedCountry ? (
+          {selectedOption ? (
             <>
-              <span className="text-xl shrink-0">{codeToFlag(selectedCountry.code)}</span>
-              <span className="truncate text-white">{selectedCountry.name}</span>
+              <span className="shrink-0 text-white/70">
+                {selectedOption.icon}
+              </span>
+              <span className="truncate text-white">{selectedOption.label}</span>
             </>
           ) : (
             <span className="text-white/50">{placeholder}</span>
@@ -111,36 +145,45 @@ export function CountrySelector({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search countries..."
+                placeholder="Search visa types..."
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-10 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
           </div>
 
-          {/* Country list */}
+          {/* Visa type list */}
           <div className="max-h-64 overflow-y-auto p-2">
-            {filteredCountries.length === 0 ? (
+            {filteredOptions.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-white/60">
-                No countries found
+                No visa types found
               </div>
             ) : (
-              filteredCountries.map((country) => {
-                const isSelected = country.code === value;
+              filteredOptions.map((option) => {
+                const isSelected = option.value === value;
                 return (
                   <button
-                    key={country.code}
+                    key={option.value}
                     type="button"
-                    onClick={() => handleSelect(country.code)}
-                    className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
+                    onClick={() => handleSelect(option.value)}
+                    className={`w-full flex items-start gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
                       isSelected
                         ? 'bg-primary/20 text-white'
                         : 'text-white/90 hover:bg-white/10'
                     }`}
                   >
-                    <span className="text-xl shrink-0">{codeToFlag(country.code)}</span>
-                    <span className="flex-1 truncate font-medium">{country.name}</span>
+                    <span className="shrink-0 text-white/70 mt-0.5">
+                      {option.icon}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium">{option.label}</div>
+                      {option.description && (
+                        <div className="mt-0.5 text-xs text-white/60">
+                          {option.description}
+                        </div>
+                      )}
+                    </div>
                     {isSelected && (
-                      <Check size={18} className="shrink-0 text-primary" />
+                      <Check size={18} className="shrink-0 text-primary mt-0.5" />
                     )}
                   </button>
                 );
@@ -156,5 +199,4 @@ export function CountrySelector({
     </div>
   );
 }
-
 

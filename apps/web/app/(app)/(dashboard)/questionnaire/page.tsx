@@ -10,6 +10,7 @@ import { mapQuestionnaireV2ToLegacy } from '@/lib/utils/questionnaireMapper';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import ErrorBanner from '@/components/ErrorBanner';
 import { CountrySelector } from '@/components/questionnaire/CountrySelector';
+import { VisaTypeSelector } from '@/components/questionnaire/VisaTypeSelector';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -303,25 +304,12 @@ export default function QuestionnairePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/90 mb-2">
-                {t('questionnaire.visaType')} *
-              </label>
-              <input
-                type="text"
-                value={formData.visaType || ''}
-                onChange={(e) => updateField('visaType', e.target.value as any)}
-                placeholder={t('questionnaire.selectVisaType', 'Enter visa type (e.g., Tourist, Student, Work)')}
-                className="mt-1 block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white shadow-card-soft focus:border-primary focus:ring-primary"
-                list="visa-type-suggestions"
+              <VisaTypeSelector
+                value={formData.visaType}
+                onChange={(visaType) => updateField('visaType', visaType as any)}
+                placeholder={t('questionnaire.selectVisaType', 'Select visa type')}
+                label={t('questionnaire.visaType', 'Visa Type') + ' *'}
               />
-              <datalist id="visa-type-suggestions">
-                <option value="Tourist" />
-                <option value="Student" />
-                <option value="Work" />
-                <option value="Business" />
-                <option value="Transit" />
-                <option value="Family Reunion" />
-              </datalist>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -142,7 +142,7 @@ function ChatPageContent() {
   };
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
       {/* AI Context Chip - Shows what application AI is helping with */}
       {application && (
         <div className="shrink-0 border-b border-white/10 bg-white/[0.02] px-3 py-2 sm:px-4 lg:px-8">
@@ -190,13 +190,13 @@ function ChatPageContent() {
       )}
 
       {/* Messages Area - Scrollable container */}
-      <div 
-        ref={messagesContainerRef} 
-        className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-8" 
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-8"
         id="chat-messages"
         style={{ scrollBehavior: 'smooth' }}
       >
-        <div className="mx-auto max-w-5xl py-4 pb-24">
+        <div className="mx-auto max-w-5xl py-4 pb-32">
           {isLoading && messages.length === 0 ? (
             <div className="space-y-4">
               <div className="h-20 animate-pulse rounded-xl bg-white/5" />
@@ -242,7 +242,7 @@ function ChatPageContent() {
       )}
 
       {/* Input Area - Fixed at bottom */}
-      <div className="shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)]">
+      <div className="sticky bottom-0 left-0 right-0 z-30 shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
           <ChatInput
             value={input}

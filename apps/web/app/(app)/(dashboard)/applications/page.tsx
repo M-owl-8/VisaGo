@@ -161,6 +161,56 @@ export default function ApplicationsPage() {
       {/* Next Step Guidance - Dominant but not loud */}
       <NextStepGuidance applications={userApplications} />
 
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="glass-panel border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
+        >
+          <div className="mb-2 text-sm font-medium text-white/60">
+            {t('applications.metrics.active', 'Active applications')}
+          </div>
+          <div className="text-3xl font-bold text-white">{totalApplications}</div>
+          <div className="mt-2 text-xs text-white/40">
+            {t('applications.metrics.synced', 'Synced with mobile')}
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass-panel border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
+        >
+          <div className="mb-2 text-sm font-medium text-white/60">
+            {t('applications.metrics.documentsReady', 'Documents ready')}
+          </div>
+          <div className="text-3xl font-bold text-white">
+            {documentsReady.uploaded}/{documentsReady.required}
+          </div>
+          <div className="mt-2 text-xs text-white/40">
+            {t('applications.metrics.documentsLabel', 'Ready for upload')}
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="glass-panel border border-white/10 bg-white/[0.03] px-6 py-6 text-white"
+        >
+          <div className="mb-2 text-sm font-medium text-white/60">
+            {t('applications.metrics.avgProgress', 'Average progress')}
+          </div>
+          <div className="text-3xl font-bold text-white">{overallProgress}%</div>
+          <div className="mt-2 text-xs text-white/40">
+            {t('applications.metrics.progressHelper', 'Across all journeys')}
+          </div>
+        </motion.div>
+      </div>
+
       {/* Show onboarding for first-time users */}
       {totalApplications === 0 && !hasCompletedOnboarding && <OnboardingFlow />}
 
