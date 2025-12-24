@@ -697,16 +697,22 @@ async function startServer() {
     }
 
     // Get pool statistics
-    const poolStats = DatabasePoolService.getPoolStats();
-    process.stdout.write('\n📈 Database Pool Stats:\n');
-    process.stdout.write(`   - Status: ${poolStats.status}\n`);
-    process.stdout.write(`   - Total connections: ${poolStats.totalConnections}\n`);
-    process.stdout.write(`   - Idle connections: ${poolStats.idleConnections}\n`);
+    try {
+      const poolStats = DatabasePoolService.getPoolStats();
+      process.stdout.write('\n📈 Database Pool Stats:\n');
+      process.stdout.write(`   - Status: ${poolStats.status}\n`);
+      process.stdout.write(`   - Total connections: ${poolStats.totalConnections}\n`);
+      process.stdout.write(`   - Idle connections: ${poolStats.idleConnections}\n`);
+    } catch (error) {
+      process.stderr.write(`⚠️  Failed to get pool stats: ${error}\n`);
+    }
 
     process.stdout.write('\n✅ All services initialized successfully!\n\n');
 
-    // Start Express server
-    const server = app.listen(PORT, () => {
+    // Start Express server - explicitly bind to 0.0.0.0 for Railway/cloud deployments
+    process.stdout.write(`🚀 Starting server on port ${PORT}...\n`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      process.stdout.write(`✅ Server listening on 0.0.0.0:${PORT}\n`);
       // Initialize WebSocket server
       websocketService.initialize(server);
       process.stdout.write('✅ WebSocket server initialized on path /ws\n');
@@ -734,10 +740,31 @@ async function startServer() {
 ╚════════════════════════════════════════════════════════════╝
       \n`);
     });
+
+    // Handle server startup errors
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        process.stderr.write(`✗ Port ${PORT} is already in use\n`);
+      } else {
+        process.stderr.write(`✗ Server error: ${error.message}\n`);
+      }
+      process.exit(1);
+    });
   } catch (error) {
     process.stderr.write(`✗ Failed to start server: ${error}\n`);
-    await DatabasePoolService.close();
-    await prisma.$disconnect();
+    if (error instanceof Error) {
+      process.stderr.write(`   Error details: ${error.stack}\n`);
+    }
+    try {
+      await DatabasePoolService.close();
+    } catch (closeError) {
+      // Ignore close errors
+    }
+    try {
+      await prisma.$disconnect();
+    } catch (disconnectError) {
+      // Ignore disconnect errors
+    }
     process.exit(1);
   }
 }
