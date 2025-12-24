@@ -51,7 +51,9 @@ function ChatPageContent() {
   const [input, setInput] = useState('');
   const [lastFailedMessage, setLastFailedMessage] = useState<string>('');
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load chat history when component mounts or applicationId changes (last 100 messages)
   useEffect(() => {
@@ -69,20 +71,26 @@ function ChatPageContent() {
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
-      setShowScrollButton(!isNearBottom && messages.length > 3);
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 120;
+      setIsNearBottom(nearBottom);
+      setShowScrollButton(!nearBottom && messages.length > 3);
     };
 
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
   }, [messages.length]);
 
+  // Auto-scroll to bottom when new messages arrive (only if user is near bottom)
+  useEffect(() => {
+    if (isNearBottom && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [messages, isNearBottom]);
+
   const scrollToBottom = () => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      setIsNearBottom(true);
     }
   };
 
@@ -142,7 +150,7 @@ function ChatPageContent() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
+    <div className="flex h-full flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
       {/* AI Context Chip - Shows what application AI is helping with */}
       {application && (
         <div className="shrink-0 border-b border-white/10 bg-white/[0.02] px-3 py-2 sm:px-4 lg:px-8">
@@ -189,14 +197,13 @@ function ChatPageContent() {
         </div>
       )}
 
-      {/* Messages Area - Scrollable container */}
+      {/* Messages Area - Scrollable container (ONLY this scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-8"
+        className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-4 lg:px-8"
         id="chat-messages"
-        style={{ scrollBehavior: 'smooth' }}
       >
-        <div className="mx-auto max-w-5xl py-4 pb-32">
+        <div className="mx-auto max-w-5xl py-4">
           {isLoading && messages.length === 0 ? (
             <div className="space-y-4">
               <div className="h-20 animate-pulse rounded-xl bg-white/5" />
@@ -227,6 +234,8 @@ function ChatPageContent() {
           ) : (
             <ChatMessageList messages={messages} isLoading={false} isSending={isLoading} />
           )}
+          {/* Scroll anchor for auto-scroll */}
+          <div ref={messagesEndRef} className="h-4" />
         </div>
       </div>
 
@@ -241,8 +250,8 @@ function ChatPageContent() {
         </button>
       )}
 
-      {/* Input Area - Fixed at bottom */}
-      <div className="sticky bottom-0 left-0 right-0 z-30 shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom)]">
+      {/* Input Area - Pinned at bottom (not scrollable) */}
+      <div className="shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
           <ChatInput
             value={input}

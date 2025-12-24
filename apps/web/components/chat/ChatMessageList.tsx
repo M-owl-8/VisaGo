@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { Bot } from 'lucide-react';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { SkeletonList } from '@/components/ui/Skeleton';
@@ -13,13 +12,6 @@ interface ChatMessageListProps {
 }
 
 export function ChatMessageList({ messages, isLoading, isSending }: ChatMessageListProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isSending]);
-
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -51,7 +43,6 @@ export function ChatMessageList({ messages, isLoading, isSending }: ChatMessageL
           </div>
         </div>
       )}
-      <div ref={messagesEndRef} />
     </div>
   );
 }

@@ -178,27 +178,80 @@ export class VisaConversationOrchestratorService {
       // Step 4: Build user messages (history + current message)
       const messages = this.buildMessages(conversationHistory || [], message, chatContext);
 
-      // Step 5: Call chat model
+      // Step 5: Call chat model (prefer DeepSeek for assistant chat)
       const aiConfig = getAIConfig('chat');
-      const openaiClient = AIOpenAIService.getOpenAIClient();
+      const useDeepSeek = !!process.env.DEEPSEEK_API_KEY;
+      let primaryReply = 'I apologize, but I could not generate a response.';
+      let tokensUsed = 0;
+      let modelUsed = aiConfig.model;
 
-      logInfo('[VisaChatOrchestrator] Calling chat model', {
-        model: aiConfig.model,
-        messageLength: message.length,
-        contextSize: JSON.stringify(chatContext).length,
-      });
+      if (useDeepSeek) {
+        logInfo('[VisaChatOrchestrator] Calling DeepSeek chat model', {
+          messageLength: message.length,
+          contextSize: JSON.stringify(chatContext).length,
+        });
 
-      const chatResponse = await openaiClient.chat.completions.create({
-        model: aiConfig.model,
-        messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        temperature: aiConfig.temperature,
-        max_tokens: aiConfig.maxTokens,
-      });
+        try {
+          const { deepseekVisaChat } = await import('./deepseek');
+          type DeepSeekMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
-      const primaryReply =
-        chatResponse.choices[0]?.message?.content ||
-        'I apologize, but I could not generate a response.';
-      const tokensUsed = chatResponse.usage?.total_tokens || 0;
+          // Reuse built messages (includes context + trimmed history + current user message)
+          const deepSeekMessages: DeepSeekMessage[] = messages.map((m) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          }));
+
+          const dsResponse = await deepseekVisaChat(
+            deepSeekMessages,
+            systemPrompt,
+            userId,
+            chatContext.applicationId || undefined
+          );
+
+          primaryReply = dsResponse.message || primaryReply;
+          tokensUsed = dsResponse.tokensUsed || 0;
+          modelUsed = dsResponse.model || 'deepseek-ai/DeepSeek-R1';
+
+          logInfo('[VisaChatOrchestrator] DeepSeek reply generated', {
+            replyLength: primaryReply.length,
+            tokensUsed,
+            modelUsed,
+          });
+        } catch (err: any) {
+          logWarn('[VisaChatOrchestrator] DeepSeek failed, falling back to OpenAI', {
+            error: err?.message || String(err),
+          });
+        }
+      }
+
+      // Fallback to OpenAI if DeepSeek not available or failed
+      if (!useDeepSeek || primaryReply === 'I apologize, but I could not generate a response.') {
+        const openaiClient = AIOpenAIService.getOpenAIClient();
+
+        logInfo('[VisaChatOrchestrator] Calling chat model (OpenAI fallback)', {
+          model: aiConfig.model,
+          messageLength: message.length,
+          contextSize: JSON.stringify(chatContext).length,
+        });
+
+        const chatResponse = await openaiClient.chat.completions.create({
+          model: aiConfig.model,
+          messages: [{ role: 'system', content: systemPrompt }, ...messages],
+          temperature: aiConfig.temperature,
+          max_tokens: aiConfig.maxTokens,
+        });
+
+        primaryReply =
+          chatResponse.choices[0]?.message?.content ||
+          'I apologize, but I could not generate a response.';
+        tokensUsed = chatResponse.usage?.total_tokens || tokensUsed;
+        modelUsed = aiConfig.model;
+
+        logInfo('[VisaChatOrchestrator] Primary reply generated (OpenAI)', {
+          replyLength: primaryReply.length,
+          tokensUsed,
+        });
+      }
 
       logInfo('[VisaChatOrchestrator] Primary reply generated', {
         replyLength: primaryReply.length,
@@ -261,7 +314,7 @@ export class VisaConversationOrchestratorService {
         },
         sources: [],
         tokens_used: tokensUsed,
-        model: aiConfig.model,
+        model: modelUsed,
       };
 
       logInfo('[VisaChatOrchestrator] Response built', {
