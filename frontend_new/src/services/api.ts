@@ -1474,7 +1474,7 @@ class ApiClient {
           conversationHistory: transformedHistory,
         },
         {
-          timeout: 30000, // 30 seconds for AI responses
+          timeout: 60000, // 60 seconds - DeepSeek-R1 reasoning model needs more time (backend timeout is 45s)
         },
       );
 
