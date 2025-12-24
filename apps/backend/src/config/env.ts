@@ -38,6 +38,15 @@ const envSchema = z.object({
   // OpenAI (optional)
   OPENAI_API_KEY: z.string().optional(),
 
+  // Together / Ketdik (optional but required for Ketdik routing)
+  TOGETHER_API_KEY: z.string().optional(),
+  TOGETHER_BASE_URL: z.string().url().default('https://api.together.ai/v1').optional(),
+  KETDIK_MODEL_ID: z
+    .string()
+    .default('murodbekshamsid_9585/DeepSeek-R1-ketdik-r1-v1-9cf6dce1')
+    .optional(),
+  KETDIK_TIMEOUT_MS: z.string().regex(/^\d+$/).transform(Number).default('20000').optional(),
+
   // OCR Configuration (optional)
   OCR_PROVIDER: z
     .enum(['tesseract', 'google_vision', 'aws_textract', 'azure'])

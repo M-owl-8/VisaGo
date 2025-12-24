@@ -57,6 +57,7 @@ import docCheckRoutes from './routes/doc-check';
 import internalRoutes from './routes/internal';
 import devRoutes from './routes/dev';
 import metaRoutes from './routes/meta';
+import ketdikRoutes from './routes/ketdik';
 import { websocketService } from './services/websocket.service';
 
 // Load environment variables
@@ -297,6 +298,8 @@ app.use('/api/document-checklist', documentChecklistRoutes);
 app.use('/api/doc-check', docCheckRoutes);
 // Meta endpoints (countries list, etc.)
 app.use('/api/meta', metaRoutes);
+// Ketdik assistant (document instruction-only)
+app.use('/api/assistant', ketdikRoutes);
 // Chat routes with user-level rate limiting and cost tracking
 // NOTE: chatRateLimitMiddleware must run AFTER authentication (which is in chatRoutes)
 // So we apply it inside the chatRoutes router, not here

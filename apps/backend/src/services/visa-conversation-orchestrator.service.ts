@@ -32,6 +32,8 @@ import {
   buildCanonicalCountryContext,
   assertCountryConsistency,
 } from '../config/country-registry';
+import { isKetdikInstructionIntent } from './ketdik/ketdik.intent';
+import { getKetdikInstruction } from './ketdik/ketdik.service';
 
 const prisma = new PrismaClient();
 
@@ -171,6 +173,65 @@ export class VisaConversationOrchestratorService {
 
       // Step 2: Build comprehensive context
       const chatContext = await this.buildChatContext(userId, activeApplicationId);
+
+      // Step 2.5: Route Ketdik document-instruction intents to specialized model
+      if (isKetdikInstructionIntent(message)) {
+        logInfo('[VisaChatOrchestrator] Routed to Ketdik (document instructions)', {
+          userId,
+          applicationId: chatContext.applicationId,
+          countryCode: chatContext.countryCode,
+          visaType: chatContext.visaType,
+        });
+
+        try {
+          const ketdikResult = await getKetdikInstruction({
+            message,
+            language: undefined,
+            country: chatContext.countryName || chatContext.countryCode,
+            visaType: chatContext.visaType,
+            userId,
+            applicationId: chatContext.applicationId,
+          });
+
+          logChat({
+            userId,
+            applicationId: chatContext.applicationId,
+            countryCode: chatContext.countryCode,
+            visaType: chatContext.visaType,
+            visaCategory: chatContext.visaCategory,
+            messageLength: message.length,
+            replyLength: ketdikResult.answer.length,
+            tokensUsed: 0,
+            selfCheckPassed: true,
+            selfCheckFlags: ketdikResult.usedFallback ? ['KETDIK_FALLBACK'] : [],
+            riskLevel: chatContext.riskLevel,
+            riskDrivers: chatContext.riskDrivers,
+            hasVisaRuleSet: chatContext.officialRulesSummary?.hasRules,
+            hasCountryPlaybook: chatContext.playbookSummary?.hasPlaybook,
+          });
+
+          return {
+            reply: ketdikResult.answer,
+            applicationId: chatContext.applicationId,
+            countryCode: chatContext.countryCode,
+            visaType: chatContext.visaType,
+            visaCategory: chatContext.visaCategory,
+            riskLevel: chatContext.riskLevel,
+            riskDrivers: chatContext.riskDrivers,
+            selfCheck: {
+              passed: true,
+              flags: ketdikResult.usedFallback ? ['KETDIK_FALLBACK'] : [],
+            },
+            sources: [],
+            tokens_used: 0,
+            model: ketdikResult.model,
+          };
+        } catch (ketdikError: any) {
+          logWarn('[VisaChatOrchestrator] Ketdik handling failed, continuing with default flow', {
+            error: ketdikError?.message || String(ketdikError),
+          });
+        }
+      }
 
       // Step 3: Build system prompt with context
       const systemPrompt = this.buildSystemPrompt(chatContext);
