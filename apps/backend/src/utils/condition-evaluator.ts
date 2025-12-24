@@ -133,31 +133,31 @@ function getFieldValue(
     // Legacy support for nested path (for backward compatibility)
     case 'riskScore.level':
       return riskScore?.level;
-    // Employment fields (from employment object)
+    // Employment fields (currentStatus is at top level, not in employment object)
     case 'employmentStatus':
-      return profile.employment?.currentStatus || profile.currentStatus;
+      return profile.currentStatus;
     case 'hasStableIncome':
-      // Check if employment has stable income or if isEmployed is true
-      return profile.employment?.hasStableIncome ?? profile.isEmployed;
-    // Financial fields (from financial object)
+      // Check if isEmployed is true (stable income indicator)
+      return profile.isEmployed ?? false;
+    // Financial fields (isSponsored derived from sponsorType)
     case 'isSponsored':
-      // Check if sponsorType is not 'self' or if financial.isSponsored is true
-      return profile.financial?.isSponsored ?? profile.sponsorType !== 'self';
-    // Business module fields (from questionnaire modules)
+      // Check if sponsorType is not 'self'
+      return profile.sponsorType !== 'self';
+    // Business module fields (from questionnaire modules - optional)
     case 'hasBusinessInvitation':
       return profile.businessModule?.invitationFromCompany ?? false;
-    // Work module fields (from questionnaire modules)
+    // Work module fields (from questionnaire modules - optional)
     case 'hasWorkPermit':
       return profile.workModule?.hasWorkPermit ?? false;
-    // Student module fields (from questionnaire modules)
+    // Student module fields (from questionnaire modules - optional)
     case 'hasAdmissionLetter':
       return profile.studentModule?.hasAdmissionLetter ?? profile.hasUniversityInvitation;
-    // Family module fields (from questionnaire modules)
+    // Family module fields (from questionnaire modules - optional)
     case 'hasInvitationLetter':
       return profile.familyModule?.hasInvitationLetter ?? profile.hasOtherInvitation;
     case 'willSponsor':
       return profile.familyModule?.willSponsor ?? false;
-    // Transit module fields (from questionnaire modules)
+    // Transit module fields (from questionnaire modules - optional)
     case 'hasOnwardTicket':
       return profile.transitModule?.onwardTicket ?? false;
     default:

@@ -392,6 +392,48 @@ export interface CanonicalAIUserContext {
       hasFlightBooking: boolean;
       hasHotelBookingOrAccommodation: boolean;
     };
+
+    // Visa-type specific modules (optional - from QuestionnaireV2)
+    studentModule?: {
+      schoolName?: string;
+      acceptanceStatus?: 'accepted' | 'applied' | 'not_applied';
+      programStartDate?: string;
+      tuitionAmountUSD?: number | null;
+      tuitionPaidStatus?: 'paid' | 'partial' | 'unpaid';
+      scholarship?: boolean;
+      accommodationType?: 'dorm' | 'private' | 'host';
+      hasAdmissionLetter?: boolean;
+      previousEducationDocs?: boolean;
+    };
+    workModule?: {
+      employerName?: string;
+      position?: string;
+      contractType?: 'permanent' | 'contract' | 'probation';
+      salaryMonthlyUSD?: number | null;
+      sponsorshipStatus?: 'employer_sponsored' | 'not_sponsored';
+      hasWorkPermit?: boolean;
+      yearsOfExperience?: number | null;
+      professionalLicenses?: boolean;
+    };
+    familyModule?: {
+      inviterRelationship?: 'spouse' | 'parent' | 'sibling' | 'relative' | 'friend';
+      inviterResidencyStatus?: 'citizen' | 'pr' | 'work_permit' | 'student' | 'other';
+      hasInvitationLetter?: boolean;
+      willHost?: boolean;
+      willSponsor?: boolean;
+    };
+    businessModule?: {
+      companyName?: string;
+      invitationFromCompany?: boolean;
+      eventType?: string;
+      eventDatesKnown?: boolean;
+      funding?: 'company' | 'self';
+    };
+    transitModule?: {
+      onwardTicket?: boolean;
+      layoverHours?: number | null;
+      finalDestinationVisa?: 'yes' | 'no' | 'not_required';
+    };
   };
 
   // ✅ REQUIRED - Always present
