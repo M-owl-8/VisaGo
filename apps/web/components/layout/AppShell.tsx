@@ -78,8 +78,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase();
 
+  const isChat = pathname === '/chat';
+
   return (
-    <div className="relative flex min-h-full flex-col overflow-hidden bg-background text-white">
+    <div className={cn(
+      "relative flex flex-col overflow-hidden bg-background text-white",
+      isChat ? "h-[100dvh]" : "min-h-full"
+    )}>
       <div className="pointer-events-none absolute inset-0 z-0 opacity-70">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(62,166,255,0.15),transparent_60%),radial-gradient(circle_at_80%_0%,rgba(13,25,56,0.7),transparent_40%)]" />
         <div className="blur-[180px] opacity-40 absolute right-[-10%] top-[-5%] h-72 w-72 rounded-full bg-primary animate-blob" />

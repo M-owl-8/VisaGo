@@ -8,17 +8,20 @@ import { useEffect } from 'react';
  * only the message list scrolls.
  */
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
-  // Lock body scroll when on chat page
+  // Lock body and html scroll when on chat page
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const previousHeight = document.body.style.height;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyHeight = document.body.style.height;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
     
     document.body.style.overflow = 'hidden';
     document.body.style.height = '100dvh';
+    document.documentElement.style.overflow = 'hidden';
     
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.height = previousHeight;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.height = prevBodyHeight;
+      document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, []);
 
