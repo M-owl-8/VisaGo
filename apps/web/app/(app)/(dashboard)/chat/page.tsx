@@ -150,7 +150,7 @@ function ChatPageContent() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-background via-background to-midnight overflow-hidden">
       {/* AI Context Chip - Shows what application AI is helping with */}
       {application && (
         <div className="shrink-0 border-b border-white/10 bg-white/[0.02] px-3 py-2 sm:px-4 lg:px-8">
@@ -251,7 +251,7 @@ function ChatPageContent() {
       )}
 
       {/* Input Area - Pinned at bottom (not scrollable) */}
-      <div className="shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="relative z-40 shrink-0 border-t border-white/10 bg-gradient-to-t from-midnight/95 to-background/95 backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-4 lg:px-8">
           <ChatInput
             value={input}

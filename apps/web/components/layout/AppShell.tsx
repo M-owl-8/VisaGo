@@ -293,7 +293,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </nav>
 
-      <main id="main-content" className="relative z-10 flex-1" role="main">
+      <main id="main-content" className={cn("relative z-10 flex-1", pathname === '/chat' && "overflow-hidden")} role="main">
         {children}
       </main>
 
