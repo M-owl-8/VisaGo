@@ -14,11 +14,11 @@ import { logInfo, logWarn, logError } from '../middleware/logger';
  */
 
 const TOGETHER_API_URL = 'https://api.together.xyz/v1/chat/completions';
-// HIGH PRIORITY FIX: 15 second timeout ensures fast AI assistant responses
-// This prevents 40-60 second hangs that make the app feel unresponsive
-const REQUEST_TIMEOUT_MS = 15000; // 15 seconds (optimized for speed)
-const MAX_COMPLETION_TOKENS = 500; // Bounded response length
-const TEMPERATURE = 0.5; // Lower temperature for more focused responses
+// DeepSeek-R1 is a reasoning model that requires more time for thoughtful responses
+// Increased timeout to 45 seconds to accommodate reasoning process
+const REQUEST_TIMEOUT_MS = 45000; // 45 seconds (DeepSeek-R1 needs time for reasoning)
+const MAX_COMPLETION_TOKENS = 2000; // Increased for more complete responses
+const TEMPERATURE = 0.7; // Slightly higher for more natural conversation
 
 if (!process.env.DEEPSEEK_API_KEY) {
   console.warn('⚠️ DEEPSEEK_API_KEY is not set in environment variables.');
