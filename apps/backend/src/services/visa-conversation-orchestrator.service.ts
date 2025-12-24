@@ -239,53 +239,20 @@ export class VisaConversationOrchestratorService {
       // Step 4: Build user messages (history + current message)
       const messages = this.buildMessages(conversationHistory || [], message, chatContext);
 
-      // Step 5: Call chat model (prefer DeepSeek for assistant chat)
+      // Step 5: Call chat model
+      // NOTE: DeepSeek-R1 base model is disabled for general chat due to timeout issues.
+      // Document instruction questions are routed to Ketdik (fine-tuned) above.
+      // For general chat, use GPT-4o-mini directly for reliability.
       const aiConfig = getAIConfig('chat');
-      const useDeepSeek = !!process.env.DEEPSEEK_API_KEY;
       let primaryReply = 'I apologize, but I could not generate a response.';
       let tokensUsed = 0;
       let modelUsed = aiConfig.model;
 
-      if (useDeepSeek) {
-        logInfo('[VisaChatOrchestrator] Calling DeepSeek chat model', {
-          messageLength: message.length,
-          contextSize: JSON.stringify(chatContext).length,
-        });
+      // Skip DeepSeek-R1 base model for general chat (it times out frequently)
+      // Ketdik (fine-tuned DeepSeek) handles document instructions via routing above
+      const useDeepSeek = false; // Disabled: DeepSeek-R1 base model times out
 
-        try {
-          const { deepseekVisaChat } = await import('./deepseek');
-          type DeepSeekMessage = { role: 'system' | 'user' | 'assistant'; content: string };
-
-          // Reuse built messages (includes context + trimmed history + current user message)
-          const deepSeekMessages: DeepSeekMessage[] = messages.map((m) => ({
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-          }));
-
-          const dsResponse = await deepseekVisaChat(
-            deepSeekMessages,
-            systemPrompt,
-            userId,
-            chatContext.applicationId || undefined
-          );
-
-          primaryReply = dsResponse.message || primaryReply;
-          tokensUsed = dsResponse.tokensUsed || 0;
-          modelUsed = dsResponse.model || 'deepseek-ai/DeepSeek-R1';
-
-          logInfo('[VisaChatOrchestrator] DeepSeek reply generated', {
-            replyLength: primaryReply.length,
-            tokensUsed,
-            modelUsed,
-          });
-        } catch (err: any) {
-          logWarn('[VisaChatOrchestrator] DeepSeek failed, falling back to OpenAI', {
-            error: err?.message || String(err),
-          });
-        }
-      }
-
-      // Fallback to OpenAI if DeepSeek not available or failed
+      // Fallback to OpenAI for general chat (GPT-4o-mini)
       if (!useDeepSeek || primaryReply === 'I apologize, but I could not generate a response.') {
         const openaiClient = AIOpenAIService.getOpenAIClient();
 
