@@ -94,6 +94,80 @@ export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
 export type ChecklistResponse = z.infer<typeof ChecklistResponseSchema>;
 
 /**
+ * Embassy content cache (in-memory, 5 minute TTL)
+ * Reduces database queries for frequently accessed embassy content
+ */
+interface EmbassyCacheEntry {
+  content: string;
+  expires: number;
+}
+
+const embassyCache = new Map<string, EmbassyCacheEntry>();
+const EMBASSY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Get cached embassy content or fetch from database
+ */
+async function getEmbassyContent(countryCode: string, visaType: string): Promise<string | null> {
+  const cacheKey = `${countryCode.toUpperCase()}-${visaType.toLowerCase()}`;
+  const cached = embassyCache.get(cacheKey);
+
+  // Return cached content if still valid
+  if (cached && cached.expires > Date.now()) {
+    return cached.content;
+  }
+
+  // Fetch from database
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+
+    const source = await prisma.embassySource.findFirst({
+      where: {
+        countryCode: countryCode.toUpperCase(),
+        visaType: visaType.toLowerCase(),
+        isActive: true,
+      },
+      include: {
+        pageContents: {
+          where: { status: 'success' },
+          orderBy: { fetchedAt: 'desc' },
+          take: 3,
+        },
+      },
+    });
+
+    await prisma.$disconnect();
+
+    if (source?.pageContents && source.pageContents.length > 0) {
+      const combinedText = source.pageContents
+        .map((page) => page.cleanedText || '')
+        .join('\n\n')
+        .substring(0, 2000);
+
+      if (combinedText.length > 0) {
+        // Cache the result
+        embassyCache.set(cacheKey, {
+          content: combinedText,
+          expires: Date.now() + EMBASSY_CACHE_TTL_MS,
+        });
+
+        return combinedText;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    logWarn('[VisaChecklistEngine] Could not fetch embassy content', {
+      error: error instanceof Error ? error.message : String(error),
+      countryCode,
+      visaType,
+    });
+    return null;
+  }
+}
+
+/**
  * Visa Checklist Engine Service
  */
 export class VisaChecklistEngineService {
@@ -253,31 +327,15 @@ export class VisaChecklistEngineService {
           ? 'student'
           : 'tourist';
       const playbook = getCountryVisaPlaybook(normalizedCountryCode, visaCategory);
-      try {
-        const { PrismaClient } = await import('@prisma/client');
-        const prisma = new PrismaClient();
-        const source = await prisma.embassySource.findFirst({
-          where: {
-            countryCode: normalizedCountryCode,
-            visaType: visaType.toLowerCase(),
-            isActive: true,
-          },
-          include: {
-            pageContents: {
-              where: { status: 'success' },
-              orderBy: { fetchedAt: 'desc' },
-              take: 1,
-            },
-          },
-        });
-        if (source?.pageContents?.[0]?.cleanedText) {
-          embassySummary = source.pageContents[0].cleanedText.substring(0, 1000);
-        }
-        await prisma.$disconnect();
-      } catch (error) {
-        // Embassy summary is optional, continue without it
-        logWarn('[VisaChecklistEngine] Could not fetch embassy summary', {
-          error: error instanceof Error ? error.message : String(error),
+
+      // Fetch embassy content with caching (reduces database queries)
+      const embassyContent = await getEmbassyContent(normalizedCountryCode, visaType);
+      if (embassyContent) {
+        embassySummary = embassyContent;
+        logInfo('[VisaChecklistEngine] Using embassy content (cached or fresh)', {
+          countryCode: normalizedCountryCode,
+          visaType,
+          textLength: embassyContent.length,
         });
       }
 

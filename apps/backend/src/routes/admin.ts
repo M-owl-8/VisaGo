@@ -8,6 +8,7 @@ import { VisaRulesService } from '../services/visa-rules.service';
 import { EmbassySourceService } from '../services/embassy-source.service';
 import { EmbassySyncJobService } from '../services/embassy-sync-job.service';
 import { EmbassySyncSchedulerService } from '../services/embassy-sync-scheduler.service';
+import { EvaluationService } from '../services/evaluation.service';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -1402,6 +1403,84 @@ router.get(
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to fetch AI interactions',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/evaluation/metrics
+ * Get evaluation metrics and recent results (cached or from last run)
+ */
+router.get(
+  '/evaluation/metrics',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      // For now, return empty state if no cases exist
+      // In the future, could cache results in database
+      const cases = EvaluationService.loadEvaluationCases();
+
+      if (cases.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            metrics: null,
+            results: [],
+            message: 'No evaluation cases found. Please add cases to evaluation/cases.json',
+          },
+        });
+      }
+
+      // Run evaluation to get current metrics
+      const { results, metrics } = await EvaluationService.runEvaluationSuite();
+
+      res.json({
+        success: true,
+        data: {
+          metrics,
+          results: results.slice(0, 50), // Return top 50 results
+        },
+      });
+    } catch (error: any) {
+      console.error('[AdminRoute] Error fetching evaluation metrics:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch evaluation metrics',
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/evaluation/run
+ * Run evaluation and return metrics
+ */
+router.post(
+  '/evaluation/run',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      // Run full evaluation suite
+      const { results, metrics } = await EvaluationService.runEvaluationSuite();
+
+      // Save results (for future tracking)
+      await EvaluationService.saveEvaluationResults(results, metrics);
+
+      res.json({
+        success: true,
+        data: {
+          metrics,
+          results: results.slice(0, 50), // Return top 50 results
+        },
+      });
+    } catch (error: any) {
+      console.error('[AdminRoute] Error running evaluation:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to run evaluation',
       });
     }
   }

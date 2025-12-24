@@ -210,5 +210,109 @@ describe('Condition Evaluator', () => {
       expect(evaluateCondition('sponsorType = self', context)).toBe('unknown'); // Missing ===
     });
   });
+
+  describe('New condition fields (Track B enhancements)', () => {
+    it('should evaluate employmentStatus field', () => {
+      const context = createMockContext({
+        currentStatus: 'employed',
+        isEmployed: true,
+        employment: {
+          currentStatus: 'employed',
+        },
+      });
+      expect(evaluateCondition('employmentStatus === \'employed\'', context)).toBe(true);
+    });
+
+    it('should evaluate hasStableIncome field', () => {
+      const context = createMockContext({
+        isEmployed: true,
+        employment: {
+          hasStableIncome: true,
+        },
+      });
+      expect(evaluateCondition('hasStableIncome === true', context)).toBe(true);
+    });
+
+    it('should evaluate isSponsored field', () => {
+      const context = createMockContext({
+        sponsorType: 'parent',
+        financial: {
+          isSponsored: true,
+        },
+      });
+      expect(evaluateCondition('isSponsored === true', context)).toBe(true);
+    });
+
+    it('should evaluate hasBusinessInvitation field', () => {
+      const context = createMockContext({
+        businessModule: {
+          invitationFromCompany: true,
+        },
+      });
+      expect(evaluateCondition('hasBusinessInvitation === true', context)).toBe(true);
+    });
+
+    it('should evaluate hasWorkPermit field', () => {
+      const context = createMockContext({
+        workModule: {
+          hasWorkPermit: true,
+        },
+      });
+      expect(evaluateCondition('hasWorkPermit === true', context)).toBe(true);
+    });
+
+    it('should evaluate hasAdmissionLetter field', () => {
+      const context = createMockContext({
+        hasUniversityInvitation: true,
+        studentModule: {
+          hasAdmissionLetter: true,
+        },
+      });
+      expect(evaluateCondition('hasAdmissionLetter === true', context)).toBe(true);
+    });
+
+    it('should evaluate hasInvitationLetter field', () => {
+      const context = createMockContext({
+        hasOtherInvitation: true,
+        familyModule: {
+          hasInvitationLetter: true,
+        },
+      });
+      expect(evaluateCondition('hasInvitationLetter === true', context)).toBe(true);
+    });
+
+    it('should evaluate willSponsor field', () => {
+      const context = createMockContext({
+        familyModule: {
+          willSponsor: true,
+        },
+      });
+      expect(evaluateCondition('willSponsor === true', context)).toBe(true);
+    });
+
+    it('should evaluate hasOnwardTicket field', () => {
+      const context = createMockContext({
+        transitModule: {
+          onwardTicket: true,
+        },
+      });
+      expect(evaluateCondition('hasOnwardTicket === true', context)).toBe(true);
+    });
+
+    it('should return unknown for missing module fields', () => {
+      const context = createMockContext();
+      // No businessModule, so should return unknown
+      expect(evaluateCondition('hasBusinessInvitation === true', context)).toBe('unknown');
+    });
+
+    it('should handle fallback for isSponsored when sponsorType is not self', () => {
+      const context = createMockContext({
+        sponsorType: 'parent',
+        // No financial module
+      });
+      // Should fallback to checking sponsorType !== 'self'
+      expect(evaluateCondition('isSponsored === true', context)).toBe(true);
+    });
+  });
 });
 

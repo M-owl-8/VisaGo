@@ -12,7 +12,8 @@ import {
   Activity,
   Brain,
   Settings,
-  ChevronRight
+  ChevronRight,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { LucideIcon } from 'lucide-react';
@@ -34,6 +35,8 @@ const navItems: NavItem[] = [
   { href: '/admin/payments', labelKey: 'admin.payments', labelDefault: 'Payments', icon: CreditCard },
   { href: '/admin/documents', labelKey: 'admin.documents', labelDefault: 'Documents', icon: FileCheck },
   { href: '/admin/analytics', labelKey: 'admin.analytics', labelDefault: 'Analytics', icon: BarChart3 },
+  { href: '/admin/checklist-stats', labelKey: 'admin.checklistStats', labelDefault: 'Checklist Stats', icon: FileCheck },
+  { href: '/admin/evaluation', labelKey: 'admin.evaluation', labelDefault: 'Evaluation', icon: ClipboardCheck },
   { href: '/admin/activity-logs', labelKey: 'admin.activityLogs', labelDefault: 'Activity Logs', icon: Activity },
   { href: '/admin/ai-interactions', labelKey: 'admin.aiInteractions', labelDefault: 'AI Interactions', icon: Brain },
   { href: '/admin/visa-rules', labelKey: 'admin.visaRules', labelDefault: 'Visa Rules', icon: Settings },
