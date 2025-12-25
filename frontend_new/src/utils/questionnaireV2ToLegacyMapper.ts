@@ -25,6 +25,16 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
   maritalStatus: string;
   hasChildren: string;
   englishLevel: string;
+  tripDurationDays?: number | null;
+  travelHistoryLevel?: string;
+  hasOverstay?: boolean;
+  sponsorRelationship?: string;
+  contact?: QuestionnaireV2['contact'];
+  studentModule?: QuestionnaireV2['studentModule'];
+  workModule?: QuestionnaireV2['workModule'];
+  familyModule?: QuestionnaireV2['familyModule'];
+  businessModule?: QuestionnaireV2['businessModule'];
+  transitModule?: QuestionnaireV2['transitModule'];
 } {
   // Map visaType to purpose
   const purpose = v2.visaType === 'student' ? 'study' : 'tourism';
@@ -32,13 +42,24 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
   // Map targetCountry to country (use code directly, backend can handle it)
   const country = v2.targetCountry;
 
-  // Map duration category to legacy duration format
-  const durationMap: Record<string, string> = {
-    up_to_30_days: '1_3_months', // Approximate mapping
-    '31_90_days': '3_6_months',
-    more_than_90_days: '6_12_months',
+  // Map duration to legacy format: prefer exact tripDurationDays, fallback to durationCategory
+  const mapDuration = (): string => {
+    if (typeof v2.travel?.tripDurationDays === 'number') {
+      const days = v2.travel.tripDurationDays;
+      if (days <= 30) return '1_3_months';
+      if (days <= 90) return '3_6_months';
+      if (days <= 180) return '3_6_months';
+      if (days <= 365) return '6_12_months';
+      return '6_12_months';
+    }
+    const durationMap: Record<string, string> = {
+      up_to_30_days: '1_3_months',
+      '31_90_days': '3_6_months',
+      more_than_90_days: '6_12_months',
+    };
+    return durationMap[v2.travel?.durationCategory || ''] || '3_6_months';
   };
-  const duration = durationMap[v2.travel.durationCategory] || '3_6_months';
+  const duration = mapDuration();
 
   // Map current status
   const currentStatusMap: Record<string, string> = {
@@ -90,5 +111,15 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
     maritalStatus,
     hasChildren,
     englishLevel,
+    tripDurationDays: v2.travel.tripDurationDays,
+    travelHistoryLevel: v2.history.travelHistoryLevel,
+    hasOverstay: v2.history.hasOverstay,
+    sponsorRelationship: v2.finance.sponsorRelationship,
+    contact: v2.contact,
+    studentModule: v2.studentModule,
+    workModule: v2.workModule,
+    familyModule: v2.familyModule,
+    businessModule: v2.businessModule,
+    transitModule: v2.transitModule,
   };
 }

@@ -11,7 +11,8 @@ import {useNetworkStore} from '../store/network';
 import {logError, logMessage, addBreadcrumb} from './errorLogger';
 
 // Fallback URLs (matching constants.ts)
-const FALLBACK_API_URL = 'https://visago-production.up.railway.app';
+// Production defaults (used when env vars are missing)
+const FALLBACK_API_URL = 'https://visabuddy-backend-production.up.railway.app';
 const FALLBACK_AI_SERVICE_URL =
   'https://zippy-perfection-production.up.railway.app';
 const DEV_FALLBACK_API_URL = 'http://localhost:3000';

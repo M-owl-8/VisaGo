@@ -31,8 +31,8 @@ import {mapQuestionnaireV2ToLegacy} from '../../utils/questionnaireV2ToLegacyMap
 
 const TOTAL_STEPS = 10;
 
-// Supported countries mapping (code from backend matches TargetCountry)
-const SUPPORTED_COUNTRIES: Array<{
+// Fallback list shown only if backend country list is empty
+const FALLBACK_COUNTRIES: Array<{
   code: TargetCountry;
   name: string;
   flag: string;
@@ -51,7 +51,8 @@ export default function QuestionnaireV2Screen({navigation}: any) {
   const {t, i18n} = useTranslation();
   const language = i18n.language || 'en';
   const {user, updateProfile} = useAuthStore();
-  const {countries, fetchCountries, isLoadingCountries} = useVisaStore();
+  const {countries, filteredCountries, fetchCountries, isLoadingCountries} =
+    useVisaStore();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -423,19 +424,38 @@ export default function QuestionnaireV2Screen({navigation}: any) {
         {t('questionnaireV2.step0.country')}
       </Text>
       <View style={styles.optionsGrid}>
-        {SUPPORTED_COUNTRIES.map(country => (
-          <TouchableOpacity
-            key={country.code}
-            style={[
-              styles.optionCard,
-              formData.targetCountry === country.code &&
-                styles.optionCardSelected,
-            ]}
-            onPress={() => updateFormData('targetCountry', country.code)}>
-            <Text style={styles.optionEmoji}>{country.flag}</Text>
-            <Text style={styles.optionText}>{country.name}</Text>
-          </TouchableOpacity>
-        ))}
+        {(filteredCountries.length > 0 ? filteredCountries : countries).length >
+        0
+          ? (filteredCountries.length > 0 ? filteredCountries : countries).map(
+              country => (
+                <TouchableOpacity
+                  key={country.code}
+                  style={[
+                    styles.optionCard,
+                    formData.targetCountry === country.code &&
+                      styles.optionCardSelected,
+                  ]}
+                  onPress={() => updateFormData('targetCountry', country.code)}>
+                  <Text style={styles.optionEmoji}>
+                    {country.flagEmoji || '🌍'}
+                  </Text>
+                  <Text style={styles.optionText}>{country.name}</Text>
+                </TouchableOpacity>
+              ),
+            )
+          : FALLBACK_COUNTRIES.map(country => (
+              <TouchableOpacity
+                key={country.code}
+                style={[
+                  styles.optionCard,
+                  formData.targetCountry === country.code &&
+                    styles.optionCardSelected,
+                ]}
+                onPress={() => updateFormData('targetCountry', country.code)}>
+                <Text style={styles.optionEmoji}>{country.flag}</Text>
+                <Text style={styles.optionText}>{country.name}</Text>
+              </TouchableOpacity>
+            ))}
       </View>
 
       <Text style={[styles.fieldLabel, {marginTop: 24}]}>

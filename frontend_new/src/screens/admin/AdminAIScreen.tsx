@@ -69,7 +69,6 @@ export default function AdminAIScreen() {
       if (filters.success) params.success = filters.success === 'true';
       if (filters.dateFrom) params.dateFrom = filters.dateFrom;
       if (filters.dateTo) params.dateTo = filters.dateTo;
-      if (filters.taskType) params.userId = filters.taskType; // Reuse for userId filter
 
       const response = await adminApi.getAIInteractions(params);
       setInteractions(response.data || []);

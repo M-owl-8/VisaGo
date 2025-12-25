@@ -11,3 +11,6 @@ export {default as AdminActivityLogsScreen} from './AdminActivityLogsScreen';
 export {default as AdminAIScreen} from './AdminAIScreen';
 export {default as AdminChecklistStatsScreen} from './AdminChecklistStatsScreen';
 export {default as AdminVisaRulesScreen} from './AdminVisaRulesScreen';
+export {default as AdminVisaRuleDetailScreen} from './AdminVisaRuleDetailScreen';
+export {default as AdminVisaRuleCandidatesScreen} from './AdminVisaRuleCandidatesScreen';
+export {default as AdminVisaRuleCandidateDetailScreen} from './AdminVisaRuleCandidateDetailScreen';

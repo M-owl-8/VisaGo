@@ -102,7 +102,7 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   filteredCountries: [],
 
   // Fetch all countries
-  // IMPORTANT: Always fetch ALL countries (no limit). The questionnaire must show all 8 destination countries.
+  // IMPORTANT: Always fetch ALL countries (no artificial limit). Questionnaire must show full backend list.
   fetchCountries: async (search?: string) => {
     try {
       set({isLoadingCountries: true});
@@ -125,17 +125,9 @@ export const useVisaStore = create<VisaState>((set, get) => ({
       }
 
       // No search: Load ALL countries into both master list and filtered list
-      // This ensures the questionnaire always has access to all 8 countries
-      // HIGH PRIORITY FIX: Verify we have all 8 countries - log warning if not
-      if (countries.length < 8) {
-        console.warn(
-          '[VisaStore] Expected 8 countries, but received:',
-          countries.length,
-          'countries',
-        );
-      }
+      // This ensures the questionnaire always has access to the full destination list
       set({
-        countries, // Master list: ALL countries from backend (should be 8)
+        countries, // Master list: ALL countries from backend
         filteredCountries: countries, // Display list: ALL countries (no filter applied)
       });
     } catch (error) {
@@ -182,7 +174,7 @@ export const useVisaStore = create<VisaState>((set, get) => ({
   },
 
   // Update search query - filters locally and triggers API call if needed
-  // IMPORTANT: When search is cleared, show ALL countries (all 8). Never limit to 5.
+  // IMPORTANT: When search is cleared, show ALL countries. Never limit.
   setSearchQuery: async (query: string) => {
     set({searchQuery: query});
     const {countries} = get();
@@ -190,7 +182,7 @@ export const useVisaStore = create<VisaState>((set, get) => ({
     // If we have countries, filter locally first for instant feedback
     if (countries.length > 0) {
       if (!query || !query.trim()) {
-        // No search query: show ALL countries (all 8 destination countries)
+        // No search query: show ALL countries
         set({filteredCountries: countries});
       } else {
         // Search query: filter by name or code, but show ALL matching results (no limit)

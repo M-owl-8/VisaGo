@@ -12,6 +12,9 @@ import {
   AdminActivityLogsScreen,
   AdminAIScreen,
   AdminChecklistStatsScreen,
+  AdminVisaRuleDetailScreen,
+  AdminVisaRuleCandidatesScreen,
+  AdminVisaRuleCandidateDetailScreen,
 } from '../screens/admin';
 
 export type AdminStackParamList = {
@@ -26,6 +29,9 @@ export type AdminStackParamList = {
   AdminActivityLogs: undefined;
   AdminAI: undefined;
   AdminChecklistStats: undefined;
+  AdminVisaRuleDetail: {ruleId: string};
+  AdminVisaRuleCandidates: undefined;
+  AdminVisaRuleCandidateDetail: {candidateId: string};
 };
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -90,6 +96,21 @@ const AdminNavigator: React.FC = () => {
         name="AdminVisaRules"
         component={AdminVisaRulesScreen}
         options={{title: 'Visa Rules'}}
+      />
+      <Stack.Screen
+        name="AdminVisaRuleDetail"
+        component={AdminVisaRuleDetailScreen}
+        options={{title: 'Visa Rule Detail'}}
+      />
+      <Stack.Screen
+        name="AdminVisaRuleCandidates"
+        component={AdminVisaRuleCandidatesScreen}
+        options={{title: 'Visa Rule Candidates'}}
+      />
+      <Stack.Screen
+        name="AdminVisaRuleCandidateDetail"
+        component={AdminVisaRuleCandidateDetailScreen}
+        options={{title: 'Candidate Detail'}}
       />
       <Stack.Screen
         name="AdminActivityLogs"

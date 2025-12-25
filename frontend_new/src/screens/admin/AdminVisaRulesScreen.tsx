@@ -66,7 +66,11 @@ export default function AdminVisaRulesScreen() {
       if (visaTypeFilter) params.visaType = visaTypeFilter.toLowerCase();
 
       const data = await adminApi.getVisaRules(params);
-      setRuleSets(data.ruleSets || []);
+      const list =
+        data?.data?.ruleSets ||
+        data?.ruleSets ||
+        (Array.isArray(data) ? data : []);
+      setRuleSets(list);
     } catch (err: any) {
       console.error('Error fetching rule sets:', err);
       Alert.alert('Error', err.message || 'Failed to fetch rule sets');

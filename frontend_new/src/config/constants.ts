@@ -72,7 +72,7 @@ const getApiBaseUrl = (): string => {
   // Priority 2: Always use Railway URL by default
   // This ensures physical devices NEVER try to connect to localhost/10.0.2.2
   // For emulator development, set EXPO_PUBLIC_API_URL=http://10.0.2.2:3000 explicitly
-  return 'https://visago-production.up.railway.app';
+  return 'https://visabuddy-backend-production.up.railway.app';
 };
 
 export const API_BASE_URL = getApiBaseUrl();

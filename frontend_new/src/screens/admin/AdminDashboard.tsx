@@ -279,6 +279,10 @@ const AdminDashboard: React.FC<any> = ({navigation}) => {
           onPress={() => navigation.navigate('AdminVisaRules')}
         />
         <AdminButton
+          title="🧾 Visa Rule Candidates"
+          onPress={() => navigation.navigate('AdminVisaRuleCandidates')}
+        />
+        <AdminButton
           title="📝 Activity Logs"
           onPress={() => navigation.navigate('AdminActivityLogs')}
         />

@@ -229,7 +229,7 @@ export const adminApi = {
 
   updateVisaRule: async (
     ruleId: string,
-    data: {isApproved?: boolean; documents?: any},
+    data: {isApproved?: boolean; documents?: any; data?: any},
   ): Promise<any> => {
     const response = await apiClient.patch(
       `/api/admin/visa-rules/${ruleId}`,
@@ -241,10 +241,18 @@ export const adminApi = {
   getVisaRuleCandidates: async (params?: {
     countryCode?: string;
     visaType?: string;
+    status?: string;
   }): Promise<{candidates: any[]}> => {
     const response = await apiClient.get('/api/admin/visa-rules/candidates', {
       params,
     });
+    return response.data;
+  },
+
+  getVisaRuleCandidate: async (candidateId: string): Promise<any> => {
+    const response = await apiClient.get(
+      `/api/admin/visa-rules/candidates/${candidateId}`,
+    );
     return response.data;
   },
 
@@ -253,6 +261,17 @@ export const adminApi = {
   ): Promise<{message: string; ruleSet: any}> => {
     const response = await apiClient.post(
       `/api/admin/visa-rules/candidates/${candidateId}/approve`,
+    );
+    return response.data;
+  },
+
+  rejectVisaRuleCandidate: async (
+    candidateId: string,
+    notes?: string,
+  ): Promise<{message: string}> => {
+    const response = await apiClient.post(
+      `/api/admin/visa-rules/candidates/${candidateId}/reject`,
+      {notes},
     );
     return response.data;
   },
