@@ -22,7 +22,6 @@ import {apiClient} from '../../services/api';
 import {getTranslatedCountryName} from '../../data/countryTranslations';
 import {getTranslatedVisaTypeName} from '../../utils/visaTypeTranslations';
 import {RiskExplanationPanel} from '../../components/risk/RiskExplanationPanel';
-import {DocumentExplanationModal} from '../../components/checklist/DocumentExplanationModal';
 import {ChecklistSummary} from '../../components/checklist/ChecklistSummary';
 
 interface ApplicationDetailProps {
@@ -83,9 +82,6 @@ export default function ApplicationDetailScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [showSlowChecklistMessage, setShowSlowChecklistMessage] =
     useState(false);
-  const [explanationModalVisible, setExplanationModalVisible] = useState(false);
-  const [selectedDocumentItem, setSelectedDocumentItem] =
-    useState<DocumentChecklistItem | null>(null);
   const isFetchingRef = useRef(false);
   const hasLoadedOnceRef = useRef(false);
   const slowMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -808,26 +804,6 @@ export default function ApplicationDetailScreen({
                             <Text style={styles.documentDescription}>
                               {getLocalizedText(item, 'description')}
                             </Text>
-                            {/* Why? Button */}
-                            {(item.whereToObtain ||
-                              item.commonMistakes ||
-                              item.description) && (
-                              <TouchableOpacity
-                                style={styles.whyButton}
-                                onPress={() => {
-                                  setSelectedDocumentItem(item);
-                                  setExplanationModalVisible(true);
-                                }}>
-                                <Icon
-                                  name="help-circle-outline"
-                                  size={16}
-                                  color="#4A9EFF"
-                                />
-                                <Text style={styles.whyButtonText}>
-                                  {t('applications.why', 'Why?')}
-                                </Text>
-                              </TouchableOpacity>
-                            )}
                             {/* Rejected Status with Explanation */}
                             {item.status === 'rejected' && (
                               <View style={styles.rejectedExplanationContainer}>
@@ -931,17 +907,6 @@ export default function ApplicationDetailScreen({
           </Text>
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Document Explanation Modal */}
-      <DocumentExplanationModal
-        visible={explanationModalVisible}
-        onClose={() => {
-          setExplanationModalVisible(false);
-          setSelectedDocumentItem(null);
-        }}
-        item={selectedDocumentItem}
-        language={language}
-      />
     </View>
   );
 

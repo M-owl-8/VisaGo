@@ -828,10 +828,10 @@ export function mapAIStatusToDbStatus(
   if (aiStatus === 'verified') {
     return 'verified';
   }
-  if (aiStatus === 'rejected') {
+  if (aiStatus === 'rejected' || aiStatus === 'needs_review') {
     return 'rejected';
   }
-  // 'needs_review', 'uncertain', or any unexpected / missing value → 'pending'
+  // 'uncertain' or any unexpected / missing value → 'pending'
   return 'pending';
 }
 

@@ -63,13 +63,6 @@ export function DocumentExplanationModal({
         ? item.descriptionRu || item.description
         : item.description;
 
-  const whereToObtain =
-    language === 'uz'
-      ? item.whereToObtainUz || item.whereToObtain
-      : language === 'ru'
-        ? item.whereToObtainRu || item.whereToObtain
-        : item.whereToObtain;
-
   const commonMistakes =
     language === 'uz'
       ? item.commonMistakesUz || item.commonMistakes
@@ -108,16 +101,6 @@ export function DocumentExplanationModal({
                   {t('applications.whyThisDocument', 'Why this document?')}
                 </Text>
                 <Text style={styles.sectionText}>{description}</Text>
-              </View>
-            )}
-
-            {/* Where to Obtain */}
-            {whereToObtain && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  {t('applications.whereToObtain', 'Where to obtain')}
-                </Text>
-                <Text style={styles.sectionText}>{whereToObtain}</Text>
               </View>
             )}
 

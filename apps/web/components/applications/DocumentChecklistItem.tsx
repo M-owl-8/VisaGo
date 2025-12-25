@@ -7,7 +7,6 @@ import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils/cn';
-import { DocumentExplanationModal } from '@/components/checklist/DocumentExplanationModal';
 import { DocumentUploadModal } from '@/components/documents/DocumentUploadModal';
 import { useDocumentStatus } from '@/lib/hooks/useDocumentStatus';
 import { ContextualHelp } from '@/components/help/ContextualHelp';
@@ -51,7 +50,6 @@ export function DocumentChecklistItem({
   t,
   onPreview,
 }: DocumentChecklistItemProps) {
-  const [showExplanation, setShowExplanation] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -125,11 +123,6 @@ export function DocumentChecklistItem({
     : language === 'ru' 
     ? item.descriptionRu || item.description 
     : item.description;
-  const whereToObtain = language === 'uz'
-    ? item.whereToObtainUz || item.whereToObtain
-    : language === 'ru'
-    ? item.whereToObtainRu || item.whereToObtain
-    : item.whereToObtain;
   const commonMistakes = language === 'uz'
     ? item.commonMistakesUz || item.commonMistakes
     : language === 'ru'
@@ -253,18 +246,6 @@ export function DocumentChecklistItem({
         </div>
       </div>
 
-      {/* Where to Obtain */}
-      {whereToObtain && (
-        <div className="mt-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-          <div className="flex items-start gap-2">
-            <span className="text-xs font-semibold text-blue-300">
-              {t('checklist.whereToObtain', 'Where to obtain')}:
-            </span>
-            <p className="flex-1 text-xs text-white/70">{whereToObtain}</p>
-          </div>
-        </div>
-      )}
-
       {/* Common Mistakes - Only show if data exists */}
       {commonMistakes && (
         <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
@@ -299,29 +280,7 @@ export function DocumentChecklistItem({
             <span>{t('documents.viewDocument', 'View')}</span>
           </button>
         )}
-        {/* Why button - icon only on mobile, full button on desktop */}
-        {documentType && (
-          <button
-            onClick={() => setShowExplanation(true)}
-            className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white active:scale-95 sm:w-auto"
-            title={t('applications.whyDoINeedThis', 'Why do I need this document?')}
-          >
-            <HelpCircle size={18} />
-            <span className="sm:inline">{t('applications.why', 'Why?')}</span>
-          </button>
-        )}
       </div>
-
-      {/* Explanation Modal */}
-      {documentType && (
-        <DocumentExplanationModal
-          isOpen={showExplanation}
-          onClose={() => setShowExplanation(false)}
-          applicationId={applicationId}
-          documentType={documentType}
-          language={language}
-        />
-      )}
 
       {/* Upload Modal */}
       <DocumentUploadModal

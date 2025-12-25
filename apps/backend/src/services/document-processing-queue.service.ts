@@ -165,8 +165,17 @@ export class DocumentProcessingQueueService {
           });
         }
 
-        // Step 3: AI Validation (if not already done)
-        if (document.status === 'pending' && !document.verifiedByAI) {
+        // Step 3: AI Validation (if not already done or needs re-processing)
+        // Allow re-processing if:
+        // 1. Never processed (pending && !verifiedByAI)
+        // 2. Needs review and hasn't been updated in 24 hours (stuck documents)
+        const shouldProcessValidation =
+          (document.status === 'pending' && !document.verifiedByAI) ||
+          (document.status === 'pending' &&
+            document.needsReview &&
+            document.updatedAt < new Date(Date.now() - 24 * 60 * 60 * 1000));
+
+        if (shouldProcessValidation) {
           try {
             const { validateDocumentWithAI, saveValidationResultToDocument } = await import(
               './document-validation.service'
