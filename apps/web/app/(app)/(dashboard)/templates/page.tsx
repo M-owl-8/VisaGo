@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, Briefcase, Home, Users, Plane } from 'lucide-react';
+import { Download, FileText, Briefcase, Home, Users, Plane, Info } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -73,12 +75,13 @@ const templates: Template[] = [
 
 export default function TemplatesPage() {
   const { t } = useTranslation();
+  const [showComingSoon, setShowComingSoon] = useState(false);
 
   const handleDownload = (template: Template) => {
     // In production, this would download from backend or CDN
     console.log('[Templates] Downloading template:', template.id);
-    // For now, show alert that templates are coming soon
-    alert(t('templates.comingSoon', 'Document templates are coming soon! Check back later.'));
+    // For now, show modal that templates are coming soon
+    setShowComingSoon(true);
   };
 
   return (
@@ -175,6 +178,28 @@ export default function TemplatesPage() {
           </li>
         </ul>
       </Card>
+
+      {/* Coming Soon Modal */}
+      <Modal
+        isOpen={showComingSoon}
+        onClose={() => setShowComingSoon(false)}
+        title={t('templates.comingSoon', 'Coming Soon')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <Info size={24} className="text-primary shrink-0 mt-0.5" />
+            <p className="text-white/80">
+              {t('templates.comingSoonDescription', 'Document templates are coming soon! Check back later.')}
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowComingSoon(false)}>
+              {t('common.ok', 'OK')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

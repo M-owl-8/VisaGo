@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
 import { API_BASE_URL } from '@/lib/api/config';
 
 interface RuleSetDiff {
@@ -43,6 +44,7 @@ export default function CandidateDetailPage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
 
   const fetchCandidate = useCallback(async () => {
     try {
@@ -71,10 +73,12 @@ export default function CandidateDetailPage() {
     fetchCandidate();
   }, [fetchCandidate]);
 
+  const handleApproveClick = () => {
+    setShowApproveConfirm(true);
+  };
+
   const handleApprove = async () => {
-    if (!confirm('Are you sure you want to approve this candidate? This will create a new approved rule set.')) {
-      return;
-    }
+    setShowApproveConfirm(false);
 
     try {
       setProcessing(true);
@@ -308,13 +312,42 @@ export default function CandidateDetailPage() {
             Reject
           </Button>
           <Button
-            onClick={handleApprove}
+            onClick={handleApproveClick}
             disabled={processing}
           >
             {processing ? 'Processing...' : 'Approve'}
           </Button>
         </div>
       )}
+
+      {/* Approve Confirmation Modal */}
+      <Modal
+        isOpen={showApproveConfirm}
+        onClose={() => setShowApproveConfirm(false)}
+        title="Approve Candidate"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-white/80">
+            Are you sure you want to approve this candidate? This will create a new approved rule set.
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => setShowApproveConfirm(false)}
+              disabled={processing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApprove}
+              disabled={processing}
+            >
+              {processing ? 'Processing...' : 'Approve'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

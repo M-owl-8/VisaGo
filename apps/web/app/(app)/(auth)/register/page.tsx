@@ -33,30 +33,50 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const toLocalizedError = (error: string | null) => {
+    if (!error) return '';
+    if (error === validationRules.required.message) {
+      return t('auth.requiredField', 'This field is required');
+    }
+    if (error === validationRules.email.message) {
+      return t('auth.invalidEmail', 'Please enter a valid email address');
+    }
+    if (error.startsWith('Must be at least')) {
+      return t('auth.passwordMinLength', { min: 6, defaultValue: 'Must be at least 6 characters' });
+    }
+    if (error.startsWith('Password must be at least')) {
+      return t(
+        'auth.passwordComplexity',
+        'Password must be at least 8 characters and include uppercase, lowercase, and numbers'
+      );
+    }
+    return error;
+  };
+
   const validateEmail = (value: string) => {
     const error = validateField(value, [validationRules.required, validationRules.email]);
-    setFieldErrors((prev) => ({ ...prev, email: error || '' }));
+    setFieldErrors((prev) => ({ ...prev, email: toLocalizedError(error) }));
     return !error;
   };
 
   const validatePassword = (value: string) => {
     const error = validateField(value, [validationRules.required, validationRules.minLength(6)]);
-    setFieldErrors((prev) => ({ ...prev, password: error || '' }));
+    setFieldErrors((prev) => ({ ...prev, password: toLocalizedError(error) }));
     return !error;
   };
 
   const validateConfirmPassword = (value: string) => {
     let error = validateField(value, [validationRules.required]);
     if (!error && value !== formData.password) {
-      error = 'Passwords do not match';
+      error = t('auth.passwordsDoNotMatch', 'Passwords do not match');
     }
-    setFieldErrors((prev) => ({ ...prev, confirmPassword: error || '' }));
+    setFieldErrors((prev) => ({ ...prev, confirmPassword: toLocalizedError(error) }));
     return !error;
   };
 
   const validateName = (value: string, field: 'firstName' | 'lastName') => {
     const error = validateField(value, [validationRules.required]);
-    setFieldErrors((prev) => ({ ...prev, [field]: error || '' }));
+    setFieldErrors((prev) => ({ ...prev, [field]: toLocalizedError(error) }));
     return !error;
   };
 

@@ -13,6 +13,7 @@ import { useOverallProgress } from '@/lib/hooks/useOverallProgress';
 import ErrorBanner from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
 import { StatusBadge } from '@/components/applications/StatusBadge';
 import { DocumentChecklist } from '@/components/checklist/DocumentChecklist';
 import { ChecklistSummary } from '@/components/checklist/ChecklistSummary';
@@ -43,6 +44,7 @@ export default function ApplicationDetailPage() {
   } = useApplication(applicationId, { autoFetch: isSignedIn });
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   // Calculate overall progress across ALL applications (verified documents only)
   const { overallProgress: globalOverallProgress, isLoading: progressLoading } = useOverallProgress();
@@ -127,25 +129,27 @@ export default function ApplicationDetailPage() {
   const countryCode = application.country?.code?.toLowerCase() || 'xx';
   const flagEmoji = getFlagEmoji(countryCode);
 
-  const handleDeleteApplication = async () => {
-    if (!confirm(t('applications.deleteConfirm', 'Are you sure you want to delete this application? This action cannot be undone.'))) {
-      return;
-    }
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+    setDeleteError(null);
+  };
 
+  const handleDeleteApplication = async () => {
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       const response = await apiClient.deleteApplication(applicationId);
       if (response.success) {
+        setShowDeleteConfirm(false);
         router.push('/applications');
       } else {
-        alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+        setDeleteError(response.error?.message || t('applications.deleteError', 'Failed to delete application. Please try again.'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete application error:', error);
-      alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+      setDeleteError(error?.message || t('applications.deleteError', 'Failed to delete application. Please try again.'));
     } finally {
       setIsDeleting(false);
-      setShowDeleteConfirm(false);
     }
   };
 
@@ -161,6 +165,13 @@ export default function ApplicationDetailPage() {
               <span className="ml-2">{t('errors.tryAgain', 'Try Again')}</span>
             </Button>
           }
+        />
+      )}
+
+      {deleteError && (
+        <ErrorBanner
+          message={deleteError}
+          onClose={() => setDeleteError(null)}
         />
       )}
 
@@ -204,7 +215,7 @@ export default function ApplicationDetailPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleDeleteApplication}
+                    onClick={handleDeleteClick}
                     disabled={isDeleting}
                     className="h-7 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 text-xs text-rose-300 hover:bg-rose-500/20 hover:text-rose-200"
                     title={t('applications.deleteApplication', 'Delete Application')}
@@ -333,6 +344,47 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setDeleteError(null);
+        }}
+        title={t('applications.deleteApplication', 'Delete Application')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <ErrorBanner
+              message={deleteError}
+              onClose={() => setDeleteError(null)}
+            />
+          )}
+          <p className="text-white/80">
+            {t('applications.deleteConfirm', 'Are you sure you want to delete this application? This action cannot be undone.')}
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setDeleteError(null);
+              }}
+              disabled={isDeleting}
+            >
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteApplication}
+              disabled={isDeleting}
+            >
+              {isDeleting ? t('common.loading', 'Loading...') : t('common.delete', 'Delete')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'next/navigation';
-import { FileText, GraduationCap, Briefcase, ChevronRight } from 'lucide-react';
+import { FileText, GraduationCap, Briefcase, ChevronRight, Info } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 
 interface ApplicationTypeModalProps {
   isOpen: boolean;
@@ -13,6 +15,7 @@ interface ApplicationTypeModalProps {
 export function ApplicationTypeModal({ isOpen, onClose }: ApplicationTypeModalProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const [showComingSoon, setShowComingSoon] = useState(false);
 
   const handleSelectVisa = () => {
     onClose();
@@ -20,13 +23,11 @@ export function ApplicationTypeModal({ isOpen, onClose }: ApplicationTypeModalPr
   };
 
   const handleSelectUniversities = () => {
-    onClose();
-    alert(t('applications.comingSoon', 'Coming Soon'));
+    setShowComingSoon(true);
   };
 
   const handleSelectJobContract = () => {
-    onClose();
-    alert(t('applications.comingSoon', 'Coming Soon'));
+    setShowComingSoon(true);
   };
 
   return (
@@ -89,9 +90,32 @@ export function ApplicationTypeModal({ isOpen, onClose }: ApplicationTypeModalPr
           <ChevronRight size={20} className="text-white/40 shrink-0" />
         </button>
       </div>
+
+      {/* Coming Soon Modal */}
+      <Modal
+        isOpen={showComingSoon}
+        onClose={() => setShowComingSoon(false)}
+        title={t('applications.comingSoon', 'Coming Soon')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <Info size={24} className="text-primary shrink-0 mt-0.5" />
+            <p className="text-white/80">
+              {t('applications.comingSoonDescription', 'This feature is currently under development. Check back soon!')}
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowComingSoon(false)}>
+              {t('common.ok', 'OK')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Modal>
   );
 }
+
 
 
 

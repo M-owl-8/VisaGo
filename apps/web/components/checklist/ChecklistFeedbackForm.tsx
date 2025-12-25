@@ -19,12 +19,14 @@ export function ChecklistFeedbackForm({ applicationId, onSuccess }: ChecklistFee
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedbackText.trim()) return;
 
     setIsSubmitting(true);
+    setError(null);
 
     try {
       const token = localStorage.getItem('auth_token');
@@ -51,9 +53,9 @@ export function ChecklistFeedbackForm({ applicationId, onSuccess }: ChecklistFee
         setFeedbackText('');
         onSuccess?.();
       }, 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[ChecklistFeedback] Error submitting feedback:', err);
-      alert(t('applications.feedbackError', 'Failed to submit feedback. Please try again.'));
+      setError(err?.message || t('applications.feedbackError', 'Failed to submit feedback. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -75,6 +77,7 @@ export function ChecklistFeedbackForm({ applicationId, onSuccess }: ChecklistFee
             setIsOpen(false);
             setFeedbackText('');
             setShowSuccess(false);
+            setError(null);
           }
         }}
         title={t('applications.giveFeedback', 'Give Feedback')}
@@ -89,6 +92,11 @@ export function ChecklistFeedbackForm({ applicationId, onSuccess }: ChecklistFee
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-3">
+                <p className="text-sm text-rose-200">{error}</p>
+              </div>
+            )}
             <div>
               <label className="mb-2 block text-sm font-medium text-white">
                 {t('applications.feedbackType', 'Feedback Type')}

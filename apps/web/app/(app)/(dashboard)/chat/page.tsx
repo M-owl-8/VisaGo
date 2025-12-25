@@ -181,17 +181,32 @@ function ChatPageContent() {
                 <p className="text-sm font-medium text-rose-100">{t('chat.errorTitle', 'Message not sent')}</p>
                 <p className="text-xs text-rose-200/80">{chatError || t('chat.errorDefault', 'Something went wrong. Your conversation is saved — try sending again.')}</p>
               </div>
-              {lastFailedMessage && (
+              <div className="flex gap-2 shrink-0">
+                {lastFailedMessage && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRetry}
+                    className="bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
+                  >
+                    <RefreshCcw size={14} />
+                    <span className="ml-2">{t('errors.tryAgain', 'Retry')}</span>
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={handleRetry}
-                  className="bg-rose-500/20 text-rose-100 hover:bg-rose-500/30 shrink-0"
+                  onClick={() => {
+                    // Clear error and reload chat history
+                    useChatStore.setState({ error: null });
+                    loadChatHistory(applicationId, 100);
+                  }}
+                  className="bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
                 >
                   <RefreshCcw size={14} />
-                  <span className="ml-2">{t('errors.tryAgain', 'Retry')}</span>
+                  <span className="ml-2">{t('chat.reload', 'Reload')}</span>
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         </div>

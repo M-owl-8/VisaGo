@@ -7,6 +7,11 @@ import {
   AdminPaymentsScreen,
   AdminDocumentsScreen,
   AdminAnalyticsScreen,
+  AdminEvaluationScreen,
+  AdminVisaRulesScreen,
+  AdminActivityLogsScreen,
+  AdminAIScreen,
+  AdminChecklistStatsScreen,
 } from '../screens/admin';
 
 export type AdminStackParamList = {
@@ -16,6 +21,11 @@ export type AdminStackParamList = {
   AdminPayments: undefined;
   AdminDocuments: undefined;
   AdminAnalytics: undefined;
+  AdminEvaluation: undefined;
+  AdminVisaRules: undefined;
+  AdminActivityLogs: undefined;
+  AdminAI: undefined;
+  AdminChecklistStats: undefined;
 };
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -70,6 +80,31 @@ const AdminNavigator: React.FC = () => {
         name="AdminAnalytics"
         component={AdminAnalyticsScreen}
         options={{title: 'Analytics'}}
+      />
+      <Stack.Screen
+        name="AdminEvaluation"
+        component={AdminEvaluationScreen}
+        options={{title: 'Evaluation'}}
+      />
+      <Stack.Screen
+        name="AdminVisaRules"
+        component={AdminVisaRulesScreen}
+        options={{title: 'Visa Rules'}}
+      />
+      <Stack.Screen
+        name="AdminActivityLogs"
+        component={AdminActivityLogsScreen}
+        options={{title: 'Activity Logs'}}
+      />
+      <Stack.Screen
+        name="AdminAI"
+        component={AdminAIScreen}
+        options={{title: 'AI Interactions'}}
+      />
+      <Stack.Screen
+        name="AdminChecklistStats"
+        component={AdminChecklistStatsScreen}
+        options={{title: 'Checklist Stats'}}
       />
     </Stack.Navigator>
   );

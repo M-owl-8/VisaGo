@@ -6,6 +6,9 @@ import { ArrowUpRight, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import ErrorBanner from '@/components/ErrorBanner';
 import { cn } from '@/lib/utils/cn';
 import type { Application } from '@/lib/hooks/useApplications';
 import { apiClient } from '@/lib/api/client';
@@ -26,30 +29,34 @@ export function ApplicationCard({
   onDelete,
 }: ApplicationCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const statusVariant = getStatusVariant(application.status);
   const countryCode = application.country?.code?.toLowerCase() || 'xx';
   const flagEmoji = getFlagEmoji(countryCode);
   const isDraft = application.status?.toLowerCase() === 'draft';
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setShowDeleteConfirm(true);
+    setDeleteError(null);
+  };
 
-    if (!confirm(t('applications.deleteConfirm', 'Are you sure you want to delete this application? This action cannot be undone.'))) {
-      return;
-    }
-
+  const handleDeleteConfirm = async () => {
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       const response = await apiClient.deleteApplication(application.id);
       if (response.success) {
+        setShowDeleteConfirm(false);
         onDelete?.();
       } else {
-        alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+        setDeleteError(response.error?.message || t('applications.deleteError', 'Failed to delete application. Please try again.'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete application error:', error);
-      alert(t('applications.deleteError', 'Failed to delete application. Please try again.'));
+      setDeleteError(error?.message || t('applications.deleteError', 'Failed to delete application. Please try again.'));
     } finally {
       setIsDeleting(false);
     }
@@ -108,7 +115,7 @@ export function ApplicationCard({
         </Link>
         {isDraft && (
           <button
-            onClick={handleDelete}
+            onClick={handleDeleteClick}
             disabled={isDeleting}
             className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-400 transition-all duration-200 hover:bg-rose-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-rose-500/50 sm:px-4 sm:py-2"
             aria-label={t('applications.removeApplication', 'Remove application')}
@@ -118,6 +125,48 @@ export function ApplicationCard({
           </button>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setDeleteError(null);
+        }}
+        title={t('applications.deleteApplication', 'Delete Application')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <ErrorBanner
+              message={deleteError}
+              onClose={() => setDeleteError(null)}
+            />
+          )}
+          <p className="text-white/80">
+            {t('applications.deleteConfirm', 'Are you sure you want to delete this application? This action cannot be undone.')}
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setDeleteError(null);
+              }}
+              disabled={isDeleting}
+            >
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? t('common.loading', 'Loading...') : t('common.delete', 'Delete')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Card>
   );
 }

@@ -24,7 +24,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout, isSignedIn } = useAuthStore();
+  const { user, logout, isSignedIn, updateProfile } = useAuthStore();
   const [currentLang, setCurrentLang] = useState('en');
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [showApplicationTypeModal, setShowApplicationTypeModal] = useState(false);
@@ -63,12 +63,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
-  const changeLanguage = (lang: string) => {
+  const changeLanguage = async (lang: string) => {
     if (!i18n) return;
     i18n.changeLanguage(lang);
     setCurrentLang(lang);
     if (typeof window !== 'undefined') {
       localStorage.setItem('app_language', lang);
+    }
+    // Save language preference to backend if user is signed in
+    if (isSignedIn && user) {
+      try {
+        await updateProfile({ language: lang });
+      } catch (error) {
+        // Silently fail - language change still works locally
+        console.warn('Failed to save language preference to backend:', error);
+      }
     }
   };
 

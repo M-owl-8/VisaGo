@@ -19,6 +19,7 @@ export default function AdminUsersPage() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [newRole, setNewRole] = useState<string>('');
   const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -44,13 +45,14 @@ export default function AdminUsersPage() {
 
     try {
       setUpdating(true);
+      setUpdateError(null);
       await adminApi.updateUserRole(selectedUser.id, newRole);
       await loadUsers();
       setShowRoleModal(false);
       setSelectedUser(null);
       setNewRole('');
     } catch (err: any) {
-      alert(`Failed to update role: ${err.message}`);
+      setUpdateError(err?.message || 'Failed to update role');
     } finally {
       setUpdating(false);
     }
@@ -191,10 +193,16 @@ export default function AdminUsersPage() {
           setShowRoleModal(false);
           setSelectedUser(null);
           setNewRole('');
+          setUpdateError(null);
         }}
         title="Change User Role"
       >
         <div className="space-y-4">
+          {updateError && (
+            <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+              <p className="text-sm text-red-200">{updateError}</p>
+            </div>
+          )}
           <div>
             <p className="text-sm text-white/60 mb-2">User: {selectedUser?.email}</p>
             <label className="block text-sm font-medium text-white mb-2">New Role</label>

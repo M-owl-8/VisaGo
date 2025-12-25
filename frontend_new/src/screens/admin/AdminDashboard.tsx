@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Icon from 'react-native-vector-icons/Ionicons';
 import {useIsAdmin} from '../../hooks/useIsAdmin';
 import {adminApi, DashboardMetrics} from '../../services/adminApi';
+import {COLORS} from '../../theme/colors';
 
 const AdminDashboard: React.FC<any> = ({navigation}) => {
   const isAdmin = useIsAdmin();
@@ -63,16 +65,28 @@ const AdminDashboard: React.FC<any> = ({navigation}) => {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading dashboard...</Text>
       </View>
     );
   }
 
-  const StatCard = ({label, value, subtext, color = '#007AFF'}: any) => (
+  const StatCard = ({
+    label,
+    value,
+    subtext,
+    color = COLORS.primary,
+    icon,
+  }: any) => (
     <View style={[styles.statCard, {borderLeftColor: color}]}>
+      {icon && (
+        <View
+          style={[styles.statIconContainer, {backgroundColor: color + '20'}]}>
+          <Icon name={icon} size={24} color={color} />
+        </View>
+      )}
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={[styles.statValue, {color}]}>{value}</Text>
       {subtext && <Text style={styles.statSubtext}>{subtext}</Text>}
     </View>
   );
@@ -95,22 +109,26 @@ const AdminDashboard: React.FC<any> = ({navigation}) => {
           <StatCard
             label="Total Users"
             value={metrics?.totalUsers || 0}
-            color="#007AFF"
+            color="#4A9EFF"
+            icon="people"
           />
           <StatCard
             label="Total Applications"
             value={metrics?.totalApplications || 0}
-            color="#34C759"
+            color="#10B981"
+            icon="document-text"
           />
           <StatCard
             label="Total Revenue"
             value={`$${(metrics?.totalRevenue || 0).toFixed(2)}`}
-            color="#FF9500"
+            color="#F59E0B"
+            icon="cash"
           />
           <StatCard
             label="Verified Documents"
             value={metrics?.totalDocumentsVerified || 0}
-            color="#5856D6"
+            color="#8B5CF6"
+            icon="checkmark-circle"
           />
         </View>
       </View>
@@ -236,6 +254,36 @@ const AdminDashboard: React.FC<any> = ({navigation}) => {
         />
       </View>
 
+      {/* GPT & Evaluation */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>GPT & Evaluation</Text>
+        <AdminButton
+          title="📈 Evaluation Dashboard"
+          onPress={() => navigation.navigate('AdminEvaluation')}
+        />
+        <AdminButton
+          title="🤖 AI Interactions"
+          onPress={() => navigation.navigate('AdminAI')}
+        />
+        <AdminButton
+          title="📋 Checklist Statistics"
+          onPress={() => navigation.navigate('AdminChecklistStats')}
+        />
+      </View>
+
+      {/* System Management */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>System Management</Text>
+        <AdminButton
+          title="📜 Visa Rules"
+          onPress={() => navigation.navigate('AdminVisaRules')}
+        />
+        <AdminButton
+          title="📝 Activity Logs"
+          onPress={() => navigation.navigate('AdminActivityLogs')}
+        />
+      </View>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -260,89 +308,97 @@ const AdminButton = ({title, onPress}: any) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: COLORS.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.background,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#000',
+    color: COLORS.text,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    color: COLORS.textSecondary,
   },
   section: {
-    padding: 16,
-    marginBottom: 8,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: COLORS.text,
     marginBottom: 12,
   },
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
   statCard: {
     width: '48%',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 8,
     fontWeight: '500',
   },
   statValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000',
     marginBottom: 4,
   },
   statSubtext: {
     fontSize: 11,
-    color: '#999',
+    color: COLORS.textSecondary,
   },
   breakdownContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   breakdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   colorBadge: {
     width: 12,
@@ -355,18 +411,20 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     fontSize: 14,
-    color: '#000',
+    color: COLORS.text,
     fontWeight: '500',
   },
   breakdownValue: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
   listContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   listItem: {
     flexDirection: 'row',
@@ -375,7 +433,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   listItemLeft: {
     flex: 1,
@@ -383,29 +441,31 @@ const styles = StyleSheet.create({
   listItemTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000',
+    color: COLORS.text,
   },
   listItemSubtext: {
     fontSize: 12,
-    color: '#999',
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
   listItemValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FF9500',
+    color: '#F59E0B',
   },
   adminButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    paddingVertical: 12,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '40',
   },
   adminButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   bottomSpacer: {

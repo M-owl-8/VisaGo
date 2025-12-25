@@ -200,4 +200,100 @@ export const adminApi = {
     });
     return response.data;
   },
+
+  // Evaluation API
+  getEvaluationMetrics: async (): Promise<any> => {
+    const response = await apiClient.get('/api/admin/evaluation/metrics');
+    return response.data;
+  },
+
+  runEvaluation: async (): Promise<any> => {
+    const response = await apiClient.post('/api/admin/evaluation/run');
+    return response.data;
+  },
+
+  // Visa Rules API
+  getVisaRules: async (params?: {
+    countryCode?: string;
+    visaType?: string;
+  }): Promise<{ruleSets: any[]}> => {
+    const response = await apiClient.get('/api/admin/visa-rules', {params});
+    // API returns { data: { ruleSets: [...] } }
+    return response.data?.data || response.data;
+  },
+
+  getVisaRule: async (ruleId: string): Promise<any> => {
+    const response = await apiClient.get(`/api/admin/visa-rules/${ruleId}`);
+    return response.data;
+  },
+
+  updateVisaRule: async (
+    ruleId: string,
+    data: {isApproved?: boolean; documents?: any},
+  ): Promise<any> => {
+    const response = await apiClient.patch(
+      `/api/admin/visa-rules/${ruleId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  getVisaRuleCandidates: async (params?: {
+    countryCode?: string;
+    visaType?: string;
+  }): Promise<{candidates: any[]}> => {
+    const response = await apiClient.get('/api/admin/visa-rules/candidates', {
+      params,
+    });
+    return response.data;
+  },
+
+  approveVisaRuleCandidate: async (
+    candidateId: string,
+  ): Promise<{message: string; ruleSet: any}> => {
+    const response = await apiClient.post(
+      `/api/admin/visa-rules/candidates/${candidateId}/approve`,
+    );
+    return response.data;
+  },
+
+  // Activity Logs API
+  getActivityLogs: async (params?: {
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+    action?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<{items: any[]; total: number}> => {
+    const response = await apiClient.get('/api/admin/activity-logs', {params});
+    return response.data;
+  },
+
+  // AI Interactions API
+  getAIInteractions: async (params?: {
+    skip?: number;
+    take?: number;
+    userId?: string;
+    applicationId?: string;
+  }): Promise<PaginatedResponse<any>> => {
+    const response = await apiClient.get('/api/admin/ai-interactions', {
+      params,
+    });
+    return response.data;
+  },
+
+  // Checklist Stats API
+  getChecklistStats: async (params?: {
+    countryCode?: string;
+    visaType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<any> => {
+    const response = await apiClient.get('/api/admin/checklist-stats', {
+      params,
+    });
+    // API returns { success: true, data: {...} }
+    return response.data?.data || response.data;
+  },
 };

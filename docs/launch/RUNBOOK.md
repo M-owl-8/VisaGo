@@ -1,6 +1,6 @@
 # Deployment Runbook
 
-Last updated: 2025-12-17
+Last updated: 2025-01-XX
 
 ## Environments
 
@@ -9,11 +9,17 @@ Last updated: 2025-12-17
 
 ## Pre-Deployment Checklist
 
-1. Set env vars (see `apps/backend/src/config/env.ts` required fields)
-2. Ensure `CORS_ORIGIN` is not `*` in production
-3. BACKUP database
-4. Run tests: `npm run test` (backend), web build
-5. Run migrations in staging
+1. ✅ Set env vars (see `apps/backend/src/config/env.ts` required fields)
+   - Required: `DATABASE_URL`, `JWT_SECRET` (>=32 chars), `NODE_ENV=production`
+   - Recommended: `CORS_ORIGIN`, `REDIS_URL`, `SENTRY_DSN`, `OPENAI_API_KEY`
+   - See `PRODUCTION_ENV_SETUP.md` for complete list
+2. ✅ Ensure `CORS_ORIGIN` is not `*` in production (specific domains only)
+3. ✅ BACKUP database (critical before migrations)
+4. ✅ Run tests: `npm run test` (backend), web build
+5. ✅ Run migrations in staging first: `npm run db:migrate:deploy`
+6. ✅ Verify health checks: `/api/health`, `/api/health/detailed`
+7. ✅ Security audit: `npm audit` (should show 0 vulnerabilities)
+8. ✅ Environment validation: `npm run validate:env`
 
 ## Deploy Steps (Backend)
 
@@ -42,10 +48,36 @@ Last updated: 2025-12-17
 
 ## Health & Smoke Checks
 
-- `/api/health` (extend to DB/Redis/Firebase/AI)
-- `/api/chat` test message
-- `/api/document-checklist/:applicationId`
-- `/api/documents` upload small file (non-prod bucket)
+### Basic Health
+
+- `GET /api/health` - Basic health check (database connectivity)
+- `GET /api/health/detailed` - Detailed health (DB, Redis, Storage, AI)
+- `GET /api/health/live` - Liveness probe (for Kubernetes/Docker)
+- `GET /api/health/ready` - Readiness probe (for Kubernetes/Docker)
+
+### Functional Tests
+
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `POST /api/applications` - Create application (with auth)
+- `GET /api/document-checklist/:applicationId` - Get checklist
+- `POST /api/documents/upload` - Upload document (test file)
+- `POST /api/chat/message` - Send chat message
+
+### Verification Commands
+
+```bash
+# Health check
+curl https://your-api.com/api/health
+
+# Detailed health
+curl https://your-api.com/api/health/detailed
+
+# Test registration
+curl -X POST https://your-api.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"Test123456"}'
+```
 
 ## Rollback
 
@@ -55,8 +87,34 @@ Last updated: 2025-12-17
 
 ## Monitoring
 
-- Enable Sentry DSN; configure alerts (error rate, latency, AI failures, webhooks)
-- Add dashboards for AI latency, upload failures, payment webhooks
+### Sentry Configuration
+
+- ✅ Enable Sentry DSN in environment variables
+- ✅ Configure alerts:
+  - Error rate > 1% (5-minute window)
+  - API latency P95 > 2s
+  - AI service failures
+  - Payment webhook failures
+  - Database connection errors
+
+### Metrics to Monitor
+
+- API response times (P50, P95, P99)
+- AI service latency
+- Document upload success rate
+- Database query performance
+- Redis cache hit rate
+- Error rates by endpoint
+- Active user count
+
+### Dashboards
+
+- Create dashboard for:
+  - AI latency trends
+  - Upload success/failure rates
+  - Payment webhook status
+  - Database performance
+  - Error rate by service
 
 ## Incident Response
 

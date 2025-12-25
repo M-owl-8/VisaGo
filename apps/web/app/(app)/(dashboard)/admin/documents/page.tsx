@@ -14,6 +14,7 @@ export default function AdminDocumentsPage() {
   const [page, setPage] = useState(0);
   const [pageSize] = useState(20);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -36,10 +37,13 @@ export default function AdminDocumentsPage() {
   const handleVerify = async (documentId: string, status: 'verified' | 'rejected') => {
     try {
       setUpdating(documentId);
+      setUpdateError(null);
       await adminApi.updateDocumentStatus(documentId, status);
       await loadDocuments();
     } catch (err: any) {
-      alert(`Failed to update document: ${err.message}`);
+      setUpdateError(err?.message || 'Failed to update document');
+      // Clear error after 5 seconds
+      setTimeout(() => setUpdateError(null), 5000);
     } finally {
       setUpdating(null);
     }
@@ -57,6 +61,12 @@ export default function AdminDocumentsPage() {
       {error && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-red-400">
           <p>{error}</p>
+        </div>
+      )}
+
+      {updateError && (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-red-400">
+          <p>{updateError}</p>
         </div>
       )}
 
