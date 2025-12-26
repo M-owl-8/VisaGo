@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { errors } from '../utils/errors';
 import { DocumentChecklistService } from './document-checklist.service';
-import { logError, logInfo } from '../middleware/logger';
+import { logError, logInfo, logWarn } from '../middleware/logger';
 
 const prisma = new PrismaClient();
 
@@ -189,6 +189,27 @@ export class ApplicationsService {
         checkpoints: true,
       },
     });
+
+    // Non-blocking: create chat session attached to this application
+    try {
+      const { chatService } = await import('./chat.service');
+      await chatService.createSessionForApplication(
+        userId,
+        application.id,
+        application.country,
+        application.visaType
+      );
+      logInfo('[ApplicationsService] Chat session created for application', {
+        applicationId: application.id,
+        userId,
+      });
+    } catch (sessionError: any) {
+      logWarn('[ApplicationsService] Failed to create chat session (non-blocking)', {
+        applicationId: application.id,
+        userId,
+        error: sessionError instanceof Error ? sessionError.message : String(sessionError),
+      });
+    }
 
     // Ensure canonical Application row exists (shadow) with legacy mapping
     await prisma.application.upsert({

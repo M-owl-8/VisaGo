@@ -45,8 +45,15 @@ function ChatPageContent() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSessionResolving, setIsSessionResolving] = useState(false);
+  const hasAttemptedSessionRef = useRef(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Reset session creation attempts when applicationId changes
+  useEffect(() => {
+    hasAttemptedSessionRef.current = false;
+  }, [applicationId]);
 
   // Load sessions on mount
   useEffect(() => {
@@ -62,16 +69,59 @@ function ChatPageContent() {
     }
   }, [isSignedIn, selectedSessionId, loadChatHistory]);
 
-  // If applicationId is provided, auto-select or create session
+  // If applicationId is provided, auto-select or create session (idempotent)
   useEffect(() => {
     if (!isSignedIn || !applicationId) return;
-    const matching = sessions.find((s) => s.applicationId === applicationId);
-    if (matching && matching.id !== selectedSessionId) {
-      selectSession(matching.id);
-    } else if (!matching && !selectedSessionId) {
-      createNewSession(applicationId);
-    }
-  }, [isSignedIn, applicationId, sessions, selectedSessionId, selectSession, createNewSession]);
+    if (isSessionResolving) return;
+    if (isLoadingSessions) return;
+
+    let cancelled = false;
+    const findOrCreateSession = async () => {
+      try {
+        setIsSessionResolving(true);
+        const matching = sessions.find((s) => s.applicationId === applicationId);
+        if (matching) {
+          if (matching.id !== selectedSessionId) {
+            await selectSession(matching.id);
+          }
+          return;
+        }
+
+        if (hasAttemptedSessionRef.current) {
+          return;
+        }
+        hasAttemptedSessionRef.current = true;
+
+        // Create session if not found
+        const newSessionId = await createNewSession(applicationId);
+        if (!cancelled && newSessionId) {
+          await selectSession(newSessionId);
+        } else if (!newSessionId) {
+          // allow retry on failure
+          hasAttemptedSessionRef.current = false;
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSessionResolving(false);
+        }
+      }
+    };
+
+    findOrCreateSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSignedIn,
+    applicationId,
+    sessions,
+    selectedSessionId,
+    selectSession,
+    createNewSession,
+    isSessionResolving,
+    isLoadingSessions,
+  ]);
 
   // Handle scroll to show/hide scroll-to-bottom button
   useEffect(() => {
