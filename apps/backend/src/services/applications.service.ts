@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { errors } from '../utils/errors';
 import { DocumentChecklistService } from './document-checklist.service';
 import { logError, logInfo, logWarn } from '../middleware/logger';
-import { chatService, ChatService } from './chat.service';
+import { chatService } from './chat.service';
 
 const prisma = new PrismaClient();
 
@@ -193,8 +193,8 @@ export class ApplicationsService {
 
     // Non-blocking: create chat session attached to this application
     try {
-      // TypeScript workaround: use InstanceType to get the correct instance type
-      const service = chatService as InstanceType<typeof ChatService>;
+      // Explicitly bypass type narrowing to avoid build-time type resolution issues
+      const service = chatService as any;
       await service.createSessionForApplication(
         userId,
         application.id,

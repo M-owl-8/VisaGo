@@ -4,7 +4,7 @@ import { AIOpenAIService } from './ai-openai.service';
 import { ApplicationsService } from './applications.service';
 import { VisaTypesService } from './visa-types.service';
 import { CountriesService } from './countries.service';
-import { chatService, ChatService } from './chat.service';
+import { chatService } from './chat.service';
 
 const prisma = new PrismaClient();
 
@@ -198,8 +198,8 @@ export class AIApplicationService {
 
       // Non-blocking: create chat session attached to the new application
       try {
-        // TypeScript workaround: use InstanceType to get the correct instance type
-        const service = chatService as InstanceType<typeof ChatService>;
+        // Explicitly bypass type narrowing to avoid build-time type resolution issues
+        const service = chatService as any;
         await service.createSessionForApplication(
           userId,
           application.id,
