@@ -270,16 +270,17 @@ export class ChatService {
         });
       }
 
-      sessionId = session.id;
+      // Resolve sessionId to a definite string (session.id is always defined)
+      const resolvedSessionId: string = session.id;
       const existingMessagesCount = await prisma.chatMessage.count({
-        where: { sessionId },
+        where: { sessionId: resolvedSessionId },
       });
 
       // Get recent conversation history for context
       let history = conversationHistory || [];
       if (!history.length) {
         const recentMessages = await prisma.chatMessage.findMany({
-          where: { sessionId },
+          where: { sessionId: resolvedSessionId },
           orderBy: { createdAt: 'desc' },
           take: 10,
         });
@@ -320,7 +321,7 @@ User's Current Visa Application:
         return this.createFallbackResponse(
           userId,
           applicationId,
-          sessionId,
+          resolvedSessionId,
           content,
           startTime,
           'AI service not configured. Please configure DEEPSEEK_API_KEY in environment variables.'
@@ -391,7 +392,7 @@ User's Current Visa Application:
           return this.createFallbackResponse(
             userId,
             applicationId,
-            sessionId,
+            resolvedSessionId,
             content,
             startTime,
             "Serverimizdagi AI hozir sekin ishlayapti. Iltimos, birozdan so'ng qayta urinib ko'ring."
@@ -406,7 +407,7 @@ User's Current Visa Application:
           return this.createFallbackResponse(
             userId,
             applicationId,
-            sessionId,
+            resolvedSessionId,
             content,
             startTime,
             'AI service temporarily unavailable. Please try again in a moment.'
@@ -417,7 +418,7 @@ User's Current Visa Application:
         return this.createFallbackResponse(
           userId,
           applicationId,
-          sessionId,
+          resolvedSessionId,
           content,
           startTime,
           'AI service temporarily unavailable. Please try again in a moment.'
@@ -459,7 +460,7 @@ User's Current Visa Application:
       // This prevents race conditions where history is queried before messages are saved
       const userMessage = await prisma.chatMessage.create({
         data: {
-          sessionId,
+          sessionId: resolvedSessionId,
           userId,
           role: 'user',
           content,
@@ -472,12 +473,12 @@ User's Current Visa Application:
       // CRITICAL FIX: Update session timestamp immediately after saving user message
       // This ensures session is marked as active and messages are queryable
       await prisma.chatSession.update({
-        where: { id: sessionId },
+        where: { id: resolvedSessionId },
         data: { updatedAt: new Date() },
       });
 
       if (existingMessagesCount === 0 || isPlaceholderTitle(session.title)) {
-        await this.ensureSessionTitle(sessionId, content, applicationContext);
+        await this.ensureSessionTitle(resolvedSessionId, content, applicationContext);
       }
 
       // Save assistant response with sources and response time
@@ -485,7 +486,7 @@ User's Current Visa Application:
       try {
         assistantMessage = await prisma.chatMessage.create({
           data: {
-            sessionId,
+            sessionId: resolvedSessionId,
             userId,
             role: 'assistant',
             content: message,
@@ -504,7 +505,7 @@ User's Current Visa Application:
 
         // CRITICAL FIX: Update session again after assistant message to ensure both messages are queryable
         await prisma.chatSession.update({
-          where: { id: sessionId },
+          where: { id: resolvedSessionId },
           data: { updatedAt: new Date() },
         });
       } catch (error) {
@@ -520,7 +521,7 @@ User's Current Visa Application:
       // This prevents race conditions where getConversationHistory is called before session is updated
       // Only update once after both messages are saved
       await prisma.chatSession.update({
-        where: { id: sessionId },
+        where: { id: resolvedSessionId },
         data: { updatedAt: new Date() },
       });
 
