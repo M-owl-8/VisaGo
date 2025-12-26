@@ -51,7 +51,7 @@ export function ChatSidebar({
   };
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-white/10 bg-midnight/90 text-white">
+    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-white/10 bg-midnight/90 text-white">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <MessageSquare size={16} />
@@ -90,14 +90,11 @@ export function ChatSidebar({
                 <li key={session.id}>
                   <div
                     className={cn(
-                      'group relative flex cursor-pointer items-start gap-3 rounded-xl px-3 py-3 transition',
+                      'group relative flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 transition',
                       isActive ? 'bg-white/10' : 'hover:bg-white/5'
                     )}
                     onClick={() => onSelectSession(session.id)}
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/80">
-                      <MessageSquare size={16} />
-                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-white">
                         {session.title || 'New Chat'}

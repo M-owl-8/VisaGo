@@ -218,7 +218,7 @@ function ChatPageContent() {
       {isSidebarOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setIsSidebarOpen(false)} />
-          <div className="relative z-10 h-full w-72">
+          <div className="relative z-10 h-full w-56">
             <ChatSidebar
               sessions={sessions}
               selectedSessionId={selectedSessionId}
@@ -333,7 +333,7 @@ function ChatPageContent() {
                   Salom! I&apos;m your AI visa assistant 👋
                 </h3>
                 <p className="mb-2 max-w-md text-sm text-white/70 sm:text-base">
-                  I can help you with visa requirements, document checklists, and application processes for Spain, Germany, Italy, France, Turkey, UAE, UK, USA, Canada, and South Korea.
+                  I can help you with visa requirements, document checklists, and application processes for all countries worldwide.
                 </p>
                 <p className="mb-8 text-xs text-white/40">
                   {t(
