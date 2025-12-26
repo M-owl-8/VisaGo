@@ -206,6 +206,7 @@ model UserDocument {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   history           DocumentStatusHistory[]
+  documentCheckResults DocumentCheckResult[]
 
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   application       VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -648,6 +649,7 @@ model DocumentCheckResult {
   updatedAt       DateTime @updatedAt
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  document     UserDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@unique([applicationId, checklistItemId])
   @@index([applicationId])
