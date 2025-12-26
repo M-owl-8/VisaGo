@@ -4,6 +4,7 @@ import { AIOpenAIService } from './ai-openai.service';
 import { ApplicationsService } from './applications.service';
 import { VisaTypesService } from './visa-types.service';
 import { CountriesService } from './countries.service';
+import { chatService } from './chat.service';
 
 const prisma = new PrismaClient();
 
@@ -194,6 +195,26 @@ export class AIApplicationService {
         visaTypeId,
         notes: `AI-generated application based on questionnaire. ${aiRecommendations}`,
       });
+
+      // Non-blocking: create chat session attached to the new application
+      try {
+        await chatService.createSessionForApplication(
+          userId,
+          application.id,
+          application.country,
+          application.visaType
+        );
+        console.log('[AIApplication] Chat session created for AI-generated application', {
+          applicationId: application.id,
+          userId,
+        });
+      } catch (sessionError: any) {
+        console.warn('[AIApplication] Failed to create chat session (non-blocking)', {
+          applicationId: application.id,
+          userId,
+          error: sessionError instanceof Error ? sessionError.message : String(sessionError),
+        });
+      }
 
       // CRITICAL FIX: Generate checklist immediately after application creation
       // This ensures checklist exists even if user navigates away

@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { errors } from '../utils/errors';
 import { DocumentChecklistService } from './document-checklist.service';
 import { logError, logInfo, logWarn } from '../middleware/logger';
+import { chatService } from './chat.service';
 
 const prisma = new PrismaClient();
 
@@ -192,7 +193,6 @@ export class ApplicationsService {
 
     // Non-blocking: create chat session attached to this application
     try {
-      const { chatService } = await import('./chat.service');
       await chatService.createSessionForApplication(
         userId,
         application.id,
