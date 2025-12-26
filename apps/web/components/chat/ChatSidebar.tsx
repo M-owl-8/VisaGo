@@ -102,11 +102,8 @@ export function ChatSidebar({
                       <p className="truncate text-sm font-medium text-white">
                         {session.title || 'New Chat'}
                       </p>
-                      <p className="line-clamp-2 text-xs text-white/60">
-                        {session.lastMessage?.content || 'No messages yet'}
-                      </p>
-                      <p className="text-[11px] text-white/40">
-                        {renderTimestamp(session.lastMessage?.createdAt || session.updatedAt)}
+                      <p className="text-[11px] text-white/50">
+                        {renderTimestamp(session.updatedAt || session.createdAt)}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
