@@ -101,12 +101,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className={cn(
-        "sticky top-0 z-40 shrink-0 px-3 py-2.5 sm:px-4 sm:py-3 lg:px-8",
-        pathname === '/chat' && "bg-gradient-to-b from-background/95 to-background/80 backdrop-blur-xl"
+        "sticky top-0 z-40 shrink-0 bg-background px-3 py-2.5 sm:px-4 sm:py-3 lg:px-8"
       )}>
         <div className={cn(
-          "glass-panel relative flex items-center justify-between border border-white/10 px-3 py-2.5 text-white sm:px-4 sm:py-3 md:px-6",
-          pathname === '/chat' ? "bg-midnight/95 backdrop-blur-xl shadow-lg" : "bg-midnight/80"
+          "relative flex items-center justify-between border-b border-white/10 px-3 py-2.5 text-white sm:px-4 sm:py-3 md:px-6"
         )}>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/applications" className="flex items-center gap-2 sm:gap-3">
@@ -218,7 +216,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="glass-panel mt-4 flex flex-col gap-3 border border-white/10 bg-white/5 px-4 py-4 text-white md:hidden"
+              className="mt-4 flex flex-col gap-3 border-b border-white/10 bg-background px-4 py-4 text-white md:hidden"
             >
               {navLinks.map((link) => {
                 const isActive = pathname.startsWith(link.href);
@@ -264,7 +262,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
 
-              <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-background/50 p-4">
                 <p className="text-sm font-semibold text-white">
                   {user?.firstName} {user?.lastName}
                 </p>
