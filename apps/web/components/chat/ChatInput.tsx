@@ -41,7 +41,7 @@ export function ChatInput({
 
   return (
     <form onSubmit={onSubmit} className="w-full">
-      <div className="flex gap-2 sm:gap-3">
+      <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.35)] sm:gap-3">
         <textarea
           ref={textareaRef}
           value={value}
@@ -53,7 +53,7 @@ export function ChatInput({
           }
           rows={1}
           disabled={disabled}
-          className="flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:py-3"
+          className="flex-1 resize-none bg-transparent px-1 py-2 text-sm text-white placeholder:text-white/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
           style={{
             minHeight: '44px',
             maxHeight: '120px',
@@ -62,14 +62,11 @@ export function ChatInput({
         <Button
           type="submit"
           disabled={disabled || !value.trim()}
-          className="shrink-0 rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 shadow-[0_10px_25px_rgba(62,166,255,0.35)] disabled:opacity-50 disabled:cursor-not-allowed sm:px-6 sm:py-3"
+          className="shrink-0 rounded-xl bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 shadow-[0_10px_25px_rgba(62,166,255,0.35)] disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-3"
         >
           <Send size={16} className="sm:size-5" />
         </Button>
       </div>
-      <p className="mt-1.5 text-[10px] text-white/40 sm:mt-2 sm:text-xs">
-        {t('chat.inputHint', 'Press Enter to send, Shift+Enter for new line')}
-      </p>
     </form>
   );
 }

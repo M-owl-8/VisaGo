@@ -3,7 +3,7 @@
 import { Bot } from 'lucide-react';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { SkeletonList } from '@/components/ui/Skeleton';
-import type { ChatMessage } from '@/lib/hooks/useChatSession';
+import type { ChatMessage } from '@/lib/stores/chat';
 
 interface ChatMessageListProps {
   messages: ChatMessage[];

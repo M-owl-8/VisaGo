@@ -36,7 +36,7 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
         },
       });
     }
-    const { query, applicationId, conversationHistory } = req.body;
+    const { query, applicationId, conversationHistory, sessionId } = req.body;
     // Use 'query' from middleware validation, fallback to 'content' for backward compatibility
     const content = query || req.body.content;
 
@@ -54,6 +54,7 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
       userId,
       contentLength: content.length,
       hasApplicationId: !!applicationId,
+      hasSessionId: !!sessionId,
       historyLength: conversationHistory?.length || 0,
     });
 
@@ -111,15 +112,29 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
     });
 
     // Save messages to database (for history)
+    let resolvedSessionId = sessionId as string | undefined;
     try {
-      const sessionId = await ChatService.getOrCreateSession(userId, applicationId);
-
-      // Save user message
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
+
+      if (resolvedSessionId) {
+        const session = await prisma.chatSession.findFirst({
+          where: { id: resolvedSessionId, userId },
+        });
+        if (!session) {
+          return res.status(404).json({
+            success: false,
+            error: { message: 'Session not found' },
+          });
+        }
+      } else {
+        resolvedSessionId = await ChatService.getOrCreateSession(userId, applicationId);
+      }
+
+      // Save user message
       await prisma.chatMessage.create({
         data: {
-          sessionId,
+          sessionId: resolvedSessionId,
           userId,
           role: 'user',
           content,
@@ -131,7 +146,7 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
       // Save assistant message
       await prisma.chatMessage.create({
         data: {
-          sessionId,
+          sessionId: resolvedSessionId,
           userId,
           role: 'assistant',
           content: response.message,
@@ -140,6 +155,14 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
           tokensUsed: response.tokens_used || 0,
         },
       });
+
+      if (resolvedSessionId) {
+        await ChatService.ensureSessionTitle(
+          resolvedSessionId,
+          content,
+          response.applicationContext
+        );
+      }
     } catch (saveError) {
       // Non-blocking: log but don't fail the request
       console.warn('[Chat Route] Failed to save messages to database:', saveError);
@@ -159,6 +182,7 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
       tokens_used: response.tokens_used || 0,
       model: response.model || 'gpt-4',
       id: response.id || `msg-${Date.now()}`,
+      sessionId: resolvedSessionId,
       applicationContext: response.applicationContext || null,
     };
 
@@ -211,7 +235,7 @@ router.post('/send', async (req: Request, res: Response) => {
         },
       });
     }
-    const { content, applicationId, conversationHistory } = req.body;
+    const { content, applicationId, conversationHistory, sessionId } = req.body;
 
     // Validate required fields
     if (!content || !content.trim()) {
@@ -227,7 +251,8 @@ router.post('/send', async (req: Request, res: Response) => {
       userId,
       content,
       applicationId,
-      conversationHistory
+      conversationHistory,
+      sessionId
     );
 
     // Increment rate limit counter after successful message
@@ -253,6 +278,37 @@ router.post('/send', async (req: Request, res: Response) => {
       success: false,
       error: {
         message: error.message || 'Failed to process message',
+      },
+    });
+  }
+});
+
+/**
+ * POST /api/chat/sessions
+ * Create a new chat session
+ */
+router.post('/sessions', async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId || (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: { message: 'User not authenticated' },
+      });
+    }
+
+    const { applicationId, title } = req.body;
+    const session = await ChatService.createSession(userId, applicationId, title);
+
+    res.status(201).json({
+      success: true,
+      data: session,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        message: error.message || 'Failed to create session',
       },
     });
   }

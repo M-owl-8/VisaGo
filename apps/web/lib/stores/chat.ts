@@ -11,33 +11,195 @@ export interface ChatMessage {
   model?: string;
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  applicationId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  lastMessage?: {
+    content: string;
+    createdAt: string;
+    role: 'user' | 'assistant';
+  } | null;
+}
+
 interface ChatState {
   messages: ChatMessage[];
-  isLoading: boolean;
-  error: string | null;
+  sessions: ChatSession[];
+  selectedSessionId: string | null;
   currentApplicationId: string | null;
-  currentSessionId: string | null;
+  isLoading: boolean; // sending / loading messages
+  isLoadingSessions: boolean;
+  error: string | null;
 
   // Actions
+  loadSessions: () => Promise<void>;
+  selectSession: (sessionId: string | null) => Promise<void>;
+  createNewSession: (applicationId?: string | null) => Promise<string | null>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  renameSession: (sessionId: string, title: string) => Promise<void>;
   setCurrentApplication: (applicationId: string | null) => void;
   sendMessage: (content: string, applicationId?: string) => Promise<void>;
-  loadChatHistory: (applicationId?: string, limit?: number) => Promise<void>;
+  loadChatHistory: (sessionId?: string | null, limit?: number) => Promise<void>;
   clearMessages: () => void;
 }
 
+const mapMessage = (msg: any): ChatMessage => {
+  let sources = msg.sources;
+  if (typeof sources === 'string') {
+    try {
+      sources = JSON.parse(sources);
+    } catch {
+      sources = [];
+    }
+  }
+  if (!Array.isArray(sources)) {
+    sources = [];
+  }
+
+  return {
+    id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+    role: msg.role || 'user',
+    content: msg.content || msg.message || '',
+    timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
+    sources,
+    tokens_used: msg.tokens_used || msg.tokensUsed || 0,
+    model: msg.model || 'gpt-4',
+  };
+};
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
-  isLoading: false,
-  error: null,
+  sessions: [],
+  selectedSessionId: null,
   currentApplicationId: null,
-  currentSessionId: null,
+  isLoading: false,
+  isLoadingSessions: false,
+  error: null,
+
+  loadSessions: async () => {
+    try {
+      set({ isLoadingSessions: true });
+      const response = await apiClient.getChatSessions(100, 0);
+      if (!response.success || !response.data?.sessions) {
+        throw new Error(response.error?.message || 'Failed to load sessions');
+      }
+
+      const sessions: ChatSession[] = response.data.sessions.map((session: any) => ({
+        id: session.id,
+        title: session.title || 'New Chat',
+        applicationId: session.applicationId || null,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        lastMessage: session.messages?.[0]
+          ? {
+              content: session.messages[0].content,
+              createdAt: session.messages[0].createdAt,
+              role: session.messages[0].role || 'assistant',
+            }
+          : null,
+      }));
+
+      set((state) => {
+        const existingSelection = state.selectedSessionId;
+        const nextSelection =
+          existingSelection && sessions.find((s) => s.id === existingSelection)
+            ? existingSelection
+            : sessions[0]?.id || null;
+
+        return { sessions, selectedSessionId: nextSelection };
+      });
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      set({ sessions: [] });
+    } finally {
+      set({ isLoadingSessions: false });
+    }
+  },
+
+  selectSession: async (sessionId: string | null) => {
+    set({ selectedSessionId: sessionId });
+    if (sessionId) {
+      await get().loadChatHistory(sessionId);
+    } else {
+      set({ messages: [] });
+    }
+  },
+
+  createNewSession: async (applicationId?: string | null) => {
+    try {
+      const response = await apiClient.createChatSession(applicationId || undefined);
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to create session');
+      }
+
+      const session: ChatSession = {
+        id: response.data.id,
+        title: response.data.title || 'New Chat',
+        applicationId: response.data.applicationId || null,
+        createdAt: response.data.createdAt,
+        updatedAt: response.data.updatedAt,
+        lastMessage: null,
+      };
+
+      set((state) => ({
+        sessions: [session, ...state.sessions],
+        selectedSessionId: session.id,
+        currentApplicationId: applicationId || null,
+        messages: [],
+      }));
+
+      return session.id;
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      set({ error: 'Unable to create new chat session' });
+      return null;
+    }
+  },
+
+  deleteSession: async (sessionId: string) => {
+    try {
+      const response = await apiClient.deleteChatSession(sessionId);
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Failed to delete session');
+      }
+
+      set((state) => {
+        const filtered = state.sessions.filter((s) => s.id !== sessionId);
+        const nextSelected = state.selectedSessionId === sessionId ? filtered[0]?.id || null : state.selectedSessionId;
+        return {
+          sessions: filtered,
+          selectedSessionId: nextSelected,
+          messages: nextSelected === state.selectedSessionId ? state.messages : [],
+        };
+      });
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      set({ error: 'Failed to delete chat session' });
+    }
+  },
+
+  renameSession: async (sessionId: string, title: string) => {
+    try {
+      const response = await apiClient.renameChatSession(sessionId, title);
+      if (!response.success || !response.data) {
+        throw new Error(response.error?.message || 'Failed to rename session');
+      }
+
+      set((state) => ({
+        sessions: state.sessions.map((s) =>
+          s.id === sessionId ? { ...s, title: response.data.title || title } : s
+        ),
+      }));
+    } catch (error) {
+      console.error('Failed to rename session:', error);
+      set({ error: 'Failed to rename chat session' });
+    }
+  },
 
   setCurrentApplication: (applicationId: string | null) => {
     set({ currentApplicationId: applicationId });
-    // Only load history if not already loading to prevent spam
-    if (!get().isLoading) {
-      get().loadChatHistory(applicationId || undefined);
-    }
   },
 
   sendMessage: async (content: string, applicationId?: string) => {
@@ -46,7 +208,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
 
-    // Store user message ID for potential removal on error
+    const activeSessionId = get().selectedSessionId;
     const userMessageId = `user-${Date.now()}`;
 
     try {
@@ -70,23 +232,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
         content: msg.content,
       }));
 
-      // Send to backend
       const response = await apiClient.sendMessage(
         content,
         applicationId || get().currentApplicationId || undefined,
-        conversationHistory
+        conversationHistory,
+        activeSessionId || undefined
       );
 
-      // Handle 429 rate limit response
       if (!response.success && response.error?.status === 429) {
-        throw new Error(response.error.message || 'You\'re sending messages too quickly. Please wait a few seconds and try again.');
+        throw new Error(
+          response.error.message ||
+            "You're sending messages too quickly. Please wait a few seconds and try again."
+        );
       }
 
       if (!response.success || !response.data) {
         throw new Error(response.error?.message || 'Failed to send message');
       }
 
-      // Add assistant response
+      const resolvedSessionId = response.data.sessionId || activeSessionId || get().selectedSessionId;
+      if (resolvedSessionId && resolvedSessionId !== get().selectedSessionId) {
+        set({ selectedSessionId: resolvedSessionId });
+      }
+
       const assistantMessage: ChatMessage = {
         id: response.data.id || `assistant-${Date.now()}`,
         role: 'assistant',
@@ -99,17 +267,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       set((state) => ({
         messages: [...state.messages, assistantMessage],
+        sessions: state.sessions.map((s) =>
+          s.id === resolvedSessionId
+            ? {
+                ...s,
+                updatedAt: new Date().toISOString(),
+                lastMessage: {
+                  content: assistantMessage.content,
+                  createdAt: assistantMessage.timestamp,
+                  role: 'assistant',
+                },
+              }
+            : s
+        ),
       }));
     } catch (error: any) {
-      // Handle 429 rate limit errors specifically
-      if (error.response?.status === 429 || error.message?.includes('429') || error.message?.includes('rate limit') || error.message?.includes('limit exceeded')) {
-        set({ 
-          error: 'You\'re sending messages too quickly. Please wait a few seconds and try again.' 
+      if (
+        error.response?.status === 429 ||
+        error.message?.includes('429') ||
+        error.message?.includes('rate limit') ||
+        error.message?.includes('limit exceeded')
+      ) {
+        set({
+          error: "You're sending messages too quickly. Please wait a few seconds and try again.",
         });
       } else {
         set({ error: error.message || 'Failed to send message' });
       }
-      // Remove optimistic user message on error using the stored ID
+
       set((state) => ({
         messages: state.messages.filter((msg) => msg.id !== userMessageId),
       }));
@@ -118,123 +303,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  loadChatHistory: async (applicationId?: string, limit: number = 100) => {
-    // Prevent concurrent calls
+  loadChatHistory: async (sessionId?: string | null, limit: number = 100) => {
     if (get().isLoading) {
+      return;
+    }
+
+    const targetSessionId = sessionId || get().selectedSessionId;
+    if (!targetSessionId) {
+      set({ messages: [] });
       return;
     }
 
     try {
       set({ isLoading: true, error: null });
 
-      // First, get or find the session for this applicationId
-      let sessionId = get().currentSessionId;
-      
-      if (!sessionId) {
-        try {
-          // Get user sessions to find the one for this applicationId
-          const sessionsResponse = await apiClient.getChatSessions(100, 0);
-          if (sessionsResponse.success && sessionsResponse.data?.sessions) {
-            const sessions = sessionsResponse.data.sessions;
-            // Find session matching applicationId (or general chat if no applicationId)
-            const matchingSession = sessions.find((s: any) => 
-              applicationId ? s.applicationId === applicationId : !s.applicationId
-            );
-            if (matchingSession?.id) {
-              sessionId = matchingSession.id;
-              set({ currentSessionId: sessionId });
-            }
-          }
-        } catch (sessionsError) {
-          // If getting sessions fails, continue with fallback endpoint
-          console.warn('Failed to get sessions, using fallback:', sessionsError);
-        }
+      const sessionResponse = await apiClient.getChatSessionDetails(targetSessionId, limit);
+      if (!sessionResponse.success || !sessionResponse.data) {
+        throw new Error(sessionResponse.error?.message || 'Failed to load chat history');
       }
 
-      // If we have a sessionId, use the session-based endpoint for cross-platform sync
-      if (sessionId) {
-        const sessionResponse = await apiClient.getChatSessionDetails(sessionId, limit);
-        if (sessionResponse.success && sessionResponse.data) {
-          const sessionData = sessionResponse.data;
-          const historyData = sessionData.messages || [];
-          const messages: ChatMessage[] = historyData.map((msg: any) => {
-            // Parse sources if it's a JSON string
-            let sources = msg.sources;
-            if (typeof sources === 'string') {
-              try {
-                sources = JSON.parse(sources);
-              } catch {
-                sources = [];
-              }
-            }
-            if (!Array.isArray(sources)) {
-              sources = [];
-            }
-            
-            return {
-              id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-              role: msg.role || 'user',
-              content: msg.content || msg.message || '',
-              timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
-              sources,
-              tokens_used: msg.tokens_used || msg.tokensUsed || 0,
-              model: msg.model || 'gpt-4',
-            };
-          });
-          set({ messages, error: null, currentSessionId: sessionId });
-          return;
-        }
-      }
+      const historyData = sessionResponse.data.messages || [];
+      const messages: ChatMessage[] = historyData.map(mapMessage);
 
-      // Fallback to the old endpoint if no session found (for backward compatibility)
-      const response = await apiClient.getChatHistory(applicationId, limit);
-
-      // Handle empty history gracefully - backend returns empty array if no session
-      if (!response.success) {
-        // If it's a "session not found" error, treat as empty history
-        if (response.error?.message?.includes('Session not found') || 
-            response.error?.status === 500) {
-          set({ messages: [], error: null });
-          return;
-        }
-        throw new Error(response.error?.message || 'Failed to load chat history');
-      }
-
-      // Transform backend messages to ChatMessage format
-      // Backend returns array directly, not wrapped in messages property
-      const historyData = Array.isArray(response.data) ? response.data : (response.data?.messages || []);
-      const messages: ChatMessage[] = historyData.map((msg: any) => {
-        // Parse sources if it's a JSON string
-        let sources = msg.sources;
-        if (typeof sources === 'string') {
-          try {
-            sources = JSON.parse(sources);
-          } catch {
-            sources = [];
-          }
-        }
-        if (!Array.isArray(sources)) {
-          sources = [];
-        }
-        
-        return {
-          id: msg.id || `msg-${Date.now()}-${Math.random()}`,
-          role: msg.role || 'user',
-          content: msg.content || msg.message || '',
-          timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
-          sources,
-          tokens_used: msg.tokens_used || msg.tokensUsed || 0,
-          model: msg.model || 'gpt-4',
-        };
+      set({
+        messages,
+        error: null,
+        selectedSessionId: targetSessionId,
       });
-
-      set({ messages, error: null });
     } catch (error: any) {
-      // Don't spam console - only log first error
       if (!get().error) {
         console.error('Failed to load chat history:', error);
       }
-      // Set empty messages instead of error to allow user to start chatting
       set({ messages: [], error: null });
     } finally {
       set({ isLoading: false });

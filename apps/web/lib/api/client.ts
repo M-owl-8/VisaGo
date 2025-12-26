@@ -415,7 +415,8 @@ class ApiClient {
   async sendMessage(
     content: string,
     applicationId?: string,
-    conversationHistory?: any[]
+    conversationHistory?: any[],
+    sessionId?: string
   ): Promise<ApiResponse> {
     try {
       const transformedHistory = (conversationHistory || []).map((msg) => ({
@@ -429,6 +430,7 @@ class ApiClient {
           query: content,
           content: content,
           applicationId: applicationId,
+          sessionId,
           conversationHistory: transformedHistory,
         },
         {
@@ -450,6 +452,7 @@ class ApiClient {
           tokens_used: aiData.tokens_used || 0,
           model: aiData.model || 'deepseek-reasoner',
           id: aiData.id || `assistant-${Date.now()}`,
+          sessionId: aiData.sessionId,
           applicationContext: aiData.applicationContext,
         },
       };
@@ -520,6 +523,26 @@ class ApiClient {
     return response.data;
   }
 
+  async createChatSession(applicationId?: string, title?: string): Promise<ApiResponse> {
+    const response = await this.api.post('/chat/sessions', {
+      applicationId,
+      title,
+    });
+    return response.data;
+  }
+
+  async renameChatSession(sessionId: string, title: string): Promise<ApiResponse> {
+    const response = await this.api.patch(`/chat/sessions/${sessionId}`, {
+      title,
+    });
+    return response.data;
+  }
+
+  async deleteChatSession(sessionId: string): Promise<ApiResponse> {
+    const response = await this.api.delete(`/chat/sessions/${sessionId}`);
+    return response.data;
+  }
+
   // ============================================================================
   // USER ENDPOINTS
   // ============================================================================
@@ -545,6 +568,11 @@ class ApiClient {
 
     this.pendingRequests.set(requestKey, requestPromise);
     return requestPromise;
+  }
+
+  async getActiveSessions(): Promise<ApiResponse> {
+    const response = await this.api.get('/notifications/active-sessions');
+    return response.data;
   }
 
   async getUserApplications(userId: string): Promise<ApiResponse> {

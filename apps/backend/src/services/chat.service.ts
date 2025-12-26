@@ -26,6 +26,31 @@ function getAIServiceURL(): string {
 
 const AI_SERVICE_URL = getAIServiceURL();
 
+function isPlaceholderTitle(title?: string | null): boolean {
+  if (!title) return true;
+  const normalized = title.trim().toLowerCase();
+  return (
+    normalized === 'new chat' || normalized === 'general chat' || normalized.startsWith('chat for')
+  );
+}
+
+function buildSessionTitle(content: string, applicationContext?: any): string {
+  const maxLength = 50;
+
+  if (applicationContext?.country && applicationContext?.visaType) {
+    const base = `${applicationContext.country} ${applicationContext.visaType} visa`;
+    return base.length > maxLength ? `${base.slice(0, maxLength - 1)}…` : base;
+  }
+
+  const condensed = (content || '').trim().replace(/\s+/g, ' ');
+
+  if (!condensed) {
+    return 'New Chat';
+  }
+
+  return condensed.length > maxLength ? `${condensed.slice(0, maxLength - 1)}…` : condensed;
+}
+
 export class ChatService {
   /**
    * Create or get a chat session
@@ -67,6 +92,45 @@ export class ChatService {
       // Log error and re-throw to prevent messages from being saved without a session
       console.error('[ChatService] Failed to get or create session:', error);
       throw new Error(`Failed to create chat session: ${error.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create a new session explicitly
+   */
+  async createSession(userId: string, applicationId?: string | null, title?: string) {
+    const session = await prisma.chatSession.create({
+      data: {
+        userId,
+        applicationId: applicationId || null,
+        title: title?.trim() || (applicationId ? `Chat for ${applicationId}` : 'New Chat'),
+      },
+    });
+
+    return session;
+  }
+
+  /**
+   * Ensure session has a meaningful title (first message or application context)
+   */
+  async ensureSessionTitle(sessionId: string, content: string, applicationContext?: any) {
+    try {
+      const session = await prisma.chatSession.findFirst({
+        where: { id: sessionId },
+        select: { title: true },
+      });
+
+      if (!session || !isPlaceholderTitle(session.title)) {
+        return;
+      }
+
+      const newTitle = buildSessionTitle(content, applicationContext);
+      await prisma.chatSession.update({
+        where: { id: sessionId },
+        data: { title: newTitle },
+      });
+    } catch (error) {
+      console.warn('[ChatService] Failed to update session title:', error);
     }
   }
 
@@ -169,12 +233,47 @@ export class ChatService {
     userId: string,
     content: string,
     applicationId?: string,
-    conversationHistory?: any[]
+    conversationHistory?: any[],
+    sessionId?: string
   ) {
     const startTime = Date.now();
     try {
-      // Get or create session
-      const sessionId = await this.getOrCreateSession(userId, applicationId);
+      // Resolve session (explicit sessionId has priority)
+      let session = null as any;
+
+      if (sessionId) {
+        session = await prisma.chatSession.findFirst({
+          where: { id: sessionId, userId },
+        });
+        if (!session) {
+          throw new Error('Session not found');
+        }
+      }
+
+      if (!session) {
+        session = await prisma.chatSession.findFirst({
+          where: {
+            userId,
+            applicationId: applicationId || null,
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+      }
+
+      if (!session) {
+        session = await prisma.chatSession.create({
+          data: {
+            userId,
+            applicationId: applicationId || null,
+            title: applicationId ? `Chat for ${applicationId}` : 'New Chat',
+          },
+        });
+      }
+
+      sessionId = session.id;
+      const existingMessagesCount = await prisma.chatMessage.count({
+        where: { sessionId },
+      });
 
       // Get recent conversation history for context
       let history = conversationHistory || [];
@@ -376,6 +475,10 @@ User's Current Visa Application:
         where: { id: sessionId },
         data: { updatedAt: new Date() },
       });
+
+      if (existingMessagesCount === 0 || isPlaceholderTitle(session.title)) {
+        await this.ensureSessionTitle(sessionId, content, applicationContext);
+      }
 
       // Save assistant response with sources and response time
       let assistantMessage;
@@ -825,6 +928,8 @@ STYLE: Short paragraphs, simple lists (1., 2., 3.), no markdown headings, no cha
         responseTime: 0,
       },
     });
+
+    await this.ensureSessionTitle(sessionId, content);
 
     // Create a helpful fallback message based on the user's question
     let fallbackMessage = '';
