@@ -57,3 +57,5 @@ export function isKetdikInstructionIntent(text: string): boolean {
 
   return instructionKeywords.some((phrase) => normalized.includes(phrase));
 }
+
+

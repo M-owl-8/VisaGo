@@ -1,6 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 import { Request, Response } from 'express';
+import { getEnvConfig } from '../config/env';
 import Redis from 'ioredis';
 
 // Initialize Redis client for rate limiting with health checks
@@ -200,6 +201,61 @@ export const webhookLimiter = rateLimit({
       error: {
         status: 429,
         message: 'Too many webhook requests. Please try again later.',
+      },
+    });
+  },
+});
+
+/**
+ * Per-user API limiter: defaults 120 req / 60s. Falls back to IP if userId missing.
+ */
+const { PER_USER_RATE_LIMIT_WINDOW_MS, PER_USER_RATE_LIMIT_MAX } = getEnvConfig();
+
+export const perUserLimiter = rateLimit({
+  store: getStore(),
+  windowMs: PER_USER_RATE_LIMIT_WINDOW_MS,
+  max: PER_USER_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    return (req as any).userId || (req as any).user?.id || req.ip;
+  },
+  skip: (req: Request) => {
+    const p = req.path || '';
+    if (p === '/health' || p === '/api/status' || p.includes('/webhook/')) return true;
+    return false;
+  },
+  message: 'Too many requests. Please slow down.',
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: {
+        status: 429,
+        message: 'Too many requests. Please slow down.',
+      },
+    });
+  },
+});
+
+// Admin-specific rate limiter (stricter, keyed by userId when available)
+const { ADMIN_RATE_LIMIT_WINDOW_MS, ADMIN_RATE_LIMIT_MAX } = getEnvConfig();
+
+export const adminLimiter = rateLimit({
+  store: getStore(),
+  windowMs: ADMIN_RATE_LIMIT_WINDOW_MS,
+  max: ADMIN_RATE_LIMIT_MAX,
+  message: 'Admin rate limit exceeded. Please slow down.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    return (req as any).userId || req.ip;
+  },
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: {
+        status: 429,
+        message: 'Admin rate limit exceeded. Please slow down.',
       },
     });
   },

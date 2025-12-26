@@ -137,58 +137,79 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 },
             });
         }
-        // HIGH PRIORITY FIX: Update application progress after document upload
-        // This ensures progress percentage reflects document completion status
-        try {
-            const { ApplicationsService } = await Promise.resolve().then(() => __importStar(require('../services/applications.service')));
-            await ApplicationsService.updateProgressFromDocuments(applicationId);
-            console.log('[Documents] Updated application progress after upload', { applicationId });
-        }
-        catch (progressError) {
-            // Log but don't fail document upload if progress update fails
-            console.warn('[Documents] Failed to update application progress:', progressError);
-        }
-        // Try to find matching checklist item (optional)
-        let checklistItem = undefined;
-        try {
-            const { DocumentChecklistService } = await Promise.resolve().then(() => __importStar(require('../services/document-checklist.service')));
-            const checklist = await DocumentChecklistService.generateChecklist(applicationId, userId);
-            // Handle both checklist object and status object with proper type narrowing
-            if (isDocumentChecklist(checklist)) {
-                checklistItem = checklist.items.find((item) => item.documentType === documentType ||
-                    item.documentType?.toLowerCase() === documentType.toLowerCase());
-                // Log checklist item lookup for debugging
-                console.log('[UPLOAD_DEBUG] Checklist item lookup', {
-                    documentType,
-                    checklistItemFound: !!checklistItem,
-                    checklistItemDocumentType: checklistItem?.documentType,
-                    allChecklistItemTypes: checklist.items.map((i) => i.documentType),
-                });
-            }
-            // If checklist is a status object (processing/failed), we skip the lookup
-            // This is expected and not an error - checklist lookup is optional
-        }
-        catch (error) {
-            // Checklist lookup is optional, continue without it
-            console.log('[UPLOAD_DEBUG] Checklist lookup failed (non-blocking)', {
-                documentType,
-                error: error instanceof Error ? error.message : String(error),
-            });
-        }
-        // Create document record in database first
-        // Use documentType directly from request body (must be the value sent by frontend)
-        const document = await prisma.userDocument.create({
-            data: {
+        // Note: Progress update and checklist generation moved to background queue
+        // This allows the upload endpoint to return immediately (< 2s)
+        // Normalize document type before storing
+        const { toCanonicalDocumentType, logUnknownDocumentType, } = require('../config/document-types-map');
+        const rawDocumentType = documentType.trim();
+        const norm = toCanonicalDocumentType(rawDocumentType);
+        if (!norm.canonicalType) {
+            logUnknownDocumentType(rawDocumentType, {
+                source: 'document-upload',
                 userId,
                 applicationId,
-                documentName: req.file.originalname,
-                documentType: documentType.trim(), // Use the value sent by frontend, trimmed
-                fileUrl: uploadResult.fileUrl,
-                fileName: uploadResult.fileName,
-                fileSize: uploadResult.fileSize,
-                status: 'pending', // Will be updated after AI validation in background
+            });
+        }
+        // Use canonical type if available, otherwise fall back to original (backward compatible)
+        const storedDocumentType = norm.canonicalType ?? rawDocumentType;
+        // Check for existing document with same applicationId and documentType
+        // Update existing record instead of creating duplicates
+        const existingDocument = await prisma.userDocument.findFirst({
+            where: {
+                applicationId,
+                documentType: storedDocumentType,
+            },
+            orderBy: {
+                createdAt: 'desc',
             },
         });
+        let document;
+        if (existingDocument) {
+            // Update existing document with new file
+            document = await prisma.userDocument.update({
+                where: { id: existingDocument.id },
+                data: {
+                    documentName: req.file.originalname,
+                    fileUrl: uploadResult.fileUrl,
+                    fileName: uploadResult.fileName,
+                    fileSize: uploadResult.fileSize,
+                    status: 'pending', // Reset to pending for new validation
+                    verifiedByAI: false,
+                    aiConfidence: null,
+                    aiNotesUz: null,
+                    aiNotesEn: null,
+                    aiNotesRu: null,
+                    verificationNotes: null,
+                },
+            });
+            console.log('[UPLOAD_DEBUG] Updated existing UserDocument', {
+                documentId: document.id,
+                documentType: document.documentType,
+                status: document.status,
+                applicationId: document.applicationId,
+            });
+        }
+        else {
+            // Create new document record
+            document = await prisma.userDocument.create({
+                data: {
+                    userId,
+                    applicationId,
+                    documentName: req.file.originalname,
+                    documentType: storedDocumentType,
+                    fileUrl: uploadResult.fileUrl,
+                    fileName: uploadResult.fileName,
+                    fileSize: uploadResult.fileSize,
+                    status: 'pending', // Will be updated after AI validation in background
+                },
+            });
+            console.log('[UPLOAD_DEBUG] Created new UserDocument', {
+                documentId: document.id,
+                documentType: document.documentType,
+                status: document.status,
+                applicationId: document.applicationId,
+            });
+        }
         // Log document creation for debugging
         console.log('[UPLOAD_DEBUG] Created UserDocument', {
             documentId: document.id,
@@ -221,13 +242,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 }
             });
         }
-        // Return response immediately - processing happens in background
-        res.status(201).json({
+        // Return 202 Accepted immediately - processing happens in background
+        res.status(202).json({
             success: true,
             data: {
                 documentId: document.id,
                 documentType: document.documentType,
-                status: document.status,
+                status: 'pending',
                 fileUrl: document.fileUrl,
                 fileName: document.fileName,
                 uploadedAt: document.uploadedAt,
@@ -236,7 +257,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 type: process.env.STORAGE_TYPE || 'local',
                 fileUrl: uploadResult.fileUrl,
             },
-            message: 'Document uploaded successfully. Processing in background.',
+            message: 'Document uploaded successfully. AI validation in progress.',
         });
     }
     catch (error) {
@@ -244,6 +265,51 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             success: false,
             error: {
                 message: error.message,
+            },
+        });
+    }
+});
+/**
+ * GET /api/documents/:documentId/status
+ * Get the current status of a specific document
+ */
+router.get('/:documentId/status', async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { documentId } = req.params;
+        const document = await prisma.userDocument.findFirst({
+            where: {
+                id: documentId,
+                userId,
+            },
+            select: {
+                status: true,
+                verifiedByAI: true,
+                aiConfidence: true,
+                aiNotesUz: true,
+                aiNotesEn: true,
+                aiNotesRu: true,
+                verificationNotes: true,
+            },
+        });
+        if (!document) {
+            return res.status(404).json({
+                success: false,
+                error: {
+                    message: 'Document not found or access denied',
+                },
+            });
+        }
+        res.status(200).json({
+            success: true,
+            data: document,
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: {
+                message: error.message || 'Failed to fetch document status',
             },
         });
     }

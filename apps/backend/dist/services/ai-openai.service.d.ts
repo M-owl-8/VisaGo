@@ -120,6 +120,20 @@ export declare class AIOpenAIService {
      */
     private static parseHybridResponse;
     /**
+     * Best-effort repair for truncated JSON (common when max tokens is hit).
+     * Only applies safe fixes:
+     * - Removes trailing commas before ] or }
+     * - Appends missing closing ] / } (brace counting outside strings)
+     *
+     * Returns repaired JSON text or null if no safe repair can be applied.
+     */
+    private static repairLikelyTruncatedJson;
+    /**
+     * Append missing closing brackets/braces by counting structure characters outside strings.
+     * If the input ends inside an open string, we do not attempt to repair.
+     */
+    private static appendMissingJsonClosers;
+    /**
      * Validate hybrid response matches base checklist
      */
     private static validateHybridResponse;
@@ -195,6 +209,13 @@ export declare class AIOpenAIService {
      * @param application - Application object with country and visaType
      * @param aiUserContext - AI user context with questionnaire data
      * @returns Checklist response with items array
+     */
+    /**
+     * Legacy checklist generator used only when the rules-first engine is not available
+     * or fails. New features should prefer VisaChecklistEngineService with VisaRuleSet.
+     *
+     * @deprecated This is a fallback mode. Use VisaChecklistEngineService with approved
+     * VisaRuleSet as the primary checklist generation method.
      */
     static generateChecklistLegacy(application: {
         country: {

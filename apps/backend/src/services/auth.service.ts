@@ -680,13 +680,14 @@ export class AuthService {
     // Generate reset token (32 character random string)
     const crypto = require('crypto');
     const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
     // Save reset token to database
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        resetToken,
+        resetToken: resetTokenHash,
         resetTokenExpiry,
       },
     });
@@ -699,10 +700,16 @@ export class AuthService {
       const userName = user.firstName || user.email.split('@')[0];
       await emailService.sendPasswordResetEmail(user.email, resetLink);
     } catch (error) {
-      // Log reset token if email service fails (for development)
-      console.log(`Password reset token for ${normalizedEmail}: ${resetToken}`);
-      console.log(`Reset link: ${resetLink}`);
-      console.warn('Email service not available, reset token logged to console');
+      // Do not log raw token; log truncated hash for debugging only
+      const tokenPreview = `${resetTokenHash.substring(0, 6)}...`;
+      console.warn(
+        'Email service not available, reset token hash logged to console for development only',
+        {
+          email: normalizedEmail.substring(0, 3) + '***',
+          tokenPreview,
+          resetLink,
+        }
+      );
     }
   }
 
@@ -719,10 +726,13 @@ export class AuthService {
       });
     }
 
-    // Find user by reset token
+    // Find user by reset token (hashed)
+    const crypto = require('crypto');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
     const user = await prisma.user.findFirst({
       where: {
-        resetToken: token,
+        resetToken: tokenHash,
         resetTokenExpiry: {
           gt: new Date(), // Token not expired
         },

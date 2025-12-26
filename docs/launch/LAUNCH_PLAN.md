@@ -156,3 +156,5 @@ All items list owner (role), priority (P0/P1/P2), effort (S/M/L), and Definition
 - Checklist engine: `apps/backend/src/services/visa-checklist-engine.service.ts`
 - Prisma schema: `apps/backend/prisma/schema.prisma`
 - Web landing & layout: `apps/web/app/page.tsx`, `apps/web/components/landing/HeroSection.tsx`
+
+

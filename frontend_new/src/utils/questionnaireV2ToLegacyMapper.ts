@@ -16,7 +16,7 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
   purpose: string;
   country: string;
   targetCountry: string;
-  visaType: 'tourist' | 'student';
+  visaType: string;
   duration: string;
   traveledBefore: boolean;
   currentStatus: string;
@@ -36,8 +36,29 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
   businessModule?: QuestionnaireV2['businessModule'];
   transitModule?: QuestionnaireV2['transitModule'];
 } {
-  // Map visaType to purpose
-  const purpose = v2.visaType === 'student' ? 'study' : 'tourism';
+  // Map visaType to purpose and normalize visa type
+  const visaTypeLower = (v2.visaType || '').toLowerCase();
+  let purpose = 'tourism';
+  let normalizedVisaType = v2.visaType;
+  
+  if (visaTypeLower.includes('student')) {
+    purpose = 'study';
+    normalizedVisaType = 'student';
+  } else if (visaTypeLower.includes('work')) {
+    purpose = 'work';
+    normalizedVisaType = 'work';
+  } else if (visaTypeLower.includes('business')) {
+    purpose = 'business';
+    normalizedVisaType = 'business';
+  } else if (visaTypeLower.includes('family') || visaTypeLower.includes('visitor')) {
+    purpose = 'family';
+    normalizedVisaType = 'family';
+  } else if (visaTypeLower.includes('transit')) {
+    purpose = 'transit';
+    normalizedVisaType = 'transit';
+  } else {
+    normalizedVisaType = 'tourist';
+  }
 
   // Map targetCountry to country (use code directly, backend can handle it)
   const country = v2.targetCountry;
@@ -102,7 +123,7 @@ export function mapQuestionnaireV2ToLegacy(v2: QuestionnaireV2): {
     purpose,
     country,
     targetCountry: v2.targetCountry,
-    visaType: v2.visaType,
+    visaType: normalizedVisaType,
     duration,
     traveledBefore: v2.history.hasTraveledBefore,
     currentStatus,

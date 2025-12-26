@@ -3,6 +3,7 @@ import { chatService as ChatService } from '../services/chat.service';
 import { authenticateToken } from '../middleware/auth';
 import { validateRAGRequest } from '../middleware/input-validation';
 import { chatRateLimitMiddleware, attachChatLimitHeaders } from '../middleware/chat-rate-limit';
+import { UsageTrackingService } from '../services/usage-tracking.service';
 
 const router = Router();
 
@@ -47,6 +48,23 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
         error: {
           message: 'Message content is required',
         },
+      });
+    }
+
+    // Pre-flight cost check (conservative estimate)
+    const anticipatedCents = UsageTrackingService.estimateCostCents(undefined, 10);
+    const preflight = await UsageTrackingService.ensureWithinLimit(userId, anticipatedCents);
+    res.setHeader('X-RateLimit-AI-Daily-Limit', preflight.limitCents);
+    res.setHeader('X-RateLimit-AI-Daily-Remaining', preflight.remainingCents);
+    res.setHeader('X-RateLimit-AI-Daily-Reset', preflight.resetAt);
+    if (preflight.isLimited) {
+      return res.status(429).json({
+        success: false,
+        error: {
+          message: 'AI daily cost limit reached. Try again after reset.',
+          code: 'AI_COST_LIMIT_EXCEEDED',
+        },
+        data: preflight,
       });
     }
 
@@ -110,6 +128,16 @@ router.post('/', validateRAGRequest, async (req: Request, res: Response) => {
       selfCheckPassed: orchestratorResponse.selfCheck?.passed,
       selfCheckFlags: orchestratorResponse.selfCheck?.flags || [],
     });
+
+    // Track AI cost usage
+    const costCents = UsageTrackingService.estimateCostCents(
+      orchestratorResponse.tokens_used,
+      anticipatedCents
+    );
+    const postCost = await UsageTrackingService.incrementAICost(userId, costCents);
+    res.setHeader('X-RateLimit-AI-Daily-Limit', postCost.limitCents);
+    res.setHeader('X-RateLimit-AI-Daily-Remaining', postCost.remainingCents);
+    res.setHeader('X-RateLimit-AI-Daily-Reset', postCost.resetAt);
 
     // Save messages to database (for history)
     let resolvedSessionId = sessionId as string | undefined;

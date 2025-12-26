@@ -22,6 +22,7 @@ import {
   buildCanonicalCountryContext,
   assertCountryConsistency,
 } from '../config/country-registry';
+import { ApplicationsService } from './applications.service';
 
 const prisma = new PrismaClient();
 
@@ -106,14 +107,8 @@ export class VisaChecklistExplanationService {
         return explanationCache.get(cacheKey)!;
       }
 
-      // Get application
-      const application = await prisma.visaApplication.findUnique({
-        where: { id: applicationId },
-        include: {
-          country: true,
-          visaType: true,
-        },
-      });
+      // Get canonical application (prefers new Application model, falls back to legacy VisaApplication)
+      const application = await ApplicationsService.getApplication(applicationId, userId);
 
       if (!application) {
         throw new Error('Application not found');

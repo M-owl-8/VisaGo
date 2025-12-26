@@ -14,6 +14,74 @@ generator client {
 // AI MODEL REGISTRY (A/B testing, canary routing, fine-tunes)
 // ============================================================================
 
+enum VisaApplicationStatus {
+  draft
+  submitted
+  approved
+  rejected
+  expired
+}
+
+enum ApplicationStatus {
+  draft
+  submitted
+  under_review
+  approved
+  rejected
+}
+
+enum DocumentChecklistStatus {
+  processing
+  ready
+  failed
+}
+
+enum UserDocumentStatus {
+  pending
+  verified
+  rejected
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+  partially_refunded
+}
+
+enum RefundStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum WebhookStatus {
+  pending
+  processed
+  failed
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+enum EmailStatus {
+  pending
+  sent
+  failed
+}
+
+enum DocumentCheckStatus {
+  OK
+  MISSING
+  PROBLEM
+  UNCERTAIN
+}
+
 enum AIModelStatus {
   ACTIVE
   CANDIDATE
@@ -133,7 +201,7 @@ model VisaApplication {
   userId             String
   countryId          String
   visaTypeId         String
-  status             String    @default("draft") // draft, submitted, approved, rejected, expired
+  status             VisaApplicationStatus    @default(draft)
   progressPercentage Int       @default(0)
   notes              String?
   submissionDate     DateTime?
@@ -196,7 +264,7 @@ model UserDocument {
   fileName          String
   fileSize          Int // In bytes
   uploadedAt        DateTime  @default(now())
-  status            String    @default("pending") // pending, verified, rejected
+  status            UserDocumentStatus    @default(pending)
   verificationNotes String?
   expiryDate        DateTime?
   verifiedByAI      Boolean?  @default(false)
@@ -253,7 +321,7 @@ model Payment {
   amount             Float // In USD
   refundedAmount     Float     @default(0) // Amount refunded
   currency           String    @default("USD")
-  status             String    @default("pending") // pending, completed, failed, refunded, partially_refunded
+  status             PaymentStatus    @default(pending)
   paymentMethod      String // payme, uzum, click, stripe, card
   transactionId      String?   @unique
   orderId            String?
@@ -279,7 +347,7 @@ model WebhookIdempotency {
   eventType     String // Type of webhook event
   signature     String // Webhook signature for verification
   body          String // Full webhook payload (JSON string for SQLite compatibility)
-  status        String    @default("pending") // pending, processed, failed
+  status        WebhookStatus    @default(pending)
   attempts      Int       @default(0) // Number of processing attempts
   lastAttemptAt DateTime?
   processedAt   DateTime?
@@ -540,7 +608,7 @@ model EmailLog {
   subject        String
   templateName   String?
   type           String? // payment_confirmation, payment_failed, visa_status_update, welcome, etc
-  status         String    @default("pending") // pending, sent, failed
+  status         EmailStatus    @default(pending)
   error          String? // Error message if failed
   sentAt         DateTime?
   failureReason  String?
@@ -580,7 +648,7 @@ model NotificationLog {
   title         String
   body          String
   type          String // app_update, payment_status, document_request, visa_status
-  status        String    @default("pending") // pending, sent, failed
+  status        NotificationStatus    @default(pending)
   sentAt        DateTime?
   failureReason String?
   metadata      String? // JSON with additional context
@@ -600,7 +668,7 @@ model Refund {
   amount          Float
   reason          String
   notes           String? // Additional notes about the refund
-  status          String    @default("pending") // pending, processing, completed, failed
+  status          RefundStatus    @default(pending)
   gatewayRefundId String?   @unique
   failureReason   String?
   initiatedBy     String // user, admin, system
@@ -621,7 +689,7 @@ model Application {
   countryId      String
   visaTypeId     String
   legacyVisaApplicationId String? @unique
-  status         String    @default("draft") // draft, submitted, under_review, approved, rejected
+  status         ApplicationStatus    @default(draft)
   submissionDate DateTime?
   approvalDate   DateTime?
   expiryDate     DateTime?
@@ -644,8 +712,9 @@ model Application {
 model DocumentChecklist {
   id            String    @id @default(cuid())
   applicationId String    @unique
-  status        String    @default("processing") // processing, ready, failed
+  status        DocumentChecklistStatus    @default(processing)
   checklistData String? // JSON string with checklist items
+  checklistVersion Int   @default(1) // Schema version of checklistData
   aiGenerated   Boolean   @default(false)
   generatedAt   DateTime?
   errorMessage  String?
@@ -668,7 +737,7 @@ model DocumentCheckResult {
   checklistItemId String // ID of checklist item in DocumentChecklist
   documentId      String? // ID of matched uploaded document (nullable if missing)
 
-  status          String // 'OK' | 'MISSING' | 'PROBLEM' | 'UNCERTAIN'
+  status          DocumentCheckStatus
   problemsJson    String? // JSON array of DocCheckProblem
   suggestionsJson String? // JSON array of DocCheckSuggestion
   confidence      Float? // optional AI confidence
@@ -679,8 +748,7 @@ model DocumentCheckResult {
   updatedAt DateTime @updatedAt
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  // document relation removed - UserDocument doesn't have opposite relation field
-  // documentId is kept as plain foreign key field for reference
+  document     UserDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@unique([applicationId, checklistItemId])
   @@index([applicationId])
@@ -728,6 +796,7 @@ model VisaRuleSet {
   data          Json     // Structured visa rules (see VisaRuleSetData type)
   data_legacy   Json?    // Backup for rollback and migration
   version       Int      @default(1) // Incremental version number
+  schemaVersion Int      @default(1) // Schema version for rule set data structure
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   createdBy     String   @default("system") // "system" | "admin" | userId

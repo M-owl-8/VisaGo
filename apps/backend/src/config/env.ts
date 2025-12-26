@@ -132,6 +132,59 @@ const envSchema = z.object({
   DATADOG_API_KEY: z.string().optional(),
   DATADOG_SITE: z.string().optional(),
   LOGZIO_TOKEN: z.string().optional(),
+
+  // Encryption for sensitive fields (AES-256-GCM). Must be 32 bytes (base64 allowed).
+  ENCRYPTION_KEY: z.string().min(32).optional(),
+
+  // Data retention (logs cleanup)
+  DATA_RETENTION_DAYS: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('90')
+    .optional(),
+
+  // Admin security
+  ADMIN_IP_ALLOWLIST: z.string().optional(),
+  ADMIN_REQUIRE_2FA: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('true')
+    .optional(),
+  ADMIN_RATE_LIMIT_WINDOW_MS: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('60000')
+    .optional(),
+  ADMIN_RATE_LIMIT_MAX: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('60')
+    .optional(),
+
+  // Per-user API rate limiting (general)
+  PER_USER_RATE_LIMIT_WINDOW_MS: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('60000')
+    .optional(),
+  PER_USER_RATE_LIMIT_MAX: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('120')
+    .optional(),
+
+  // AI cost controls (daily budget per user, in cents)
+  AI_COST_DAILY_LIMIT_CENTS: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .default('2000') // $20.00 default daily cap
+    .optional(),
 });
 
 /**

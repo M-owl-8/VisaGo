@@ -593,6 +593,7 @@ model DocumentChecklist {
   applicationId     String    @unique
   status            String    @default("processing") // processing, ready, failed
   checklistData     String?   // JSON string with checklist items
+  checklistVersion  Int       @default(1) // Schema version of checklistData
   aiGenerated       Boolean   @default(false)
   generatedAt       DateTime?
   errorMessage      String?
@@ -694,6 +695,7 @@ model VisaRuleSet {
   data          String   // Structured visa rules (JSON string for SQLite compatibility)
   data_legacy   String?  // Backup for rollback and migration (JSON string for SQLite)
   version       Int      @default(1) // Incremental version number
+  schemaVersion Int      @default(1) // Schema version for rule set data structure
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   createdBy     String   @default("system") // "system" | "admin" | userId

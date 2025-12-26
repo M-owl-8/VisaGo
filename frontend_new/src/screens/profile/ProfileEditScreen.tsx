@@ -40,6 +40,14 @@ export const ProfileEditScreen = ({ navigation }: any) => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [activeSessions, setActiveSessions] = useState<Array<{
+    id: string;
+    deviceName: string;
+    platform: string;
+    lastUsedAt: string | null;
+    isCurrent: boolean;
+  }>>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -57,6 +65,42 @@ export const ProfileEditScreen = ({ navigation }: any) => {
         firstName: user.firstName || '',
         phone: user.phone || '',
       });
+    }
+  }, [user]);
+
+  // Fetch active sessions
+  useEffect(() => {
+    const fetchActiveSessions = async () => {
+      try {
+        setIsLoadingSessions(true);
+        const response = await apiClient.getActiveSessions();
+        if (response.success && Array.isArray(response.data)) {
+          // Mark current device (mobile app) as current session
+          const sessions = response.data.map((session: any) => ({
+            ...session,
+            isCurrent: session.platform === Platform.OS.toLowerCase(),
+          }));
+          setActiveSessions(sessions);
+        }
+      } catch (error) {
+        console.error('Error fetching active sessions:', error);
+        // Fallback to showing current device if API fails
+        setActiveSessions([
+          {
+            id: 'current',
+            deviceName: `${Platform.OS === 'ios' ? 'iOS' : 'Android'} · Mobile App`,
+            platform: Platform.OS.toLowerCase(),
+            lastUsedAt: new Date().toISOString(),
+            isCurrent: true,
+          },
+        ]);
+      } finally {
+        setIsLoadingSessions(false);
+      }
+    };
+
+    if (user) {
+      fetchActiveSessions();
     }
   }, [user]);
 
@@ -187,6 +231,65 @@ export const ProfileEditScreen = ({ navigation }: any) => {
                 <Text style={styles.helperText}>
                   {t('profile.phoneHint')}
                 </Text>
+              </View>
+
+              {/* Active Sessions */}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>{t('profile.activeSessions', 'Active Sessions')}</Text>
+                {isLoadingSessions ? (
+                  <View style={styles.activeSessionCard}>
+                    <ActivityIndicator size="small" color="#4A9EFF" />
+                    <Text style={[styles.activeSessionDevice, {marginLeft: 12}]}>
+                      {t('common.loading', 'Loading...')}
+                    </Text>
+                  </View>
+                ) : activeSessions.length > 0 ? (
+                  activeSessions.map((session) => (
+                    <View key={session.id} style={styles.activeSessionCard}>
+                      <View style={styles.activeSessionContent}>
+                        <View style={styles.activeSessionIndicator} />
+                        <View style={styles.activeSessionInfo}>
+                          <Text style={styles.activeSessionDevice}>
+                            {session.deviceName}
+                          </Text>
+                          <Text style={styles.activeSessionTime}>
+                            {session.isCurrent
+                              ? t('profile.currentDevice', 'Current device')
+                              : session.lastUsedAt
+                              ? t('profile.lastUsed', 'Last used {{time}}', {
+                                  time: new Date(session.lastUsedAt).toLocaleDateString(),
+                                })
+                              : t('profile.active', 'Active')}
+                          </Text>
+                        </View>
+                      </View>
+                      <Icon
+                        name={
+                          session.platform === 'ios' || session.platform === 'android'
+                            ? 'phone-portrait-outline'
+                            : 'desktop-outline'
+                        }
+                        size={20}
+                        color="#94A3B8"
+                      />
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.activeSessionCard}>
+                    <View style={styles.activeSessionContent}>
+                      <View style={styles.activeSessionIndicator} />
+                      <View style={styles.activeSessionInfo}>
+                        <Text style={styles.activeSessionDevice}>
+                          {Platform.OS === 'ios' ? 'iOS' : 'Android'} · Mobile App
+                        </Text>
+                        <Text style={styles.activeSessionTime}>
+                          {t('profile.currentDevice', 'Current device')}
+                        </Text>
+                      </View>
+                    </View>
+                    <Icon name="phone-portrait-outline" size={20} color="#94A3B8" />
+                  </View>
+                )}
               </View>
 
               {/* Info Card */}
@@ -348,5 +451,44 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  activeSessionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
+    borderRadius: 12,
+    padding: 16,
+  },
+  activeSessionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  activeSessionIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+  },
+  activeSessionInfo: {
+    flex: 1,
+  },
+  activeSessionDevice: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  activeSessionTime: {
+    fontSize: 12,
+    color: '#94A3B8',
   },
 });

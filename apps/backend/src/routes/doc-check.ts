@@ -7,6 +7,8 @@
 import express, { Request, Response, Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { DocCheckService } from '../services/doc-check.service';
+import { ApplicationsService } from '../services/applications.service';
+import { DocCheckQueueService } from '../services/doc-check-queue.service';
 import { PrismaClient } from '@prisma/client';
 import { logInfo, logError } from '../middleware/logger';
 
@@ -26,18 +28,27 @@ router.post('/:applicationId/run', async (req: Request, res: Response) => {
     const userId = (req as any).user.id;
     const { applicationId } = req.params;
 
-    // Verify user owns the application
-    const application = await prisma.visaApplication.findFirst({
-      where: { id: applicationId, userId },
-    });
+    // Verify user owns the application (canonical + legacy)
+    const application = await ApplicationsService.getApplication(applicationId, userId);
 
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Application not found or access denied',
-        },
-      });
+    const useQueue = process.env.ENABLE_DOC_CHECK_QUEUE !== 'false';
+
+    if (useQueue) {
+      try {
+        await DocCheckQueueService.enqueueDocCheck(applicationId, userId);
+        logInfo('[DocCheck] Enqueued document check job', { applicationId, userId });
+        return res.status(202).json({
+          success: true,
+          data: {
+            status: 'queued',
+          },
+        });
+      } catch (queueError: any) {
+        logWarn('[DocCheck] Queue enqueue failed, falling back to sync run', {
+          applicationId,
+          error: queueError instanceof Error ? queueError.message : String(queueError),
+        });
+      }
     }
 
     logInfo('[DocCheck] Starting document check run', {
@@ -45,11 +56,8 @@ router.post('/:applicationId/run', async (req: Request, res: Response) => {
       userId,
     });
 
-    // Run doc-check (synchronously for now)
-    // TODO: Make this async/job-based for better UX
     await DocCheckService.checkAllItemsForApplication(applicationId, userId);
 
-    // Get summary immediately after
     const summary = await DocCheckService.computeReadiness(applicationId);
 
     res.json({
@@ -83,19 +91,8 @@ router.get('/:applicationId/summary', async (req: Request, res: Response) => {
     const userId = (req as any).user.id;
     const { applicationId } = req.params;
 
-    // Verify user owns the application
-    const application = await prisma.visaApplication.findFirst({
-      where: { id: applicationId, userId },
-    });
-
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Application not found or access denied',
-        },
-      });
-    }
+    // Verify user owns the application (canonical + legacy)
+    const application = await ApplicationsService.getApplication(applicationId, userId);
 
     // Compute readiness
     const readiness = await DocCheckService.computeReadiness(applicationId);

@@ -298,11 +298,7 @@ function logErrorEntry(entry: Partial<LogEntry>): void {
  * Removes sensitive information like passwords, tokens, etc.
  */
 function sanitizeBodyForLogging(body: any): any {
-  if (!body || typeof body !== 'object') {
-    return body;
-  }
-
-  const sensitiveFields = [
+  const sensitiveFields = new Set([
     'password',
     'token',
     'secret',
@@ -313,17 +309,44 @@ function sanitizeBodyForLogging(body: any): any {
     'creditCard',
     'cvv',
     'ssn',
-  ];
+  ]);
 
-  const sanitized = { ...body };
+  const redactString = (val: string) => {
+    let out = val;
+    // Emails
+    out = out.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]');
+    // Phone numbers (basic)
+    out = out.replace(/\+?\d[\d\s().-]{7,}/g, '[REDACTED_PHONE]');
+    // Passport/ID patterns (alphanumeric 6-12 chars)
+    out = out.replace(/\b[0-9A-Z]{6,12}\b/g, '[REDACTED_ID]');
+    return out;
+  };
 
-  for (const field of sensitiveFields) {
-    if (sanitized[field]) {
-      sanitized[field] = '[REDACTED]';
+  const sanitizeValue = (val: any): any => {
+    if (val === null || val === undefined) return val;
+    if (typeof val === 'string') return redactString(val);
+    if (Array.isArray(val)) return val.map((v) => sanitizeValue(v));
+    if (typeof val === 'object') return sanitizeObject(val);
+    return val;
+  };
+
+  const sanitizeObject = (obj: Record<string, any>) => {
+    const cloned: Record<string, any> = Array.isArray(obj) ? [] : {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (sensitiveFields.has(key)) {
+        cloned[key] = '[REDACTED]';
+        continue;
+      }
+      cloned[key] = sanitizeValue(value);
     }
+    return cloned;
+  };
+
+  if (!body || typeof body !== 'object') {
+    return sanitizeValue(body);
   }
 
-  return sanitized;
+  return sanitizeObject(body);
 }
 
 /**

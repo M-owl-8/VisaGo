@@ -9,6 +9,7 @@ import { successResponse } from '../utils/response';
 import { HTTP_STATUS } from '../config/constants';
 import db from '../db';
 import { OptimizedCacheService } from '../services/cache.service.optimized';
+import { getRateLimitRedisStatus } from '../middleware/rate-limit';
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ interface HealthStatus {
     cache: ServiceStatus;
     storage: ServiceStatus;
     ai: ServiceStatus;
+    rateLimiter: ServiceStatus;
   };
 }
 
@@ -99,6 +101,7 @@ router.get('/detailed', async (_req: Request, res: Response) => {
       cache: await checkCache(),
       storage: await checkStorage(envConfig),
       ai: await checkAIService(envConfig),
+      rateLimiter: await checkRateLimiter(),
     },
   };
 
@@ -265,6 +268,29 @@ async function checkAIService(envConfig: ReturnType<typeof getEnvConfig>): Promi
       message: 'AI service check failed',
     };
   }
+}
+
+/**
+ * Check rate limiter store (Redis) status
+ */
+async function checkRateLimiter(): Promise<ServiceStatus> {
+  const status = getRateLimitRedisStatus();
+  if (!status.enabled) {
+    return {
+      status: 'degraded',
+      message: 'Redis not configured; using in-memory rate limiting',
+    };
+  }
+  if (status.connected) {
+    return {
+      status: 'up',
+      message: `Redis rate limit store (${status.store}) connected`,
+    };
+  }
+  return {
+    status: 'degraded',
+    message: 'Redis configured but not connected; falling back to memory',
+  };
 }
 
 export default router;

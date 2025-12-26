@@ -106,6 +106,13 @@ const rotateAndAttachToken = (sessionId: string, res: Response) => {
 export const csrfProtection = (req: Request, res: Response, next: NextFunction) => {
   const method = (req.method || 'GET').toUpperCase();
   const path = getPathWithoutQuery(req);
+  const origin = (req.headers.origin as string | undefined)?.trim();
+  const isMobileOrService = !origin; // Mobile apps / internal services often omit Origin
+
+  // Mobile/service clients are exempt but still proceed without blocking
+  if (isMobileOrService) {
+    return next();
+  }
 
   // Determine session identifier
   const headerSessionId = (req.headers[SESSION_HEADER_NAME] as string | undefined)?.trim();

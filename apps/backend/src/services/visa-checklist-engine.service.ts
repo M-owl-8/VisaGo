@@ -51,7 +51,10 @@ const ChecklistItemSchema = z.object({
   priority: z.number().int().min(1),
   dependsOn: z.array(z.string()).optional(),
   // Phase 3: Source tracking (REQUIRED)
-  source: z.enum(['rules', 'ai_extra']).default('rules'),
+  source: z.enum(['rules', 'ai_extra', 'fallback']).default('rules'),
+  ruleSetId: z.string().optional(),
+  ruleSetVersion: z.number().optional(),
+  embassySourceUrl: z.string().url().optional(),
   // Phase 3: Expert fields (strongly encouraged, but optional for backward compatibility)
   expertReasoning: z
     .object({
@@ -115,6 +118,35 @@ async function getEmbassyContent(countryCode: string, visaType: string): Promise
   // Return cached content if still valid
   if (cached && cached.expires > Date.now()) {
     return cached.content;
+  }
+
+  /**
+   * Apply conditional logic to checklist items based on AIUserContext and rule set data.
+   */
+  private static applyConditions(
+    items: ChecklistItem[],
+    aiUserContext: AIUserContext,
+    ruleSet: VisaRuleSetData | null
+  ): ChecklistItem[] {
+    return items.map((item) => {
+      // Find matching rule definition for condition
+      const ruleDef = ruleSet?.requiredDocuments?.find(
+        (doc) => doc.documentType === item.documentType
+      );
+      const condition = (item as any).condition || ruleDef?.condition;
+      const applies = evaluateCondition(condition, { user: aiUserContext, item: item as any });
+
+      return {
+        ...item,
+        appliesToThisApplicant: applies,
+        reasonIfApplies:
+          applies && (item as any).reasonIfApplies
+            ? (item as any).reasonIfApplies
+            : applies
+              ? 'Applies based on your profile'
+              : 'Not needed based on your profile',
+      };
+    });
   }
 
   // Fetch from database
@@ -224,6 +256,7 @@ export class VisaChecklistEngineService {
 
       let ruleSet: VisaRuleSetData | null = null;
       let ruleSetId: string | undefined;
+      let ruleSetVersion: number | undefined;
       let ruleSetCountryCode: string | undefined;
       let ruleSetVisaType: string | undefined;
       let documentReferences:
@@ -245,6 +278,7 @@ export class VisaChecklistEngineService {
         if (ruleSetWithRefs) {
           ruleSet = ruleSetWithRefs.data;
           ruleSetId = ruleSetWithRefs.id;
+          ruleSetVersion = ruleSetWithRefs.version;
           ruleSetCountryCode = ruleSetWithRefs.countryCode;
           ruleSetVisaType = ruleSetWithRefs.visaType;
           // Only use catalog if references exist
@@ -269,6 +303,7 @@ export class VisaChecklistEngineService {
             normalizedCountryCode,
             visaType.toLowerCase()
           );
+          ruleSetVersion = (ruleSet as any)?.version ?? ruleSetVersion;
         }
         // Clear references if we're not using catalog mode
         documentReferences = undefined;
@@ -727,9 +762,21 @@ export class VisaChecklistEngineService {
       }
 
       // Phase 3: Validate and enrich checklist items
-      const validatedChecklist = this.validateAndEnrichChecklistItems(
+      const conditionedChecklist = this.applyConditions(
         validationResult.success ? validationResult.data.checklist : parsed.checklist,
-        baseDocuments
+        aiUserContext,
+        ruleSet
+      );
+
+      const validatedChecklist = this.validateAndEnrichChecklistItems(
+        conditionedChecklist,
+        baseDocuments,
+        {
+          ruleSetId: ruleSetId || capturedRuleSetId || null,
+          ruleSetVersion: ruleSetVersion || null,
+          embassySourceUrl: (ruleSet as any)?.sourceInfo?.extractedFrom || null,
+          generationMode: 'rules',
+        }
       );
 
       // Normalize priorities according to category (before risk-weighted prioritization)
@@ -1995,16 +2042,29 @@ Return ONLY valid JSON matching the schema, no other text.`;
    */
   private static validateAndEnrichChecklistItems(
     checklist: ChecklistItem[],
-    baseDocuments: Array<{ documentType: string; category: string; required: boolean }>
+    baseDocuments: Array<{ documentType: string; category: string; required: boolean }>,
+    options?: {
+      ruleSetId?: string | null;
+      ruleSetVersion?: number | null;
+      embassySourceUrl?: string | null;
+      generationMode?: ChecklistGenerationMode;
+    }
   ): ChecklistItem[] {
     const baseDocTypes = new Set(baseDocuments.map((doc) => doc.documentType));
     const MAX_AI_EXTRA_ITEMS = 3;
+    const generationMode = options?.generationMode;
 
     // Enrich items with source field and validate
     const enriched = checklist.map((item) => {
       // Set source based on whether document is in base documents
       const isFromRules = baseDocTypes.has(item.documentType);
-      const source = item.source || (isFromRules ? 'rules' : 'ai_extra');
+      const source =
+        item.source ||
+        (generationMode === 'static_fallback'
+          ? 'fallback'
+          : isFromRules
+            ? 'rules'
+            : 'ai_extra');
 
       // Ensure expertReasoning exists (even if empty)
       const expertReasoning = item.expertReasoning || {
@@ -2016,7 +2076,10 @@ Return ONLY valid JSON matching the schema, no other text.`;
 
       return {
         ...item,
-        source: source as 'rules' | 'ai_extra',
+        source: source as any,
+        ruleSetId: item.ruleSetId || options?.ruleSetId || undefined,
+        ruleSetVersion: item.ruleSetVersion || options?.ruleSetVersion || undefined,
+        embassySourceUrl: item.embassySourceUrl || options?.embassySourceUrl || undefined,
         expertReasoning,
       };
     });
@@ -2110,9 +2173,15 @@ Return ONLY valid JSON matching the schema, no other text.`;
           adjustedPriority = Math.max(1, item.priority - 1); // Critical to address refusal reasons
         }
 
+        const extraRecommended =
+          riskLevel === 'high' &&
+          (item.category === 'highly_recommended' || item.category === 'optional') &&
+          (item.group === 'financial' || item.group === 'ties' || item.group === 'employment');
+
         return {
           ...item,
           priority: adjustedPriority,
+          extraRecommended: item.extraRecommended || extraRecommended || false,
         };
       })
       .sort((a, b) => a.priority - b.priority); // Sort by priority (ascending)

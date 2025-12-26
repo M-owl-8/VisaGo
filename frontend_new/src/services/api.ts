@@ -1096,6 +1096,13 @@ class ApiClient {
     return response.data;
   }
 
+  async getMetaCountries(): Promise<ApiResponse> {
+    // Returns ISO 3166-1 alpha-2 country list (~248 countries)
+    // Same endpoint used by web app for consistency
+    const response = await this.api.get('/meta/countries');
+    return response.data;
+  }
+
   async getPopularCountries(): Promise<ApiResponse> {
     const response = await this.api.get('/countries/popular');
     return response.data;
@@ -1615,6 +1622,11 @@ class ApiClient {
         },
       } as ApiRequestConfig,
     );
+    return response.data;
+  }
+
+  async getActiveSessions(): Promise<ApiResponse> {
+    const response = await this.api.get('/notifications/active-sessions');
     return response.data;
   }
 

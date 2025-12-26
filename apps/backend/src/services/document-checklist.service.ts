@@ -42,8 +42,10 @@ import { buildAIUserContext } from './ai-context.service';
 import { inferCategory, normalizePriority } from '../utils/checklist-helpers';
 import { MIN_ITEMS_HARD, IDEAL_MIN_ITEMS } from '../config/checklist-config';
 import type { ChecklistGenerationMode, ChecklistMetadata } from '../types/checklist';
+import { assertStatus } from '../utils/status-validator';
 
 const prisma = new PrismaClient();
+const CHECKLIST_VERSION = 1;
 
 /**
  * Document checklist item
@@ -129,6 +131,57 @@ export class DocumentChecklistService {
     }
     return map;
   }
+
+  private static buildChecklistDataPayload(
+    items: any[],
+    meta: Partial<ChecklistMetadata> = {}
+  ): ChecklistMetadata & { checklistVersion: number } {
+    const generationMode = meta.generationMode;
+    const normalizedItems =
+      generationMode === 'static_fallback'
+        ? items.map((item: any) => ({
+            ...item,
+            source: item.source || 'fallback',
+          }))
+        : items;
+
+    return {
+      items: normalizedItems,
+      aiGenerated: meta.aiGenerated ?? false,
+      aiFallbackUsed: meta.aiFallbackUsed ?? false,
+      aiErrorOccurred: meta.aiErrorOccurred ?? false,
+      generationMode: meta.generationMode,
+      modelName: meta.modelName,
+      checklistVersion: CHECKLIST_VERSION,
+    };
+  }
+
+  /**
+   * Lightweight status lookup for polling endpoints
+   */
+  static async getChecklistStatus(
+    applicationId: string,
+    userId: string
+  ): Promise<{ status: string; updatedAt?: Date | null }> {
+    const application = await this.findOrCreateCanonicalApplication(applicationId);
+    if (application.userId !== userId) {
+      throw errors.forbidden();
+    }
+
+    const stored = await prisma.documentChecklist.findUnique({
+      where: { applicationId },
+    });
+
+    if (!stored) {
+      assertStatus('DocumentChecklistStatus', 'processing'); // normalize to processing start
+      return { status: 'not_started' };
+    }
+
+    return {
+      status: stored.status,
+      updatedAt: stored.updatedAt,
+    };
+  }
   /**
    * Generate document checklist for an application
    * Now uses persistent DB storage to avoid re-calling OpenAI on every GET
@@ -193,6 +246,7 @@ export class DocumentChecklistService {
       if (storedChecklist) {
         // If checklist is ready, return it immediately without calling OpenAI
         if (storedChecklist.status === 'ready') {
+        assertStatus('DocumentChecklistStatus', storedChecklist.status);
           logInfo('[Checklist][Cache] Returning stored checklist', {
             applicationId,
             status: storedChecklist.status,
@@ -237,11 +291,13 @@ export class DocumentChecklistService {
           logInfo('[Checklist][Status] Checklist generation in progress', {
             applicationId,
           });
+          assertStatus('DocumentChecklistStatus', 'processing');
           return { status: 'processing' };
         }
 
         // If checklist failed, generate fallback on-the-fly instead of returning error
         if (storedChecklist.status === 'failed') {
+        assertStatus('DocumentChecklistStatus', storedChecklist.status);
           logWarn('[Checklist][Status] Stored checklist failed, generating fallback on-the-fly', {
             applicationId,
             errorMessage: storedChecklist.errorMessage,
@@ -283,16 +339,24 @@ export class DocumentChecklistService {
             );
 
             // Update stored checklist to 'ready' with fallback data
-            await prisma.documentChecklist.update({
-              where: { applicationId },
-              data: {
-                status: 'ready',
-                checklistData: JSON.stringify(sanitizedItems),
-                aiGenerated: false,
-                generatedAt: new Date(),
-                errorMessage: null,
-              },
-            });
+        const payload = this.buildChecklistDataPayload(sanitizedItems, {
+          aiGenerated: false,
+          aiFallbackUsed: true,
+          aiErrorOccurred: true,
+          generationMode: 'static_fallback',
+        });
+
+        await prisma.documentChecklist.update({
+          where: { applicationId },
+          data: {
+            status: 'ready',
+            checklistData: JSON.stringify(payload),
+            aiGenerated: false,
+            generatedAt: new Date(),
+            errorMessage: null,
+            checklistVersion: CHECKLIST_VERSION,
+          },
+        });
 
             return this.buildChecklistResponse(
               applicationId,
@@ -318,25 +382,51 @@ export class DocumentChecklistService {
 
       // No checklist exists or needs regeneration - start async generation
       // Create checklist entry with status 'processing'
+      assertStatus('DocumentChecklistStatus', 'processing');
+
       const checklistEntry = await prisma.documentChecklist.upsert({
         where: { applicationId },
         create: {
           applicationId,
           status: 'processing',
           checklistData: '[]',
+          checklistVersion: CHECKLIST_VERSION,
         },
         update: {
           status: 'processing',
           errorMessage: null,
+          checklistVersion: CHECKLIST_VERSION,
         },
       });
 
-      // Trigger async generation (don't await - let it run in background)
-      this.generateChecklistAsync(applicationId, userId, application).catch((error) => {
-        logError('[Checklist][Async] Background generation failed', error as Error, {
-          applicationId,
+      const useQueue = process.env.ENABLE_CHECKLIST_QUEUE === 'true';
+      if (useQueue) {
+        try {
+          const { ChecklistQueueService } = await import('./checklist-queue.service');
+          await ChecklistQueueService.enqueueGeneration(applicationId, userId);
+          logInfo('[Checklist][Queue] Enqueued checklist generation job', {
+            applicationId,
+            userId,
+          });
+        } catch (queueError) {
+          logWarn('[Checklist][Queue] Failed to enqueue, falling back to inline async generation', {
+            applicationId,
+            error: queueError instanceof Error ? queueError.message : String(queueError),
+          });
+          this.generateChecklistAsync(applicationId, userId, application).catch((error) => {
+            logError('[Checklist][Async] Background generation failed', error as Error, {
+              applicationId,
+            });
+          });
+        }
+      } else {
+        // Trigger async generation (don't await - let it run in background)
+        this.generateChecklistAsync(applicationId, userId, application).catch((error) => {
+          logError('[Checklist][Async] Background generation failed', error as Error, {
+            applicationId,
+          });
         });
-      });
+      }
 
       // Return processing status immediately
       return { status: 'processing' };
@@ -929,14 +1019,13 @@ export class DocumentChecklistService {
 
       // Store checklist in database with status 'ready'
       // Include metadata about AI fallback usage and generation mode
-      const checklistMetadata: ChecklistMetadata = {
-        items: sanitizedItems,
+      const checklistMetadata = this.buildChecklistDataPayload(sanitizedItems, {
         aiGenerated,
         aiFallbackUsed,
         aiErrorOccurred,
         generationMode,
         modelName, // Model used for AI generation (if applicable)
-      };
+      });
       await prisma.documentChecklist.update({
         where: { applicationId },
         data: {
@@ -945,6 +1034,7 @@ export class DocumentChecklistService {
           aiGenerated,
           generatedAt: new Date(),
           errorMessage: null,
+          checklistVersion: CHECKLIST_VERSION,
         },
       });
 
@@ -1030,14 +1120,13 @@ export class DocumentChecklistService {
 
         // Store checklist with status 'ready' (not 'failed')
         // Include metadata about emergency fallback usage
-        const emergencyMetadata: ChecklistMetadata = {
-          items: sanitizedItems,
+        const emergencyMetadata = this.buildChecklistDataPayload(sanitizedItems, {
           aiGenerated: false,
           aiFallbackUsed: true,
           aiErrorOccurred: true,
           generationMode: 'static_fallback',
           modelName: undefined, // Emergency fallback doesn't use AI
-        };
+        });
         await prisma.documentChecklist.update({
           where: { applicationId },
           data: {
@@ -1046,6 +1135,7 @@ export class DocumentChecklistService {
             aiGenerated: false,
             generatedAt: new Date(),
             errorMessage: null, // Clear error message since we have a fallback
+            checklistVersion: CHECKLIST_VERSION,
           },
         });
 
@@ -1061,6 +1151,15 @@ export class DocumentChecklistService {
         });
       }
     }
+  }
+
+  /**
+   * Execute checklist generation as a queued job.
+   * Ensures application is loaded and then runs the async generator.
+   */
+  static async runChecklistJob(applicationId: string, userId: string): Promise<void> {
+    const application = await this.findOrCreateCanonicalApplication(applicationId);
+    await this.generateChecklistAsync(applicationId, userId, application);
   }
 
   /**
@@ -1245,14 +1344,13 @@ export class DocumentChecklistService {
         application.visaType.name
       );
 
-      const emergencyMetadata: ChecklistMetadata = {
-        items: sanitizedItems,
+      const emergencyMetadata = this.buildChecklistDataPayload(sanitizedItems, {
         aiGenerated: false,
         aiFallbackUsed: true,
         aiErrorOccurred: true,
         generationMode: 'static_fallback',
         modelName: undefined,
-      };
+      });
 
       await prisma.documentChecklist.update({
         where: { applicationId: application.id },
@@ -1262,6 +1360,7 @@ export class DocumentChecklistService {
           aiGenerated: false,
           generatedAt: new Date(),
           errorMessage: 'auto-repaired: stuck processing',
+          checklistVersion: CHECKLIST_VERSION,
         },
       });
     } catch (error) {

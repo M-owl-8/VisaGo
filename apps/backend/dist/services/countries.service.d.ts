@@ -12,8 +12,8 @@ export declare class CountriesService {
             description: string | null;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             countryId: string;
             requirements: string;
             processingDays: number;
@@ -26,11 +26,28 @@ export declare class CountriesService {
         code: string;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         flagEmoji: string;
         requirements: string | null;
     })[]>;
+    /**
+     * Resolve a country by code or name against ISO dataset.
+     */
+    static resolveIsoCountry(codeOrName: string | null | undefined): import("../data/countries-iso2").IsoCountry | null;
+    /**
+     * Get or create a country record using ISO mapping, tolerant to unknown inputs.
+     */
+    static getOrCreateCountry(codeOrName: string): Promise<{
+        description: string | null;
+        code: string;
+        id: string;
+        createdAt: Date;
+        name: string;
+        updatedAt: Date;
+        flagEmoji: string;
+        requirements: string | null;
+    }>;
     /**
      * Get single country with all details
      */
@@ -39,8 +56,8 @@ export declare class CountriesService {
             description: string | null;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             countryId: string;
             requirements: string;
             processingDays: number;
@@ -53,8 +70,8 @@ export declare class CountriesService {
         code: string;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         flagEmoji: string;
         requirements: string | null;
     }>;
@@ -66,8 +83,8 @@ export declare class CountriesService {
             description: string | null;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             countryId: string;
             requirements: string;
             processingDays: number;
@@ -80,8 +97,8 @@ export declare class CountriesService {
         code: string;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         flagEmoji: string;
         requirements: string | null;
     }>;
@@ -94,8 +111,8 @@ export declare class CountriesService {
             description: string | null;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             countryId: string;
             requirements: string;
             processingDays: number;
@@ -108,8 +125,8 @@ export declare class CountriesService {
         code: string;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         flagEmoji: string;
         requirements: string | null;
     }) | null>;
@@ -121,8 +138,8 @@ export declare class CountriesService {
             description: string | null;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             countryId: string;
             requirements: string;
             processingDays: number;
@@ -135,8 +152,8 @@ export declare class CountriesService {
         code: string;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         flagEmoji: string;
         requirements: string | null;
     })[]>;
@@ -149,8 +166,8 @@ export declare class CountriesService {
             code: string;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
             name: string;
+            updatedAt: Date;
             flagEmoji: string;
             requirements: string | null;
         };
@@ -158,8 +175,8 @@ export declare class CountriesService {
         description: string | null;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         countryId: string;
         requirements: string;
         processingDays: number;
@@ -174,8 +191,8 @@ export declare class CountriesService {
         description: string | null;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         countryId: string;
         requirements: string;
         processingDays: number;
@@ -197,8 +214,8 @@ export declare class CountriesService {
         code: string;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         flagEmoji: string;
         requirements: string | null;
     }>;
@@ -217,8 +234,8 @@ export declare class CountriesService {
         description: string | null;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
         name: string;
+        updatedAt: Date;
         countryId: string;
         requirements: string;
         processingDays: number;

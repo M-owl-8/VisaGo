@@ -9,6 +9,7 @@ import { logError, logInfo, logWarn } from '../middleware/logger';
 import { AIOpenAIService } from '../services/ai-openai.service';
 import { VisaRiskExplanationService } from '../services/visa-risk-explanation.service';
 import { VisaChecklistExplanationService } from '../services/visa-checklist-explanation.service';
+import { ProbabilityQueueService } from '../services/probability-queue.service';
 
 const prisma = new PrismaClient();
 
@@ -497,6 +498,28 @@ router.post('/:id/visa-probability', async (req: Request, res: Response, next: N
     }
 
     // Step 2: Call AI service probability endpoint
+    const useQueue = process.env.ENABLE_PROBABILITY_QUEUE !== 'false';
+    if (useQueue) {
+      try {
+        const jobId = await (await import('../services/probability-queue.service')).ProbabilityQueueService.enqueueProbability(
+          applicationId,
+          userId,
+          req.headers.authorization || null
+        );
+        logInfo('Probability job enqueued', { applicationId, jobId, userId });
+        return res.status(202).json({
+          success: true,
+          jobId,
+          status: 'queued',
+        });
+      } catch (queueError: any) {
+        logWarn('Probability queue enqueue failed, falling back to sync', {
+          applicationId,
+          error: queueError instanceof Error ? queueError.message : String(queueError),
+        });
+      }
+    }
+
     const aiServiceURL = getAIServiceURL();
     const probabilityEndpoint = `${aiServiceURL}/api/visa-probability`;
 
@@ -577,6 +600,31 @@ router.post('/:id/visa-probability', async (req: Request, res: Response, next: N
       userId: req.userId,
       applicationId: req.params.id,
     });
+    next(error);
+  }
+});
+
+/**
+ * GET /api/applications/:id/visa-probability/status
+ * Poll probability job status when queued
+ */
+router.get('/:id/visa-probability/status', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { jobId } = req.query;
+    if (!jobId || typeof jobId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'JOB_ID_REQUIRED',
+        message: 'jobId query param is required',
+      });
+    }
+
+    const status = await ProbabilityQueueService.getJobStatus(jobId);
+    return res.json({
+      success: true,
+      data: status,
+    });
+  } catch (error) {
     next(error);
   }
 });
@@ -745,31 +793,8 @@ router.post('/:id/checklist-feedback', async (req: Request, res: Response, next:
       });
     }
 
-    // Get application
-    const application = await prisma.visaApplication.findUnique({
-      where: { id: applicationId },
-      include: {
-        country: true,
-        visaType: true,
-      },
-    });
-
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        error: 'APPLICATION_NOT_FOUND',
-        message: 'Application not found',
-      });
-    }
-
-    // Verify ownership
-    if (application.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        error: 'UNAUTHORIZED',
-        message: 'You do not have access to this application',
-      });
-    }
+    // Get application (ensures canonical Application shadow exists)
+    const application = await ApplicationsService.getApplication(applicationId, userId);
 
     // Get current checklist snapshot
     const checklist = await prisma.documentChecklist.findUnique({

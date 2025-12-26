@@ -58,3 +58,5 @@ curl -X POST https://api.example.com/api/assistant/ketdik \
 - [ ] Non-instruction questions are rejected or routed away.
 - [ ] Fallback triggers when Together is disabled or returns unsafe content.
 - [ ] Logs show Ketdik selection, latency, and fallback reasons.
+
+

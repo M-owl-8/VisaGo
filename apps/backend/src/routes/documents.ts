@@ -11,6 +11,7 @@ import {
   documentValidationRateLimitMiddleware,
   incrementDocumentValidationCount,
 } from '../middleware/checklist-rate-limit';
+import { DocumentSecurityService } from '../services/document-security.service';
 
 /**
  * Type guard to check if a value is a DocumentChecklist (not a status object)
@@ -28,15 +29,13 @@ const prisma = new PrismaClient();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20 MB
+    fileSize: 10 * 1024 * 1024, // 10 MB
   },
   fileFilter: (req, file, cb) => {
     const allowedMimes = [
       'application/pdf',
       'image/jpeg',
       'image/png',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
 
     if (allowedMimes.includes(file.mimetype)) {
@@ -88,6 +87,23 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       fileSize: req.file.size,
     });
 
+    // Security validation (size/type + optional SafeSearch)
+    const validation = await DocumentSecurityService.validateUpload({
+      buffer: req.file.buffer,
+      fileName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    });
+
+    if (!validation.ok) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: validation.reason || 'File failed security checks',
+        },
+      });
+    }
+
     // Ensure documentType is not defaulted to 'document' if a non-empty value is present
     if (!documentType || documentType.trim() === '') {
       return res.status(400).json({
@@ -109,6 +125,8 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         generateThumbnail: ['image/jpeg', 'image/png'].includes(req.file.mimetype),
       }
     );
+
+    const signedDownloadUrl = await StorageAdapter.getSignedUrl(uploadResult.fileName, 1);
 
     // Get application details for AI validation context (with relations)
     const application = await prisma.visaApplication.findFirst({
@@ -169,7 +187,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         where: { id: existingDocument.id },
         data: {
           documentName: req.file.originalname,
-          fileUrl: uploadResult.fileUrl,
+          fileUrl: signedDownloadUrl || uploadResult.fileUrl,
           fileName: uploadResult.fileName,
           fileSize: uploadResult.fileSize,
           status: 'pending', // Reset to pending for new validation
@@ -195,7 +213,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
           applicationId,
           documentName: req.file.originalname,
           documentType: storedDocumentType,
-          fileUrl: uploadResult.fileUrl,
+          fileUrl: signedDownloadUrl || uploadResult.fileUrl,
           fileName: uploadResult.fileName,
           fileSize: uploadResult.fileSize,
           status: 'pending', // Will be updated after AI validation in background
@@ -269,7 +287,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       },
       storage: {
         type: process.env.STORAGE_TYPE || 'local',
-        fileUrl: uploadResult.fileUrl,
+        fileUrl: signedDownloadUrl || uploadResult.fileUrl,
       },
       message: 'Document uploaded successfully. AI validation in progress.',
     });

@@ -1,7 +1,8 @@
 /**
- * Questionnaire V2 Screen - 10-Step Multiple Choice Questionnaire
+ * Questionnaire V2 Screen - 11-Step Multiple Choice Questionnaire
  * Implements QuestionnaireV2 structure with branching logic
  * Replaces the old 32-question questionnaire system
+ * Matches web app: 11 steps including visa-specific modules (Step 10)
  */
 
 import React, {useState, useEffect} from 'react';
@@ -16,6 +17,7 @@ import {
   Platform,
   Alert,
   Switch,
+  TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useTranslation} from 'react-i18next';
@@ -29,7 +31,7 @@ import {
 } from '../../types/questionnaire-v2';
 import {mapQuestionnaireV2ToLegacy} from '../../utils/questionnaireV2ToLegacyMapper';
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 11;
 
 // Fallback list shown only if backend country list is empty
 const FALLBACK_COUNTRIES: Array<{
@@ -81,7 +83,8 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 
   // Auto-set duration for student visas
   useEffect(() => {
-    if (formData.visaType === 'student') {
+    const visaTypeLower = (formData.visaType || '').toLowerCase();
+    if (visaTypeLower.includes('student')) {
       setFormData(prev => ({
         ...prev,
         travel: {
@@ -94,8 +97,9 @@ export default function QuestionnaireV2Screen({navigation}: any) {
 
   // Update invitation defaults based on visaType
   useEffect(() => {
+    const visaTypeLower = (formData.visaType || '').toLowerCase();
     if (
-      formData.visaType === 'tourist' &&
+      visaTypeLower.includes('tourist') &&
       !formData.invitation?.hasInvitation
     ) {
       setFormData(prev => ({
@@ -150,11 +154,13 @@ export default function QuestionnaireV2Screen({navigation}: any) {
           formData.status?.currentStatus && formData.status?.highestEducation
         );
       case 3: // Travel Profile
+        const visaTypeLower = (formData.visaType || '').toLowerCase();
         return !!(
           formData.travel?.plannedWhen !== undefined &&
           formData.travel?.isExactDatesKnown !== undefined &&
-          (formData.visaType === 'student' ||
-            formData.travel?.durationCategory !== undefined)
+          (visaTypeLower.includes('student') ||
+            formData.travel?.durationCategory !== undefined ||
+            formData.travel?.tripDurationDays !== undefined)
         );
       case 4: // Financial
         return !!(
@@ -167,10 +173,15 @@ export default function QuestionnaireV2Screen({navigation}: any) {
         if (!formData.invitation?.hasInvitation) {
           return formData.invitation?.hasInvitation === false;
         }
-        if (formData.visaType === 'student') {
+        const visaTypeLowerInv = (formData.visaType || '').toLowerCase();
+        if (visaTypeLowerInv.includes('student')) {
           return !!formData.invitation?.studentInvitationType;
         }
-        return !!formData.invitation?.touristInvitationType;
+        if (visaTypeLowerInv.includes('tourist')) {
+          return !!formData.invitation?.touristInvitationType;
+        }
+        // For other visa types, invitation is optional
+        return true;
       case 6: // Stay & Tickets
         return !!(
           formData.stay?.accommodationType &&
@@ -200,6 +211,8 @@ export default function QuestionnaireV2Screen({navigation}: any) {
           formData.special?.hasMedicalReasonForTrip !== undefined &&
           formData.special?.hasCriminalRecord !== undefined
         );
+      case 10: // Visa-specific modules (all optional)
+        return true;
       default:
         return false;
     }
@@ -407,6 +420,8 @@ export default function QuestionnaireV2Screen({navigation}: any) {
         return renderStep8_TiesAndDocuments();
       case 9:
         return renderStep9_SpecialConditions();
+      case 10:
+        return renderStep10_VisaSpecifics();
       default:
         return null;
     }
@@ -461,27 +476,73 @@ export default function QuestionnaireV2Screen({navigation}: any) {
       <Text style={[styles.fieldLabel, {marginTop: 24}]}>
         {t('questionnaireV2.step0.visaType')}
       </Text>
-      <View style={styles.optionsRow}>
+      <View style={styles.optionsGrid}>
         <TouchableOpacity
           style={[
             styles.optionCard,
-            formData.visaType === 'tourist' && styles.optionCardSelected,
+            (formData.visaType === 'Tourist Visa' || formData.visaType === 'tourist') &&
+              styles.optionCardSelected,
           ]}
-          onPress={() => updateFormData('visaType', 'tourist')}>
+          onPress={() => updateFormData('visaType', 'Tourist Visa')}>
           <Icon name="airplane" size={24} color="#4A9EFF" />
           <Text style={styles.optionText}>
-            {t('questionnaireV2.step0.tourist')}
+            {t('questionnaireV2.step0.tourist', 'Tourist Visa')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.optionCard,
-            formData.visaType === 'student' && styles.optionCardSelected,
+            (formData.visaType === 'Student Visa' || formData.visaType === 'student') &&
+              styles.optionCardSelected,
           ]}
-          onPress={() => updateFormData('visaType', 'student')}>
+          onPress={() => updateFormData('visaType', 'Student Visa')}>
           <Icon name="school" size={24} color="#4A9EFF" />
           <Text style={styles.optionText}>
-            {t('questionnaireV2.step0.student')}
+            {t('questionnaireV2.step0.student', 'Student Visa')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.optionCard,
+            formData.visaType === 'Work Visa' && styles.optionCardSelected,
+          ]}
+          onPress={() => updateFormData('visaType', 'Work Visa')}>
+          <Icon name="briefcase" size={24} color="#4A9EFF" />
+          <Text style={styles.optionText}>
+            {t('questionnaireV2.step0.work', 'Work Visa')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.optionCard,
+            formData.visaType === 'Business Visa' && styles.optionCardSelected,
+          ]}
+          onPress={() => updateFormData('visaType', 'Business Visa')}>
+          <Icon name="business" size={24} color="#4A9EFF" />
+          <Text style={styles.optionText}>
+            {t('questionnaireV2.step0.business', 'Business Visa')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.optionCard,
+            formData.visaType === 'Family/Visitor Visa' && styles.optionCardSelected,
+          ]}
+          onPress={() => updateFormData('visaType', 'Family/Visitor Visa')}>
+          <Icon name="people" size={24} color="#4A9EFF" />
+          <Text style={styles.optionText}>
+            {t('questionnaireV2.step0.family', 'Family/Visitor Visa')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.optionCard,
+            formData.visaType === 'Transit Visa' && styles.optionCardSelected,
+          ]}
+          onPress={() => updateFormData('visaType', 'Transit Visa')}>
+          <Icon name="airplane" size={24} color="#4A9EFF" />
+          <Text style={styles.optionText}>
+            {t('questionnaireV2.step0.transit', 'Transit Visa')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -1288,6 +1349,371 @@ export default function QuestionnaireV2Screen({navigation}: any) {
     </View>
   );
 
+  // Step 10: Visa-specific modules
+  const renderStep10_VisaSpecifics = () => {
+    const visaTypeLower = (formData.visaType || '').toLowerCase();
+    const isStudent = visaTypeLower.includes('student');
+    const isWork = visaTypeLower.includes('work');
+    const isBusiness =
+      visaTypeLower.includes('business') || visaTypeLower.includes('conference');
+    const isFamily =
+      visaTypeLower.includes('family') ||
+      visaTypeLower.includes('visit') ||
+      visaTypeLower.includes('visitor');
+    const isTransit = visaTypeLower.includes('transit');
+
+    const updateModuleField = <K extends keyof QuestionnaireV2>(
+      module: 'studentModule' | 'workModule' | 'familyModule' | 'businessModule' | 'transitModule',
+      field: string,
+      value: any,
+    ) => {
+      setFormData(prev => {
+        const currentModule = prev[module] || {};
+        return {
+          ...prev,
+          [module]: {
+            ...currentModule,
+            [field]: value,
+          },
+        };
+      });
+    };
+
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>
+          {t('questionnaireV2.step10.title', 'Visa-specific details')}
+        </Text>
+        <Text style={styles.stepDescription}>
+          {t(
+            'questionnaireV2.step10.description',
+            'Answer the questions relevant to your visa type. Skip anything that does not apply.',
+          )}
+        </Text>
+
+        {isStudent && (
+          <View style={styles.moduleSection}>
+            <Text style={styles.moduleTitle}>
+              {t('questionnaireV2.step10.studentModule', 'Student Visa Details')}
+            </Text>
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.schoolName', 'School / university name')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={formData.studentModule?.schoolName || ''}
+              onChangeText={value => updateModuleField('studentModule', 'schoolName', value)}
+              placeholder={t('questionnaireV2.step10.schoolNamePlaceholder', 'Enter school name')}
+              placeholderTextColor="#94A3B8"
+            />
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.acceptanceStatus', 'Acceptance status')}
+            </Text>
+            <View style={styles.optionsRow}>
+              {['accepted', 'applied', 'not_applied'].map(status => (
+                <TouchableOpacity
+                  key={status}
+                  style={[
+                    styles.optionCard,
+                    formData.studentModule?.acceptanceStatus === status &&
+                      styles.optionCardSelected,
+                  ]}
+                  onPress={() =>
+                    updateModuleField('studentModule', 'acceptanceStatus', status)
+                  }>
+                  <Text style={styles.optionText}>
+                    {t(`questionnaireV2.step10.${status}`, status)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.programStartDate', 'Program start date')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={formData.studentModule?.programStartDate || ''}
+              onChangeText={value =>
+                updateModuleField('studentModule', 'programStartDate', value)
+              }
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#94A3B8"
+            />
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.tuitionAmount', 'Tuition amount (USD)')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={
+                formData.studentModule?.tuitionAmountUSD
+                  ? String(formData.studentModule.tuitionAmountUSD)
+                  : ''
+              }
+              onChangeText={value =>
+                updateModuleField(
+                  'studentModule',
+                  'tuitionAmountUSD',
+                  value ? Number(value) : null,
+                )
+              }
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#94A3B8"
+            />
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                {t('questionnaireV2.step10.scholarship', 'Scholarship')}
+              </Text>
+              <Switch
+                value={formData.studentModule?.scholarship || false}
+                onValueChange={value =>
+                  updateModuleField('studentModule', 'scholarship', value)
+                }
+              />
+            </View>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                {t(
+                  'questionnaireV2.step10.hasAdmissionLetter',
+                  'Admission/acceptance letter available',
+                )}
+              </Text>
+              <Switch
+                value={formData.studentModule?.hasAdmissionLetter || false}
+                onValueChange={value =>
+                  updateModuleField('studentModule', 'hasAdmissionLetter', value)
+                }
+              />
+            </View>
+          </View>
+        )}
+
+        {isWork && (
+          <View style={styles.moduleSection}>
+            <Text style={styles.moduleTitle}>
+              {t('questionnaireV2.step10.workModule', 'Work Visa Details')}
+            </Text>
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.employerName', 'Employer name')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={formData.workModule?.employerName || ''}
+              onChangeText={value => updateModuleField('workModule', 'employerName', value)}
+              placeholder={t('questionnaireV2.step10.employerNamePlaceholder', 'Enter employer name')}
+              placeholderTextColor="#94A3B8"
+            />
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.position', 'Position / role')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={formData.workModule?.position || ''}
+              onChangeText={value => updateModuleField('workModule', 'position', value)}
+              placeholder={t('questionnaireV2.step10.positionPlaceholder', 'Enter position')}
+              placeholderTextColor="#94A3B8"
+            />
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.salaryMonthly', 'Monthly salary (USD)')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={
+                formData.workModule?.salaryMonthlyUSD
+                  ? String(formData.workModule.salaryMonthlyUSD)
+                  : ''
+              }
+              onChangeText={value =>
+                updateModuleField(
+                  'workModule',
+                  'salaryMonthlyUSD',
+                  value ? Number(value) : null,
+                )
+              }
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#94A3B8"
+            />
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                {t('questionnaireV2.step10.hasWorkPermit', 'Work permit already issued')}
+              </Text>
+              <Switch
+                value={formData.workModule?.hasWorkPermit || false}
+                onValueChange={value =>
+                  updateModuleField('workModule', 'hasWorkPermit', value)
+                }
+              />
+            </View>
+          </View>
+        )}
+
+        {isFamily && (
+          <View style={styles.moduleSection}>
+            <Text style={styles.moduleTitle}>
+              {t('questionnaireV2.step10.familyModule', 'Family/Visitor Visa Details')}
+            </Text>
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.inviterRelationship', 'Inviter relationship')}
+            </Text>
+            <View style={styles.optionsGrid}>
+              {['spouse', 'parent', 'sibling', 'relative', 'friend'].map(rel => (
+                <TouchableOpacity
+                  key={rel}
+                  style={[
+                    styles.optionCard,
+                    formData.familyModule?.inviterRelationship === rel &&
+                      styles.optionCardSelected,
+                  ]}
+                  onPress={() =>
+                    updateModuleField('familyModule', 'inviterRelationship', rel)
+                  }>
+                  <Text style={styles.optionText}>
+                    {t(`questionnaireV2.step10.${rel}`, rel)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                {t('questionnaireV2.step10.hasInvitationLetter', 'Invitation letter available')}
+              </Text>
+              <Switch
+                value={formData.familyModule?.hasInvitationLetter || false}
+                onValueChange={value =>
+                  updateModuleField('familyModule', 'hasInvitationLetter', value)
+                }
+              />
+            </View>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                {t('questionnaireV2.step10.willHost', 'Inviter will host')}
+              </Text>
+              <Switch
+                value={formData.familyModule?.willHost || false}
+                onValueChange={value =>
+                  updateModuleField('familyModule', 'willHost', value)
+                }
+              />
+            </View>
+          </View>
+        )}
+
+        {isBusiness && (
+          <View style={styles.moduleSection}>
+            <Text style={styles.moduleTitle}>
+              {t('questionnaireV2.step10.businessModule', 'Business Visa Details')}
+            </Text>
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.companyName', 'Company / organizer')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={formData.businessModule?.companyName || ''}
+              onChangeText={value => updateModuleField('businessModule', 'companyName', value)}
+              placeholder={t('questionnaireV2.step10.companyNamePlaceholder', 'Enter company name')}
+              placeholderTextColor="#94A3B8"
+            />
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.eventType', 'Event / conference')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={formData.businessModule?.eventType || ''}
+              onChangeText={value => updateModuleField('businessModule', 'eventType', value)}
+              placeholder={t('questionnaireV2.step10.eventTypePlaceholder', 'Enter event type')}
+              placeholderTextColor="#94A3B8"
+            />
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                {t(
+                  'questionnaireV2.step10.invitationFromCompany',
+                  'Invitation from company available',
+                )}
+              </Text>
+              <Switch
+                value={formData.businessModule?.invitationFromCompany || false}
+                onValueChange={value =>
+                  updateModuleField('businessModule', 'invitationFromCompany', value)
+                }
+              />
+            </View>
+          </View>
+        )}
+
+        {isTransit && (
+          <View style={styles.moduleSection}>
+            <Text style={styles.moduleTitle}>
+              {t('questionnaireV2.step10.transitModule', 'Transit Visa Details')}
+            </Text>
+
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>
+                {t('questionnaireV2.step10.onwardTicket', 'Onward/return ticket booked')}
+              </Text>
+              <Switch
+                value={formData.transitModule?.onwardTicket || false}
+                onValueChange={value =>
+                  updateModuleField('transitModule', 'onwardTicket', value)
+                }
+              />
+            </View>
+
+            <Text style={styles.fieldLabel}>
+              {t('questionnaireV2.step10.layoverHours', 'Layover duration (hours)')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={
+                formData.transitModule?.layoverHours
+                  ? String(formData.transitModule.layoverHours)
+                  : ''
+              }
+              onChangeText={value =>
+                updateModuleField(
+                  'transitModule',
+                  'layoverHours',
+                  value ? Number(value) : null,
+                )
+              }
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+        )}
+
+        {!isStudent && !isWork && !isBusiness && !isFamily && !isTransit && (
+          <View style={styles.infoBox}>
+            <Icon name="information-circle" size={20} color="#4A9EFF" />
+            <Text style={styles.infoText}>
+              {t(
+                'questionnaireV2.step10.noExtraQuestions',
+                'No additional questions for this visa type. You can continue.',
+              )}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1579,5 +2005,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  moduleSection: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: 'rgba(15, 30, 45, 0.4)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
+  },
+  moduleTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#4A9EFF',
+    marginBottom: 16,
+  },
+  textInput: {
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
+    marginBottom: 16,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(74, 158, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 24,
+    gap: 12,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#94A3B8',
+    lineHeight: 20,
   },
 });

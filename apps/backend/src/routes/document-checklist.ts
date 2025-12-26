@@ -9,6 +9,7 @@ import { DocumentChecklistService } from '../services/document-checklist.service
 import { successResponse, errorResponse } from '../utils/response';
 import { HTTP_STATUS, ERROR_CODES } from '../config/constants';
 import { logWarn } from '../middleware/logger';
+import { VisaChecklistExplanationService } from '../services/visa-checklist-explanation.service';
 import {
   checklistRateLimitMiddleware,
   incrementChecklistGenerationCount,
@@ -30,6 +31,29 @@ router.use(checklistRateLimitMiddleware);
  * @access Private
  * @returns {object} Document checklist
  */
+router.get('/:applicationId/status', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.userId) {
+      return errorResponse(
+        res,
+        HTTP_STATUS.UNAUTHORIZED,
+        'User ID not found in request',
+        ERROR_CODES.UNAUTHORIZED
+      );
+    }
+
+    const { applicationId } = req.params;
+    const status = await DocumentChecklistService.getChecklistStatus(applicationId, req.userId);
+
+    return res.json({
+      success: true,
+      data: status,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:applicationId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.userId) {
@@ -189,6 +213,40 @@ router.put(
       }
 
       successResponse(res, checklistResult);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/document-checklist/:applicationId/items/:documentType/explanation
+ * Fetch explanation for a specific documentType for this application.
+ */
+router.get(
+  '/:applicationId/items/:documentType/explanation',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.userId) {
+        return errorResponse(
+          res,
+          HTTP_STATUS.UNAUTHORIZED,
+          'User ID not found in request',
+          ERROR_CODES.UNAUTHORIZED
+        );
+      }
+
+      const { applicationId, documentType } = req.params;
+      const explanation = await VisaChecklistExplanationService.getExplanation(
+        req.userId,
+        applicationId,
+        documentType
+      );
+
+      return res.json({
+        success: true,
+        data: explanation,
+      });
     } catch (error) {
       next(error);
     }

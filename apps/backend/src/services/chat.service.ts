@@ -26,6 +26,60 @@ function getAIServiceURL(): string {
 
 const AI_SERVICE_URL = getAIServiceURL();
 
+function capitalizeFirst(value: string): string {
+  if (!value) return '';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getFlagEmoji(countryCode?: string | null): string {
+  if (!countryCode) return '🌍';
+  const flagMap: Record<string, string> = {
+    us: '🇺🇸',
+    ca: '🇨🇦',
+    gb: '🇬🇧',
+    au: '🇦🇺',
+    de: '🇩🇪',
+    fr: '🇫🇷',
+    es: '🇪🇸',
+    it: '🇮🇹',
+    jp: '🇯🇵',
+    ae: '🇦🇪',
+    uz: '🇺🇿',
+    ru: '🇷🇺',
+    kr: '🇰🇷',
+    tr: '🇹🇷',
+  };
+  return flagMap[countryCode.toLowerCase()] || '🌍';
+}
+
+/**
+ * Generate chat session title based on application context
+ * Example: "🇺🇸 United States Tourist Visa"
+ */
+function generateApplicationSessionTitle(
+  country?: { name?: string | null; code?: string | null },
+  visaType?: { name?: string | null }
+): string {
+  const countryName = country?.name?.trim();
+  const countryCode = country?.code?.trim();
+  const visaTypeName = visaType?.name?.trim();
+
+  if (countryName && visaTypeName) {
+    const visaLabel = capitalizeFirst(visaTypeName);
+    return `${getFlagEmoji(countryCode)} ${countryName} ${visaLabel} Visa`;
+  }
+
+  if (countryName) {
+    return `${getFlagEmoji(countryCode)} ${countryName} Visa`;
+  }
+
+  if (visaTypeName) {
+    return `${capitalizeFirst(visaTypeName)} Visa`;
+  }
+
+  return 'New Chat';
+}
+
 function isPlaceholderTitle(title?: string | null): boolean {
   if (!title) return true;
   const normalized = title.trim().toLowerCase();
@@ -104,6 +158,41 @@ export class ChatService {
         userId,
         applicationId: applicationId || null,
         title: title?.trim() || (applicationId ? `Chat for ${applicationId}` : 'New Chat'),
+      },
+    });
+
+    return session;
+  }
+
+  /**
+   * Create or reuse a chat session for a specific application with a meaningful title
+   * Idempotent: returns existing session if one already exists for the user/application
+   */
+  async createSessionForApplication(
+    userId: string,
+    applicationId: string,
+    country?: { name?: string | null; code?: string | null },
+    visaType?: { name?: string | null }
+  ) {
+    // Check for existing session to avoid duplicates
+    const existing = await prisma.chatSession.findFirst({
+      where: {
+        userId,
+        applicationId,
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const title = generateApplicationSessionTitle(country, visaType);
+
+    const session = await prisma.chatSession.create({
+      data: {
+        userId,
+        applicationId,
+        title,
       },
     });
 

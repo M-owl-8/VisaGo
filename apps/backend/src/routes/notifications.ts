@@ -272,4 +272,71 @@ router.post('/start-daily-reminders', authenticateToken, async (req: Request, re
   }
 });
 
+// Get active sessions/devices for user
+router.get('/active-sessions', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          message: 'Unauthorized',
+        },
+      });
+    }
+
+    // Get all active device tokens for the user
+    const devices = await db.deviceToken.findMany({
+      where: {
+        userId,
+        isValid: true,
+        isActive: true,
+      },
+      orderBy: {
+        lastUsedAt: 'desc',
+      },
+    });
+
+    // Format devices as sessions
+    const sessions = devices.map(device => {
+      // Determine device name based on platform
+      let deviceName = 'Unknown Device';
+      if (device.platform === 'ios') {
+        deviceName = 'iOS · Mobile App';
+      } else if (device.platform === 'android') {
+        deviceName = 'Android · Mobile App';
+      } else if (device.platform === 'web') {
+        // Try to extract browser info from deviceId if available
+        // deviceId for web contains "OS · Browser" format
+        deviceName = device.deviceId || 'Web Browser';
+      }
+
+      return {
+        id: device.id,
+        deviceName,
+        platform: device.platform,
+        deviceId: device.deviceId,
+        lastUsedAt: device.lastUsedAt,
+        createdAt: device.createdAt,
+        isCurrent: false, // Will be set by client based on current device token or deviceId
+      };
+    });
+
+    res.json({
+      success: true,
+      data: sessions,
+      count: sessions.length,
+    });
+  } catch (error) {
+    console.error('Error fetching active sessions:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch active sessions',
+      },
+    });
+  }
+});
+
 export default router;

@@ -53,3 +53,5 @@ Last updated: 2025-12-17
 - Footer: `apps/web/components/landing/LandingFooter.tsx`
 - Auth fields: `apps/web/components/auth/AuthField.tsx`
 - Questionnaire: `apps/web/app/(dashboard)/questionnaire/page.tsx`
+
+

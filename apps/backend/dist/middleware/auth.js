@@ -107,10 +107,12 @@ const authenticateToken = (req, res, next) => {
                     tokenLength: token.length,
                     tokenPreview: token.substring(0, 20) + '...',
                 });
-                res.status(constants_1.HTTP_STATUS.FORBIDDEN).json({
+                // Invalid/expired tokens are an authentication problem (401), not an authorization problem (403).
+                // Using 401 allows clients to reliably clear local sessions and re-authenticate.
+                res.status(constants_1.HTTP_STATUS.UNAUTHORIZED).json({
                     success: false,
                     error: {
-                        status: constants_1.HTTP_STATUS.FORBIDDEN,
+                        status: constants_1.HTTP_STATUS.UNAUTHORIZED,
                         message: errorMessage,
                         code: constants_1.ERROR_CODES.INVALID_TOKEN,
                     },
@@ -119,10 +121,10 @@ const authenticateToken = (req, res, next) => {
             }
             // Type guard for decoded token
             if (!decoded || typeof decoded !== 'object' || !('id' in decoded) || !('email' in decoded)) {
-                res.status(constants_1.HTTP_STATUS.FORBIDDEN).json({
+                res.status(constants_1.HTTP_STATUS.UNAUTHORIZED).json({
                     success: false,
                     error: {
-                        status: constants_1.HTTP_STATUS.FORBIDDEN,
+                        status: constants_1.HTTP_STATUS.UNAUTHORIZED,
                         message: 'Invalid token payload',
                         code: constants_1.ERROR_CODES.INVALID_TOKEN,
                     },

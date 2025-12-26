@@ -12,6 +12,7 @@ import { useAuthStore } from '@/lib/stores/auth';
 import { useApplications } from '@/lib/hooks/useApplications';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
+import { apiClient } from '@/lib/api/client';
 
 export default function ProfilePage() {
   const { t, i18n } = useTranslation();
@@ -22,6 +23,14 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<any>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [activeSessions, setActiveSessions] = useState<Array<{
+    id: string;
+    deviceName: string;
+    platform: string;
+    lastUsedAt: string | null;
+    isCurrent: boolean;
+  }>>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
 
   const hasFetchedRef = useRef(false);
 
@@ -36,6 +45,86 @@ export default function ProfilePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch active sessions
+  useEffect(() => {
+    const fetchActiveSessions = async () => {
+      if (!isSignedIn) return;
+      
+      try {
+        setIsLoadingSessions(true);
+        const response = await apiClient.getActiveSessions();
+        if (response.success && Array.isArray(response.data)) {
+          // Detect current browser/device
+          const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+          const isChrome = userAgent.includes('Chrome') && !userAgent.includes('Edg');
+          const isFirefox = userAgent.includes('Firefox');
+          const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome');
+          const isEdge = userAgent.includes('Edg');
+          const browserName = isChrome ? 'Chrome' : isFirefox ? 'Firefox' : isSafari ? 'Safari' : isEdge ? 'Edge' : 'Browser';
+          
+          const osName = typeof navigator !== 'undefined' && navigator.platform 
+            ? (navigator.platform.includes('Win') ? 'Windows' 
+              : navigator.platform.includes('Mac') ? 'macOS' 
+              : navigator.platform.includes('Linux') ? 'Linux' 
+              : 'Unknown')
+            : 'Unknown';
+          
+          const currentDeviceName = `${osName} · ${browserName}`;
+          
+          // Mark current device (web browser) as current session
+          const sessions = response.data.map((session: any) => ({
+            ...session,
+            isCurrent: session.platform === 'web' && session.deviceName === currentDeviceName,
+          }));
+          
+          // If no web session found, add current one
+          const hasWebSession = sessions.some((s: any) => s.platform === 'web');
+          if (!hasWebSession) {
+            sessions.unshift({
+              id: 'current',
+              deviceName: currentDeviceName,
+              platform: 'web',
+              lastUsedAt: new Date().toISOString(),
+              isCurrent: true,
+            });
+          }
+          
+          setActiveSessions(sessions);
+        }
+      } catch (error) {
+        console.error('Error fetching active sessions:', error);
+        // Fallback to showing current device if API fails
+        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        const isChrome = userAgent.includes('Chrome') && !userAgent.includes('Edg');
+        const isFirefox = userAgent.includes('Firefox');
+        const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome');
+        const isEdge = userAgent.includes('Edg');
+        const browserName = isChrome ? 'Chrome' : isFirefox ? 'Firefox' : isSafari ? 'Safari' : isEdge ? 'Edge' : 'Browser';
+        const osName = typeof navigator !== 'undefined' && navigator.platform 
+          ? (navigator.platform.includes('Win') ? 'Windows' 
+            : navigator.platform.includes('Mac') ? 'macOS' 
+            : navigator.platform.includes('Linux') ? 'Linux' 
+            : 'Unknown')
+          : 'Unknown';
+        setActiveSessions([
+          {
+            id: 'current',
+            deviceName: `${osName} · ${browserName}`,
+            platform: 'web',
+            lastUsedAt: new Date().toISOString(),
+            isCurrent: true,
+          },
+        ]);
+      } finally {
+        setIsLoadingSessions(false);
+      }
+    };
+
+    if (isSignedIn) {
+      fetchActiveSessions();
+    }
+  }, [isSignedIn]);
 
   if (!user) {
     return (
@@ -223,25 +312,62 @@ export default function ProfilePage() {
           </div>
 
           {/* Active Sessions */}
-          <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-xs font-medium uppercase tracking-wider text-white/50">
                 {i18n.language === 'uz' ? 'Faol seanslar' : i18n.language === 'ru' ? 'Активные сеансы' : 'Active sessions'}
               </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white/70 hover:text-white"
+                onClick={() => {/* TODO: Sessions drawer */}}
+              >
+                <Monitor size={14} className="mr-1.5" />
+                {i18n.language === 'uz' ? "Ko'rish" : i18n.language === 'ru' ? 'Показать' : 'View'}
+              </Button>
+            </div>
+            {isLoadingSessions ? (
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-white/20" />
+                <p className="text-sm text-white/50">{t('common.loading')}</p>
+              </div>
+            ) : activeSessions.length > 0 ? (
+              <div className="space-y-2">
+                {activeSessions.map((session) => (
+                  <div key={session.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]",
+                        session.isCurrent ? "bg-emerald-400" : "bg-white/40"
+                      )} />
+                      <div>
+                        <p className="text-sm font-medium text-white">{session.deviceName}</p>
+                        <p className="text-xs text-white/50">
+                          {session.isCurrent
+                            ? (i18n.language === 'uz' ? 'Joriy qurilma' : i18n.language === 'ru' ? 'Текущее устройство' : 'Current device')
+                            : session.lastUsedAt
+                            ? new Date(session.lastUsedAt).toLocaleDateString()
+                            : (i18n.language === 'uz' ? 'Faol' : i18n.language === 'ru' ? 'Активен' : 'Active')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_currentColor]" />
-                <p className="text-sm font-medium text-white">Windows · Chrome</p>
+                <p className="text-sm font-medium text-white">
+                  {typeof navigator !== 'undefined' && navigator.platform 
+                    ? (navigator.platform.includes('Win') ? 'Windows' 
+                      : navigator.platform.includes('Mac') ? 'macOS' 
+                      : navigator.platform.includes('Linux') ? 'Linux' 
+                      : 'Unknown')
+                    : 'Unknown'} · {typeof navigator !== 'undefined' && navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Browser'}
+                </p>
               </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white/70 hover:text-white"
-              onClick={() => {/* TODO: Sessions drawer */}}
-            >
-              <Monitor size={14} className="mr-1.5" />
-              {i18n.language === 'uz' ? "Ko'rish" : i18n.language === 'ru' ? 'Показать' : 'View'}
-            </Button>
+            )}
           </div>
 
           {/* 2FA Placeholder */}

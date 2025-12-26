@@ -24,3 +24,5 @@ Last updated: 2025-12-17
 | 18  | Rate limit bypass via missing requestId                       | Low    | Med        | Add requestId correlation in logs                                                         | Backend  |
 | 19  | Health checks not covering dependencies                       | Low    | Med        | Extend `/api/health` to DB/Redis/AI/Firebase                                              | Backend  |
 | 20  | Admin panel incomplete CRUD                                   | Low    | Med        | Finish admin routes/pages (`apps/web/app/(dashboard)/admin/*`)                            | Frontend |
+
+

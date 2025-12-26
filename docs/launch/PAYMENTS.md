@@ -42,3 +42,5 @@ Last updated: 2025-12-17
 - Status transitions correct
 - Webhooks verified
 - Entitlements gated on payment status (if/when enabled)
+
+

@@ -10,6 +10,7 @@ from typing import Optional, List, Dict, Any
 import os
 from dotenv import load_dotenv
 import logging
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -87,6 +88,15 @@ class HealthResponse(BaseModel):
     version: str
 
 
+class RegistryEntry(BaseModel):
+    code: str
+    name: str
+    schengen: Optional[bool] = None
+    aliases: Optional[list[str]] = None
+    visaCategories: Optional[list[str]] = None
+    defaultVisaTypes: Optional[dict] = None
+
+
 class ChecklistRequest(BaseModel):
     """Request model for checklist generation"""
     user_input: str
@@ -120,6 +130,38 @@ class ProbabilityResponse(BaseModel):
 # ROUTES
 # ============================================================================
 
+# In-memory country registry (fetched from backend if available)
+COUNTRY_REGISTRY: list[dict] = []
+
+
+def fetch_country_registry():
+    """Fetch country registry from backend if configured."""
+    global COUNTRY_REGISTRY
+    backend_url = os.getenv("COUNTRY_REGISTRY_URL") or os.getenv("BACKEND_API_URL")
+    if not backend_url:
+        logger.info("COUNTRY_REGISTRY_URL or BACKEND_API_URL not set; skipping registry fetch")
+        return
+
+    url = (
+        backend_url
+        if backend_url.endswith("/api/meta/country-registry")
+        else backend_url.rstrip("/") + "/api/meta/country-registry"
+    )
+
+    try:
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        registry = data.get("data") if isinstance(data, dict) else data
+        if isinstance(registry, list) and len(registry) > 0:
+            COUNTRY_REGISTRY = registry
+            logger.info("Loaded country registry from backend", extra={"count": len(registry)})
+        else:
+            logger.warning("Country registry response was empty or invalid")
+    except Exception as e:
+        logger.warning(f"Failed to fetch country registry: {e}")
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
@@ -137,6 +179,16 @@ async def api_status():
         "message": "VisaBuddy AI Service is running",
         "service": "AI Chat & RAG",
         "available_models": ["gpt-4", "gpt-3.5-turbo"],
+    }
+
+
+@app.get("/api/registry", response_model=Dict[str, Any])
+async def registry_status():
+    """Return cached country registry."""
+    return {
+        "success": True,
+        "data": COUNTRY_REGISTRY,
+        "count": len(COUNTRY_REGISTRY),
     }
 
 
@@ -520,6 +572,9 @@ async def startup_event():
     """Startup event - Initialize services"""
     logger.info("🚀 VisaBuddy AI Service starting...")
     
+    # Load country registry (non-blocking)
+    fetch_country_registry()
+
     # Initialize OpenAI service
     from services.openai import get_openai_service
     logger.info("Initializing OpenAI service...")

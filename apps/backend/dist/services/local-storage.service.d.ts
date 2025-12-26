@@ -25,7 +25,8 @@ export declare class LocalStorageService {
     private static baseDir;
     private static serverUrl;
     /**
-     * Initialize storage directory
+     * Initialize and validate configuration
+     * Throws error in production if SERVER_URL is not set
      */
     static initialize(): Promise<void>;
     /**

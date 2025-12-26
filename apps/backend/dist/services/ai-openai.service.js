@@ -89,24 +89,100 @@ class AIOpenAIService {
             if (!AIOpenAIService.prisma) {
                 AIOpenAIService.prisma = new client_1.PrismaClient();
             }
-            await AIOpenAIService.prisma.aIInteraction.create({
-                data: {
-                    taskType: params.taskType,
-                    model: params.model,
-                    promptVersion: params.promptVersion || null,
-                    requestPayload: params.requestPayload,
-                    responsePayload: params.responsePayload,
-                    success: params.success,
-                    errorMessage: params.errorMessage || null,
-                    source: params.source,
-                    countryCode: params.contextMeta?.countryCode || null,
-                    visaType: params.contextMeta?.visaType || null,
-                    ruleSetId: params.contextMeta?.ruleSetId || null,
-                    applicationId: params.contextMeta?.applicationId || null,
-                    userId: params.contextMeta?.userId || null,
-                    modelVersionId: params.modelVersionId || null,
-                },
-            });
+            // Safely stringify payloads, truncating if too large
+            const MAX_PAYLOAD_LENGTH = 50000; // ~50KB per field
+            const stringifyPayload = (payload) => {
+                try {
+                    const str = JSON.stringify(payload);
+                    return str.length > MAX_PAYLOAD_LENGTH
+                        ? str.substring(0, MAX_PAYLOAD_LENGTH) + '... [truncated]'
+                        : str;
+                }
+                catch (e) {
+                    return String(payload).substring(0, MAX_PAYLOAD_LENGTH);
+                }
+            };
+            // Redact sensitive data from payloads
+            const redactSensitive = (obj) => {
+                if (!obj || typeof obj !== 'object')
+                    return obj;
+                const redacted = { ...obj };
+                // Check for sensitive field patterns (not actual secrets, just field names to redact)
+                const isSensitiveField = (fieldName) => {
+                    const lower = fieldName.toLowerCase();
+                    return (lower.includes('password') ||
+                        lower.includes('token') ||
+                        lower.includes('secret') ||
+                        lower.includes('authorization') ||
+                        (lower.includes('api') && lower.includes('key')));
+                };
+                for (const key in redacted) {
+                    if (isSensitiveField(key)) {
+                        redacted[key] = '[REDACTED]';
+                    }
+                    else if (typeof redacted[key] === 'object') {
+                        redacted[key] = redactSensitive(redacted[key]);
+                    }
+                }
+                return redacted;
+            };
+            const safeRequestPayload = stringifyPayload(redactSensitive(params.requestPayload));
+            const safeResponsePayload = params.responsePayload
+                ? stringifyPayload(redactSensitive(params.responsePayload))
+                : null;
+            // Try to create with latencyMs first
+            try {
+                await AIOpenAIService.prisma.aIInteraction.create({
+                    data: {
+                        taskType: params.taskType,
+                        model: params.model,
+                        promptVersion: params.promptVersion || null,
+                        source: params.source || null,
+                        requestPayload: safeRequestPayload,
+                        responsePayload: safeResponsePayload,
+                        success: params.success,
+                        errorMessage: params.errorMessage || null,
+                        countryCode: params.contextMeta?.countryCode || null,
+                        visaType: params.contextMeta?.visaType || null,
+                        ruleSetId: params.contextMeta?.ruleSetId || null,
+                        applicationId: params.contextMeta?.applicationId || null,
+                        userId: params.contextMeta?.userId || null,
+                        modelVersionId: params.modelVersionId || null,
+                        latencyMs: params.latencyMs || null,
+                    },
+                });
+            }
+            catch (latencyError) {
+                // If latencyMs column doesn't exist, try without it
+                if (latencyError?.message?.includes('latencyMs') ||
+                    latencyError?.message?.includes('does not exist')) {
+                    (0, logger_1.logWarn)('[AIOpenAI] latencyMs column not found, creating without it. Run migration to add column.', {
+                        taskType: params.taskType,
+                    });
+                    await AIOpenAIService.prisma.aIInteraction.create({
+                        data: {
+                            taskType: params.taskType,
+                            model: params.model,
+                            promptVersion: params.promptVersion || null,
+                            source: params.source || null,
+                            requestPayload: safeRequestPayload,
+                            responsePayload: safeResponsePayload,
+                            success: params.success,
+                            errorMessage: params.errorMessage || null,
+                            countryCode: params.contextMeta?.countryCode || null,
+                            visaType: params.contextMeta?.visaType || null,
+                            ruleSetId: params.contextMeta?.ruleSetId || null,
+                            applicationId: params.contextMeta?.applicationId || null,
+                            userId: params.contextMeta?.userId || null,
+                            modelVersionId: params.modelVersionId || null,
+                            // Omit latencyMs
+                        },
+                    });
+                }
+                else {
+                    throw latencyError; // Re-throw if it's a different error
+                }
+            }
         }
         catch (error) {
             // Don't fail the main request if logging fails
@@ -329,14 +405,20 @@ class AIOpenAIService {
                     error.message.includes('401') ||
                     statusCode === 401) {
                     const aiConfig = (0, ai_models_1.getAIConfig)('chat');
-                    (0, logger_1.logError)('[OPENAI_CONFIG_ERROR] Invalid API key', error, { task: 'chat', model: aiConfig.model });
+                    (0, logger_1.logError)('[OPENAI_CONFIG_ERROR] Invalid API key', error, {
+                        task: 'chat',
+                        model: aiConfig.model,
+                    });
                     throw new Error('AI service configuration error. Please contact support.');
                 }
                 if (error.message.includes('quota') ||
                     error.message.includes('insufficient_quota') ||
                     statusCode === 429) {
                     const aiConfig = (0, ai_models_1.getAIConfig)('chat');
-                    (0, logger_1.logError)('[OPENAI_QUOTA_ERROR] Quota exceeded', error, { task: 'chat', model: aiConfig.model });
+                    (0, logger_1.logError)('[OPENAI_QUOTA_ERROR] Quota exceeded', error, {
+                        task: 'chat',
+                        model: aiConfig.model,
+                    });
                     throw new Error('AI service quota exceeded. Please try again later.');
                 }
             }
@@ -581,6 +663,7 @@ RULES:
 - You MUST NOT remove documents
 - You MUST NOT change category or required status
 - Each documentType must have complete name, description, and whereToObtain in EN, UZ, and RU
+- Be concise to avoid truncation: keep each description and whereToObtain to 1 short sentence per language (aim for <= 160 characters per field)
 - Use correct country-specific terminology:
   * USA student: "Form I-20" (NOT "LOA")
   * Canada student: "Letter of Acceptance (LOA) from a Designated Learning Institution (DLI)" (NOT "I-20")
@@ -670,9 +753,9 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
      * Parse hybrid response from GPT-4
      */
     static parseHybridResponse(rawContent, baseChecklist, country, visaType) {
+        // Extract JSON from response
+        let jsonText = rawContent.trim();
         try {
-            // Extract JSON from response
-            let jsonText = rawContent.trim();
             if (jsonText.includes('```json')) {
                 const start = jsonText.indexOf('```json') + 7;
                 const end = jsonText.indexOf('```', start);
@@ -697,17 +780,121 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
             }
             const parsed = JSON.parse(jsonText);
             if (!parsed.checklist || !Array.isArray(parsed.checklist)) {
+                (0, logger_1.logWarn)('[OpenAI][Checklist] Hybrid mode response missing checklist array', {
+                    country,
+                    visaType,
+                    hasChecklist: !!parsed.checklist,
+                    checklistType: typeof parsed.checklist,
+                });
                 return null;
             }
             return parsed;
         }
         catch (error) {
+            // Best-effort repair for the most common production failure:
+            // truncated JSON due to max token limits (EOF while still inside checklist array/object).
+            const repaired = this.repairLikelyTruncatedJson(jsonText);
+            if (repaired) {
+                try {
+                    const parsed = JSON.parse(repaired);
+                    if (parsed?.checklist && Array.isArray(parsed.checklist)) {
+                        (0, logger_1.logWarn)('[OpenAI][Checklist] Hybrid mode JSON repaired after parse error', {
+                            country,
+                            visaType,
+                        });
+                        return parsed;
+                    }
+                }
+                catch {
+                    // ignore repair parse failures and fall back to error logging below
+                }
+            }
+            // Log first 300 chars of jsonText for debugging (truncated to avoid log bloat)
+            const jsonTextPreview = jsonText.length > 300 ? jsonText.substring(0, 300) + '...' : jsonText;
+            // Also log around the error position if it's a syntax error
+            let errorPosition = -1;
+            if (error instanceof SyntaxError && error.message.includes('position')) {
+                const match = error.message.match(/position (\d+)/);
+                if (match) {
+                    errorPosition = parseInt(match[1], 10);
+                }
+            }
+            const contextStart = Math.max(0, errorPosition - 100);
+            const contextEnd = Math.min(jsonText.length, errorPosition + 100);
+            const errorContext = errorPosition >= 0 ? jsonText.substring(contextStart, contextEnd) : null;
             (0, logger_1.logError)('[OpenAI][Checklist] Hybrid mode JSON parse error', error, {
                 country,
                 visaType,
+                jsonTextPreview,
+                jsonTextLength: jsonText.length,
+                errorPosition: errorPosition >= 0 ? errorPosition : undefined,
+                errorContext: errorContext ? errorContext.substring(0, 200) : undefined,
             });
             return null;
         }
+    }
+    /**
+     * Best-effort repair for truncated JSON (common when max tokens is hit).
+     * Only applies safe fixes:
+     * - Removes trailing commas before ] or }
+     * - Appends missing closing ] / } (brace counting outside strings)
+     *
+     * Returns repaired JSON text or null if no safe repair can be applied.
+     */
+    static repairLikelyTruncatedJson(jsonText) {
+        const original = jsonText.trim();
+        // 1) Remove trailing commas like ",}" or ",]"
+        let candidate = original.replace(/,\s*([}\]])/g, '$1');
+        // 2) Append missing closers (only if we are not inside an open string)
+        candidate = this.appendMissingJsonClosers(candidate);
+        if (candidate === original) {
+            return null;
+        }
+        return candidate;
+    }
+    /**
+     * Append missing closing brackets/braces by counting structure characters outside strings.
+     * If the input ends inside an open string, we do not attempt to repair.
+     */
+    static appendMissingJsonClosers(input) {
+        let inString = false;
+        let escape = false;
+        let openBraces = 0;
+        let openBrackets = 0;
+        for (let i = 0; i < input.length; i++) {
+            const ch = input[i];
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (inString && ch === '\\') {
+                escape = true;
+                continue;
+            }
+            if (ch === '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString)
+                continue;
+            if (ch === '{')
+                openBraces++;
+            else if (ch === '}')
+                openBraces = Math.max(0, openBraces - 1);
+            else if (ch === '[')
+                openBrackets++;
+            else if (ch === ']')
+                openBrackets = Math.max(0, openBrackets - 1);
+        }
+        // If we're inside a string, we can't safely repair
+        if (inString)
+            return input;
+        let output = input;
+        if (openBrackets > 0)
+            output += ']'.repeat(openBrackets);
+        if (openBraces > 0)
+            output += '}'.repeat(openBraces);
+        return output;
     }
     /**
      * Validate hybrid response matches base checklist
@@ -1026,6 +1213,9 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                         const hybridSystemPrompt = this.buildHybridSystemPrompt(country, visaType, visaKb);
                         // Build hybrid user prompt with base checklist
                         const hybridUserPrompt = await this.buildHybridUserPrompt(userContext, country, visaType, baseChecklist, visaKb, documentGuidesText);
+                        // Dynamic token sizing: multilingual enrichment can easily truncate JSON if the cap is too low.
+                        // Raise the floor to avoid 2000-token truncation seen in logs; keep a hard cap for cost.
+                        const maxCompletionTokens = Math.min(5000, Math.max(3200, baseChecklist.length * 240));
                         // Call GPT-4 for enrichment only (with retry logic)
                         let response;
                         let attempt = 0;
@@ -1040,8 +1230,9 @@ Return ONLY valid JSON matching the schema, no other text, no markdown, no comme
                                     { role: 'system', content: hybridSystemPrompt },
                                     { role: 'user', content: hybridUserPrompt },
                                 ], {
-                                    temperature: 0.5,
-                                    max_completion_tokens: 2000,
+                                    // Lower temperature improves JSON reliability and reduces verbose drift
+                                    temperature: 0.2,
+                                    max_completion_tokens: maxCompletionTokens,
                                     response_format: { type: 'json_object' },
                                 }, {
                                     country,
@@ -2085,6 +2276,13 @@ You MUST:
      * @param application - Application object with country and visaType
      * @param aiUserContext - AI user context with questionnaire data
      * @returns Checklist response with items array
+     */
+    /**
+     * Legacy checklist generator used only when the rules-first engine is not available
+     * or fails. New features should prefer VisaChecklistEngineService with VisaRuleSet.
+     *
+     * @deprecated This is a fallback mode. Use VisaChecklistEngineService with approved
+     * VisaRuleSet as the primary checklist generation method.
      */
     static async generateChecklistLegacy(application, aiUserContext) {
         const country = application.country.name;

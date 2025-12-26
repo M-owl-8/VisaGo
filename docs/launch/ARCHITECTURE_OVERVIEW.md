@@ -51,3 +51,5 @@ Responses to client
 - `apps/backend/src/routes/documents.ts:64-275` — upload flow
 - `apps/backend/src/routes/chat.ts:28-523` — chat endpoints
 - `apps/backend/src/routes/monitoring.ts` — health/metrics (basic)
+
+

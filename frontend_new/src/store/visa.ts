@@ -3,6 +3,15 @@ import {apiClient} from '../services/api';
 
 // Change summary (2025-11-24): Preserve the full country list even when performing server-side searches so questionnaire country picker always shows every destination.
 
+// Helper function to convert country code to flag emoji
+function codeToFlag(code: string): string {
+  const codePoints = code
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
 interface Country {
   id: string;
   name: string;
@@ -103,10 +112,49 @@ export const useVisaStore = create<VisaState>((set, get) => ({
 
   // Fetch all countries
   // IMPORTANT: Always fetch ALL countries (no artificial limit). Questionnaire must show full backend list.
+  // Uses /api/meta/countries to get the full ISO 3166-1 alpha-2 list (~248 countries) for consistency with web app
   fetchCountries: async (search?: string) => {
     try {
       set({isLoadingCountries: true});
-      const response = await apiClient.getCountries(search);
+      
+      // Use meta/countries endpoint for full ISO list (same as web app)
+      // Falls back to /countries if meta endpoint fails
+      let response;
+      try {
+        response = await apiClient.getMetaCountries();
+        // Transform ISO_COUNTRIES format to match expected format
+        if (response.success && Array.isArray(response.data)) {
+          const isoCountries = response.data.map((c: any) => ({
+            id: c.code,
+            code: c.code,
+            name: c.name,
+            flagEmoji: codeToFlag(c.code),
+            description: c.description,
+            requirements: c.requirements,
+          }));
+          
+          // Apply search filter if provided
+          const filtered = search
+            ? isoCountries.filter(
+                (country: any) =>
+                  country.name.toLowerCase().includes(search.toLowerCase()) ||
+                  country.code.toLowerCase().includes(search.toLowerCase()),
+              )
+            : isoCountries;
+
+          set({
+            countries: isoCountries, // Master list: ALL countries (~248)
+            filteredCountries: filtered, // Display list
+          });
+          set({isLoadingCountries: false});
+          return;
+        }
+      } catch (metaError) {
+        console.warn('Meta countries endpoint failed, falling back to /countries:', metaError);
+      }
+      
+      // Fallback to database countries endpoint
+      response = await apiClient.getCountries(search);
 
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch countries');

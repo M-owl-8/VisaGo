@@ -20,6 +20,7 @@ import {
 } from '../utils/visa-type-aliases';
 import { normalizeCountryCode } from '../config/country-registry';
 import { DEFAULT_GENERIC_RULESET_DATA } from '../data/generic-ruleset';
+import { validateRuleSetData } from '../utils/visa-rules-validator';
 
 const prisma = new PrismaClient();
 
@@ -191,8 +192,17 @@ export class VisaRulesService {
       }
 
       // Handle both Json (PostgreSQL) and String (SQLite) types
-      const data = typeof ruleSet.data === 'string' ? JSON.parse(ruleSet.data) : ruleSet.data;
-      return data as VisaRuleSetData;
+      const dataRaw = typeof ruleSet.data === 'string' ? JSON.parse(ruleSet.data) : ruleSet.data;
+      const validation = validateRuleSetData(dataRaw);
+      if (!validation.success) {
+        logWarn('[VisaRules] Rule set data validation failed (using raw data)', {
+          ruleSetId: ruleSet.id,
+          errors: validation.errors,
+        });
+        return dataRaw as VisaRuleSetData;
+      }
+
+      return validation.data;
     } catch (error) {
       logError('[VisaRules] Error getting active rule set', error as Error, {
         countryCode,
@@ -265,6 +275,7 @@ export class VisaRulesService {
             visaType: normalizedVisaType,
             data: serializedData as any,
             version: nextVersion,
+            schemaVersion: 1,
             createdBy: 'system',
             sourceSummary: 'Generic default (editable)',
             isApproved: true,
@@ -342,6 +353,7 @@ export class VisaRulesService {
     countryCode: string;
     visaType: string;
     data: VisaRuleSetData;
+    version: number;
     documentReferences: any[];
   } | null> {
     try {
@@ -379,6 +391,7 @@ export class VisaRulesService {
         countryCode: ruleSet.countryCode,
         visaType: ruleSet.visaType,
         data: data as VisaRuleSetData,
+        version: ruleSet.version,
         documentReferences: ruleSet.documentReferences,
       };
     } catch (error) {
@@ -637,14 +650,24 @@ export class VisaRulesService {
         throw new Error('Rule set not found');
       }
 
-      // Serialize data for database
-      const dataSerialized = JSON.stringify(data);
+      const validation = validateRuleSetData(data);
+      if (!validation.success) {
+        logWarn('[VisaRules] Rule set data validation failed, storing raw data', {
+          ruleSetId,
+          errors: validation.errors,
+        });
+      }
+
+      // Serialize data for database (use validated data when available)
+      const dataToPersist = validation.success ? validation.data : data;
+      const dataSerialized = JSON.stringify(dataToPersist);
 
       // Update rule set
       await prisma.visaRuleSet.update({
         where: { id: ruleSetId },
         data: {
           data: dataSerialized as any,
+          schemaVersion: (dataToPersist as any).schemaVersion || 1,
           updatedAt: new Date(),
           createdBy: updatedBy,
         },

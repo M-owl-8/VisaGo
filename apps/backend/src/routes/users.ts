@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { ApiError } from '../utils/errors';
+import { GdprService } from '../services/gdpr.service';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -390,5 +391,45 @@ router.patch(
     }
   }
 );
+
+/**
+ * GET /api/users/me/gdpr-export
+ * Export user data (authenticated user only)
+ */
+router.get('/me/gdpr-export', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+    const data = await GdprService.exportUserData(userId);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/users/me/gdpr-delete
+ * Record a GDPR deletion request for the authenticated user.
+ */
+router.post('/me/gdpr-delete', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : undefined;
+    const result = await GdprService.requestDeletion(
+      userId,
+      reason,
+      req.ip,
+      (req.headers['user-agent'] || '').toString().slice(0, 200)
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

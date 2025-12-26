@@ -44,3 +44,5 @@ export function isKetdikResponseSafe(text: string): boolean {
 
   return true;
 }
+
+

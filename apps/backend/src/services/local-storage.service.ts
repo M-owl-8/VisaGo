@@ -85,8 +85,8 @@ export class LocalStorageService {
     await this.initialize();
 
     const {
-      maxFileSize = 50 * 1024 * 1024, // 50MB
-      allowedFormats = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      maxFileSize = 10 * 1024 * 1024, // 10MB
+      allowedFormats = ['pdf', 'jpg', 'jpeg', 'png'],
       compress = true,
       generateThumbnail = false,
     } = options;

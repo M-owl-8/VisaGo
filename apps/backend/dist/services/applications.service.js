@@ -163,6 +163,27 @@ class ApplicationsService {
                 checkpoints: true,
             },
         });
+        // Ensure canonical Application row exists (shadow) with legacy mapping
+        await prisma.application.upsert({
+            where: { id: application.id },
+            update: {
+                userId,
+                countryId: data.countryId,
+                visaTypeId: data.visaTypeId,
+                status: 'draft',
+                metadata: data.notes || null,
+                legacyVisaApplicationId: application.id,
+            },
+            create: {
+                id: application.id,
+                userId,
+                countryId: data.countryId,
+                visaTypeId: data.visaTypeId,
+                status: 'draft',
+                metadata: data.notes || null,
+                legacyVisaApplicationId: application.id,
+            },
+        });
         return application;
     }
     /**

@@ -6,6 +6,7 @@ import {useNotificationStore} from '../store/notifications';
 import {addBreadcrumb, logError, logMessage} from './errorLogger';
 import {APP_VERSION} from '../config/constants';
 import {getMessaging, isFirebaseInitialized, initializeFirebase} from './firebase';
+import {getDeviceId} from '../utils/deviceId';
 
 export const DEFAULT_TOPIC = 'visabuddy-general';
 
@@ -39,10 +40,13 @@ const syncDeviceToken = async (token: string | null | undefined) => {
   const notificationStore = useNotificationStore.getState();
 
   try {
+    // Get or create device ID for better session tracking
+    const deviceId = await getDeviceId();
+    
     await notificationStore.registerDeviceToken(
       token,
       Platform.OS,
-      undefined,
+      deviceId,
       APP_VERSION,
     );
     await notificationStore.subscribeToTopic(DEFAULT_TOPIC, token);

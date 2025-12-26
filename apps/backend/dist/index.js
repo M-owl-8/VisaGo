@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cacheService = void 0;
+exports.websocketService = exports.cacheService = void 0;
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
@@ -80,6 +80,9 @@ const document_checklist_1 = __importDefault(require("./routes/document-checklis
 const doc_check_1 = __importDefault(require("./routes/doc-check"));
 const internal_1 = __importDefault(require("./routes/internal"));
 const dev_1 = __importDefault(require("./routes/dev"));
+const meta_1 = __importDefault(require("./routes/meta"));
+const websocket_service_1 = require("./services/websocket.service");
+Object.defineProperty(exports, "websocketService", { enumerable: true, get: function () { return websocket_service_1.websocketService; } });
 // Load environment variables
 dotenv_1.default.config();
 // Validate environment variables
@@ -154,22 +157,38 @@ app.use(securityHeaders_1.removeSensitiveHeaders);
 app.use(securityHeaders_1.securityHeaders);
 app.use(securityHeaders_1.cacheControl);
 // CORS configuration with validation
+const originConfig = envConfig.CORS_ORIGIN;
+const parseAllowedOrigins = (originValue) => {
+    if (!originValue || originValue.trim() === '') {
+        throw new Error('CORS_ORIGIN must be set to explicit origin(s); wildcard is not allowed.');
+    }
+    // Support comma or space separated list
+    const parsed = originValue
+        .split(/[,\s]+/)
+        .map((o) => o.trim())
+        .filter(Boolean);
+    if (parsed.length === 0) {
+        throw new Error('CORS_ORIGIN must include at least one origin.');
+    }
+    if (parsed.some((o) => o === '*' || o === 'http://*' || o === 'https://*')) {
+        throw new Error('Wildcard origins are not allowed when credentials are enabled.');
+    }
+    return parsed;
+};
 let allowedOrigins;
 try {
-    allowedOrigins = (0, env_1.validateCorsOrigin)();
+    allowedOrigins = parseAllowedOrigins(originConfig);
 }
 catch (error) {
     process.stderr.write(`❌ CORS configuration error: ${error instanceof Error ? error.message : error}\n`);
     process.exit(1);
 }
+// Log resolved CORS origins (no secrets)
+process.stdout.write(`[Startup] CORS allowed origins: ${allowedOrigins.join(', ') || 'none'}\n`);
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
         // Allow requests with no origin (mobile apps, Postman, etc.)
         if (!origin) {
-            return callback(null, true);
-        }
-        // In development, allow all origins if CORS_ORIGIN is "*"
-        if (allowedOrigins.includes('*') && NODE_ENV === 'development') {
             return callback(null, true);
         }
         // Check if origin is in allowed list
@@ -255,13 +274,16 @@ app.use('/api/forms', forms_1.default);
 app.use('/api/document-checklist', document_checklist_1.default);
 // Document check routes (Phase 3: Document checking & readiness)
 app.use('/api/doc-check', doc_check_1.default);
+// Meta endpoints (countries list, etc.)
+app.use('/api/meta', meta_1.default);
 // Chat routes with user-level rate limiting and cost tracking
 // NOTE: chatRateLimitMiddleware must run AFTER authentication (which is in chatRoutes)
 // So we apply it inside the chatRoutes router, not here
 app.use('/api/chat', chat_1.default);
 app.use('/api/users', users_1.default);
 app.use('/api/notifications', notifications_1.default);
-app.use('/api/admin', rate_limit_1.strictLimiter); // Sensitive operations
+// Admin routes with more lenient rate limiting (admin panel needs multiple requests)
+app.use('/api/admin', rate_limit_1.adminLimiter);
 app.use('/api/admin', admin_1.default);
 app.use('/api/analytics', analytics_1.default);
 app.use('/api/legal', legal_1.default);
@@ -595,7 +617,10 @@ async function startServer() {
         process.stdout.write(`   - Idle connections: ${poolStats.idleConnections}\n`);
         process.stdout.write('\n✅ All services initialized successfully!\n\n');
         // Start Express server
-        app.listen(PORT, () => {
+        const server = app.listen(PORT, () => {
+            // Initialize WebSocket server
+            websocket_service_1.websocketService.initialize(server);
+            process.stdout.write('✅ WebSocket server initialized on path /ws\n');
             // Get actual storage status (not just STORAGE_TYPE env var)
             const storageInfo = storage_adapter_1.default.getStorageInfo();
             const storageDisplay = storageInfo.type === 'firebase' ? `Firebase (${storageInfo.bucket || 'unknown'})` : 'Local';

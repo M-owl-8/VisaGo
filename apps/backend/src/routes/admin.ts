@@ -1,9 +1,13 @@
 import express, { Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { requireAdmin } from '../middleware/admin';
+import { requireAdmin, requireSuperAdmin } from '../middleware/admin';
+import { adminSecurityGuard, adminAuditLogger } from '../middleware/admin-security';
+import { adminLimiter, getRateLimitRedisStatus } from '../middleware/rate-limit';
 import AdminService from '../services/admin.service';
 import AnalyticsService from '../services/analytics.service';
 import AdminLogService from '../services/admin-log.service';
+import { DataRetentionService } from '../services/data-retention.service';
+import { getEnvConfig } from '../config/env';
 import { VisaRulesService } from '../services/visa-rules.service';
 import { EmbassySourceService } from '../services/embassy-source.service';
 import { EmbassySyncJobService } from '../services/embassy-sync-job.service';
@@ -11,10 +15,88 @@ import { EmbassySyncSchedulerService } from '../services/embassy-sync-scheduler.
 import { EvaluationService } from '../services/evaluation.service';
 import { getVerificationMetrics } from '../services/verification-metrics.service';
 import { PrismaClient } from '@prisma/client';
+import { AIAnalyticsService } from '../services/ai-analytics.service';
+import { ChecklistMetricsService } from '../services/checklist-metrics.service';
 
 const prisma = new PrismaClient();
+const envConfig = getEnvConfig();
 
 const router = express.Router();
+
+// Shared middleware for all admin routes
+router.use(authenticateToken, requireAdmin, adminSecurityGuard, adminLimiter, adminAuditLogger);
+
+/**
+ * POST /api/admin/maintenance/data-retention/run
+ * Trigger log cleanup older than DATA_RETENTION_DAYS (super admin only).
+ */
+router.post(
+  '/maintenance/data-retention/run',
+  requireSuperAdmin,
+  async (_req: Request, res: Response) => {
+    await DataRetentionService.runRetention();
+    res.json({ success: true, message: 'Data retention job executed' });
+  }
+);
+
+/**
+ * GET /api/admin/rate-limits/status
+ * Returns current rate limit configs and Redis store health.
+ */
+router.get('/rate-limits/status', async (_req: Request, res: Response) => {
+  const redis = getRateLimitRedisStatus();
+  res.json({
+    success: true,
+    data: {
+      redis,
+      perUser: {
+        windowMs: envConfig.PER_USER_RATE_LIMIT_WINDOW_MS,
+        max: envConfig.PER_USER_RATE_LIMIT_MAX,
+      },
+      admin: {
+        windowMs: envConfig.ADMIN_RATE_LIMIT_WINDOW_MS,
+        max: envConfig.ADMIN_RATE_LIMIT_MAX,
+      },
+      aiCostDailyLimitCents: envConfig.AI_COST_DAILY_LIMIT_CENTS,
+    },
+  });
+});
+
+/**
+ * GET /api/admin/ai-analytics/summary
+ * Returns AI interaction metrics (read-only).
+ */
+router.get('/ai-analytics/summary', async (req: Request, res: Response) => {
+  const windowHours = req.query.windowHours ? Number(req.query.windowHours) : undefined;
+  try {
+    const summary = await AIAnalyticsService.getSummary({ windowHours });
+    res.json({ success: true, data: summary });
+  } catch (error) {
+    console.error('[Admin][AIAnalytics] Failed to compute summary', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute AI analytics summary',
+    });
+  }
+});
+
+/**
+ * GET /api/admin/checklist-metrics/summary
+ * Returns checklist quality/throughput metrics.
+ */
+router.get('/checklist-metrics/summary', async (req: Request, res: Response) => {
+  const windowHours = req.query.windowHours ? Number(req.query.windowHours) : undefined;
+  try {
+    const summary = await ChecklistMetricsService.getSummary({ windowHours });
+    res.json({ success: true, data: summary });
+  } catch (error) {
+    console.error('[Admin][ChecklistMetrics] Failed to compute summary', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute checklist metrics summary',
+    });
+  }
+});
 
 /**
  * GET /api/admin/analytics

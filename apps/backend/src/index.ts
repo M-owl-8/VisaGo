@@ -11,6 +11,7 @@ import {
   strictLimiter,
   webhookLimiter,
   adminLimiter,
+  perUserLimiter,
 } from './middleware/rate-limit';
 import { csrfProtection } from './middleware/csrf';
 import { preventSQLInjection, preventXSS } from './middleware/input-validation';
@@ -153,6 +154,9 @@ app.use(removeSensitiveHeaders);
 app.use(securityHeaders);
 app.use(cacheControl);
 
+// Global per-user rate limiting (falls back to IP)
+app.use(perUserLimiter);
+
 // CORS configuration with validation
 const originConfig = envConfig.CORS_ORIGIN;
 
@@ -213,9 +217,10 @@ app.use(
   })
 );
 
-// CSRF Protection - Optional for mobile-only API (JWT provides protection)
-// For future web version, uncomment this:
-// app.use(csrfProtection);
+// CSRF Protection - enabled for web (Origin present), bypassed for mobile/no-origin clients
+if (process.env.ENABLE_CSRF !== 'false') {
+  app.use(csrfProtection);
+}
 
 // Input validation and security
 app.use(preventSQLInjection); // Check all inputs for SQL injection
@@ -238,8 +243,10 @@ app.use('/api/payments/webhook', webhookLimiter);
 app.use(express.json({ limit: SERVER_CONFIG.MAX_REQUEST_SIZE }));
 app.use(express.urlencoded({ limit: SERVER_CONFIG.MAX_REQUEST_SIZE, extended: true }));
 
-// Static file serving for uploaded files (local storage)
-app.use('/uploads', express.static(envConfig.LOCAL_STORAGE_PATH));
+// Static file serving for uploaded files (local storage) - can be disabled to enforce signed URLs
+if (process.env.ENABLE_STATIC_UPLOADS !== 'false') {
+  app.use('/uploads', express.static(envConfig.LOCAL_STORAGE_PATH));
+}
 
 // Comprehensive request logging middleware
 app.use(requestLogger);

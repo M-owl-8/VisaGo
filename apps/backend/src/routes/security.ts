@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
+import { csrfProtection } from '../middleware/csrf';
 import { validateJWTSecret, checkPasswordStrength } from '../utils/securityAudit';
 import { getEnvConfig } from '../config/env';
 
@@ -133,6 +134,19 @@ router.post('/check-password', async (req: Request, res: Response) => {
       },
     });
   }
+});
+
+/**
+ * GET /api/security/csrf-token
+ * Issues a CSRF token (headers) for web clients. Middleware attaches X-CSRF-Token and X-Session-Id.
+ */
+router.get('/csrf-token', csrfProtection, async (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      message: 'CSRF token issued in headers',
+    },
+  });
 });
 
 export default router;

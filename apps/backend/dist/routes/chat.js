@@ -83,10 +83,36 @@ router.post('/', input_validation_1.validateRAGRequest, async (req, res) => {
             hasApplicationId: !!applicationId,
             historyLength: conversationHistory?.length || 0,
         });
-        const response = await chat_service_1.chatService.sendMessage(userId, content, applicationId, conversationHistory);
+        // Phase 6: Use VisaConversationOrchestratorService for enhanced chat
+        const { VisaConversationOrchestratorService } = await Promise.resolve().then(() => __importStar(require('../services/visa-conversation-orchestrator.service')));
+        const orchestratorResponse = await VisaConversationOrchestratorService.handleUserMessage({
+            userId,
+            message: content,
+            applicationId,
+            conversationHistory,
+        });
+        // Convert orchestrator response to ChatService format for backward compatibility
+        const response = {
+            message: orchestratorResponse.reply,
+            sources: orchestratorResponse.sources || [],
+            tokens_used: orchestratorResponse.tokens_used || 0,
+            model: orchestratorResponse.model || 'gpt-4',
+            id: orchestratorResponse.id || `msg-${Date.now()}`,
+            applicationContext: orchestratorResponse.applicationId
+                ? {
+                    applicationId: orchestratorResponse.applicationId,
+                    countryCode: orchestratorResponse.countryCode,
+                    visaType: orchestratorResponse.visaType,
+                    riskLevel: orchestratorResponse.riskLevel,
+                    riskDrivers: orchestratorResponse.riskDrivers,
+                }
+                : null,
+            // Phase 6: Include self-check metadata (optional, for debugging/monitoring)
+            selfCheck: orchestratorResponse.selfCheck,
+        };
         // Validate response before sending
         if (!response || !response.message) {
-            console.error('[Chat Route] Invalid response from ChatService:', response);
+            console.error('[Chat Route] Invalid response from orchestrator:', response);
             return res.status(500).json({
                 success: false,
                 error: {
@@ -94,13 +120,48 @@ router.post('/', input_validation_1.validateRAGRequest, async (req, res) => {
                 },
             });
         }
-        console.log('[Chat Route] Message processed successfully:', {
+        console.log('[Chat Route] Message processed successfully (Phase 6):', {
             hasMessage: !!response.message,
             messageLength: response.message.length,
             hasId: !!response.id,
             model: response.model,
             messagePreview: response.message.substring(0, 100),
+            selfCheckPassed: orchestratorResponse.selfCheck?.passed,
+            selfCheckFlags: orchestratorResponse.selfCheck?.flags || [],
         });
+        // Save messages to database (for history)
+        try {
+            const sessionId = await chat_service_1.chatService.getOrCreateSession(userId, applicationId);
+            // Save user message
+            const { PrismaClient } = await Promise.resolve().then(() => __importStar(require('@prisma/client')));
+            const prisma = new PrismaClient();
+            await prisma.chatMessage.create({
+                data: {
+                    sessionId,
+                    userId,
+                    role: 'user',
+                    content,
+                    sources: JSON.stringify([]),
+                    model: response.model,
+                },
+            });
+            // Save assistant message
+            await prisma.chatMessage.create({
+                data: {
+                    sessionId,
+                    userId,
+                    role: 'assistant',
+                    content: response.message,
+                    sources: JSON.stringify(response.sources || []),
+                    model: response.model,
+                    tokensUsed: response.tokens_used || 0,
+                },
+            });
+        }
+        catch (saveError) {
+            // Non-blocking: log but don't fail the request
+            console.warn('[Chat Route] Failed to save messages to database:', saveError);
+        }
         // Increment rate limit counter after successful message
         const { incrementChatMessageCount, getChatRateLimitInfo } = await Promise.resolve().then(() => __importStar(require('../middleware/chat-rate-limit')));
         await incrementChatMessageCount(userId);

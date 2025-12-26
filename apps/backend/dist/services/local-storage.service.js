@@ -10,9 +10,15 @@ const uuid_1 = require("uuid");
 const sharp_wrapper_1 = require("../utils/sharp-wrapper");
 class LocalStorageService {
     /**
-     * Initialize storage directory
+     * Initialize and validate configuration
+     * Throws error in production if SERVER_URL is not set
      */
     static async initialize() {
+        // Fail fast in production if base URL is not configured
+        if (process.env.NODE_ENV === 'production' && !this.serverUrl) {
+            throw new Error('SERVER_URL or BACKEND_PUBLIC_URL must be set in production for LocalStorageService. ' +
+                'This is required to generate correct file URLs.');
+        }
         try {
             await promises_1.default.mkdir(this.baseDir, { recursive: true });
             await promises_1.default.mkdir(path_1.default.join(this.baseDir, 'uploads'), { recursive: true });
@@ -27,6 +33,11 @@ class LocalStorageService {
      * Upload file to local storage
      */
     static async uploadFile(fileBuffer, fileName, fileType, userId, options = {}) {
+        // Ensure serverUrl is set (will throw in production if not configured)
+        if (!this.serverUrl) {
+            throw new Error('SERVER_URL or BACKEND_PUBLIC_URL must be set for LocalStorageService. ' +
+                'Cannot generate file URLs without a base URL.');
+        }
         await this.initialize();
         const { maxFileSize = 50 * 1024 * 1024, // 50MB
         allowedFormats = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'], compress = true, generateThumbnail = false, } = options;
@@ -195,6 +206,8 @@ class LocalStorageService {
 }
 exports.LocalStorageService = LocalStorageService;
 LocalStorageService.baseDir = process.env.LOCAL_STORAGE_PATH || 'uploads';
-LocalStorageService.serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+LocalStorageService.serverUrl = process.env.SERVER_URL ||
+    process.env.BACKEND_PUBLIC_URL ||
+    (process.env.NODE_ENV === 'production' ? null : 'http://localhost:3000');
 exports.default = LocalStorageService;
 //# sourceMappingURL=local-storage.service.js.map

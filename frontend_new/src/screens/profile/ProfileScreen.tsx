@@ -49,22 +49,6 @@ export default function ProfileScreen({ navigation }: any) {
       onPress: () => navigation?.navigate('Language'),
     },
     {
-      id: 'notifications',
-      icon: ProfileIcons.notifications,
-      title: t('profile.notifications'),
-      subtitle: t('profile.manageNotificationSettings'),
-      color: '#F59E0B',
-      onPress: () => navigation?.navigate('NotificationSettings'),
-    },
-    {
-      id: 'security',
-      icon: ProfileIcons.security,
-      title: t('profile.security'),
-      subtitle: t('profile.passwordAndSecurity'),
-      color: '#8B5CF6',
-      onPress: () => navigation?.navigate('Security'),
-    },
-    {
       id: 'help',
       icon: ProfileIcons.help,
       title: t('profile.helpSupport'),

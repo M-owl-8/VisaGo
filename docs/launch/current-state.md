@@ -83,3 +83,5 @@ Flow: Auth → Create application → Generate checklist → Upload docs (Fireba
 - No confirmation of production storage bucket credentials in repo.
 - No verified deployment manifests for combined stack (backend + web + ai-service) in one orchestration; docker-compose present but not validated here.
 - AI service (Python) not exercised in this session; RAG embeddings freshness unknown.
+
+

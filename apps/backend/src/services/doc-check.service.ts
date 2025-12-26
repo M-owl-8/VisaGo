@@ -21,10 +21,68 @@ import {
   buildDocumentValidationUserPrompt,
 } from '../config/ai-prompts';
 import { DocumentClassifierService } from './document-classifier.service';
+import { assertStatus } from '../utils/status-validator';
 
 const prisma = new PrismaClient();
 
 export class DocCheckService {
+  /**
+   * Load canonical application (Application table preferred) with country, visaType, user.
+   * If only legacy VisaApplication exists, create a shadow Application to prevent drift.
+   */
+  private static async getCanonicalApplication(applicationId: string) {
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: {
+        user: true,
+        country: true,
+        visaType: true,
+      },
+    });
+
+    if (application) {
+      return application;
+    }
+
+    const legacy = await prisma.visaApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        user: true,
+        country: true,
+        visaType: true,
+      },
+    });
+
+    if (!legacy) {
+      throw new Error('Application not found');
+    }
+
+    // Create shadow Application for future reads (best-effort)
+    try {
+      await prisma.application.create({
+        data: {
+          id: legacy.id,
+          userId: legacy.userId,
+          countryId: legacy.countryId,
+          visaTypeId: legacy.visaTypeId,
+          legacyVisaApplicationId: legacy.id,
+          status: legacy.status,
+          submissionDate: legacy.submissionDate,
+          approvalDate: legacy.approvalDate,
+          expiryDate: legacy.expiryDate,
+          metadata: legacy.notes || null,
+        },
+      });
+    } catch (shadowError: any) {
+      logWarn('[DocCheck] Could not create shadow Application (non-blocking)', {
+        applicationId,
+        error: shadowError instanceof Error ? shadowError.message : String(shadowError),
+      });
+    }
+
+    return legacy as any;
+  }
+
   /**
    * Find the best candidate document for a checklist item.
    *
@@ -133,18 +191,7 @@ export class DocCheckService {
       const document = await this.findBestDocumentForChecklistItem(applicationId, checklistItem);
 
       // 2) Fetch ApplicantProfile for this application
-      const application = await prisma.visaApplication.findUnique({
-        where: { id: applicationId },
-        include: {
-          user: true,
-          country: true,
-          visaType: true,
-        },
-      });
-
-      if (!application) {
-        throw new Error('Application not found');
-      }
+      const application = await this.getCanonicalApplication(applicationId);
 
       // Build AIUserContext (simplified for doc-check)
       const aiUserContext = {
@@ -421,6 +468,8 @@ export class DocCheckService {
         }
       }
 
+      assertStatus('DocumentCheckStatus', docCheckStatus);
+
       // 7) Save result in DocumentCheckResult table
       // Prepare rawJson: use validationResult.rawJson if available, otherwise stringify the validationResult
       const rawJsonValue = validationResult.rawJson
@@ -482,11 +531,8 @@ export class DocCheckService {
   static async checkAllItemsForApplication(applicationId: string, userId: string): Promise<void> {
     try {
       // Verify user owns the application
-      const application = await prisma.visaApplication.findFirst({
-        where: { id: applicationId, userId },
-      });
-
-      if (!application) {
+      const application = await this.getCanonicalApplication(applicationId);
+      if (!application || application.userId !== userId) {
         throw new Error('Application not found or access denied');
       }
 
@@ -569,9 +615,7 @@ export class DocCheckService {
 
       // Load checklist to get total items and categories
       const { DocumentChecklistService } = await import('./document-checklist.service');
-      const application = await prisma.visaApplication.findUnique({
-        where: { id: applicationId },
-      });
+      const application = await this.getCanonicalApplication(applicationId);
 
       if (!application) {
         throw new Error('Application not found');

@@ -146,10 +146,11 @@ export default function QuestionnairePage() {
       case 2: // Status & Education
         return !!(formData.status?.currentStatus && formData.status?.highestEducation);
       case 3: // Travel Profile
+        const visaTypeLower = (formData.visaType || '').toLowerCase();
         return !!(
           formData.travel?.plannedWhen !== undefined &&
           formData.travel?.isExactDatesKnown !== undefined &&
-          (formData.visaType === 'student' || (formData.travel?.tripDurationDays !== undefined && formData.travel?.tripDurationDays !== null))
+          (visaTypeLower.includes('student') || (formData.travel?.tripDurationDays !== undefined && formData.travel?.tripDurationDays !== null))
         );
       case 4: // Financial
         return !!(
@@ -162,10 +163,15 @@ export default function QuestionnairePage() {
         if (!formData.invitation?.hasInvitation) {
           return formData.invitation?.hasInvitation === false;
         }
-        if (formData.visaType === 'student') {
+        const visaTypeLowerInv = (formData.visaType || '').toLowerCase();
+        if (visaTypeLowerInv.includes('student')) {
           return !!formData.invitation?.studentInvitationType;
         }
-        return !!formData.invitation?.touristInvitationType;
+        if (visaTypeLowerInv.includes('tourist')) {
+          return !!formData.invitation?.touristInvitationType;
+        }
+        // For other visa types, invitation is optional
+        return true;
       case 6: // Stay & Tickets
         return !!(
           formData.stay?.accommodationType && formData.stay?.hasRoundTripTicket !== undefined
@@ -653,7 +659,7 @@ export default function QuestionnairePage() {
               </label>
             </div>
 
-            {formData.invitation?.hasInvitation && formData.visaType === 'student' && (
+            {formData.invitation?.hasInvitation && (formData.visaType || '').toLowerCase().includes('student') && (
               <div>
                 <label className="block text-sm font-medium text-white/90 mb-2">
                   {t('questionnaire.studentInvitationType')}
@@ -677,7 +683,7 @@ export default function QuestionnairePage() {
               </div>
             )}
 
-            {formData.invitation?.hasInvitation && formData.visaType === 'tourist' && (
+            {formData.invitation?.hasInvitation && (formData.visaType || '').toLowerCase().includes('tourist') && (
               <div>
                 <label className="block text-sm font-medium text-white/90 mb-2">
                   {t('questionnaire.touristInvitationType')}

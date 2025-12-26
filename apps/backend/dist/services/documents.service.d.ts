@@ -22,6 +22,14 @@ export declare class DocumentService {
         aiNotesUz: string | null;
         aiNotesRu: string | null;
         aiNotesEn: string | null;
+        extractedText: string | null;
+        ocrStatus: string | null;
+        ocrConfidence: number | null;
+        ocrLanguage: string | null;
+        imageAnalysisResult: string | null;
+        hasSignature: boolean | null;
+        hasStamp: boolean | null;
+        imageQualityScore: number | null;
     }>;
     /**
      * Get all documents for a user
@@ -46,6 +54,14 @@ export declare class DocumentService {
         aiNotesUz: string | null;
         aiNotesRu: string | null;
         aiNotesEn: string | null;
+        extractedText: string | null;
+        ocrStatus: string | null;
+        ocrConfidence: number | null;
+        ocrLanguage: string | null;
+        imageAnalysisResult: string | null;
+        hasSignature: boolean | null;
+        hasStamp: boolean | null;
+        imageQualityScore: number | null;
     }[]>;
     /**
      * Get all documents for an application
@@ -70,6 +86,14 @@ export declare class DocumentService {
         aiNotesUz: string | null;
         aiNotesRu: string | null;
         aiNotesEn: string | null;
+        extractedText: string | null;
+        ocrStatus: string | null;
+        ocrConfidence: number | null;
+        ocrLanguage: string | null;
+        imageAnalysisResult: string | null;
+        hasSignature: boolean | null;
+        hasStamp: boolean | null;
+        imageQualityScore: number | null;
     }[]>;
     /**
      * Get a specific document
@@ -94,6 +118,14 @@ export declare class DocumentService {
         aiNotesUz: string | null;
         aiNotesRu: string | null;
         aiNotesEn: string | null;
+        extractedText: string | null;
+        ocrStatus: string | null;
+        ocrConfidence: number | null;
+        ocrLanguage: string | null;
+        imageAnalysisResult: string | null;
+        hasSignature: boolean | null;
+        hasStamp: boolean | null;
+        imageQualityScore: number | null;
     }>;
     /**
      * Delete a document
@@ -124,6 +156,14 @@ export declare class DocumentService {
         aiNotesUz: string | null;
         aiNotesRu: string | null;
         aiNotesEn: string | null;
+        extractedText: string | null;
+        ocrStatus: string | null;
+        ocrConfidence: number | null;
+        ocrLanguage: string | null;
+        imageAnalysisResult: string | null;
+        hasSignature: boolean | null;
+        hasStamp: boolean | null;
+        imageQualityScore: number | null;
     }>;
     /**
      * Get document statistics for a user

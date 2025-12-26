@@ -39,6 +39,15 @@ export interface PaginatedResponse<T> {
   pageSize: number;
 }
 
+export interface AdminActionLogInput {
+  action: string;
+  entityType: string;
+  entityId: string;
+  performedBy: string;
+  reason?: string;
+  changes?: Record<string, any>;
+}
+
 class AdminLogService {
   /**
    * Get activity logs with pagination and filters
@@ -242,6 +251,24 @@ class AdminLogService {
       page,
       pageSize,
     };
+  }
+
+  /**
+   * Record an admin action for audit purposes.
+   */
+  async recordAdminAction(input: AdminActionLogInput): Promise<void> {
+    const { action, entityType, entityId, performedBy, reason, changes } = input;
+
+    await prisma.adminLog.create({
+      data: {
+        action,
+        entityType,
+        entityId,
+        performedBy,
+        reason,
+        changes: changes ? JSON.stringify(changes) : null,
+      },
+    });
   }
 }
 

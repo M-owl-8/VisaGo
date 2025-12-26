@@ -386,10 +386,21 @@ class AuthService {
             (0, logger_1.logInfo)('[GoogleAuth] Verifying Google ID token', {
                 clientIdLength: envConfig.GOOGLE_CLIENT_ID.length,
             });
-            const ticket = await client.verifyIdToken({
-                idToken,
-                audience: envConfig.GOOGLE_CLIENT_ID,
-            });
+            let ticket;
+            try {
+                ticket = await client.verifyIdToken({
+                    idToken,
+                    audience: envConfig.GOOGLE_CLIENT_ID,
+                });
+            }
+            catch (error) {
+                (0, logger_1.logError)('[GoogleAuth] Token verification failed', error instanceof Error ? error : new Error(String(error)), {
+                    errorName: error?.name,
+                    errorMessage: error?.message,
+                    reason: 'google_verify_failed',
+                });
+                throw errors_1.errors.unauthorized('GOOGLE_OAUTH_FAILED');
+            }
             // Extract payload from verified token
             const payload = ticket.getPayload();
             if (!payload || !payload.sub) {

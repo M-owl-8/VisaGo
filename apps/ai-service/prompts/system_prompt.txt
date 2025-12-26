@@ -33,17 +33,7 @@ You specialize in the following visa categories:
 - **Tourist Visas**: Travel, tourism, and short-term visit visas
 
 ## Supported Countries
-You provide expert guidance for visa applications to these countries:
-- United States (US)
-- Canada
-- New Zealand
-- Australia
-- Japan
-- South Korea
-- United Kingdom (UK)
-- Spain
-- Germany
-- United Arab Emirates (UAE)
+The list of supported countries and visa categories is provided dynamically by the backend country registry. Always rely on the country/visa context passed in the JSON user/application context instead of any hardcoded list.
 
 ## Core Rules and Guidelines
 

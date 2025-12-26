@@ -8,6 +8,42 @@ const prisma = new PrismaClient();
 
 export class ApplicationsService {
   /**
+   * Ensure a canonical Application row exists for the given legacy VisaApplication id.
+   * If missing, create a shadow Application that mirrors the legacy record and links via legacyVisaApplicationId.
+   * Returns the Application row or null if legacy not found.
+   */
+  private static async ensureApplicationShadow(applicationId: string) {
+    const existing = await prisma.application.findUnique({ where: { id: applicationId } });
+    if (existing) {
+      return existing;
+    }
+
+    const legacy = await prisma.visaApplication.findUnique({ where: { id: applicationId } });
+    if (!legacy) {
+      return null;
+    }
+
+    logWarn('[ApplicationsService] Creating shadow Application for legacy VisaApplication', {
+      applicationId,
+    });
+
+    return prisma.application.create({
+      data: {
+        id: legacy.id,
+        userId: legacy.userId,
+        countryId: legacy.countryId,
+        visaTypeId: legacy.visaTypeId,
+        legacyVisaApplicationId: legacy.id,
+        status: legacy.status,
+        submissionDate: legacy.submissionDate,
+        approvalDate: legacy.approvalDate,
+        expiryDate: legacy.expiryDate,
+        metadata: legacy.notes || null,
+      },
+    });
+  }
+
+  /**
    * Get all applications for a user
    */
   static async getUserApplications(userId: string) {
@@ -36,7 +72,11 @@ export class ApplicationsService {
     // HIGH PRIORITY FIX: Calculate progress based on documents first (primary source), then checkpoints (fallback)
     // Document-based progress is more accurate as it reflects actual document upload status
     // This ensures progress percentage correctly reflects document completion, not just checkpoint completion
-    return applications.map((app: any) => {
+    return Promise.all(
+      applications.map(async (app: any) => {
+        // Maintain canonical shadow for downstream services
+        await this.ensureApplicationShadow(app.id);
+
       const allCheckpoints = app.checkpoints || [];
       const completedCount = allCheckpoints.filter((cp: any) => cp.isCompleted).length;
       const checkpointProgress =
@@ -64,17 +104,20 @@ export class ApplicationsService {
             ? dbProgress
             : checkpointProgress;
 
-      return {
-        ...app,
-        progressPercentage,
-      };
-    });
+        return {
+          ...app,
+          progressPercentage,
+        };
+      })
+    );
   }
 
   /**
    * Get single application
    */
   static async getApplication(applicationId: string, userId: string) {
+    await this.ensureApplicationShadow(applicationId);
+
     const application = await prisma.visaApplication.findUnique({
       where: { id: applicationId },
       include: {
@@ -140,55 +183,84 @@ export class ApplicationsService {
       throw errors.conflict('Active application for this country already exists');
     }
 
-    const application = await prisma.visaApplication.create({
-      data: {
-        userId,
-        countryId: data.countryId,
-        visaTypeId: data.visaTypeId,
-        status: 'draft',
-        notes: data.notes,
-        // Create default checkpoints based on visa type
-        checkpoints: {
-          create: [
-            {
-              order: 1,
-              title: 'Application Started',
-              description: 'Begin visa application process',
-              isCompleted: true,
-              completedAt: new Date(),
-            },
-            {
-              order: 2,
-              title: 'Document Preparation',
-              description: 'Gather and prepare required documents',
-              isCompleted: false,
-            },
-            {
-              order: 3,
-              title: 'Application Submission',
-              description: 'Submit application to embassy',
-              isCompleted: false,
-            },
-            {
-              order: 4,
-              title: 'Application Review',
-              description: 'Embassy reviews application',
-              isCompleted: false,
-            },
-            {
-              order: 5,
-              title: 'Visa Decision',
-              description: 'Receive visa approval/rejection',
-              isCompleted: false,
-            },
-          ],
+    const application = await prisma.$transaction(async (tx) => {
+      const legacy = await tx.visaApplication.create({
+        data: {
+          userId,
+          countryId: data.countryId,
+          visaTypeId: data.visaTypeId,
+          status: 'draft',
+          notes: data.notes,
+          // Create default checkpoints based on visa type
+          checkpoints: {
+            create: [
+              {
+                order: 1,
+                title: 'Application Started',
+                description: 'Begin visa application process',
+                isCompleted: true,
+                completedAt: new Date(),
+              },
+              {
+                order: 2,
+                title: 'Document Preparation',
+                description: 'Gather and prepare required documents',
+                isCompleted: false,
+              },
+              {
+                order: 3,
+                title: 'Application Submission',
+                description: 'Submit application to embassy',
+                isCompleted: false,
+              },
+              {
+                order: 4,
+                title: 'Application Review',
+                description: 'Embassy reviews application',
+                isCompleted: false,
+              },
+              {
+                order: 5,
+                title: 'Visa Decision',
+                description: 'Receive visa approval/rejection',
+                isCompleted: false,
+              },
+            ],
+          },
         },
-      },
-      include: {
-        country: true,
-        visaType: true,
-        checkpoints: true,
-      },
+        include: {
+          country: true,
+          visaType: true,
+          checkpoints: true,
+        },
+      });
+
+      // Shadow canonical Application (same id) for downstream services
+      await tx.application.upsert({
+        where: { id: legacy.id },
+        update: {
+          userId,
+          countryId: data.countryId,
+          visaTypeId: data.visaTypeId,
+          status: 'draft',
+          metadata: data.notes || null,
+          legacyVisaApplicationId: legacy.id,
+          submissionDate: null,
+          approvalDate: null,
+          expiryDate: null,
+        },
+        create: {
+          id: legacy.id,
+          userId,
+          countryId: data.countryId,
+          visaTypeId: data.visaTypeId,
+          status: 'draft',
+          metadata: data.notes || null,
+          legacyVisaApplicationId: legacy.id,
+        },
+      });
+
+      return legacy;
     });
 
     // Non-blocking: create chat session attached to this application
@@ -212,28 +284,6 @@ export class ApplicationsService {
         error: sessionError instanceof Error ? sessionError.message : String(sessionError),
       });
     }
-
-    // Ensure canonical Application row exists (shadow) with legacy mapping
-    await prisma.application.upsert({
-      where: { id: application.id },
-      update: {
-        userId,
-        countryId: data.countryId,
-        visaTypeId: data.visaTypeId,
-        status: 'draft',
-        metadata: data.notes || null,
-        legacyVisaApplicationId: application.id,
-      },
-      create: {
-        id: application.id,
-        userId,
-        countryId: data.countryId,
-        visaTypeId: data.visaTypeId,
-        status: 'draft',
-        metadata: data.notes || null,
-        legacyVisaApplicationId: application.id,
-      },
-    });
 
     return application;
   }
@@ -263,6 +313,20 @@ export class ApplicationsService {
         checkpoints: true,
       },
     });
+
+    // Keep shadow Application in sync (best-effort)
+    try {
+      await this.ensureApplicationShadow(applicationId);
+      await prisma.application.update({
+        where: { id: applicationId },
+        data: { status },
+      });
+    } catch (syncError) {
+      logWarn('[ApplicationsService] Failed to sync Application status (non-blocking)', {
+        applicationId,
+        error: syncError instanceof Error ? syncError.message : String(syncError),
+      });
+    }
 
     return updated;
   }
@@ -401,8 +465,16 @@ export class ApplicationsService {
       throw errors.forbidden();
     }
 
-    await prisma.visaApplication.delete({
-      where: { id: applicationId },
+    await prisma.$transaction(async (tx) => {
+      await tx.visaApplication.delete({
+        where: { id: applicationId },
+      });
+
+      // Delete shadow Application if exists
+      const shadow = await tx.application.findUnique({ where: { id: applicationId } });
+      if (shadow) {
+        await tx.application.delete({ where: { id: applicationId } });
+      }
     });
 
     return { success: true, message: 'Application deleted' };

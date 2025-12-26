@@ -49,3 +49,5 @@ Last updated: 2025-12-17
 - Backend routes: `apps/backend/src/routes/*.ts`
 - Prisma models: `apps/backend/prisma/schema.prisma`
 - Web components: `apps/web/components/*`
+
+
