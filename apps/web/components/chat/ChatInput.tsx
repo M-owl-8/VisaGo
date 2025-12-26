@@ -67,8 +67,8 @@ export function ChatInput({
             "w-full resize-none rounded-2xl border px-4 py-3 pr-14 text-sm text-white placeholder:text-white/40 transition-all",
             "focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed",
             disabled 
-              ? "border-white/10 bg-background" 
-              : "border-white/10 bg-background focus:bg-background focus:border-primary/50 focus:ring-primary/20"
+              ? "border-white/10 bg-midnight/80" 
+              : "border-white/10 bg-midnight/80 focus:bg-midnight/90 focus:border-primary/50 focus:ring-primary/20"
           )}
           style={{
             minHeight: '52px',
@@ -84,7 +84,7 @@ export function ChatInput({
             "absolute right-2 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-xl transition-all",
             value.trim() && !disabled
               ? "bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/30 hover:scale-105 active:scale-95"
-              : "bg-background cursor-not-allowed opacity-50"
+              : "bg-midnight/60 cursor-not-allowed opacity-50"
           )}
         >
           {disabled ? (
