@@ -103,11 +103,15 @@ export async function deepseekVisaChat(
     const response = await Promise.race([apiPromise, timeoutPromise]);
 
     const responseTime = Date.now() - startTime;
-    const content = response.data?.choices?.[0]?.message?.content ?? null;
+    const rawContent = response.data?.choices?.[0]?.message?.content ?? null;
 
-    if (!content) {
+    if (!rawContent) {
       throw new Error('Empty response from Together.ai');
     }
+
+    // Strip <think> tags from DeepSeek reasoning output
+    // DeepSeek-R1 includes reasoning in <think>...</think> blocks which should not be shown to users
+    const content = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
     // Extract token usage if available
     const promptTokens = response.data?.usage?.prompt_tokens || 0;

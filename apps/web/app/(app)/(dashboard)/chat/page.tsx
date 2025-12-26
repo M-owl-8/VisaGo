@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { RefreshCcw, ArrowDown, Menu, X } from 'lucide-react';
+import { RefreshCcw, ArrowDown, Menu, X, Sparkles } from 'lucide-react';
 import { useChatStore } from '@/lib/stores/chat';
 import { useAuthStore } from '@/lib/stores/auth';
 import { ChatMessageList } from '@/components/chat/ChatMessageList';
@@ -269,26 +269,29 @@ function ChatPageContent() {
                 <div className="h-20 animate-pulse rounded-xl bg-white/5" />
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex min-h-[300px] flex-col items-center justify-center px-4 text-center sm:min-h-[400px]">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 sm:mb-6 sm:h-20 sm:w-20">
-                  <span className="text-lg font-semibold text-primary">AI</span>
+              <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center animate-in fade-in duration-500">
+                {/* Animated icon */}
+                <div className="mb-6 relative">
+                  <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl animate-pulse" />
+                  <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 border border-primary/30 sm:h-24 sm:w-24">
+                    <Sparkles size={32} className="text-primary animate-pulse sm:size-10" />
+                  </div>
                 </div>
-                <h3 className="mb-2 font-display text-lg font-semibold text-white sm:text-xl">
-                  {t('chat.emptyStateTitle', 'Your AI visa assistant is ready')}
+                
+                {/* Welcome message */}
+                <h3 className="mb-2 font-display text-xl font-semibold text-white sm:text-2xl">
+                  Salom! I'm your AI visa assistant 👋
                 </h3>
-                <p className="mb-2 max-w-md text-xs text-white/70 sm:text-sm">
-                  {t(
-                    'chat.emptyStateSubtitle',
-                    "Ask me anything about visa requirements, document checklists, or application processes. I'm trained on official embassy requirements from dozens of countries."
-                  )}
+                <p className="mb-2 max-w-md text-sm text-white/70 sm:text-base">
+                  I can help you with visa requirements, document checklists, and application processes for Spain, Germany, Italy, France, Turkey, UAE, UK, USA, Canada, and South Korea.
                 </p>
-                <p className="mb-6 text-xs text-white/40 sm:mb-8">
+                <p className="mb-8 text-xs text-white/40">
                   {t(
                     'chat.confidence',
                     'Responses are based on official sources. For legal advice, consult an attorney.'
                   )}
                 </p>
-
+                
                 <QuickActions onSelect={handleQuickAction} applicationContext={undefined} />
               </div>
             ) : (

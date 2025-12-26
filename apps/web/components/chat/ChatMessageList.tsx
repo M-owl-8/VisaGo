@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import type { ChatMessage } from '@/lib/stores/chat';
@@ -25,20 +25,21 @@ export function ChatMessageList({ messages, isLoading, isSending }: ChatMessageL
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-0">
       {messages.map((msg) => (
         <ChatMessageBubble key={msg.id} message={msg} />
       ))}
       {isSending && (
-        <div className="flex gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">
-            <Bot size={16} className="text-white" />
+        <div className="flex gap-3 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 border border-white/10">
+            <Sparkles size={18} className="text-primary animate-pulse" />
           </div>
-          <div className="rounded-2xl bg-white/10 px-4 py-3">
+          <div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 backdrop-blur-sm">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 animate-bounce rounded-full bg-white/60 [animation-delay:-0.3s]" />
-              <div className="h-2 w-2 animate-bounce rounded-full bg-white/60 [animation-delay:-0.15s]" />
-              <div className="h-2 w-2 animate-bounce rounded-full bg-white/60" />
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
+              <span className="ml-2 text-xs text-white/60 font-medium">Ketdik is thinking...</span>
             </div>
           </div>
         </div>

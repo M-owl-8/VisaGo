@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Plus, Trash2, Pencil, MessageSquare } from 'lucide-react';
 import { ChatSession } from '@/lib/stores/chat';
 import { cn } from '@/lib/utils/cn';
+import { formatRelativeTime } from '@/lib/utils/time';
 import { Button } from '@/components/ui/Button';
 
 interface ChatSidebarProps {
@@ -44,7 +45,9 @@ export function ChatSidebar({
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleString();
+    
+    // Use relative time format
+    return formatRelativeTime(value);
   };
 
   return (
