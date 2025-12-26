@@ -150,7 +150,7 @@ export class DocumentChecklistService {
       aiGenerated: meta.aiGenerated ?? false,
       aiFallbackUsed: meta.aiFallbackUsed ?? false,
       aiErrorOccurred: meta.aiErrorOccurred ?? false,
-      generationMode: meta.generationMode,
+      generationMode: meta.generationMode || 'rules',
       modelName: meta.modelName,
       checklistVersion: CHECKLIST_VERSION,
     };
@@ -202,10 +202,10 @@ export class DocumentChecklistService {
         where: { applicationId },
       });
 
-      // Watchdog: if processing/pending and stale (>2 minutes), repair with fallback
+      // Watchdog: if processing and stale (>2 minutes), repair with fallback
       if (
         storedChecklist &&
-        (storedChecklist.status === 'processing' || storedChecklist.status === 'pending') &&
+        storedChecklist.status === 'processing' &&
         storedChecklist.updatedAt &&
         Date.now() - storedChecklist.updatedAt.getTime() > 2 * 60 * 1000
       ) {
@@ -246,7 +246,7 @@ export class DocumentChecklistService {
       if (storedChecklist) {
         // If checklist is ready, return it immediately without calling OpenAI
         if (storedChecklist.status === 'ready') {
-        assertStatus('DocumentChecklistStatus', storedChecklist.status);
+          assertStatus('DocumentChecklistStatus', storedChecklist.status);
           logInfo('[Checklist][Cache] Returning stored checklist', {
             applicationId,
             status: storedChecklist.status,
@@ -286,8 +286,8 @@ export class DocumentChecklistService {
           }
         }
 
-        // If checklist is pending/processing, return status
-        if (storedChecklist.status === 'pending' || storedChecklist.status === 'processing') {
+        // If checklist is processing, return status
+        if (storedChecklist.status === 'processing') {
           logInfo('[Checklist][Status] Checklist generation in progress', {
             applicationId,
           });
@@ -297,7 +297,7 @@ export class DocumentChecklistService {
 
         // If checklist failed, generate fallback on-the-fly instead of returning error
         if (storedChecklist.status === 'failed') {
-        assertStatus('DocumentChecklistStatus', storedChecklist.status);
+          assertStatus('DocumentChecklistStatus', storedChecklist.status);
           logWarn('[Checklist][Status] Stored checklist failed, generating fallback on-the-fly', {
             applicationId,
             errorMessage: storedChecklist.errorMessage,
@@ -339,24 +339,24 @@ export class DocumentChecklistService {
             );
 
             // Update stored checklist to 'ready' with fallback data
-        const payload = this.buildChecklistDataPayload(sanitizedItems, {
-          aiGenerated: false,
-          aiFallbackUsed: true,
-          aiErrorOccurred: true,
-          generationMode: 'static_fallback',
-        });
+            const payload = this.buildChecklistDataPayload(sanitizedItems, {
+              aiGenerated: false,
+              aiFallbackUsed: true,
+              aiErrorOccurred: true,
+              generationMode: 'static_fallback',
+            });
 
-        await prisma.documentChecklist.update({
-          where: { applicationId },
-          data: {
-            status: 'ready',
-            checklistData: JSON.stringify(payload),
-            aiGenerated: false,
-            generatedAt: new Date(),
-            errorMessage: null,
-            checklistVersion: CHECKLIST_VERSION,
-          },
-        });
+            await prisma.documentChecklist.update({
+              where: { applicationId },
+              data: {
+                status: 'ready',
+                checklistData: JSON.stringify(payload),
+                aiGenerated: false,
+                generatedAt: new Date(),
+                errorMessage: null,
+                checklistVersion: CHECKLIST_VERSION,
+              },
+            });
 
             return this.buildChecklistResponse(
               applicationId,
@@ -1283,7 +1283,7 @@ export class DocumentChecklistService {
         countryId: legacy.countryId,
         visaTypeId: legacy.visaTypeId,
         legacyVisaApplicationId: legacy.id,
-        status: legacy.status,
+        status: (legacy.status === 'expired' ? 'rejected' : legacy.status) as any,
         submissionDate: legacy.submissionDate,
         approvalDate: legacy.approvalDate,
         expiryDate: legacy.expiryDate,
@@ -2430,10 +2430,19 @@ Only return the JSON object, no other text.`;
     }
 
     // Update document status if documentId provided
+    // Map ChecklistItem status to UserDocumentStatus
     if (documentId) {
+      const statusMap: Record<string, string> = {
+        pending: 'pending',
+        verified: 'verified',
+        rejected: 'rejected',
+        missing: 'pending', // Map missing to pending
+        processing: 'pending', // Map processing to pending
+      };
+      const mappedStatus = statusMap[status] || 'pending';
       await prisma.userDocument.update({
         where: { id: documentId },
-        data: { status },
+        data: { status: mappedStatus as any },
       });
     }
   }

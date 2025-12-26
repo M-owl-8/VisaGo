@@ -63,7 +63,7 @@ export class GdprService {
           currency: true,
           status: true,
           createdAt: true,
-          provider: true,
+          paymentMethod: true,
         },
       }),
       prisma.activityLog.findMany({
@@ -92,7 +92,12 @@ export class GdprService {
    * Records a GDPR deletion request (does not delete immediately).
    * Logs to ActivityLog and AdminLog for compliance tracking.
    */
-  static async requestDeletion(userId: string, reason?: string, requesterIp?: string, userAgent?: string) {
+  static async requestDeletion(
+    userId: string,
+    reason?: string,
+    requesterIp?: string,
+    userAgent?: string
+  ) {
     try {
       await prisma.activityLog.create({
         data: {
@@ -130,4 +135,3 @@ export class GdprService {
     }
   }
 }
-

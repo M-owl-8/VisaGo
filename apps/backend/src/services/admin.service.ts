@@ -303,7 +303,7 @@ class AdminService {
       const application = await prisma.visaApplication.update({
         where: { id: applicationId },
         data: {
-          status,
+          status: status as any,
           approvalDate: status === 'approved' ? new Date() : undefined,
         },
         include: {

@@ -735,7 +735,7 @@ export class VisaChecklistEngineService {
       }
 
       // Phase 3: Validate and enrich checklist items
-      const conditionedChecklist = VisaChecklistEngineService.applyConditions(
+      const conditionedChecklist = await VisaChecklistEngineService.applyConditions(
         validationResult.success ? validationResult.data.checklist : parsed.checklist,
         aiUserContext,
         ruleSet
@@ -2159,18 +2159,23 @@ Return ONLY valid JSON matching the schema, no other text.`;
   /**
    * Apply conditional logic to checklist items based on AIUserContext and rule set data.
    */
-  private static applyConditions(
+  private static async applyConditions(
     items: ChecklistItem[],
     aiUserContext: AIUserContext,
     ruleSet: VisaRuleSetData | null
-  ): ChecklistItem[] {
+  ): Promise<ChecklistItem[]> {
+    // Convert to CanonicalAIUserContext for condition evaluation
+    const canonicalContext = await buildCanonicalAIUserContext(aiUserContext);
+
     return items.map((item) => {
       // Find matching rule definition for condition
       const ruleDef = ruleSet?.requiredDocuments?.find(
         (doc) => doc.documentType === item.documentType
       );
       const condition = (item as any).condition || ruleDef?.condition;
-      const applies = evaluateCondition(condition, { user: aiUserContext, item: item as any });
+      const conditionResult = evaluateCondition(condition || '', canonicalContext);
+      // Convert ConditionResult to boolean (treat 'unknown' as true to be safe)
+      const applies = conditionResult === true || conditionResult === 'unknown';
 
       return {
         ...item,

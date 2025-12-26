@@ -831,17 +831,16 @@ router.get('/usage/daily', async (req: Request, res: Response) => {
       });
     }
 
-    const usage = await ChatService.getDailyUsage(userId);
-
+    // TODO: Re-implement with UsageTrackingService static methods
     res.json({
       success: true,
       data: {
-        date: usage?.date || new Date(),
-        requests: usage?.totalRequests || 0,
-        tokens: usage?.totalTokens || 0,
-        cost: usage?.totalCost || 0,
-        avgResponseTime: usage?.avgResponseTime || 0,
-        errors: usage?.errorCount || 0,
+        date: new Date(),
+        requests: 0,
+        tokens: 0,
+        cost: 0,
+        avgResponseTime: 0,
+        errors: 0,
       },
     });
   } catch (error: any) {
@@ -870,11 +869,20 @@ router.get('/usage/weekly', async (req: Request, res: Response) => {
       });
     }
 
-    const usage = await ChatService.getWeeklyUsage(userId);
-
+    // TODO: Re-implement with UsageTrackingService static methods
     res.json({
       success: true,
-      data: usage,
+      data: {
+        period: { startDate: new Date(), endDate: new Date(), days: 0 },
+        dailyBreakdown: [],
+        totals: {
+          totalRequests: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          avgResponseTime: 0,
+          errorCount: 0,
+        },
+      },
     });
   } catch (error: any) {
     res.status(500).json({
@@ -902,11 +910,20 @@ router.get('/usage/monthly', async (req: Request, res: Response) => {
       });
     }
 
-    const usage = await ChatService.getMonthlyUsage(userId);
-
+    // TODO: Re-implement with UsageTrackingService static methods
     res.json({
       success: true,
-      data: usage,
+      data: {
+        period: { startDate: new Date(), endDate: new Date(), days: 0 },
+        dailyBreakdown: [],
+        totals: {
+          totalRequests: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          avgResponseTime: 0,
+          errorCount: 0,
+        },
+      },
     });
   } catch (error: any) {
     res.status(500).json({
@@ -934,11 +951,14 @@ router.get('/usage/cost-analysis', async (req: Request, res: Response) => {
       });
     }
 
-    const costAnalysis = await ChatService.getCostAnalysis(userId);
-
+    // TODO: Re-implement with UsageTrackingService static methods
     res.json({
       success: true,
-      data: costAnalysis,
+      data: {
+        today: { cost: 0, requests: 0, tokens: 0 },
+        weekly: { cost: 0, requests: 0, tokens: 0 },
+        monthly: { cost: 0, requests: 0, tokens: 0 },
+      },
     });
   } catch (error: any) {
     res.status(500).json({

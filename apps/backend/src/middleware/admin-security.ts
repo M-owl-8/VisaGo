@@ -18,17 +18,13 @@ const getClientIp = (req: Request): string => {
     const first = forwarded.split(',')[0]?.trim();
     if (first) return first;
   }
-  return req.ip;
+  return req.ip || 'unknown';
 };
 
 /**
  * Enforces admin IP allowlist and 2FA requirement (if enabled).
  */
-export const adminSecurityGuard = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const adminSecurityGuard = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const config = getEnvConfig();
     const allowlist = parseAllowlist(config.ADMIN_IP_ALLOWLIST);
@@ -120,4 +116,3 @@ export const adminAuditLogger = (req: Request, res: Response, next: NextFunction
 
   next();
 };
-

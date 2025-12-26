@@ -66,7 +66,7 @@ export class DocCheckService {
           countryId: legacy.countryId,
           visaTypeId: legacy.visaTypeId,
           legacyVisaApplicationId: legacy.id,
-          status: legacy.status,
+          status: (legacy.status === 'expired' ? 'rejected' : legacy.status) as any,
           submissionDate: legacy.submissionDate,
           approvalDate: legacy.approvalDate,
           expiryDate: legacy.expiryDate,

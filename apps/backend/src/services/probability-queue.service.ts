@@ -67,7 +67,11 @@ export class ProbabilityQueueService {
     return this.queue;
   }
 
-  static async enqueueProbability(applicationId: string, userId: string, authToken?: string | null) {
+  static async enqueueProbability(
+    applicationId: string,
+    userId: string,
+    authToken?: string | null
+  ) {
     const queue = this.initialize();
     const job = await queue.add({ applicationId, userId, authToken });
     return job.id;
@@ -118,8 +122,12 @@ export class ProbabilityQueueService {
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
         throw new Error('Probability generation timed out');
       }
-      throw new Error(error.response?.data || error.message || 'Probability generation failed');
+      const errorMessage = error.response?.data
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
+        : error.message || 'Probability generation failed';
+      throw new Error(errorMessage);
     }
   }
 }
-

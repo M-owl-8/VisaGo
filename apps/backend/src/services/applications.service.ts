@@ -27,6 +27,16 @@ export class ApplicationsService {
       applicationId,
     });
 
+    // Map VisaApplicationStatus to ApplicationStatus (expired -> rejected)
+    const statusMap: Record<string, string> = {
+      draft: 'draft',
+      submitted: 'submitted',
+      approved: 'approved',
+      rejected: 'rejected',
+      expired: 'rejected', // Map expired to rejected
+    };
+    const mappedStatus = statusMap[legacy.status] || 'draft';
+
     return prisma.application.create({
       data: {
         id: legacy.id,
@@ -34,7 +44,7 @@ export class ApplicationsService {
         countryId: legacy.countryId,
         visaTypeId: legacy.visaTypeId,
         legacyVisaApplicationId: legacy.id,
-        status: legacy.status,
+        status: mappedStatus as any, // Type assertion needed due to enum mismatch
         submissionDate: legacy.submissionDate,
         approvalDate: legacy.approvalDate,
         expiryDate: legacy.expiryDate,
@@ -77,32 +87,34 @@ export class ApplicationsService {
         // Maintain canonical shadow for downstream services
         await this.ensureApplicationShadow(app.id);
 
-      const allCheckpoints = app.checkpoints || [];
-      const completedCount = allCheckpoints.filter((cp: any) => cp.isCompleted).length;
-      const checkpointProgress =
-        allCheckpoints.length > 0 ? Math.round((completedCount / allCheckpoints.length) * 100) : 0;
+        const allCheckpoints = app.checkpoints || [];
+        const completedCount = allCheckpoints.filter((cp: any) => cp.isCompleted).length;
+        const checkpointProgress =
+          allCheckpoints.length > 0
+            ? Math.round((completedCount / allCheckpoints.length) * 100)
+            : 0;
 
-      // Calculate document-based progress (primary source of truth)
-      // Count verified documents vs total required documents
-      const documents = app.documents || [];
-      const verifiedDocuments = documents.filter((doc: any) => doc.status === 'verified').length;
-      const documentProgress =
-        documents.length > 0 ? Math.round((verifiedDocuments / documents.length) * 100) : 0;
+        // Calculate document-based progress (primary source of truth)
+        // Count verified documents vs total required documents
+        const documents = app.documents || [];
+        const verifiedDocuments = documents.filter((doc: any) => doc.status === 'verified').length;
+        const documentProgress =
+          documents.length > 0 ? Math.round((verifiedDocuments / documents.length) * 100) : 0;
 
-      // Use document progress if available, otherwise fallback to checkpoint progress
-      // If app.progressPercentage exists in DB (from previous calculation), use it if higher
-      const dbProgress =
-        app.progressPercentage !== undefined && app.progressPercentage !== null
-          ? app.progressPercentage
-          : null;
+        // Use document progress if available, otherwise fallback to checkpoint progress
+        // If app.progressPercentage exists in DB (from previous calculation), use it if higher
+        const dbProgress =
+          app.progressPercentage !== undefined && app.progressPercentage !== null
+            ? app.progressPercentage
+            : null;
 
-      // Priority: documentProgress > dbProgress > checkpointProgress
-      const progressPercentage =
-        documentProgress > 0
-          ? documentProgress
-          : dbProgress !== null
-            ? dbProgress
-            : checkpointProgress;
+        // Priority: documentProgress > dbProgress > checkpointProgress
+        const progressPercentage =
+          documentProgress > 0
+            ? documentProgress
+            : dbProgress !== null
+              ? dbProgress
+              : checkpointProgress;
 
         return {
           ...app,
@@ -306,7 +318,7 @@ export class ApplicationsService {
 
     const updated = await prisma.visaApplication.update({
       where: { id: applicationId },
-      data: { status },
+      data: { status: status as any },
       include: {
         country: true,
         visaType: true,
@@ -317,9 +329,18 @@ export class ApplicationsService {
     // Keep shadow Application in sync (best-effort)
     try {
       await this.ensureApplicationShadow(applicationId);
+      // Map status from VisaApplicationStatus to ApplicationStatus
+      const statusMap: Record<string, string> = {
+        draft: 'draft',
+        submitted: 'submitted',
+        approved: 'approved',
+        rejected: 'rejected',
+        expired: 'rejected',
+      };
+      const mappedStatus = statusMap[status] || 'draft';
       await prisma.application.update({
         where: { id: applicationId },
-        data: { status },
+        data: { status: mappedStatus as any },
       });
     } catch (syncError) {
       logWarn('[ApplicationsService] Failed to sync Application status (non-blocking)', {

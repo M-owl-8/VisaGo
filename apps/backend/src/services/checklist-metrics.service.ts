@@ -63,76 +63,65 @@ export class ChecklistMetricsService {
           )
         : null;
 
-    // Group by generationMode
-    const byModeGroups = await prisma.documentChecklist.groupBy({
-      by: ['generationMode'],
+    // Group by generationMode - fetch all checklists and parse JSON to extract generationMode
+    const allChecklists = await prisma.documentChecklist.findMany({
       where,
-      _count: { _all: true },
-    });
-    const byModeReady = await prisma.documentChecklist.groupBy({
-      by: ['generationMode'],
-      where: { ...where, status: 'ready' },
-      _count: { _all: true },
-      _avg: { createdAt: true, generatedAt: true }, // not useful directly; compute separately if needed
-    });
-    const byModeFailed = await prisma.documentChecklist.groupBy({
-      by: ['generationMode'],
-      where: { ...where, status: 'failed' },
-      _count: { _all: true },
-    });
-    const byModeProcessing = await prisma.documentChecklist.groupBy({
-      by: ['generationMode'],
-      where: { ...where, status: 'processing' },
-      _count: { _all: true },
+      select: {
+        id: true,
+        status: true,
+        checklistData: true,
+        createdAt: true,
+        generatedAt: true,
+      },
     });
 
-    const readyMap = new Map<string | null, number>(
-      byModeReady.map((m) => [m.generationMode, m._count._all])
-    );
-    const failedMap = new Map<string | null, number>(
-      byModeFailed.map((m) => [m.generationMode, m._count._all])
-    );
-    const processingMap = new Map<string | null, number>(
-      byModeProcessing.map((m) => [m.generationMode, m._count._all])
-    );
+    // Parse generationMode from checklistData JSON
+    const modeMap = new Map<
+      string | null,
+      { count: number; ready: number; failed: number; processing: number; times: number[] }
+    >();
+    for (const checklist of allChecklists) {
+      let generationMode: string | null = null;
+      try {
+        if (checklist.checklistData) {
+          const data = JSON.parse(checklist.checklistData);
+          generationMode = data.generationMode || null;
+        }
+      } catch {
+        // Ignore parse errors
+      }
 
-    // Approximate avg time per mode (using a small sample)
-    const byModeTime: Map<string | null, number | null> = new Map();
-    for (const modeEntry of byModeGroups) {
-      const mode = modeEntry.generationMode;
-      const rows = await prisma.documentChecklist.findMany({
-        where: { ...where, generationMode: mode, status: 'ready', generatedAt: { not: null } },
-        select: { createdAt: true, generatedAt: true },
-        take: 200,
-      });
-      const avg =
-        rows.length > 0
-          ? Math.round(
-              rows.reduce((acc, r) => {
-                const start = new Date(r.createdAt).getTime();
-                const end = r.generatedAt ? new Date(r.generatedAt).getTime() : start;
-                return acc + Math.max(0, end - start);
-              }, 0) / rows.length
-            )
-          : null;
-      byModeTime.set(mode, avg);
+      const key = generationMode || 'unknown';
+      if (!modeMap.has(key)) {
+        modeMap.set(key, { count: 0, ready: 0, failed: 0, processing: 0, times: [] });
+      }
+      const stats = modeMap.get(key)!;
+      stats.count++;
+      if (checklist.status === 'ready') stats.ready++;
+      else if (checklist.status === 'failed') stats.failed++;
+      else if (checklist.status === 'processing') stats.processing++;
+
+      // Track time for ready checklists
+      if (checklist.status === 'ready' && checklist.generatedAt) {
+        const start = new Date(checklist.createdAt).getTime();
+        const end = new Date(checklist.generatedAt).getTime();
+        stats.times.push(Math.max(0, end - start));
+      }
     }
 
-    const byMode = byModeGroups.map((g) => {
-      const mode = g.generationMode;
-      const count = g._count._all;
-      const r = readyMap.get(mode) || 0;
-      const f = failedMap.get(mode) || 0;
-      const p = processingMap.get(mode) || 0;
-      const sr = count > 0 ? Number(((r / count) * 100).toFixed(2)) : 0;
+    const byMode = Array.from(modeMap.entries()).map(([mode, stats]) => {
+      const avgTime =
+        stats.times.length > 0
+          ? Math.round(stats.times.reduce((a, b) => a + b, 0) / stats.times.length)
+          : null;
       return {
-        generationMode: mode,
-        count,
-        ready: r,
-        failed: f,
-        processing: p,
-        successRate: sr,
-        avgTimeToReadyMs: byModeTime.get(mode) ?? null,
+        generationMode: mode === 'unknown' ? null : mode,
+        count: stats.count,
+        ready: stats.ready,
+        failed: stats.failed,
+        processing: stats.processing,
+        successRate: stats.count > 0 ? Number(((stats.ready / stats.count) * 100).toFixed(2)) : 0,
+        avgTimeToReadyMs: avgTime,
       };
     });
 
@@ -152,4 +141,3 @@ export class ChecklistMetricsService {
     };
   }
 }
-

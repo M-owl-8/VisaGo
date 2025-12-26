@@ -448,7 +448,7 @@ export class VisaConversationOrchestratorService {
       where: {
         userId,
         status: {
-          in: ['draft', 'in_progress', 'pending'],
+          in: ['draft', 'submitted'] as any, // Use valid statuses
         },
       },
       orderBy: {

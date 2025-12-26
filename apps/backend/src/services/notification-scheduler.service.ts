@@ -329,7 +329,7 @@ export class NotificationSchedulerService {
       // Get all applications with missing documents
       const applicationsWithMissingDocs = await db.visaApplication.findMany({
         where: {
-          status: 'pending',
+          status: 'draft' as any, // Use 'draft' instead of 'pending' which doesn't exist
         },
         include: {
           user: true,
@@ -344,7 +344,7 @@ export class NotificationSchedulerService {
           await this.scheduleMissingDocumentsReminder({
             userId: app.userId,
             applicationId: app.id,
-            country: app.country.name,
+            country: app.country?.name || 'Unknown',
             missingDocuments: missingDocs,
           });
         }

@@ -10,7 +10,7 @@ import { DocCheckService } from '../services/doc-check.service';
 import { ApplicationsService } from '../services/applications.service';
 import { DocCheckQueueService } from '../services/doc-check-queue.service';
 import { PrismaClient } from '@prisma/client';
-import { logInfo, logError } from '../middleware/logger';
+import { logInfo, logError, logWarn } from '../middleware/logger';
 
 const router = Router();
 const prisma = new PrismaClient();
