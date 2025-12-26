@@ -280,7 +280,7 @@ function ChatPageContent() {
                 
                 {/* Welcome message */}
                 <h3 className="mb-2 font-display text-xl font-semibold text-white sm:text-2xl">
-                  Salom! I'm your AI visa assistant 👋
+                  Salom! I&apos;m your AI visa assistant 👋
                 </h3>
                 <p className="mb-2 max-w-md text-sm text-white/70 sm:text-base">
                   I can help you with visa requirements, document checklists, and application processes for Spain, Germany, Italy, France, Turkey, UAE, UK, USA, Canada, and South Korea.
