@@ -30,6 +30,8 @@ import {
   VISA_CHECKLIST_SYSTEM_PROMPT_V2,
   buildVisaChecklistUserPromptV2,
 } from '../config/ai-prompts';
+import { evaluateCondition } from '../utils/condition-evaluator';
+import type { ChecklistGenerationMode } from '../types/checklist';
 
 /**
  * Checklist Item Schema (using Zod for validation)
@@ -118,35 +120,6 @@ async function getEmbassyContent(countryCode: string, visaType: string): Promise
   // Return cached content if still valid
   if (cached && cached.expires > Date.now()) {
     return cached.content;
-  }
-
-  /**
-   * Apply conditional logic to checklist items based on AIUserContext and rule set data.
-   */
-  private static applyConditions(
-    items: ChecklistItem[],
-    aiUserContext: AIUserContext,
-    ruleSet: VisaRuleSetData | null
-  ): ChecklistItem[] {
-    return items.map((item) => {
-      // Find matching rule definition for condition
-      const ruleDef = ruleSet?.requiredDocuments?.find(
-        (doc) => doc.documentType === item.documentType
-      );
-      const condition = (item as any).condition || ruleDef?.condition;
-      const applies = evaluateCondition(condition, { user: aiUserContext, item: item as any });
-
-      return {
-        ...item,
-        appliesToThisApplicant: applies,
-        reasonIfApplies:
-          applies && (item as any).reasonIfApplies
-            ? (item as any).reasonIfApplies
-            : applies
-              ? 'Applies based on your profile'
-              : 'Not needed based on your profile',
-      };
-    });
   }
 
   // Fetch from database
@@ -762,7 +735,7 @@ export class VisaChecklistEngineService {
       }
 
       // Phase 3: Validate and enrich checklist items
-      const conditionedChecklist = this.applyConditions(
+      const conditionedChecklist = VisaChecklistEngineService.applyConditions(
         validationResult.success ? validationResult.data.checklist : parsed.checklist,
         aiUserContext,
         ruleSet
@@ -2060,11 +2033,7 @@ Return ONLY valid JSON matching the schema, no other text.`;
       const isFromRules = baseDocTypes.has(item.documentType);
       const source =
         item.source ||
-        (generationMode === 'static_fallback'
-          ? 'fallback'
-          : isFromRules
-            ? 'rules'
-            : 'ai_extra');
+        (generationMode === 'static_fallback' ? 'fallback' : isFromRules ? 'rules' : 'ai_extra');
 
       // Ensure expertReasoning exists (even if empty)
       const expertReasoning = item.expertReasoning || {
@@ -2185,6 +2154,35 @@ Return ONLY valid JSON matching the schema, no other text.`;
         };
       })
       .sort((a, b) => a.priority - b.priority); // Sort by priority (ascending)
+  }
+
+  /**
+   * Apply conditional logic to checklist items based on AIUserContext and rule set data.
+   */
+  private static applyConditions(
+    items: ChecklistItem[],
+    aiUserContext: AIUserContext,
+    ruleSet: VisaRuleSetData | null
+  ): ChecklistItem[] {
+    return items.map((item) => {
+      // Find matching rule definition for condition
+      const ruleDef = ruleSet?.requiredDocuments?.find(
+        (doc) => doc.documentType === item.documentType
+      );
+      const condition = (item as any).condition || ruleDef?.condition;
+      const applies = evaluateCondition(condition, { user: aiUserContext, item: item as any });
+
+      return {
+        ...item,
+        appliesToThisApplicant: applies,
+        reasonIfApplies:
+          applies && (item as any).reasonIfApplies
+            ? (item as any).reasonIfApplies
+            : applies
+              ? 'Applies based on your profile'
+              : 'Not needed based on your profile',
+      };
+    });
   }
 
   /**
