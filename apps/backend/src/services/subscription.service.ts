@@ -22,6 +22,8 @@ export class SubscriptionService {
   private priceId: string;
   private successUrl: string;
   private cancelUrl: string;
+  private enabled = false;
+  private disabledReason?: string;
 
   constructor(prisma: PrismaClient) {
     const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -33,21 +35,25 @@ export class SubscriptionService {
       process.env.STRIPE_CANCEL_URL || `${process.env.FRONTEND_URL || ''}/payment?canceled=true`;
 
     if (!secretKey) {
-      throw new Error('STRIPE_SECRET_KEY is not configured');
+      this.disabledReason = 'STRIPE_SECRET_KEY is not configured';
     }
     if (!this.priceId) {
-      throw new Error('STRIPE_SUBSCRIPTION_PRICE_ID is not configured');
+      this.disabledReason = this.disabledReason || 'STRIPE_SUBSCRIPTION_PRICE_ID is not configured';
     }
 
     this.prisma = prisma;
     // Use Stripe default API version to avoid type mismatches on SDK upgrades
-    this.stripe = new Stripe(secretKey);
+    if (secretKey && this.priceId) {
+      this.stripe = new Stripe(secretKey);
+      this.enabled = true;
+    }
   }
 
   async createCheckoutSession(
     userId: string,
     returnUrl?: string
   ): Promise<CreateCheckoutSessionResult> {
+    this.ensureEnabled();
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found');
 
@@ -92,10 +98,12 @@ export class SubscriptionService {
   }
 
   async getUserSubscription(userId: string): Promise<UserSubscription | null> {
+    this.ensureEnabled();
     return this.prisma.userSubscription.findUnique({ where: { userId } });
   }
 
   async cancelSubscription(userId: string): Promise<boolean> {
+    this.ensureEnabled();
     const sub = await this.getUserSubscription(userId);
     if (!sub || !sub.stripeSubscriptionId) return false;
 
@@ -114,6 +122,7 @@ export class SubscriptionService {
   }
 
   async reactivateSubscription(userId: string): Promise<boolean> {
+    this.ensureEnabled();
     const sub = await this.getUserSubscription(userId);
     if (!sub || !sub.stripeSubscriptionId) return false;
 
@@ -132,6 +141,7 @@ export class SubscriptionService {
   }
 
   async checkAccess(userId: string): Promise<boolean> {
+    this.ensureEnabled();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { subscription: true },
@@ -166,6 +176,7 @@ export class SubscriptionService {
     rawBody: Buffer | string,
     signature: string
   ): Promise<{ ok: boolean; error?: string }> {
+    this.ensureEnabled();
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) return { ok: false, error: 'Missing STRIPE_WEBHOOK_SECRET' };
 
@@ -317,5 +328,11 @@ export class SubscriptionService {
       invAny.subscriptionId ||
       (typeof invAny.subscription === 'string' ? invAny.subscription : invAny.subscription?.id)
     );
+  }
+
+  private ensureEnabled() {
+    if (!this.enabled) {
+      throw new Error(this.disabledReason || 'Stripe subscriptions are disabled');
+    }
   }
 }
