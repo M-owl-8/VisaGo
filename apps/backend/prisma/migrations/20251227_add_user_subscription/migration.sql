@@ -1,25 +1,25 @@
 -- Migration: Add subscription support
--- Note: SQLite syntax; adjust if using Postgres in deployment.
+-- PostgreSQL syntax
 
 -- Add subscription columns to User
-ALTER TABLE "User" ADD COLUMN "subscriptionStatus" TEXT;
-ALTER TABLE "User" ADD COLUMN "subscriptionRequired" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "User" ADD COLUMN "stripeCustomerId" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "subscriptionStatus" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "subscriptionRequired" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT;
 
 -- Create UserSubscription table
-CREATE TABLE "UserSubscription" (
+CREATE TABLE IF NOT EXISTS "UserSubscription" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "userId" TEXT NOT NULL,
   "stripeSubscriptionId" TEXT NOT NULL,
   "stripeCustomerId" TEXT NOT NULL,
   "status" TEXT NOT NULL DEFAULT 'active',
-  "currentPeriodStart" DATETIME,
-  "currentPeriodEnd" DATETIME,
+  "currentPeriodStart" TIMESTAMP(3),
+  "currentPeriodEnd" TIMESTAMP(3),
   "cancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT false,
-  "canceledAt" DATETIME,
+  "canceledAt" TIMESTAMP(3),
   "metadata" TEXT,
-  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "UserSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
