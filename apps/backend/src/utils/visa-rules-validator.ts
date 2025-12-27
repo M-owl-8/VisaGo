@@ -35,12 +35,14 @@ const ProcessingInfoSchema = z
 
 const FeesSchema = z
   .object({
-    visaFee: z.number().optional(),
-    serviceFee: z.number().optional(),
-    currency: z.string().optional(),
-    paymentMethods: z.array(z.string()).optional(),
+    // Accept null or undefined for optional numeric/string fields
+    visaFee: z.number().nullish(),
+    serviceFee: z.number().nullish(),
+    currency: z.string().nullish(),
+    // Accept null/undefined for paymentMethods; array of strings when present
+    paymentMethods: z.array(z.string()).nullish(),
   })
-  .optional();
+  .nullish();
 
 const AdditionalRequirementsSchema = z
   .object({
@@ -97,4 +99,3 @@ export function validateRuleSetData(
     errors: result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
   };
 }
-

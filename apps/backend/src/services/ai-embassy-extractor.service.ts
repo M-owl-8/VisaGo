@@ -676,6 +676,31 @@ Return ONLY valid JSON matching the VisaRuleSetData schema, no markdown, no expl
   private static fixCommonIssues(parsed: any): any {
     const fixed = { ...parsed };
 
+    // Normalize fees object: convert nulls to undefined and ensure arrays are arrays
+    if (fixed.fees) {
+      if (fixed.fees === null) {
+        fixed.fees = undefined;
+      } else {
+        // Normalize individual fields
+        fixed.fees.visaFee = fixed.fees.visaFee ?? undefined;
+        fixed.fees.serviceFee = fixed.fees.serviceFee ?? undefined;
+        fixed.fees.currency = fixed.fees.currency ?? undefined;
+
+        // paymentMethods: null/undefined -> undefined, string -> [string], else ensure array of strings
+        if (fixed.fees.paymentMethods === null) {
+          fixed.fees.paymentMethods = undefined;
+        } else if (typeof fixed.fees.paymentMethods === 'string') {
+          fixed.fees.paymentMethods = [fixed.fees.paymentMethods];
+        } else if (Array.isArray(fixed.fees.paymentMethods)) {
+          fixed.fees.paymentMethods = fixed.fees.paymentMethods.filter(
+            (p: any) => typeof p === 'string' && p.trim().length > 0
+          );
+        } else if (fixed.fees.paymentMethods !== undefined) {
+          fixed.fees.paymentMethods = undefined;
+        }
+      }
+    }
+
     // Ensure requiredDocuments is an array
     if (!Array.isArray(fixed.requiredDocuments)) {
       fixed.requiredDocuments = [];
