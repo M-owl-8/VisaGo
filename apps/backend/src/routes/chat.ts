@@ -390,10 +390,9 @@ router.get('/history', async (req: Request, res: Response) => {
       data: history || [], // Ensure we always return an array
     });
   } catch (error: any) {
-    // Rate-limited error logging to prevent spam
+    // Log once per 5s per user to avoid noise
     const errorKey = `chat-history-error-${userId}`;
     const errorCache = (global as any).__chatErrorCache || {};
-
     if (!errorCache[errorKey] || Date.now() - errorCache[errorKey] > 5000) {
       errorCache[errorKey] = Date.now();
       (global as any).__chatErrorCache = errorCache;
@@ -409,11 +408,17 @@ router.get('/history', async (req: Request, res: Response) => {
       );
     }
 
-    // Return empty array instead of error to allow user to start chatting
-    // This prevents 500 errors when no session exists yet
-    res.json({
-      success: true,
-      data: [], // Return empty array instead of error
+    // Surface the error to the client so the frontend can show a meaningful message
+    const status =
+      (error as any)?.statusCode ||
+      (error as any)?.status ||
+      (error as any)?.response?.status ||
+      500;
+    res.status(status >= 400 && status < 600 ? status : 500).json({
+      success: false,
+      error: {
+        message: (error as any)?.message || 'Failed to load chat history',
+      },
     });
   }
 });
