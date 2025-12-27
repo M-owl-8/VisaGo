@@ -18,7 +18,7 @@ export interface CreateCheckoutSessionResult {
 
 export class SubscriptionService {
   private prisma: PrismaClient;
-  private stripe: Stripe;
+  private stripe?: Stripe;
   private priceId: string;
   private successUrl: string;
   private cancelUrl: string;
@@ -58,6 +58,8 @@ export class SubscriptionService {
     if (!user) throw new Error('User not found');
 
     // Reuse or create customer
+    if (!this.stripe) throw new Error('Stripe not initialized');
+
     let stripeCustomerId = user.stripeCustomerId as any;
     if (!stripeCustomerId) {
       const customer = await this.stripe.customers.create({
@@ -104,6 +106,7 @@ export class SubscriptionService {
 
   async cancelSubscription(userId: string): Promise<boolean> {
     this.ensureEnabled();
+    if (!this.stripe) throw new Error('Stripe not initialized');
     const sub = await this.getUserSubscription(userId);
     if (!sub || !sub.stripeSubscriptionId) return false;
 
@@ -123,6 +126,7 @@ export class SubscriptionService {
 
   async reactivateSubscription(userId: string): Promise<boolean> {
     this.ensureEnabled();
+    if (!this.stripe) throw new Error('Stripe not initialized');
     const sub = await this.getUserSubscription(userId);
     if (!sub || !sub.stripeSubscriptionId) return false;
 
@@ -177,6 +181,7 @@ export class SubscriptionService {
     signature: string
   ): Promise<{ ok: boolean; error?: string }> {
     this.ensureEnabled();
+    if (!this.stripe) return { ok: false, error: 'Stripe not initialized' };
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) return { ok: false, error: 'Missing STRIPE_WEBHOOK_SECRET' };
 

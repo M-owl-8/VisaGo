@@ -360,15 +360,17 @@ router.get('/history', async (req: Request, res: Response) => {
       });
     }
     const applicationId = req.query.applicationId as string | undefined;
-    const limit = parseInt(req.query.limit as string) || 50;
+    // Safer pagination: default higher, cap to prevent abuse
+    const rawLimit = parseInt(req.query.limit as string);
+    const limit = Math.min(Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 100, 200);
     const offset = parseInt(req.query.offset as string) || 0;
 
     // Validate pagination
-    if (limit > 100) {
+    if (limit > 200) {
       return res.status(400).json({
         success: false,
         error: {
-          message: 'Limit cannot exceed 100',
+          message: 'Limit cannot exceed 200',
         },
       });
     }
@@ -540,8 +542,19 @@ router.get('/sessions', async (req: Request, res: Response) => {
         },
       });
     }
-    const limit = parseInt(req.query.limit as string) || 20;
+    // Safer pagination: default higher, cap to prevent abuse
+    const rawLimit = parseInt(req.query.limit as string);
+    const limit = Math.min(Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 100, 200);
     const offset = parseInt(req.query.offset as string) || 0;
+
+    if (limit > 200) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Limit cannot exceed 200',
+        },
+      });
+    }
 
     const result = await ChatService.getUserSessions(userId, limit, offset);
 
