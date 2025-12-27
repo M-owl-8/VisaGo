@@ -43,6 +43,10 @@ interface User {
   bio?: string; // JSON string containing questionnaire data
   questionnaireCompleted?: boolean;
   role?: UserRole; // User role: 'user', 'admin', or 'super_admin'
+  subscriptionStatus?: string | null;
+  subscriptionRequired?: boolean;
+  hasActiveSubscription?: boolean;
+  requiresPayment?: boolean;
   preferences?: {
     notificationsEnabled?: boolean;
     emailNotifications?: boolean;
@@ -303,6 +307,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
+        subscriptionStatus: (user as any).subscriptionStatus || null,
+        subscriptionRequired: (user as any).subscriptionRequired ?? false,
+        hasActiveSubscription: (user as any).hasActiveSubscription ?? false,
+        requiresPayment: (user as any).requiresPayment ?? false,
         role: normalizeRole(user.role),
       };
 
@@ -417,6 +425,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
+        subscriptionStatus: (user as any).subscriptionStatus || null,
+        subscriptionRequired: (user as any).subscriptionRequired ?? false,
+        hasActiveSubscription: (user as any).hasActiveSubscription ?? false,
+        requiresPayment: (user as any).requiresPayment ?? false,
         role: normalizeRole(user.role),
       };
 
@@ -498,6 +510,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         emailVerified: user.emailVerified,
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
+        subscriptionStatus: (user as any).subscriptionStatus || null,
+        subscriptionRequired: (user as any).subscriptionRequired ?? false,
+        hasActiveSubscription: (user as any).hasActiveSubscription ?? false,
+        requiresPayment: (user as any).requiresPayment ?? false,
         role: normalizeRole(user.role),
       };
 

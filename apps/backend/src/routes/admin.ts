@@ -17,9 +17,11 @@ import { getVerificationMetrics } from '../services/verification-metrics.service
 import { PrismaClient } from '@prisma/client';
 import { AIAnalyticsService } from '../services/ai-analytics.service';
 import { ChecklistMetricsService } from '../services/checklist-metrics.service';
+import { SubscriptionService } from '../services/subscription.service';
 
 const prisma = new PrismaClient();
 const envConfig = getEnvConfig();
+const subscriptionService = new SubscriptionService(prisma);
 
 const router = express.Router();
 
@@ -259,6 +261,105 @@ router.get('/payments', authenticateToken, requireAdmin, async (req: Request, re
     res.status(500).json({ error: 'Failed to fetch payments' });
   }
 });
+
+/**
+ * GET /api/admin/subscriptions
+ * List user subscriptions with pagination
+ */
+router.get(
+  '/subscriptions',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const skip = parseInt(req.query.skip as string) || 0;
+      const take = Math.min(parseInt(req.query.take as string) || 20, 100);
+
+      const [subs, total] = await Promise.all([
+        prisma.userSubscription.findMany({
+          skip,
+          take,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: { email: true, firstName: true, lastName: true, subscriptionStatus: true },
+            },
+          },
+        }),
+        prisma.userSubscription.count(),
+      ]);
+
+      res.json({ success: true, data: subs, total });
+    } catch (error: any) {
+      console.error('Error fetching subscriptions:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch subscriptions' });
+    }
+  }
+);
+
+/**
+ * GET /api/admin/subscriptions/:userId
+ * Get subscription details for a user
+ */
+router.get(
+  '/subscriptions/:userId',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const sub = await prisma.userSubscription.findUnique({
+        where: { userId: req.params.userId },
+        include: { user: { select: { email: true, subscriptionStatus: true } } },
+      });
+      if (!sub) return res.status(404).json({ success: false, error: 'Subscription not found' });
+      res.json({ success: true, data: sub });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: 'Failed to fetch subscription' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/subscriptions/:userId/cancel
+ * Admin cancels a user's subscription
+ */
+router.post(
+  '/subscriptions/:userId/cancel',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const ok = await subscriptionService.cancelSubscription(req.params.userId);
+      if (!ok) return res.status(404).json({ success: false, error: 'Subscription not found' });
+      res.json({ success: true });
+    } catch (error: any) {
+      res
+        .status(500)
+        .json({ success: false, error: error.message || 'Failed to cancel subscription' });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/subscriptions/:userId/grandfather
+ * Grant grandfathered access (no subscription required)
+ */
+router.post(
+  '/subscriptions/:userId/grandfather',
+  authenticateToken,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      await prisma.user.update({
+        where: { id: req.params.userId },
+        data: { subscriptionStatus: 'grandfathered', subscriptionRequired: false },
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: 'Failed to update user' });
+    }
+  }
+);
 
 /**
  * GET /api/admin/documents/verification-queue

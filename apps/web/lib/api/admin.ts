@@ -317,6 +317,42 @@ class AdminApiClient {
     }
     return response.json();
   }
+
+  async getSubscriptions(params?: { skip?: number; take?: number }): Promise<PaginatedResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (params?.skip) queryParams.append('skip', params.skip.toString());
+    if (params?.take) queryParams.append('take', params.take.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/admin/subscriptions?${queryParams}`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch subscriptions: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  async cancelSubscription(userId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/admin/subscriptions/${userId}/cancel`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to cancel subscription: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  async grandfatherSubscription(userId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/admin/subscriptions/${userId}/grandfather`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to grandfather subscription: ${response.statusText}`);
+    }
+    return response.json();
+  }
 }
 
 export const adminApi = new AdminApiClient();

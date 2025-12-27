@@ -64,6 +64,15 @@ const envSchema = z.object({
   // Payment Gateways (optional)
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+  STRIPE_SUBSCRIPTION_PRICE_ID: z.string().optional(),
+  STRIPE_SUCCESS_URL: z.string().optional(),
+  STRIPE_CANCEL_URL: z.string().optional(),
+  SUBSCRIPTION_REQUIRED_FOR_NEW_USERS: z
+    .string()
+    .transform((val) => val !== 'false')
+    .default('true')
+    .optional(),
   PAYME_MERCHANT_ID: z.string().optional(),
   PAYME_API_KEY: z.string().optional(),
   CLICK_MERCHANT_ID: z.string().optional(),
@@ -137,12 +146,7 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().min(32).optional(),
 
   // Data retention (logs cleanup)
-  DATA_RETENTION_DAYS: z
-    .string()
-    .regex(/^\d+$/)
-    .transform(Number)
-    .default('90')
-    .optional(),
+  DATA_RETENTION_DAYS: z.string().regex(/^\d+$/).transform(Number).default('90').optional(),
 
   // Admin security
   ADMIN_IP_ALLOWLIST: z.string().optional(),
@@ -157,12 +161,7 @@ const envSchema = z.object({
     .transform(Number)
     .default('60000')
     .optional(),
-  ADMIN_RATE_LIMIT_MAX: z
-    .string()
-    .regex(/^\d+$/)
-    .transform(Number)
-    .default('60')
-    .optional(),
+  ADMIN_RATE_LIMIT_MAX: z.string().regex(/^\d+$/).transform(Number).default('60').optional(),
 
   // Per-user API rate limiting (general)
   PER_USER_RATE_LIMIT_WINDOW_MS: z
@@ -171,12 +170,7 @@ const envSchema = z.object({
     .transform(Number)
     .default('60000')
     .optional(),
-  PER_USER_RATE_LIMIT_MAX: z
-    .string()
-    .regex(/^\d+$/)
-    .transform(Number)
-    .default('120')
-    .optional(),
+  PER_USER_RATE_LIMIT_MAX: z.string().regex(/^\d+$/).transform(Number).default('120').optional(),
 
   // AI cost controls (daily budget per user, in cents)
   AI_COST_DAILY_LIMIT_CENTS: z

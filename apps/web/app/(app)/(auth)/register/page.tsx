@@ -105,7 +105,12 @@ export default function RegisterPage() {
 
     try {
       await register(formData.email, formData.password, formData.firstName, formData.lastName);
-      router.push('/applications');
+      const user = useAuthStore.getState().user;
+      if (user?.requiresPayment || user?.subscriptionRequired) {
+        router.push('/payment');
+      } else {
+        router.push('/applications');
+      }
     } catch (err: any) {
       const errorMessage = getErrorMessage(err, t, i18n.language);
       setError(errorMessage);
@@ -118,7 +123,12 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     try {
       await loginWithGoogle(idToken);
-      router.push('/applications');
+      const user = useAuthStore.getState().user;
+      if (user?.requiresPayment || user?.subscriptionRequired) {
+        router.push('/payment');
+      } else {
+        router.push('/applications');
+      }
     } catch (err: any) {
       const errorMessage = getErrorMessage(err, t, i18n.language);
       setError(errorMessage);

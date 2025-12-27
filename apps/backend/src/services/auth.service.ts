@@ -47,6 +47,9 @@ export interface AuthResponse {
     lastName?: string;
     emailVerified: boolean;
     role: string; // 'user' | 'admin' | 'super_admin'
+    subscriptionStatus?: string | null;
+    subscriptionRequired?: boolean;
+    requiresPayment?: boolean;
   };
 }
 
@@ -137,6 +140,8 @@ export class AuthService {
         SECURITY_CONFIG.PASSWORD_HASH_ROUNDS
       );
 
+      const subscriptionRequired = process.env.SUBSCRIPTION_REQUIRED_FOR_NEW_USERS !== 'false';
+
       // Create user
       let user;
       try {
@@ -149,6 +154,8 @@ export class AuthService {
             preferences: {
               create: {},
             },
+            subscriptionRequired,
+            subscriptionStatus: subscriptionRequired ? null : 'grandfathered',
           },
         });
       } catch (createError: any) {
@@ -181,6 +188,9 @@ export class AuthService {
           lastName: user.lastName || undefined,
           emailVerified: user.emailVerified,
           role: user.role || 'user',
+          subscriptionStatus: user.subscriptionStatus,
+          subscriptionRequired: user.subscriptionRequired,
+          requiresPayment: subscriptionRequired,
         },
       };
     } catch (error) {

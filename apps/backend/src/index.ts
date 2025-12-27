@@ -42,6 +42,7 @@ import countriesRoutes from './routes/countries';
 import visaTypesRoutes from './routes/visa-types';
 import applicationsRoutes from './routes/applications';
 import paymentRoutes from './routes/payments-complete';
+import subscriptionRoutes from './routes/subscriptions';
 import documentRoutes from './routes/documents';
 import chatRoutes from './routes/chat';
 import usersRoutes from './routes/users';
@@ -60,6 +61,8 @@ import devRoutes from './routes/dev';
 import metaRoutes from './routes/meta';
 import ketdikRoutes from './routes/ketdik';
 import { websocketService } from './services/websocket.service';
+import { requireSubscription } from './middleware/subscription';
+import { authenticateToken } from './middleware/auth';
 
 // Load environment variables
 dotenv.config();
@@ -238,10 +241,34 @@ app.use('/api/', limiter);
 
 // Webhook rate limiting (stricter limits)
 app.use('/api/payments/webhook', webhookLimiter);
+app.use('/api/subscriptions/webhook', webhookLimiter);
 
-// Body parsing middleware
-app.use(express.json({ limit: SERVER_CONFIG.MAX_REQUEST_SIZE }));
-app.use(express.urlencoded({ limit: SERVER_CONFIG.MAX_REQUEST_SIZE, extended: true }));
+// Stripe + subscription webhooks need raw body
+const stripeWebhookPath = '/api/payments/webhooks/stripe';
+const subscriptionWebhookPath = '/api/subscriptions/webhook';
+app.use(
+  [stripeWebhookPath, subscriptionWebhookPath],
+  express.raw({ type: 'application/json', limit: SERVER_CONFIG.MAX_REQUEST_SIZE })
+);
+
+// Body parsing middleware (skip raw paths)
+const jsonParser = express.json({ limit: SERVER_CONFIG.MAX_REQUEST_SIZE });
+const urlEncodedParser = express.urlencoded({
+  limit: SERVER_CONFIG.MAX_REQUEST_SIZE,
+  extended: true,
+});
+app.use((req, res, next) => {
+  if (
+    req.originalUrl.startsWith(stripeWebhookPath) ||
+    req.originalUrl.startsWith(subscriptionWebhookPath)
+  ) {
+    return next();
+  }
+  return jsonParser(req, res, (err) => {
+    if (err) return next(err);
+    urlEncodedParser(req, res, next);
+  });
+});
 
 // Static file serving for uploaded files (local storage) - can be disabled to enforce signed URLs
 if (process.env.ENABLE_STATIC_UPLOADS !== 'false') {
@@ -294,15 +321,16 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/countries', countriesRoutes);
 app.use('/api/visa-types', visaTypesRoutes);
-app.use('/api/applications', applicationsRoutes);
+app.use('/api/applications', authenticateToken, requireSubscription, applicationsRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/documents', documentRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/documents', authenticateToken, requireSubscription, documentRoutes);
 // Form routes (pre-filling, validation, submission)
-app.use('/api/forms', formRoutes);
+app.use('/api/forms', authenticateToken, requireSubscription, formRoutes);
 // Document checklist routes (AI-generated checklists)
-app.use('/api/document-checklist', documentChecklistRoutes);
+app.use('/api/document-checklist', authenticateToken, requireSubscription, documentChecklistRoutes);
 // Document check routes (Phase 3: Document checking & readiness)
-app.use('/api/doc-check', docCheckRoutes);
+app.use('/api/doc-check', authenticateToken, requireSubscription, docCheckRoutes);
 // Meta endpoints (countries list, etc.)
 app.use('/api/meta', metaRoutes);
 // Ketdik assistant (document instruction-only)
@@ -310,9 +338,9 @@ app.use('/api/assistant', ketdikRoutes);
 // Chat routes with user-level rate limiting and cost tracking
 // NOTE: chatRateLimitMiddleware must run AFTER authentication (which is in chatRoutes)
 // So we apply it inside the chatRoutes router, not here
-app.use('/api/chat', chatRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/notifications', notificationsRoutes);
+app.use('/api/chat', authenticateToken, requireSubscription, chatRoutes);
+app.use('/api/users', authenticateToken, requireSubscription, usersRoutes);
+app.use('/api/notifications', authenticateToken, requireSubscription, notificationsRoutes);
 // Admin routes with more lenient rate limiting (admin panel needs multiple requests)
 app.use('/api/admin', adminLimiter);
 app.use('/api/admin', adminRoutes);

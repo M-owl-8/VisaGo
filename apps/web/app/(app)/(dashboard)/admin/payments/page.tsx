@@ -64,6 +64,7 @@ export default function AdminPaymentsPage() {
                   <th className="text-left p-4 text-sm font-semibold text-white/80">Currency</th>
                   <th className="text-left p-4 text-sm font-semibold text-white/80">Status</th>
                   <th className="text-left p-4 text-sm font-semibold text-white/80">Method</th>
+                  <th className="text-left p-4 text-sm font-semibold text-white/80">Type</th>
                   <th className="text-left p-4 text-sm font-semibold text-white/80">Country</th>
                   <th className="text-left p-4 text-sm font-semibold text-white/80">Date</th>
                 </tr>
@@ -90,6 +91,9 @@ export default function AdminPaymentsPage() {
                       </span>
                     </td>
                     <td className="p-4 text-white/80">{payment.paymentMethod}</td>
+                    <td className="p-4 text-white/80">
+                      {payment.paymentMethod === 'stripe' ? 'subscription' : 'one-time'}
+                    </td>
                     <td className="p-4 text-white/80">{payment.countryName}</td>
                     <td className="p-4 text-white/60 text-sm">
                       {payment.paidAt

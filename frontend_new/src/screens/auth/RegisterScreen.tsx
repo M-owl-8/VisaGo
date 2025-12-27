@@ -66,6 +66,12 @@ export default function RegisterScreen({navigation}: any) {
       const lastName = nameParts.slice(1).join(' ') || nameParts[0];
 
       await register(email, password, firstName, lastName);
+      const user = useAuthStore.getState().user;
+      if (user?.requiresPayment || user?.subscriptionRequired) {
+        navigation.navigate('Subscription');
+      } else {
+        navigation.navigate('Home');
+      }
     } catch (error: any) {
       // Extract error code and message from backend
       const code = error.code || 'UNKNOWN_ERROR';

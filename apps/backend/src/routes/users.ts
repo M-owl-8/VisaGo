@@ -3,9 +3,11 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { ApiError } from '../utils/errors';
 import { GdprService } from '../services/gdpr.service';
+import { SubscriptionService } from '../services/subscription.service';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const subscriptionService = new SubscriptionService(prisma);
 
 /**
  * GET /api/users/me
@@ -32,6 +34,15 @@ router.get('/me', authenticateToken, async (req: Request, res: Response, next: N
         bio: true,
         questionnaireCompleted: true,
         role: true,
+        subscriptionStatus: true,
+        subscriptionRequired: true,
+        subscription: {
+          select: {
+            status: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true,
+          },
+        },
         createdAt: true,
         updatedAt: true,
         preferences: {
@@ -49,9 +60,14 @@ router.get('/me', authenticateToken, async (req: Request, res: Response, next: N
       throw new ApiError(404, 'User not found');
     }
 
+    const hasActiveSubscription = await subscriptionService.checkAccess(userId);
+
     res.json({
       success: true,
-      data: user,
+      data: {
+        ...user,
+        hasActiveSubscription,
+      },
     });
   } catch (error) {
     next(error);
@@ -396,40 +412,48 @@ router.patch(
  * GET /api/users/me/gdpr-export
  * Export user data (authenticated user only)
  */
-router.get('/me/gdpr-export', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req as any).userId;
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
+router.get(
+  '/me/gdpr-export',
+  authenticateToken,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = (req as any).userId;
+      if (!userId) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+      const data = await GdprService.exportUserData(userId);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
     }
-    const data = await GdprService.exportUserData(userId);
-    res.json({ success: true, data });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 /**
  * POST /api/users/me/gdpr-delete
  * Record a GDPR deletion request for the authenticated user.
  */
-router.post('/me/gdpr-delete', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = (req as any).userId;
-    if (!userId) {
-      throw new ApiError(401, 'Unauthorized');
+router.post(
+  '/me/gdpr-delete',
+  authenticateToken,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = (req as any).userId;
+      if (!userId) {
+        throw new ApiError(401, 'Unauthorized');
+      }
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason : undefined;
+      const result = await GdprService.requestDeletion(
+        userId,
+        reason,
+        req.ip,
+        (req.headers['user-agent'] || '').toString().slice(0, 200)
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
     }
-    const reason = typeof req.body?.reason === 'string' ? req.body.reason : undefined;
-    const result = await GdprService.requestDeletion(
-      userId,
-      reason,
-      req.ip,
-      (req.headers['user-agent'] || '').toString().slice(0, 200)
-    );
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;

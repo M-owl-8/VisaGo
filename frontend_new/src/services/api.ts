@@ -1016,6 +1016,16 @@ class ApiClient {
     }
   }
 
+  async createSubscriptionCheckout(returnUrl?: string): Promise<ApiResponse> {
+    return this.request('/api/subscriptions/create-checkout-session', 'POST', {
+      returnUrl,
+    });
+  }
+
+  async getSubscriptionStatus(): Promise<ApiResponse> {
+    return this.request('/api/subscriptions/status', 'GET');
+  }
+
   async login(email: string, password: string): Promise<ApiResponse> {
     const response = await this.api.post('/auth/login', {
       email,

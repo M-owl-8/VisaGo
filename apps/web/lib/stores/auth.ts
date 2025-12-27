@@ -33,6 +33,10 @@ interface User {
     pushNotifications?: boolean;
     twoFactorEnabled?: boolean;
   };
+  subscriptionStatus?: string | null;
+  subscriptionRequired?: boolean;
+  hasActiveSubscription?: boolean;
+  requiresPayment?: boolean;
 }
 
 interface UserApplication {
@@ -122,6 +126,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             bio: user.bio,
             questionnaireCompleted: user.questionnaireCompleted || false,
             role: normalizeRole(user.role),
+            subscriptionStatus: user.subscriptionStatus || null,
+            subscriptionRequired: user.subscriptionRequired ?? false,
+            hasActiveSubscription: user.hasActiveSubscription ?? false,
+            requiresPayment: user.requiresPayment ?? false,
           };
 
           set({
@@ -193,6 +201,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
         role: normalizeRole(user.role),
+        subscriptionStatus: user.subscriptionStatus || null,
+        subscriptionRequired: user.subscriptionRequired ?? false,
+        hasActiveSubscription: user.hasActiveSubscription ?? false,
+        requiresPayment: user.requiresPayment ?? false,
       };
 
       set({
@@ -269,6 +281,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
         role: normalizeRole(user.role),
+        subscriptionStatus: user.subscriptionStatus || null,
+        subscriptionRequired: user.subscriptionRequired ?? false,
+        hasActiveSubscription: user.hasActiveSubscription ?? false,
+        requiresPayment: user.requiresPayment ?? false,
       };
 
       set({
@@ -346,6 +362,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         bio: user.bio,
         questionnaireCompleted: user.questionnaireCompleted || false,
         role: normalizeRole(user.role),
+        subscriptionStatus: user.subscriptionStatus || null,
+        subscriptionRequired: user.subscriptionRequired ?? false,
+        hasActiveSubscription: user.hasActiveSubscription ?? false,
+        requiresPayment: user.requiresPayment ?? false,
       };
 
       set({
@@ -441,6 +461,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         bio: response.data.bio,
         questionnaireCompleted: response.data.questionnaireCompleted,
         role: normalizeRole(response.data.role),
+        subscriptionStatus: response.data.subscriptionStatus || null,
+        subscriptionRequired: response.data.subscriptionRequired ?? false,
+        hasActiveSubscription: response.data.hasActiveSubscription ?? false,
+        requiresPayment: response.data.requiresPayment ?? false,
       };
 
       if (typeof window !== 'undefined') {
