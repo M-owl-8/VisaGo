@@ -22,11 +22,15 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       <View style={styles.leftGroup}>
         <TouchableOpacity
           onPress={onMenuPress}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
           style={styles.iconButton}
           accessibilityLabel="Open chat history"
           accessibilityRole="button">
-          <Icon name="menu" size={24} color="#FFFFFF" />
+          <View style={styles.burgerLines}>
+            <View style={styles.line} />
+            <View style={[styles.line, styles.lineMiddle]} />
+            <View style={[styles.line, styles.lineShort]} />
+          </View>
         </TouchableOpacity>
         <Text style={styles.brandText}>Ketdik</Text>
       </View>
@@ -34,7 +38,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       {showNewChatButton && (
         <TouchableOpacity
           onPress={onNewChatPress}
-          activeOpacity={0.7}
+          activeOpacity={0.85}
           style={styles.newChatButton}
           accessibilityLabel="Start new chat"
           accessibilityRole="button">
@@ -48,7 +52,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#040816',
+    backgroundColor: 'transparent',
     paddingHorizontal: 16,
     paddingBottom: 12,
     flexDirection: 'row',
@@ -67,6 +71,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
   },
   brandText: {
     color: '#FFFFFF',
@@ -81,11 +92,38 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.08)',
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
   },
   newChatText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  burgerLines: {
+    width: 22,
+    height: 18,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  line: {
+    height: 2.5,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    width: 22,
+  },
+  lineMiddle: {
+    width: 18,
+    opacity: 0.9,
+  },
+  lineShort: {
+    width: 14,
+    opacity: 0.8,
   },
 });
 

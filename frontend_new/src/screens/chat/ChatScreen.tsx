@@ -21,6 +21,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useFocusEffect} from '@react-navigation/native';
 import {useAuthStore} from '../../store/auth';
 import {apiClient} from '../../services/api';
 import {ChatHeader} from '../../components/chat/ChatHeader';
@@ -113,7 +114,7 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     setIsNearBottom(true);
   };
 
-  // Load chat sessions for drawer
+  // Load chat sessions for drawer (on mount and focus)
   useEffect(() => {
     const fetchSessions = async () => {
       if (!isSignedIn) {
@@ -122,6 +123,10 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
       try {
         setIsSessionsLoading(true);
         await loadSessions(50, 0);
+        console.log(
+          '[ChatScreen] Sessions loaded (mount):',
+          useChatStore.getState().sessions.length,
+        );
       } catch (err) {
         console.warn('[ChatScreen] Failed to load sessions', err);
       } finally {
@@ -130,6 +135,63 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     };
     fetchSessions();
   }, [isSignedIn, loadSessions]);
+
+  // Refresh sessions whenever the screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const refreshSessions = async () => {
+        if (!isSignedIn) {
+          return;
+        }
+        try {
+          setIsSessionsLoading(true);
+          await loadSessions(50, 0);
+          console.log(
+            '[ChatScreen] Sessions loaded (focus):',
+            useChatStore.getState().sessions.length,
+          );
+        } catch (err) {
+          console.warn('[ChatScreen] Failed to refresh sessions on focus', err);
+        } finally {
+          setIsSessionsLoading(false);
+        }
+      };
+      refreshSessions();
+    }, [isSignedIn, loadSessions]),
+  );
+
+  // Refresh sessions when drawer opens
+  useEffect(() => {
+    if (!isDrawerOpen || !isSignedIn) return;
+    let cancelled = false;
+    const refreshOnOpen = async () => {
+      try {
+        setIsSessionsLoading(true);
+        await loadSessions(50, 0);
+        if (!cancelled) {
+          console.log(
+            '[ChatScreen] Sessions refreshed (drawer open):',
+            useChatStore.getState().sessions.length,
+          );
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn(
+            '[ChatScreen] Failed to load sessions on drawer open',
+            err,
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSessionsLoading(false);
+        }
+      }
+    };
+    refreshOnOpen();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDrawerOpen, isSignedIn, loadSessions]);
 
   // HIGH PRIORITY FIX: Load chat history from BOTH AsyncStorage (for instant display) AND backend (for sync)
   // This ensures chat history persists across devices and app reinstalls

@@ -43,6 +43,21 @@ export default function VisaApplicationScreen({navigation}: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [showApplicationTypeModal, setShowApplicationTypeModal] =
     useState(false);
+  const [stats, setStats] = useState<{
+    activeCount: number;
+    documentsReady: number;
+    documentsTotal: number;
+    averageProgress: number;
+  }>({
+    activeCount: 0,
+    documentsReady: 0,
+    documentsTotal: 0,
+    averageProgress: 0,
+  });
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [resumeApplicationId, setResumeApplicationId] = useState<string | null>(
+    null,
+  );
 
   // MEDIUM PRIORITY FIX: Refresh applications list when screen comes into focus
   // This ensures newly created applications appear immediately when returning from creation screen
@@ -65,6 +80,8 @@ export default function VisaApplicationScreen({navigation}: any) {
       console.log('Applications loaded:', apps?.length || 0, 'applications');
       if (apps && apps.length > 0) {
         console.log('First application:', apps[0]);
+        await computeStats(apps);
+        setResumeApplicationId(selectMostRecent(apps));
       }
     } catch (error: any) {
       console.error('Error loading applications:', error);
@@ -108,6 +125,86 @@ export default function VisaApplicationScreen({navigation}: any) {
     );
   };
 
+  const selectMostRecent = (apps: any[]) => {
+    if (!apps || apps.length === 0) return null;
+    return apps
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.createdAt || 0).getTime() -
+          new Date(a.updatedAt || a.createdAt || 0).getTime(),
+      )[0].id;
+  };
+
+  const computeStats = async (apps: any[]) => {
+    if (!apps || apps.length === 0) {
+      setStats({
+        activeCount: 0,
+        documentsReady: 0,
+        documentsTotal: 0,
+        averageProgress: 0,
+      });
+      return;
+    }
+    try {
+      setIsStatsLoading(true);
+      const activeCount = apps.length;
+      const avgProgress =
+        Math.round(
+          apps.reduce((acc, app) => acc + (app.progressPercentage || 0), 0) /
+            activeCount,
+        ) || 0;
+
+      let documentsReady = 0;
+      let documentsTotal = 0;
+
+      // Fetch checklist data for accurate document counts
+      const checklistPromises = apps.map(async app => {
+        try {
+          const resp = await apiClient.getDocumentChecklist(app.id);
+          if (resp.success && resp.data) {
+            const items =
+              resp.data.items ||
+              resp.data.documents ||
+              resp.data.checklist ||
+              [];
+            const total = Array.isArray(items) ? items.length : 0;
+            const readyCount = Array.isArray(items)
+              ? items.filter((item: any) =>
+                  [
+                    'ready',
+                    'approved',
+                    'verified',
+                    'submitted',
+                    'accepted',
+                  ].includes((item.status || '').toLowerCase()),
+                ).length
+              : 0;
+            return {total, ready: readyCount};
+          }
+        } catch (err) {
+          console.warn('Failed to load checklist for app', app.id, err);
+        }
+        return {total: 0, ready: 0};
+      });
+
+      const checklistResults = await Promise.all(checklistPromises);
+      checklistResults.forEach(res => {
+        documentsReady += res.ready;
+        documentsTotal += res.total;
+      });
+
+      setStats({
+        activeCount,
+        documentsReady,
+        documentsTotal,
+        averageProgress: avgProgress,
+      });
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.gradientBackground}>
@@ -129,6 +226,70 @@ export default function VisaApplicationScreen({navigation}: any) {
               colors={['#4A9EFF']}
             />
           }>
+          {/* Resume Card */}
+          {userApplications &&
+            Array.isArray(userApplications) &&
+            userApplications.length > 0 &&
+            resumeApplicationId && (
+              <View style={styles.resumeCard}>
+                <View style={styles.resumeHeader}>
+                  <View style={styles.resumePill}>
+                    <Text style={styles.resumePillText}>
+                      Pick up where you left off
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleApplicationPress(resumeApplicationId)}
+                    style={styles.resumeAction}>
+                    <Text style={styles.resumeActionText}>Continue</Text>
+                    <AppIcon
+                      name={ApplicationIcons.chevron.name}
+                      library={ApplicationIcons.chevron.library}
+                      size={IconSizes.settings}
+                      color={IconColors.bright}
+                    />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.resumeTitle}>
+                  Your application is waiting for you
+                </Text>
+                <Text style={styles.resumeSubtitle}>
+                  You have {userApplications.length} application
+                  {userApplications.length > 1 ? 's' : ''} ready to continue.
+                  Your progress is saved — jump back in anytime.
+                </Text>
+              </View>
+            )}
+
+          {/* Stats Cards */}
+          {userApplications &&
+            Array.isArray(userApplications) &&
+            userApplications.length > 0 && (
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statLabel}>Active applications</Text>
+                  <Text style={styles.statValue}>{stats.activeCount}</Text>
+                  <Text style={styles.statHint}>Synced with mobile</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statLabel}>Documents ready</Text>
+                  <Text style={styles.statValue}>
+                    {isStatsLoading
+                      ? '...'
+                      : `${stats.documentsReady}/${Math.max(stats.documentsTotal, 20)}`}
+                  </Text>
+                  <Text style={styles.statHint}>Ready for upload</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statLabel}>Average progress</Text>
+                  <Text style={styles.statValue}>
+                    {isStatsLoading ? '...' : `${stats.averageProgress}%`}
+                  </Text>
+                  <Text style={styles.statHint}>Across all journeys</Text>
+                </View>
+              </View>
+            )}
+
           {/* Start New Applications Header */}
           <View style={styles.startNewHeader}>
             <Text style={styles.startNewText}>
@@ -461,6 +622,101 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 60,
     paddingHorizontal: 24,
+  },
+  resumeCard: {
+    backgroundColor: 'rgba(15, 30, 45, 0.9)',
+    borderRadius: 16,
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  resumeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  resumePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(74, 158, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.25)',
+  },
+  resumePillText: {
+    color: '#4A9EFF',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  resumeAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(74, 158, 255, 0.18)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.3)',
+  },
+  resumeActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resumeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 6,
+  },
+  resumeSubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+    lineHeight: 20,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingHorizontal: 24,
+    marginBottom: 8,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: 140,
+    backgroundColor: 'rgba(15, 30, 45, 0.8)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 158, 255, 0.18)',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  statHint: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   emptyTitle: {
     fontSize: 18,

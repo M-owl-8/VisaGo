@@ -206,7 +206,8 @@ function AppTabs() {
         name="Chat"
         component={ChatScreen}
         options={{
-          title: t('chat.aiAssistant'),
+          title: 'Chat',
+          headerShown: false,
         }}
       />
       <Tab.Screen
