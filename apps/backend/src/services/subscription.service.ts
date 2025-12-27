@@ -40,7 +40,8 @@ export class SubscriptionService {
     }
 
     this.prisma = prisma;
-    this.stripe = new Stripe(secretKey, { apiVersion: '2023-10-16' });
+    // Use Stripe default API version to avoid type mismatches on SDK upgrades
+    this.stripe = new Stripe(secretKey);
   }
 
   async createCheckoutSession(
@@ -231,8 +232,7 @@ export class SubscriptionService {
   }
 
   private async handleInvoicePaid(invoice: Stripe.Invoice) {
-    const subscriptionId =
-      typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+    const subscriptionId = this.getSubscriptionIdFromInvoice(invoice);
     if (!subscriptionId) return;
 
     await this.prisma.userSubscription.updateMany({
@@ -251,8 +251,7 @@ export class SubscriptionService {
   }
 
   private async handleInvoiceFailed(invoice: Stripe.Invoice) {
-    const subscriptionId =
-      typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+    const subscriptionId = this.getSubscriptionIdFromInvoice(invoice);
     if (!subscriptionId) return;
     await this.prisma.userSubscription.updateMany({
       where: { stripeSubscriptionId: subscriptionId },
@@ -272,13 +271,12 @@ export class SubscriptionService {
     let status: SubscriptionStatus = 'active';
 
     if (stripeSub) {
-      currentPeriodStart = stripeSub.current_period_start
-        ? new Date(stripeSub.current_period_start * 1000)
-        : undefined;
-      currentPeriodEnd = stripeSub.current_period_end
-        ? new Date(stripeSub.current_period_end * 1000)
-        : undefined;
-      cancelAtPeriodEnd = stripeSub.cancel_at_period_end || false;
+      const subAny = stripeSub as any;
+      const periodStartSeconds = subAny.current_period_start ?? subAny.currentPeriodStart;
+      const periodEndSeconds = subAny.current_period_end ?? subAny.currentPeriodEnd;
+      currentPeriodStart = periodStartSeconds ? new Date(periodStartSeconds * 1000) : undefined;
+      currentPeriodEnd = periodEndSeconds ? new Date(periodEndSeconds * 1000) : undefined;
+      cancelAtPeriodEnd = subAny.cancel_at_period_end ?? subAny.cancelAtPeriodEnd ?? false;
       status = this.mapStatus(stripeSub.status);
     }
 
@@ -311,5 +309,13 @@ export class SubscriptionService {
         subscriptionStatus: status === 'canceled' ? 'canceled' : 'active',
       },
     });
+  }
+
+  private getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
+    const invAny = invoice as any;
+    return (
+      invAny.subscriptionId ||
+      (typeof invAny.subscription === 'string' ? invAny.subscription : invAny.subscription?.id)
+    );
   }
 }
