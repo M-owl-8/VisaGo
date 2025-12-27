@@ -216,14 +216,23 @@ class ApiClient {
   }
 
   async createSubscriptionCheckout(returnUrl?: string): Promise<ApiResponse> {
-    return this.request('/api/subscriptions/create-checkout-session', {
-      method: 'POST',
-      body: JSON.stringify({ returnUrl }),
-    });
+    try {
+      const response = await this.api.post('/subscriptions/create-checkout-session', {
+        returnUrl,
+      });
+      return response.data;
+    } catch (error: any) {
+      return this.handleApiError(error);
+    }
   }
 
   async getSubscriptionStatus(): Promise<ApiResponse> {
-    return this.request('/api/subscriptions/status', { method: 'GET' });
+    try {
+      const response = await this.api.get('/subscriptions/status');
+      return response.data;
+    } catch (error: any) {
+      return this.handleApiError(error);
+    }
   }
 
   async login(email: string, password: string): Promise<ApiResponse> {
@@ -267,6 +276,37 @@ class ApiClient {
         },
       };
     }
+  }
+
+  /**
+   * Shared error handler to mirror existing error shape.
+   */
+  private handleApiError(error: any): ApiResponse {
+    if (!error?.response) {
+      return {
+        success: false,
+        error: {
+          status: 0,
+          message: error?.message || 'Network error. Please check your connection.',
+          code: 'NETWORK_ERROR',
+        },
+      };
+    }
+    const code = error.response?.data?.error?.code || error.response?.data?.code || 'UNKNOWN_ERROR';
+    const message =
+      error.response?.data?.error?.message ||
+      error.response?.data?.message ||
+      error.message ||
+      'Request failed. Please try again.';
+
+    return {
+      success: false,
+      error: {
+        status: error.response?.status || 400,
+        message,
+        code,
+      },
+    };
   }
 
   async getCurrentUser(): Promise<ApiResponse> {
