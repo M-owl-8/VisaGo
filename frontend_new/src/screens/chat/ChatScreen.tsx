@@ -23,6 +23,9 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuthStore} from '../../store/auth';
 import {apiClient} from '../../services/api';
+import {ChatHeader} from '../../components/chat/ChatHeader';
+import {ChatHistoryDrawer} from '../../components/chat/ChatHistoryDrawer';
+import {useChatStore} from '../../store/chat';
 
 // Enable LayoutAnimation on Android
 if (
@@ -60,6 +63,16 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
   const isSignedIn = useAuthStore(state => state.isSignedIn);
   const user = useAuthStore(state => state.user);
   const applicationId = route?.params?.applicationId || undefined;
+  const {
+    sessions,
+    loadSessions,
+    loadSessionDetails,
+    setCurrentSessionId,
+    currentConversation,
+    currentSessionId,
+    renameSession,
+    deleteSession,
+  } = useChatStore();
 
   // Local state for messages
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -67,6 +80,8 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
 
   // Refs for auto-scroll
   const flatListRef = useRef<FlatList>(null);
@@ -97,6 +112,24 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     setShowScrollToBottom(false);
     setIsNearBottom(true);
   };
+
+  // Load chat sessions for drawer
+  useEffect(() => {
+    const fetchSessions = async () => {
+      if (!isSignedIn) {
+        return;
+      }
+      try {
+        setIsSessionsLoading(true);
+        await loadSessions(50, 0);
+      } catch (err) {
+        console.warn('[ChatScreen] Failed to load sessions', err);
+      } finally {
+        setIsSessionsLoading(false);
+      }
+    };
+    fetchSessions();
+  }, [isSignedIn, loadSessions]);
 
   // HIGH PRIORITY FIX: Load chat history from BOTH AsyncStorage (for instant display) AND backend (for sync)
   // This ensures chat history persists across devices and app reinstalls
@@ -232,6 +265,24 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
   useEffect(() => {
     console.log('[ChatScreen] messages:', messages.length);
   }, [messages.length]);
+
+  // Sync messages from chat store when a session is loaded
+  useEffect(() => {
+    if (!currentConversation || !currentConversation.messages) {
+      return;
+    }
+    const mapped = currentConversation.messages.map(msg => ({
+      id: msg.id,
+      role: msg.role as LocalRole,
+      content: msg.content,
+      createdAt: msg.createdAt || new Date().toISOString(),
+      status: 'sent' as const,
+      sources: msg.sources || [],
+      model: msg.model,
+      tokensUsed: msg.tokensUsed,
+    }));
+    setMessages(mapped);
+  }, [currentConversation]);
 
   // Helper function to sanitize AI messages: remove markdown and thinking blocks
   const sanitizeAiMessage = (raw: string): string => {
@@ -466,8 +517,75 @@ export function ChatScreen({navigation, route}: ChatScreenProps) {
     default: undefined,
   }) as 'padding' | 'height' | 'position' | undefined;
 
+  const handleSelectSession = async (sessionId: string) => {
+    try {
+      setIsSending(true);
+      setCurrentSessionId(sessionId);
+      await loadSessionDetails(sessionId);
+      setIsDrawerOpen(false);
+    } catch (err) {
+      console.warn('[ChatScreen] Failed to select session', err);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    // Placeholder: simply clear local messages and input; session creation can be triggered on first send
+    setCurrentSessionId(null);
+    setMessages([]);
+    setMessageInput('');
+    setIsDrawerOpen(false);
+    loadSessions(50, 0).catch(err =>
+      console.warn(
+        '[ChatScreen] Failed to refresh sessions after new chat',
+        err,
+      ),
+    );
+  };
+
+  const handleRenameSession = (sessionId: string, currentTitle: string) => {
+    if (Platform.OS === 'ios' && (Alert as any).prompt) {
+      (Alert as any).prompt(
+        'Rename chat',
+        'Enter a new chat title',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Save',
+            onPress: (text: string) => {
+              if (text && text.trim().length > 0) {
+                renameSession(sessionId, text.trim());
+              }
+            },
+          },
+        ],
+        'plain-text',
+        currentTitle || 'New Chat',
+      );
+    } else {
+      Alert.alert('Rename chat', 'Renaming is only available on iOS for now.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ChatHeader
+        onMenuPress={() => setIsDrawerOpen(true)}
+        onNewChatPress={handleNewChat}
+        showNewChatButton
+      />
+      <ChatHistoryDrawer
+        visible={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        sessions={sessions}
+        selectedSessionId={currentSessionId}
+        onSelectSession={handleSelectSession}
+        onCreateNew={handleNewChat}
+        onRenameSession={(id, title) => handleRenameSession(id, title)}
+        onDeleteSession={id => deleteSession(id)}
+        isLoading={isSessionsLoading}
+      />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={keyboardBehavior}
